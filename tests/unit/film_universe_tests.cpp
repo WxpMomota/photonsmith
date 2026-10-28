@@ -480,3 +480,39 @@ TEST(FilmUniverseBlackHole, DiscIsHotterInsideComingSideBrighterAndTheFarSideBen
 	expectProblems({{"blackhole a at 0 0 0", "how big it is"}, {"blackhole a at 0 0 0 radius 1", "radius 10 to 100000"}, {"blackhole a at 0 0 0 radius 500 disc 2", "\"disc\""},
 					{"blackhole a at 0 0 0 radius 500 jets 1", "\"jets\""}});
 }
+
+// ---- 12. comets -----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+TEST(FilmUniverseComet, TailsPointFromTheSunTheDustTailCurvesBackAndTheCometMoves) {
+	cs::Comet c;
+	c.name = "halley", c.move = {300.0, 0.0, 0.0};
+	cartoon::Vec3 X, Y, Z;
+	cs::cometFrame(c, {0.0, 0.0, -1.0}, X, Y, Z);
+	EXPECT_NEAR(X.z, -1.0, 1e-9) << "the tails point away from the sun";
+	EXPECT_NEAR(Y.x, -1.0, 1e-9) << "the dust tail curves back along its path";
+	double e = 0.0, eSide = 0.0, eFar = 0.0, eBack = 0.0;
+	cartoon::Vec3 colour, ionColour;
+	cs::cometGlow(c, 0.0, 0.0, 0.0, e, colour);
+	EXPECT_GT(colour.y, colour.x) << "the coma glows green-white";
+	cs::cometGlow(c, 0.3, 0.0, 0.0, eFar, ionColour);
+	EXPECT_GT(ionColour.z, ionColour.x) << "the straight ion tail is blue";
+	cs::cometGlow(c, 0.3, 0.3 * 0.09, 0.0, eSide, colour);   // (on the dust tail's curve)
+	EXPECT_GT(colour.x, colour.z) << "the dust tail is warm";
+	cs::cometGlow(c, -0.05, 0.0, 0.2, eBack, colour);
+	EXPECT_GT(e, 1.5 * eFar) << "brightest at its head";
+	EXPECT_LT(eBack, 1e-3) << "nothing ahead of it off to the side";
+	// a rock: lumpy, about its size
+	const cartoon::Mesh rock = cs::spaceRock(3, 100.0);
+	double lo = 1e9, hi = 0.0;
+	for (const cartoon::Vec3 &v : rock.verts) lo = std::min(lo, length(v)), hi = std::max(hi, length(v));
+	EXPECT_LT(lo, 0.45 * 100.0);
+	EXPECT_GT(hi, 0.5 * 100.0 * 0.85);
+	EXPECT_LT(hi, 100.0);
+
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("comet", "scene s.pbrt\nlength 4\nspace\ncomet halley at 0 0 -20000 move 300 0 0 tail 20000\nshot 0 A\n key 0 0 0  0 0 -100  50\n", film), "");
+	const std::string at0 = film.sceneAt(0.0), at2 = film.sceneAt(2.0);
+	EXPECT_NE(at0.find("MediumInterface \"comet_halley\" \"\""), std::string::npos);
+	EXPECT_NE(at0, at2) << "it moves";
+	expectProblems({{"comet a at 0 0 0 size 5", "\"size\""}, {"comet a at 0 0 0 move 1 2", "\"move\""}, {"comet a at 0 0 0 tail 50", "\"tail\""}});
+}

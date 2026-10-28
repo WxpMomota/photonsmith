@@ -9,7 +9,7 @@ namespace film_file {
 
 // Whether `verb` is a space line's.
 inline bool isSpaceVerb(const std::string &verb) {
-	static const std::vector<std::string> k = {"space", "planet", "moon", "nebula", "galaxy", "star", "blackhole"};
+	static const std::vector<std::string> k = {"space", "planet", "moon", "nebula", "galaxy", "star", "blackhole", "comet"};
 	return std::find(k.begin(), k.end(), verb) != k.end();
 }
 
@@ -229,6 +229,35 @@ inline std::string blackHoleLine(Spec &s, const std::vector<std::string> &t) {
 	return std::string();
 }
 
+// A `comet` line (film_cosmos.h). "" or what is wrong with it.
+inline std::string cometLine(Spec &s, const std::vector<std::string> &t) {
+	const std::string usage = "`comet NAME at X Y Z [move DX DY DZ] [away DX DY DZ] [size S] [tail L] [brightness B] [seed N]` (size 10 to 20000 m, tail 100 to 400000 m)";
+	cosmos::Comet c;
+	// (its three-number words first: what is left is a body's line)
+	std::vector<std::string> rest;
+	for (std::size_t i = 0; i < t.size(); ++i) {
+		if ((t[i] == "move" || t[i] == "away") && i + 3 < t.size()) {
+			double a = 0.0, b = 0.0, d = 0.0;
+			if (!detail::number(t[i + 1], a) || !detail::number(t[i + 2], b) || !detail::number(t[i + 3], d)) return "\"" + t[i] + "\": " + usage;
+			(t[i] == "move" ? c.move : c.away) = {a, b, d};
+			i += 3;
+		} else {
+			rest.push_back(t[i]);
+		}
+	}
+	std::string kind;
+	const std::string e = bodyLine(rest, usage, {}, c.name, kind, c.at, [&](const std::string &w, double a) {
+		if (w == "size" && a >= 10.0 && a <= 20000.0) return c.size = a, true;
+		if (w == "tail" && a >= 100.0 && a <= 400000.0) return c.tail = a, true;
+		if (w == "brightness" && a > 0.0 && a <= 20.0) return c.brightness = a, true;
+		if (w == "seed") return c.seed = static_cast<int>(a), true;
+		return false;
+	});
+	if (!e.empty()) return e;
+	s.comets.push_back(c);
+	return std::string();
+}
+
 // One space line: what it says goes into `s`. "" or what is wrong with it.
 inline std::string spaceLine(Spec &s, const std::string &verb, const std::string &line) {
 	const std::vector<std::string> t = detail::tokens(line);
@@ -239,6 +268,7 @@ inline std::string spaceLine(Spec &s, const std::string &verb, const std::string
 	if (verb == "galaxy") return galaxyLine(s, t);
 	if (verb == "star") return starLine(s, t);
 	if (verb == "blackhole") return blackHoleLine(s, t);
+	if (verb == "comet") return cometLine(s, t);
 	return "unknown space line \"" + verb + "\"";
 }
 

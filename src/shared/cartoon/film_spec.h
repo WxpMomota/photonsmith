@@ -409,6 +409,7 @@ struct Spec {
 	std::vector<cosmos::Galaxy> galaxies;
 	std::vector<cosmos::Star> stars;
 	std::vector<cosmos::BlackHole> blackHoles;
+	std::vector<cosmos::Comet> comets;
 	std::vector<ground::Track> tracks;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;

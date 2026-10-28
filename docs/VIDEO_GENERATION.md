@@ -1206,6 +1206,17 @@ towards the camera is brighter and bluer, the side going away dimmer and redder 
 photon ring hugging the shadow - the way its gravity bends that light towards the camera; these follow the camera too. `jets L` adds two beams of blue-white plasma knots
 streaming out of its poles to L radii. It is a cartoon of the lens, not a lens: the stars behind it are not bent.
 
+**Comets: `comet`.** (film_cosmos.h)
+
+```
+comet  halley  at -8000 0 -30000  move 400 0 0  size 400  tail 22000     # `away X Y Z` (the tails' way; else away from the `space` sun), `brightness`, `seed`
+```
+
+A comet: its nucleus, a dark lumpy rock `size` across (pocked with craters, tumbling slowly), where it is at time 0 and moving `move` metres a second; round it the coma, a
+green-white glow; and its two tails `tail` long, pointing away from the sun whichever way the comet moves - the ion tail straight, thin, blue and streaked, the dust tail
+broader, warm white and curving back along the way it came. The glow is one grid in the film's cache (in the comet's own frame, made once and carried along with it); it is
+dense enough to be smooth on the GPU, so it dims the stars behind it a little.
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

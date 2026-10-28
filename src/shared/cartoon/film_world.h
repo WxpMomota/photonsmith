@@ -251,6 +251,7 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 		film_subjects::cameraOf(header, eye, target, fov);
 		for (const cosmos::BlackHole &b : spec.blackHoles) out += cosmos::blackHoleText(b, nt, {-eye.x, eye.y, eye.z});
 	}
+	for (const cosmos::Comet &c : spec.comets) out += cosmos::cometText(spec.key.empty() ? std::string("film") : spec.key, c, nt, space::sunDirection(spec.space) * -1.0);   // (film_cosmos.h)
 	for (const cosmos::Star &st : spec.stars) out += cosmos::starText(spec.key.empty() ? std::string("film") : spec.key, st, nt);   // (film_cosmos.h)
 	for (const cosmos::Galaxy &g : spec.galaxies) out += cosmos::galaxyText(spec.key.empty() ? std::string("film") : spec.key, g);   // (film_cosmos.h)
 	for (const cosmos::Nebula &n : spec.nebulae) out += cosmos::nebulaText(spec.key.empty() ? std::string("film") : spec.key, n);   // (film_cosmos.h)

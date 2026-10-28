@@ -472,5 +472,104 @@ inline std::string blackHoleText(const BlackHole &b, double nt, Vec3 eye) {
 	return out;
 }
 
+// ---- rocks in space ----
+// A rock of space - a comet's nucleus, an asteroid - `size` across: a lumpy ball (pushed in and out by a noise over its whole surface, squashed a little along one axis),
+// pocked with craters. Story space, centred on the origin.
+inline Mesh spaceRock(int seed, double size, int nu = 28, int nv = 16) {
+	Mesh m = uvSphere(1.0, nu, nv);
+	const double squash = 0.65 + 0.3 * hash01(seed, 1);
+	std::vector<Vec3> craters;
+	for (int k = 0; k < 7; ++k) {
+		const double z = 2.0 * hash01(seed * 7 + k, 2) - 1.0, a = 2.0 * kPi * hash01(seed * 7 + k, 3);
+		craters.push_back({std::sqrt(1.0 - z * z) * std::cos(a), std::sqrt(1.0 - z * z) * std::sin(a), z});
+	}
+	for (Vec3 &v : m.verts) {
+		const Vec3 o = normalize(v);
+		double k = 0.72 + 0.55 * clouds::detail::fbm3(o.x * 1.6 + 3.0, o.y * 1.6, o.z * 1.6, seed + 11);
+		for (std::size_t c = 0; c < craters.size(); ++c) {
+			const double d = std::acos(std::clamp(dot(o, craters[c]), -1.0, 1.0)) / (0.18 + 0.25 * hash01(seed * 7 + static_cast<int>(c), 4));
+			if (d < 1.3) k += d < 1.0 ? -0.08 * (1.0 - d * d) : 0.03 * (1.3 - d) / 0.3;   // (a bowl and its rim)
+		}
+		v = Vec3{o.x, o.y * squash, o.z} * (0.5 * size * k);
+	}
+	std::vector<Vec3> acc(m.verts.size(), Vec3{0.0, 0.0, 0.0});
+	for (const auto &t : m.tris) {
+		const Vec3 n = cross(m.verts[static_cast<std::size_t>(t[1])] - m.verts[static_cast<std::size_t>(t[0])], m.verts[static_cast<std::size_t>(t[2])] - m.verts[static_cast<std::size_t>(t[0])]);
+		for (int c = 0; c < 3; ++c) acc[static_cast<std::size_t>(t[c])] = acc[static_cast<std::size_t>(t[c])] + n;
+	}
+	for (std::size_t i = 0; i < acc.size(); ++i) m.normals[i] = length(acc[i]) > 1e-12 ? normalize(acc[i]) : Vec3{0.0, 1.0, 0.0};
+	return m;
+}
+
+// ---- comets ----
+// A comet: its nucleus (a dark lumpy rock `size` across) where it is at nature's time 0 and how it moves (`move`, metres a second); its coma, a green-white glow round the
+// nucleus; its two tails `tail` long, pointing away from the sun - the ion tail straight, thin, blue and streaked, the dust tail broad, warm white and curving back along the
+// way it came. `away` is the way the tails point (pbrt's); zero: away from the space set's sun.
+struct Comet {
+	std::string name;
+	Vec3 at{0.0, 0.0, -20000.0}, move{0.0, 0.0, 0.0}, away{0.0, 0.0, 0.0};
+	double size = 300.0, tail = 20000.0, brightness = 1.0;
+	int seed = 1;
+};
+// The comet's frame (pbrt's): X along its tails, Y the way its dust tail curves (back along its path), Z across.
+inline void cometFrame(const Comet &c, Vec3 fromSun, Vec3 &X, Vec3 &Y, Vec3 &Z) {
+	X = normalize(length(c.away) > 1e-9 ? c.away : fromSun);
+	Vec3 back = c.move * -1.0 - X * dot(c.move * -1.0, X);
+	if (length(back) < 1e-9) back = cross(X, std::abs(X.y) < 0.9 ? Vec3{0.0, 1.0, 0.0} : Vec3{1.0, 0.0, 0.0});
+	Y = normalize(back);
+	Z = cross(X, Y);
+}
+// The box round its glow, in its own frame and tail lengths: corner and size.
+constexpr double kCometLo[3] = {-0.08, -0.12, -0.15}, kCometSize[3] = {1.08, 0.54, 0.3};
+// The comet's glow at (x, y, z) of its own frame (in tail lengths): how much (0 up) and its colour.
+inline void cometGlow(const Comet &c, double x, double y, double z, double &amount, Vec3 &colour) {
+	const int s = c.seed * 223;
+	const double r = std::sqrt(x * x + y * y + z * z), coma = 2.5 * std::exp(-r / 0.022);
+	double ion = 0.0, dust = 0.0;
+	if (x > 0.0) {
+		const double wi = 0.005 + 0.03 * x, streak = 0.5 + 0.9 * clouds::detail::fbm3(x * 4.0, y * 70.0, z * 70.0, s + 1);
+		ion = std::exp(-(y * y + z * z) / (wi * wi)) * std::exp(-1.6 * x) * streak * smoothstep(0.0, 0.04, x);
+		const double dy = y - 0.3 * x * x, wd = 0.01 + 0.09 * x;
+		dust = 1.3 * std::exp(-(dy * dy) / (wd * wd) - (z * z) / std::pow(0.5 * wd + 0.004, 2.0)) * std::exp(-2.4 * x) * (0.75 + 0.5 * clouds::detail::fbm3(x * 9.0, y * 9.0, z * 9.0, s + 2)) *
+			   smoothstep(0.0, 0.02, x);
+	}
+	amount = coma + ion + dust;
+	colour = amount > 1e-9 ? (Vec3{0.75, 1.0, 0.8} * coma + Vec3{0.35, 0.55, 1.0} * ion + Vec3{1.0, 0.88, 0.7} * dust) * (1.0 / amount) : Vec3{0.0, 0.0, 0.0};
+	amount *= 1.0 - smoothstep(0.85, 1.0, x);
+}
+// A comet at nature's time `nt` as scene text, its tails pointing from `fromSun` (unit, pbrt's): its nucleus and its glow (a grid made once, placed where it is now).
+inline std::string cometText(const std::string &film, const Comet &c, double nt, Vec3 fromSun) {
+	Vec3 X, Y, Z;
+	cometFrame(c, fromSun, X, Y, Z);
+	const Vec3 at = c.at + c.move * nt;
+	const double L = c.tail;
+	std::string out = "# a comet (film_cosmos.h): " + c.name + "\n";
+	out += attr(diffuseMaterial({0.05, 0.045, 0.04}), emitMesh(spaceRock(c.seed, c.size), mul(translate(-at.x, at.y, at.z), rotate({0.3, 1.0, 0.2}, std::fmod(nt * 3.0, 360.0)))));
+	const int nx = 160, ny = 80, nz = 44;
+	char file[200];
+	std::snprintf(file, sizeof file, "comet_v3_%s_%d_%.0f_%.4g.pbrt", c.name.c_str(), c.seed, L, c.brightness);
+	const std::string name = "comet_" + c.name;
+	const std::string path = rgbGridFile(film, file, name, nx, ny, nz, 0.0, 0.025 * c.brightness, [&](int i, int j, int k) {
+		const double x = kCometLo[0] + kCometSize[0] * (i + 0.5) / nx, y = kCometLo[1] + kCometSize[1] * (j + 0.5) / ny, z = kCometLo[2] + kCometSize[2] * (k + 0.5) / nz;
+		double e = 0.0;
+		Vec3 colour;
+		cometGlow(c, x, y, z, e, colour);
+		Voxel v;
+		v.sa = Vec3{1.0, 1.0, 1.0} * (std::min(e, 3.0) * 15.0 / L);   // (about one across the tail: a thin glow is a few bright collisions, speckled on the GPU)
+		v.le = e > 0.002 ? colour : Vec3{0.0, 0.0, 0.0};
+		return v;
+	});
+	// the grid's unit box onto the comet's frame: the box's corner and its edges along X, Y, Z (pbrt takes the matrix by columns)
+	const Vec3 o = at + (X * kCometLo[0] + Y * kCometLo[1] + Z * kCometLo[2]) * L, ex = X * (kCometSize[0] * L), ey = Y * (kCometSize[1] * L), ez = Z * (kCometSize[2] * L);
+	char buf[520];
+	std::snprintf(buf, sizeof buf, "AttributeBegin\n  ConcatTransform [ %.6g %.6g %.6g 0  %.6g %.6g %.6g 0  %.6g %.6g %.6g 0  %.6f %.6f %.6f 1 ]\n  Include \"%s\"\nAttributeEnd\n", ex.x, ex.y, ex.z,
+				  ey.x, ey.y, ey.z, ez.x, ez.y, ez.z, o.x, o.y, o.z, path.c_str());
+	out += buf;
+	const Vec3 mid = o + (ex + ey + ez) * 0.5;
+	std::snprintf(buf, sizeof buf, "AttributeBegin\n  Translate %.4f %.4f %.4f\n  Material \"interface\"\n  MediumInterface \"%s\" \"\"\n  Shape \"sphere\" \"float radius\" [ %.4f ]\nAttributeEnd\n", mid.x, mid.y,
+				  mid.z, name.c_str(), 0.5 * length(ex + ey + ez) * 1.01);
+	return out + buf;
+}
+
 }  // namespace cosmos
 }  // namespace cartoon
