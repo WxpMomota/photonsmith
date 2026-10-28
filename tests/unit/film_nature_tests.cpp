@@ -11,7 +11,7 @@
 #include <sstream>
 #include <string>
 
-#include "../../src/shared/cartoon/cartoons.h"
+#include "../../src/shared/cartoon/cartoon_films.h"   // (the films themselves, which these tests reach into)
 
 namespace ff = cartoon::film_file;
 namespace terrain = cartoon::terrain;

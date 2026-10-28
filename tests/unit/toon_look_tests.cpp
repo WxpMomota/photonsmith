@@ -11,7 +11,7 @@
 #include <vector>
 
 #include "../../src/shared/toon_look.h"
-#include "../../src/shared/cartoon/cartoons.h"
+#include "../../src/shared/cartoon/cartoon_films.h"   // (the films themselves, which these tests reach into)
 #include "../../launcher/toon_frame.h"
 
 namespace {

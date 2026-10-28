@@ -16,7 +16,7 @@
 
 #include "pbrt_flatten_test_helpers.h"
 #include "../../src/shared/ply_mesh.h"
-#include "../../src/shared/cartoon/cartoons.h"
+#include "../../src/shared/cartoon/cartoon_films.h"   // (the films themselves, which these tests reach into)
 #include "../../src/shared/video_preset.h"
 
 // ---- what each film says about itself (the Film table in cartoons.h) -------------------------------------------------------------------------------------------------

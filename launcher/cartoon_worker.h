@@ -36,6 +36,7 @@
 #include "launcher_args.h"
 #include "render_setup.h"
 #include "../src/shared/cartoon/cartoons.h"
+#include "../src/shared/cartoon/shot_cameras.h"   // a shot's share of the samples
 
 namespace cartoon_worker {
 

@@ -14,7 +14,8 @@
 #include <set>
 #include <string>
 
-#include "../../src/shared/cartoon/cartoons.h"
+#include "../../src/shared/cartoon/cartoon_films.h"   // (the films themselves, which these tests reach into)
+#include "../../src/shared/cartoon/cartoons_registry.h"
 #include "../../src/shared/cartoon/fountain.h"
 #include "../../src/shared/cartoon/film_score.h"
 #include "../../src/shared/cartoon/film_edit.h"
@@ -267,7 +268,7 @@ TEST(FilmFile, FilmsFromFilesAreFilmsLikeTheOthersWithAStableNumberFilteredTagsA
 	cartoon::detail::Registry r;
 	for (const cartoon::Film &f : cartoon::kFilms) r.all.push_back(&f);
 	for (const char *file : {"alpha.film", "dup.film", "bad.film"}) cartoon::detail::addFilmFile(r, (d / file).string());
-	ASSERT_EQ(r.all.size(), static_cast<std::size_t>(cartoon::kFilmCount) + 1u) << "only the good one was added";
+	ASSERT_EQ(r.all.size(), cartoon::kFilms.size() + 1u) << "only the good one was added";
 	EXPECT_EQ(r.problems.size(), 2u);
 	const cartoon::Film &f = *r.all.back();
 	EXPECT_STREQ(f.key, "alpha");

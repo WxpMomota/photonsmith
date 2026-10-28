@@ -38,7 +38,8 @@
 #include "../../launcher/run_log.h"
 #include "../../src/shared/cartoon/film_subjects.h"
 #include "fixture_skip.h"
-#include "../../src/shared/cartoon/cartoons.h"
+#include "../../src/shared/cartoon/cartoon_films.h"   // (the films themselves, which these tests reach into)
+#include "../../src/shared/cartoon/cartoons_registry.h"
 #include "../../src/shared/cartoon/cartoon_stills.h"
 #include "../../src/shared/cartoon/film_checks.h"
 #include "../../src/shared/cartoon/film_baseline.h"

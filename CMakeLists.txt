@@ -115,13 +115,14 @@ add_library(cpu_renderer STATIC
     cpu_renderer/cpu_interface.cpp
     cpu_renderer/cpu_interface_bdpt.cpp
     src/shared/cartoon/cartoon_scenes.cpp
+    src/shared/cartoon/cartoons.cpp
     src/external/stb_image_impl.cpp
     src/external/tinyexr_impl.cpp
     src/external/miniz.c
     src/data/rgb_spectrum_table_data.cpp
 )
 if(MSVC)
-    target_compile_options(cpu_renderer PRIVATE /bigobj)   # (cartoon_scenes.cpp holds every film: more sections than an object file allows without it)
+    target_compile_options(cpu_renderer PRIVATE /bigobj)   # (cartoons.cpp holds every film: more sections than an object file allows without it)
 endif()
 target_include_directories(cpu_renderer PUBLIC
     ${CMAKE_SOURCE_DIR}/src

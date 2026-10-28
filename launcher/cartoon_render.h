@@ -35,6 +35,8 @@
 #include "frame_fingerprint.h"
 #include "launcher_args.h"
 #include "../src/shared/cartoon/cartoons.h"
+#include "../src/shared/cartoon/shot_cameras.h"   // a shot's share of the samples
+#include "../src/shared/cartoon/film_cache.h"
 
 namespace cartoon_render {
 

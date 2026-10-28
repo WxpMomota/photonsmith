@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-#include "../../src/shared/cartoon/cartoons.h"
+#include "../../src/shared/cartoon/cartoon_films.h"   // (the films themselves, which these tests reach into)
 #include "../../src/shared/lens_look.h"
 
 namespace ff = cartoon::film_file;

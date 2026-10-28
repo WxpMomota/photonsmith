@@ -39,7 +39,7 @@
 #include "../../launcher/run_log.h"
 #include "../../src/shared/cartoon/film_subjects.h"
 #include "fixture_skip.h"
-#include "../../src/shared/cartoon/cartoons.h"
+#include "../../src/shared/cartoon/cartoon_films.h"   // (the films themselves, which these tests reach into)
 #include "../../src/shared/cartoon/cartoon_stills.h"
 #include "../../src/shared/cartoon/film_checks.h"
 #include "../../src/shared/cartoon/film_baseline.h"
@@ -205,7 +205,7 @@ TEST(VideoPresets, EveryFilmIsAPresetAndTheCameraPresetsComeFirst) {
 	for (std::size_t i = 0; i < all.size(); ++i) {
 		const video_preset::VideoPreset &p = all[i];
 		if (std::atoi(p.id + 1) >= 1000)   // (a film made from a file: a number of its own from 1000 up, after the built-in ones)
-			EXPECT_GE(i + 1, all.size() - (cartoon::films().size() - static_cast<std::size_t>(cartoon::kFilmCount))) << p.id;
+			EXPECT_GE(i + 1, all.size() - (cartoon::films().size() - cartoon::kFilms.size())) << p.id;
 		else
 			EXPECT_EQ(std::string(p.id), "V" + std::to_string(i + 1)) << "the built-in ids are V1, V2 ... in table order";
 		if (p.isCartoon()) {

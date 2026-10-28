@@ -1,0 +1,35 @@
+#pragma once
+// cartoon_films.h -- every built-in film's header, and what the program's list of films is made with (the film-file reader, the drafted score, the cameras and cues files).
+// cartoons.cpp includes it to build the table; a test of a film's own workings includes it to reach that film. Everything else names films through cartoons.h, which declares
+// them without any of this.
+
+#include "../pbrt_asset_check.h"
+
+#include "ball_parade.h"
+#include "candle.h"
+#include "dandelion.h"
+#include "domino_run.h"
+#include "fireflies.h"
+#include "forest_dawn.h"
+#include "forest_dawn_score.h"
+#include "turtle_escape_score.h"
+#include "crystal_heart_score.h"
+#include "tengwang_score.h"
+#include "nomai_score.h"
+#include "lamp_and_ball.h"
+#include "little_robot.h"
+#include "meet_pip.h"
+#include "newtons_cradle.h"
+#include "film_file.h"
+#include "film_kinds.h"
+#include "film_parts.h"
+#include "film_score.h"
+#include "caption_file.h"
+#include "film_cache.h"
+#include "orrery.h"
+#include "paper_boat.h"
+#include "pip_and_the_moon.h"
+#include "short_scores.h"
+#include "shot_cameras.h"
+#include "music_cues.h"
+#include "cartoons.h"

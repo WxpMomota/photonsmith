@@ -277,6 +277,7 @@ add_executable(unit_tests
     unit/texture_differentials_tests.cpp
     unit/cartoon_films_tests.cpp
     ${CMAKE_SOURCE_DIR}/../src/shared/cartoon/cartoon_scenes.cpp   # pbrt_discover::listGenerated / materializeGenerated (pbrt_discover_tests.cpp reaches them)
+    ${CMAKE_SOURCE_DIR}/../src/shared/cartoon/cartoons.cpp   # the films' table and list (cartoons.h)
     unit/cartoon_pip_tests.cpp
     unit/uploaded_scene_tests.cpp
     unit/lens_look_tests.cpp
@@ -374,6 +375,7 @@ add_executable(cpu_integrator_tests
     ${CMAKE_SOURCE_DIR}/../cpu_renderer/cpu_interface.cpp
     ${CMAKE_SOURCE_DIR}/../cpu_renderer/cpu_interface_bdpt.cpp
     ${CMAKE_SOURCE_DIR}/../src/shared/cartoon/cartoon_scenes.cpp   # pbrt_discover::listGenerated / materializeGenerated, which cpu_interface.cpp calls (cpu_renderer.vcxproj has it too)
+    ${CMAKE_SOURCE_DIR}/../src/shared/cartoon/cartoons.cpp   # the films' table and list (cartoons.h)
     ${CMAKE_SOURCE_DIR}/../src/data/rgb_spectrum_table_data.cpp
     ${CMAKE_SOURCE_DIR}/../src/external/stb_image_impl.cpp
     ${CMAKE_SOURCE_DIR}/../src/external/image_writer.cpp   # write_png / stbi_write_png, which film_captions.h (cartoon_tests.cpp) and scene_builder_tests.cpp call (the MSBuild target compiles it too)
