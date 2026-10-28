@@ -12,6 +12,9 @@
 //              sphere round the planet;
 //   night      (`cities S`) the lights of cities on its land - along coasts and rivers, in clusters joined by roads - glowing warm on its night side (and
 //              drowned by day); (`aurora S`) ovals of aurora round both poles, curtains of light hanging over its night side, green below, red above, drifting;
+//   rings      (`rings INNER OUTER [opacity S]`, in its radii) a system of rings in its equator's plane: some 160 ringlets of ice and dust, their widths
+//              (and so the gaps between them) set by how dense the rings are there - bright bands, dusty ones, a wide dark division and a narrow gap - so the stars
+//              and the planet show through where they are thin; lit by the sun, in the planet's shadow behind it, and their own shadow striped across it;
 //   surface    a picture painted once for the kind and its seed (the sphere's own pbrt coordinates: row 0 its north pole), on pbrt's sphere turned so its poles are
 //              up (tipped by `tilt`) and spinning once every `spin` seconds; an ocean world's seas glossy (a coated surface whose roughness is a second picture).
 //
@@ -42,6 +45,7 @@ struct Planet {
 	double air = 0.0;                 // how thick its air is (0 none, 1 an Earth's)
 	std::string airColour = "blue";   // blue (Rayleigh), orange (a haze), white (cloud), green
 	double cities = 0.0, aurora = 0.0;   // its night side's city lights and polar aurora (0 none)
+	double ringInner = 0.0, ringOuter = 0.0, ringOpacity = 1.0;   // its rings (in its radii; none when the outer is 0)
 };
 inline const std::vector<std::string> &airColours() {
 	static const std::vector<std::string> k = {"blue", "orange", "white", "green"};
@@ -326,6 +330,34 @@ inline std::string auroraText(const std::string &film, const Planet &p, double n
 	return out;
 }
 
+// ---- rings ----
+constexpr int kRinglets = 160;
+// How dense a planet's rings are at the share `u` (0 inner edge .. 1 outer) of their width: bands of their own, a wide division at 0.62 and a narrow gap at 0.92, the
+// inner edge dusty and faint.
+inline double ringDensity(const Planet &p, double u) {
+	const double bands = 0.35 + 0.65 * nature::fbm2(u * 9.0, 0.5, p.seed + 71);
+	const double division = smoothstep(0.02, 0.035, std::abs(u - 0.62)), gap = smoothstep(0.004, 0.008, std::abs(u - 0.92));
+	return bands * division * gap * smoothstep(0.0, 0.18, u) * (1.0 - smoothstep(0.97, 1.0, u));
+}
+// A planet's rings at nature's time `nt`, as scene text: ringlets (pbrt disks with an inner radius) in its equator's plane, each as wide as the rings are dense there.
+inline std::string ringsText(const Planet &p, double nt) {
+	if (p.ringOuter <= p.ringInner || p.ringOuter <= 0.0) return std::string();
+	std::string out = "# its rings (film_planets.h)\nAttributeBegin\n" + placement(p, nt);
+	const double r0 = p.ringInner * p.radius, r1 = p.ringOuter * p.radius, step = (r1 - r0) / kRinglets;
+	char buf[260];
+	for (int i = 0; i < kRinglets; ++i) {
+		const double u = (i + 0.5) / kRinglets, d = std::min(1.0, ringDensity(p, u) * p.ringOpacity);
+		if (d < 0.03) continue;
+		const double mid = r0 + (i + 0.5) * step, w = step * (0.15 + 0.85 * d);
+		const double tint = nature::noise2(u * 40.0, 1.5, p.seed + 73);
+		const Vec3 c = lerp(Vec3{0.52, 0.48, 0.42}, Vec3{0.82, 0.75, 0.62}, 0.4 * tint + 0.6 * d);
+		std::snprintf(buf, sizeof buf, "  Material \"diffuse\" \"rgb reflectance\" [ %.4f %.4f %.4f ]\n  Shape \"disk\" \"float radius\" [ %.4f ] \"float innerradius\" [ %.4f ]\n", c.x, c.y, c.z,
+					  mid + 0.5 * w, mid - 0.5 * w);
+		out += buf;
+	}
+	return out + "AttributeEnd\n";
+}
+
 // A planet at nature's time `nt`, as scene text.
 inline std::string planetText(const std::string &film, const Planet &p, double nt, Vec3 sunDir = Vec3{0.0, 1.0, 0.0}) {
 	const Pictures pic = pictures(film, p);
@@ -344,7 +376,7 @@ inline std::string planetText(const std::string &film, const Planet &p, double n
 	}
 	char buf[96];
 	std::snprintf(buf, sizeof buf, "  Shape \"sphere\" \"float radius\" [ %.4f ]\nAttributeEnd\n", p.radius);
-	return out + buf + airText(film, p) + auroraText(film, p, nt, sunDir);
+	return out + buf + airText(film, p) + auroraText(film, p, nt, sunDir) + ringsText(p, nt);
 }
 
 }  // namespace planets

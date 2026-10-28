@@ -1118,6 +1118,17 @@ pole at about 67 degrees of latitude, wavering and drifting with nature's time: 
 picture: green below, red above) standing in a glowing band 5 degrees wide, which is what the oval looks like from orbit. It is drawn over the night side only (an
 emitting ribbon, which casts a shadow like glass, would otherwise stripe the day side).
 
+**Rings: `planet ... rings INNER OUTER [opacity S]`.** (film_planets.h)
+
+```
+planet  giant  gas  at 0 0 -40000  radius 8000  tilt 25  rings 1.3 2.4      # in the planet's radii, 1 to 10; `opacity` 0 to 3 (1)
+```
+
+A ring system in the planet's equator's plane (tipped with it): 160 ringlets of ice and dust (pbrt disks with an inner radius) from INNER to OUTER planet radii, each as
+wide as the rings are dense there - bands of their own, a wide dark division at 62% of the way out and a narrow gap at 92%, a faint dusty inner edge - so the stars and
+the planet show through where they are thin (more with a lower `opacity`). Lit by the sun: the planet's shadow falls across the rings behind it, and the rings' own
+striped shadow falls on the planet.
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

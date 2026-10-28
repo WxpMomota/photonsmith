@@ -230,3 +230,30 @@ TEST(FilmUniverseNight, CitiesLightTheLandAndAuroraHangsOverTheNightSide) {
 	(void)none;
 	expectProblems({{"planet a ocean at 0 0 0 radius 10 cities 20", "cities and aurora 0 to 10"}});
 }
+
+// ---- 5. rings --------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// Rings are ringlets in the planet's equator's plane, thin at the division and the gap, none beyond their edges; a planet without them has none.
+TEST(FilmUniverseRings, RingletsSpanTheRingsWithADivisionAndAGap) {
+	pl::Planet p;
+	p.name = "giant", p.kind = "gas", p.radius = 8000.0, p.ringInner = 1.3, p.ringOuter = 2.4;
+	EXPECT_LT(pl::ringDensity(p, 0.62), 0.05) << "the wide division";
+	EXPECT_LT(pl::ringDensity(p, 0.92), 0.05) << "the narrow gap";
+	double dense = 0.0;
+	for (double u = 0.3; u < 0.6; u += 0.01) dense = std::max(dense, pl::ringDensity(p, u));
+	EXPECT_GT(dense, 0.4) << "bright bands";
+	const std::string r = pl::ringsText(p, 0.0);
+	const std::size_t disks = count(r, "Shape \"disk\"");
+	EXPECT_GT(disks, 100u);
+	EXPECT_LE(disks, static_cast<std::size_t>(pl::kRinglets));
+	double lo = 1e30, hi = 0.0;
+	for (std::size_t at = r.find("\"float radius\" [ "); at != std::string::npos; at = r.find("\"float radius\" [ ", at + 1)) {
+		const std::vector<double> outer = numbersAfter(r, "\"float radius\" [ ", at, 1), inner = numbersAfter(r, "\"float innerradius\" [ ", at, 1);
+		hi = std::max(hi, outer[0]), lo = std::min(lo, inner[0]);
+	}
+	EXPECT_GE(lo, 1.3 * 8000.0 - 1.0);
+	EXPECT_LE(hi, 2.4 * 8000.0 + 1.0);
+	p.ringOuter = 0.0;
+	EXPECT_EQ(pl::ringsText(p, 0.0), "");
+	expectProblems({{"planet a gas at 0 0 0 radius 10 rings 3 2", "the outer beyond the inner"}, {"planet a gas at 0 0 0 radius 10 rings 0.5 2", "from 1 out to 10"}});
+}
