@@ -35,6 +35,7 @@
 #include "film_giants.h"
 #include "film_glow.h"
 #include "film_ice.h"
+#include "film_wind.h"
 #include "film_flowers.h"
 #include "film_geology.h"
 #include "film_soundscape.h"
@@ -362,6 +363,7 @@ struct Spec {
 		bool on = false;
 		std::string kind = "rain";
 		double strength = 1.0, t0 = 0.0, t1 = 1e30, wind = 90.0, speed = 12.0;
+		bool windSet = false, speedSet = false;
 		double build() const { return t1 < 1e29 ? std::clamp((t1 - t0) / 3.0, 2.0, 8.0) : 6.0; }
 		double levelAt(double t) const {   // 0 .. strength
 			if (!on) return 0.0;
@@ -389,6 +391,9 @@ struct Spec {
 	std::vector<ice::Glacier> glaciers;
 	std::vector<ice::Iceberg> icebergs;
 	ice::SeaIce seaIce;
+	// the wind (`wind`, `tornado`)
+	wind::Wind wind;
+	std::vector<wind::Tornado> tornadoes;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;
 	bool muteBirds = false;   // (`mute birds`: no birdsong, no eagles' cries, no geese - whatever flies in the picture)

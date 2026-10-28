@@ -975,6 +975,22 @@ the slab's depth. An iceberg floats on the sea (`size` metres across at the wate
 `seaice` covers `cover` of the sea round the camera (out to 40 floes) with floes `floe` metres across riding the waves. `frozen` hangs a waterfall in ice: icicles from
 its lip, a quarter of them reaching the bottom as columns, a frozen pool, no spray and no roar. Icebergs and sea ice need a `water` line.
 
+**One wind, and tornadoes: `wind`, `tornado`.** (film_wind.h; nature round 9, 2026-10-27)
+
+```
+wind     100 12                                                # the way it blows (a compass bearing: 0 +z, 90 +x) and m/s, 0 to 60
+tornado  from -500 -900  to 400 -600  during 2 38  width 40  height 600   # `seed N`
+```
+
+`wind` is one wind over the whole set, taken by everything that moves with the air unless its own line gives its own `wind` (or `speed`): clouds drift with it (at 1.5
+times its speed: faster aloft), fog banks (at 0.3 of it), the sea's waves run with it, rain, snow, dust and ash slant and stream with it, a volcano's ash column and a
+wildfire go with it, a storm blows with it, smoke from a fire bends away from it, and the grass and trees lean with it - a steady lean (its speed / 12, up to 1.5) under
+gusts that sweep across them (`gusts` at its speed / 8 when the film has no `gusts` line). A tornado crosses from its first point to its second over `during` (at least
+12 s), wandering: its funnel lowers from the cloud over the first 6 s and ropes out over the last 6, a twisting cone `height` metres tall (its cloud base, 700) narrowing to
+a rope `width` metres across at the ground (40), leaning and snaking more as it ropes out; round its foot a churning cloud of dust with dark debris whirled round and
+flung out, or over water a ring of spray (a waterspout); heard as a roar. The funnel is one grid and the cloud at its foot another below it (they never overlap); keep a
+`clouds deck` base above its top.
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

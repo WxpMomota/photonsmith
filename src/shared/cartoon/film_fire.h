@@ -55,10 +55,12 @@ struct Volcano {
 	int lightning = 0;      // strikes in the column
 	double ashfall = 0.0;   // how much ash falls round the camera (as a `weather` amount)
 	double rimY = 0.0;      // (the crater's rim: worked out when the film is loaded)
+	bool windSet = false;   // (its line gave its own wind: else the film's)
 	std::vector<PyroclasticFlow> flows;
 };
 struct Wildfire {
 	double x0 = -200.0, z0 = -200.0, x1 = 200.0, z1 = 200.0, t0 = 0.0, t1 = 30.0, wind = 0.0;
+	bool windSet = false;
 };
 
 namespace detail {

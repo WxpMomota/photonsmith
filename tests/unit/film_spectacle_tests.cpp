@@ -461,3 +461,61 @@ TEST(FilmSpectacleIce, AGlacierThinsToItsEdgesCrevassesAndCalvesBergsFloatLowAnd
 		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
 	}
 }
+
+// ---- 6. the wind -----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace wnd = cartoon::wind;
+
+// One `wind` line is taken by everything that moves with the air and did not say otherwise; a steady wind leans the plants even between gusts. A tornado forms,
+// crosses from one point to the other and ropes out; its foot churns dust on land and spray over water.
+TEST(FilmSpectacleWind, OneWindMovesEverythingAndATornadoCrossesTheLand) {
+	cartoon::dressing::Gusts steady;
+	steady.steady = 0.8, steady.dx = 1.0, steady.dz = 0.0;
+	EXPECT_GT(cartoon::dressing::gustAt(steady, 3.0, 4.0, 1.0).x, 0.5) << "a steady lean with no gusts";
+
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("wind", "scene s.pbrt\nlength 40\nterrain hills size 3000 height 40 seed 2\nwater sea level -50\nwind 90 10\nclouds cumulus\nclouds wisps wind 0 speed 2\n"
+							   "fogbank at 0 0\nweather rain\nvolcano at 0 -600 column 1000\nfire at 5 0 5\ntornado from -300 0 to 300 0 during 5 35 width 30 height 400\n"
+							   "shot 0 A\n key 0 30 500  0 100 0  50\n",
+						film),
+			  "");
+	const ff::Spec &s = film.spec;
+	ASSERT_EQ(s.cloudLayers.size(), 2u);
+	EXPECT_DOUBLE_EQ(s.cloudLayers[0].wind, 90.0);
+	EXPECT_DOUBLE_EQ(s.cloudLayers[0].speed, 15.0) << "faster aloft";
+	EXPECT_DOUBLE_EQ(s.cloudLayers[1].wind, 0.0) << "its own wind";
+	EXPECT_DOUBLE_EQ(s.cloudLayers[1].speed, 2.0);
+	EXPECT_DOUBLE_EQ(s.fogBanks[0].wind, 90.0);
+	EXPECT_DOUBLE_EQ(s.fogBanks[0].speed, 3.0);
+	EXPECT_DOUBLE_EQ(s.seas[0].wind, 90.0);
+	EXPECT_DOUBLE_EQ(s.volcanoes[0].wind, 90.0);
+	ASSERT_FALSE(s.weather.empty());
+	EXPECT_NEAR(s.weather[0].windX, 10.0, 1e-9) << "rain slants with it";
+	EXPECT_NEAR(s.weather[0].windZ, 0.0, 1e-9);
+	EXPECT_GT(s.gusts.strength, 1.0);
+	EXPECT_NEAR(s.gusts.dx, -1.0, 1e-9) << "gusts along it (story space)";
+	EXPECT_GT(s.gusts.steady, 0.5);
+	// smoke from the fire bends downwind: its column's box is shifted to +x of the fire
+	const std::string a = film.sceneAt(20.0);
+	EXPECT_NE(a.find("smoke_0"), std::string::npos);
+	// the tornado: forming, crossing, gone
+	const wnd::Tornado &k = s.tornadoes[0];
+	EXPECT_EQ(wnd::strength(k, 4.0), 0.0);
+	EXPECT_GT(wnd::strength(k, 20.0), 0.99);
+	EXPECT_LT(wnd::footAt(k, 8.0).x, wnd::footAt(k, 30.0).x - 300.0) << "crossing from -300 to 300";
+	EXPECT_NE(a.find("MakeNamedMedium \"funnel_0\""), std::string::npos);
+	EXPECT_EQ(film.sceneAt(3.0).find("funnel_0"), std::string::npos);
+	const auto flat = [](double, double) { return 0.0; };
+	const std::string land = wnd::tornadoText(k, 0, 20.0, 20.0, flat, -1e30), sea = wnd::tornadoText(k, 0, 20.0, 20.0, flat, 5.0);
+	EXPECT_NE(land.find("\"dust_0\""), std::string::npos) << "dust and debris on land";
+	EXPECT_NE(sea.find("\"spray_0\""), std::string::npos) << "a waterspout over the sea";
+	EXPECT_EQ(sea.find("\"dust_0\""), std::string::npos);
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"wind 90", "`wind DEGREES SPEED`"},
+																						{"wind 90 100", "0 to 60 m/s"},
+																						{"wind 90 5\nwind 0 5", "one `wind` line"},
+																						{"tornado from 0 0 to 1 1 during 0 5", "at least 12 s"},
+																						{"tornado from 0 0 to 1 1 width 0", "width 2 to 1000"}}) {
+		const std::string problem = problemOf(line);
+		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
+	}
+}

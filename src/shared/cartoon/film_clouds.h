@@ -33,6 +33,7 @@ struct Clouds {
 	std::string kind = "cumulus";
 	double cover = 0.35, base = 900.0, size = 800.0, speed = 6.0, wind = 90.0, density = 1.0, area = 6000.0, x = 0.0, z = 0.0, thick = 250.0;
 	int seed = 1;
+	bool windSet = false, speedSet = false;   // (its line gave its own: else the film's `wind`)
 };
 inline const std::vector<std::string> &kinds() {
 	static const std::vector<std::string> k = {"cumulus", "towering", "wisps", "deck"};
@@ -46,6 +47,7 @@ inline const std::vector<std::string> &kinds() {
 struct FogBank {
 	double x = 0.0, z = 0.0, size = 600.0, depth = 40.0, density = 0.03, wind = 90.0, speed = 1.5, t0 = -1e30, t1 = 1e30;
 	int seed = 1;
+	bool windSet = false, speedSet = false;   // (its line gave its own: else the film's `wind`)
 	double heightAt(double t) const {   // its depth now, as a share of `depth`
 		const bool from = t0 > -1e29, until = t1 < 1e29;
 		const double ramp = from && until ? std::max(1e-3, 0.1 * (t1 - t0)) : 3.0;

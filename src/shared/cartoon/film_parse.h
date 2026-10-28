@@ -147,6 +147,8 @@
 //                                                               # tumbling down the slope; `avalanche from X Z [at T]`: a powder cloud racing down; `quake T0 T1`: shaking
 //     fire     at 0 0 -4  size 1.2                              # fire (film_fire.h): flames (glowing volumes, flickering, a light among them, sparks) with smoke above;
 //     lava     from 120 -300  width 6                           # lava creeping down the land from a vent; a volcano raised in the land (`volcano at X Z [height H]
+//     wind     60 8                                            # the wind (film_wind.h): a bearing and m/s that the grass, trees, clouds, fog, rain, smoke and
+//                                                               # waves all take; `tornado from X Z to X Z [during T0 T1] [width W]`: a funnel crossing the land
 //     glacier  from 0 -400  toward 180  calve 20                # ice (film_ice.h): a glacier down the land, its front calving; `iceberg at X Z [size S]`,
 //                                                               # `seaice [cover C] [floe F]`, `waterfall ... frozen`
 //     fireflies 200  in -20 -20 20 20  together                # living light (film_glow.h): a swarm flashing (`together`: into step), `fungi COUNT in ...`
@@ -219,6 +221,66 @@
 
 namespace cartoon {
 namespace film_file {
+
+// One `wind` over the set (film_wind.h): whatever moves with the air and did not say otherwise in its own line takes it.
+inline void applyWind(Spec &s) {
+	if (!s.wind.on) return;
+	const wind::Wind &w = s.wind;
+	const Vec3 d = w.dir();
+	for (clouds::Clouds &c : s.cloudLayers) {
+		if (!c.windSet) c.wind = w.toward;
+		if (!c.speedSet) c.speed = 1.5 * w.speed;   // (faster aloft)
+	}
+	for (clouds::FogBank &f : s.fogBanks) {
+		if (!f.windSet) f.wind = w.toward;
+		if (!f.speedSet) f.speed = 0.3 * w.speed;   // (fog lies low, in the stiller air)
+	}
+	for (water::Sea &sea : s.seas)
+		if (!sea.windSet) sea.wind = w.toward;
+	for (fire::Volcano &v : s.volcanoes)
+		if (!v.windSet) v.wind = w.toward;
+	for (fire::Wildfire &f : s.wildfires)
+		if (!f.windSet) f.wind = w.toward;
+	if (!s.storm.windSet) s.storm.wind = w.toward;
+	if (!s.storm.speedSet && w.speed > 0.0) s.storm.speed = w.speed;
+	for (particles::Weather &x : s.weather)
+		if (x.windX == 0.0 && x.windZ == 0.0) x.windX = d.x * w.speed, x.windZ = d.z * w.speed;
+	if (!s.gusts.windSet) s.gusts.dx = -d.x, s.gusts.dz = d.z;   // (story space)
+	if (s.gusts.strength <= 0.0) s.gusts.strength = std::min(5.0, w.speed / 8.0), s.gusts.speed = std::max(1.0, w.speed);
+	s.gusts.steady = std::min(1.5, w.speed / 12.0);
+}
+
+// A volcano's rim; its pyroclastic flows' ways down from it (as lava finds its way); its column's lightning and its ash (film_fire.h), worked out on the land.
+inline void eruptionsOnLand(Spec &s, const terrain::Field &groundField) {
+	const terrain::Field *ground = &groundField;
+	for (std::size_t i = 0; i < s.volcanoes.size(); ++i) {
+		fire::Volcano &v = s.volcanoes[i];
+		v.rimY = -1e30;
+		for (int k = 0; k < 24; ++k) v.rimY = std::max(v.rimY, ground->heightAt(v.x + 0.11 * v.radius * std::cos(kPi * k / 12.0), v.z + 0.11 * v.radius * std::sin(kPi * k / 12.0)));
+		for (std::size_t k = 0; k < v.flows.size(); ++k) {
+			fire::PyroclasticFlow &f = v.flows[k];
+			const double a = (f.towardSet ? f.toward : 360.0 * hash01(static_cast<int>(i * 31 + k), 907)) * kPi / 180.0;
+			water::River way;
+			way.points = {{v.x + 0.15 * v.radius * std::sin(a), v.z + 0.15 * v.radius * std::cos(a)}};
+			way.downhill = true;
+			way.width = 0.05 * v.radius;
+			f.path = water::riverPath(way, ground);
+			for (Vec3 &p : f.path) p.y = ground->heightAt(p.x, p.z);
+		}
+		if (v.lightning > 0) {   // in the column, over the crater, from part way up it down to the crater and the flanks
+			skyfx::Lightning l;
+			l.count = v.lightning, l.x = v.x, l.z = v.z, l.radius = 0.12 * v.radius, l.seed = 41 + static_cast<int>(i);
+			l.t0 = v.t0 + 0.5 * fire::columnRise(v.column), l.t1 = std::min(v.t1, s.length);
+			l.base = v.rimY + 0.35 * v.column;
+			if (l.t1 > l.t0) s.lightnings.push_back(l);
+		}
+		if (v.ashfall > 0.0) {   // ash drifting down round the camera, once the umbrella has spread over
+			particles::Weather w;
+			w.kind = "ash", w.amount = v.ashfall, w.t0 = v.t0 + (v.column > 0.0 ? fire::columnRise(v.column) : 10.0), w.t1 = v.t1 + 30.0, w.onLand = true;
+			s.weather.push_back(w);
+		}
+	}
+}
 
 // Reads a film file's text. `where` names it in the messages. The scene is not read here (see load()), so the names it animates are not yet checked. The library files it
 // brings in (`set NAME`: library/NAME.set, film-file lines - a scene and what dresses it; `cast NAME`: library/NAME.cast, what a `character` line says of a character but
@@ -925,7 +987,7 @@ inline Parsed parse(const std::string &text, const std::string &where, const std
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, set, cast, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, mute, music, toon, voices, acting, lighting, terrain, water, river, waterfall, clouds, fogbank, forest, flock, herd, whale, dolphins, bioluminescence, fireflies, fungi, glacier, iceberg, seaice, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, set, cast, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, mute, music, toon, voices, acting, lighting, terrain, water, river, waterfall, clouds, fogbank, forest, flock, herd, whale, dolphins, bioluminescence, fireflies, fungi, glacier, iceberg, seaice, wind, tornado, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -1052,33 +1114,7 @@ inline Parsed parse(const std::string &text, const std::string &where, const std
 				la.x = v.x + 0.13 * v.radius * std::cos(a), la.z = v.z + 0.13 * v.radius * std::sin(a), la.width = 0.035 * v.radius, la.speed = 0.8, la.t0 = v.t0 - 25.0;   // (already flowing)
 				s.lavas.push_back(la);
 			}
-		for (std::size_t i = 0; i < s.volcanoes.size(); ++i) {   // a volcano's rim; its pyroclastic flows' ways down from it (as lava finds its way); its column's lightning and ash
-			fire::Volcano &v = s.volcanoes[i];
-			v.rimY = -1e30;
-			for (int k = 0; k < 24; ++k) v.rimY = std::max(v.rimY, ground->heightAt(v.x + 0.11 * v.radius * std::cos(kPi * k / 12.0), v.z + 0.11 * v.radius * std::sin(kPi * k / 12.0)));
-			for (std::size_t k = 0; k < v.flows.size(); ++k) {
-				fire::PyroclasticFlow &f = v.flows[k];
-				const double a = (f.towardSet ? f.toward : 360.0 * hash01(static_cast<int>(i * 31 + k), 907)) * kPi / 180.0;
-				water::River way;
-				way.points = {{v.x + 0.15 * v.radius * std::sin(a), v.z + 0.15 * v.radius * std::cos(a)}};
-				way.downhill = true;
-				way.width = 0.05 * v.radius;
-				f.path = water::riverPath(way, ground.get());
-				for (Vec3 &p : f.path) p.y = ground->heightAt(p.x, p.z);
-			}
-			if (v.lightning > 0) {   // in the column, over the crater, from part way up it down to the crater and the flanks
-				skyfx::Lightning l;
-				l.count = v.lightning, l.x = v.x, l.z = v.z, l.radius = 0.12 * v.radius, l.seed = 41 + static_cast<int>(i);
-				l.t0 = v.t0 + 0.5 * fire::columnRise(v.column), l.t1 = std::min(v.t1, s.length);
-				l.base = v.rimY + 0.35 * v.column;
-				if (l.t1 > l.t0) s.lightnings.push_back(l);
-			}
-			if (v.ashfall > 0.0) {   // ash drifting down round the camera, once the umbrella has spread over
-				particles::Weather w;
-				w.kind = "ash", w.amount = v.ashfall, w.t0 = v.t0 + (v.column > 0.0 ? fire::columnRise(v.column) : 10.0), w.t1 = v.t1 + 30.0, w.onLand = true;
-				s.weather.push_back(w);
-			}
-		}
+		eruptionsOnLand(s, *ground);   // a volcano's rim, pyroclastic flows, lightning and ash
 		for (fire::Lava &l : s.lavas) {
 			water::River way;
 			way.points = {{l.x, l.z}};
@@ -1139,6 +1175,7 @@ inline Parsed parse(const std::string &text, const std::string &where, const std
 		n = 0;
 		return fail(std::string(s.seaIce.on ? "sea ice" : "an iceberg") + " floats on the water: the film needs a `water` line");
 	}
+	applyWind(s);   // one wind over the set (film_wind.h)
 	if (s.bio.on) {   // (the sea's foam glows)
 		if (s.seas.empty()) {
 			n = 0;

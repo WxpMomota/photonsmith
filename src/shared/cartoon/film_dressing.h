@@ -76,15 +76,18 @@ inline const std::string &objects() {
 // Gusts of wind (film_file.h `gusts`): fronts that sweep across the land at `speed` along `wind` (story space), bending what grows as they pass.
 struct Gusts {
 	double strength = 0.0, dx = 0.0, dz = 1.0, speed = 7.0;
+	double steady = 0.0;    // (film_wind.h `wind`) a steady lean along (dx, dz) under the gusts
+	bool windSet = false;   // (its line gave its own way)
 };
 // How much a gust bends what grows at story-space (x, z) at t (0 between fronts): a sharp front, a slow easing behind it, the fronts' lines broken by noise.
 inline Vec3 gustAt(const Gusts &g, double x, double z, double t) {
-	if (g.strength <= 0.0) return {0.0, 0.0, 0.0};
+	const Vec3 steady = Vec3{g.dx, 0.0, g.dz} * (g.steady * (0.8 + 0.2 * std::sin(1.3 * t + 0.21 * (x + z))));   // (a steady wind: leaning, breathing a little)
+	if (g.strength <= 0.0) return steady;
 	const double along = x * g.dx + z * g.dz, across = -x * g.dz + z * g.dx;
 	const double phase = (along - g.speed * t) / 28.0 + 0.6 * nature::noise2(across / 40.0, t * 0.05, 61);
 	const double f = phase - std::floor(phase);
 	const double pulse = f < 0.15 ? smoothstep(0.0, 0.15, f) : 1.0 - smoothstep(0.15, 0.7, f);
-	return Vec3{g.dx, 0.0, g.dz} * (g.strength * pulse * pulse);
+	return steady + Vec3{g.dx, 0.0, g.dz} * (g.strength * pulse * pulse);
 }
 // A placed thing at t (its leaves and grass sway in the wind, and bend in its gusts), as scene text.
 inline std::string placementText(const Placement &p, double t, const Gusts &gusts = {}) {

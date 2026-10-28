@@ -32,6 +32,7 @@ namespace water {
 // sharp their crests are (0 to 1), and its kind - sea (deep blue-green), lake (calmer, greener) or clear (glass: the ground shows through).
 struct Sea {
 	double level = 0.0, waves = 0.8, wind = 0.0, choppy = 0.65;
+	bool windSet = false;   // (its line gave its own: else the film's `wind`)
 	std::string kind = "sea";
 	bool spectral = true;     // an ocean spectrum (film_ocean.h); `model gerstner`: the twenty summed waves of before
 	bool foam = true;

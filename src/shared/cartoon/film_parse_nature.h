@@ -26,8 +26,8 @@ inline std::string fogBankLine(Spec &s, const std::string &line) {
 			if (t[i] == "size" && a >= 20.0 && a <= 20000.0) f.size = a;
 			else if (t[i] == "depth" && a >= 2.0 && a <= 2000.0) f.depth = a;
 			else if (t[i] == "density" && a > 0.0 && a <= 1.0) f.density = a;
-			else if (t[i] == "wind") f.wind = a;
-			else if (t[i] == "speed" && a >= 0.0) f.speed = a;
+			else if (t[i] == "wind") f.wind = a, f.windSet = true;
+			else if (t[i] == "speed" && a >= 0.0) f.speed = a, f.speedSet = true;
 			else if (t[i] == "seed") f.seed = static_cast<int>(a);
 			else return fail("\"" + t[i] + "\": a fog bank takes size (20 to 20000 m), depth (2 to 2000 m), density (up to 1 a metre), wind, speed, during T0 T1 and seed");
 			i += 2;
@@ -88,7 +88,7 @@ inline std::string fireLine(Spec &s, const std::string &verb, const std::string 
 			else if (verb == "volcano" && t[i] == "column") {
 				if (a < 300.0 || a > 20000.0) return fail("a volcano's ash column climbs 300 to 20000 m");
 				vo.column = a;
-			} else if (verb == "volcano" && t[i] == "wind") vo.wind = a;
+			} else if (verb == "volcano" && t[i] == "wind") vo.wind = a, vo.windSet = true;
 			else if (verb == "volcano" && t[i] == "lightning") {
 				if (a < 1.0 || a > 100.0) return fail("lightning in an ash column: 1 to 100 strikes");
 				vo.lightning = static_cast<int>(a);
@@ -103,7 +103,7 @@ inline std::string fireLine(Spec &s, const std::string &verb, const std::string 
 				if (vo.flows.empty()) return fail("`toward DEGREES` is the way a flow goes: after `flow T`");
 				vo.flows.back().toward = a, vo.flows.back().towardSet = true;
 			}
-			else if (verb == "wildfire" && t[i] == "wind") wf.wind = a;
+			else if (verb == "wildfire" && t[i] == "wind") wf.wind = a, wf.windSet = true;
 			else return fail("\"" + t[i] + "\": " + usage);
 			i += 2;
 		} else {
@@ -268,6 +268,42 @@ inline std::string iceLine(Spec &s, const std::string &verb, const std::string &
 	return std::string();
 }
 
+// A `wind` or `tornado` line (film_wind.h). "" or what is wrong with it.
+inline std::string windLine(Spec &s, const std::string &verb, const std::string &line) {
+	using detail::number;
+	const auto fail = [](const std::string &what) { return what; };
+	const std::vector<std::string> t = detail::tokens(line);
+	double a = 0.0, b = 0.0, c = 0.0, d = 0.0;
+	if (verb == "wind") {
+		if (s.wind.on) return fail("a film has one `wind` line");
+		if (t.size() != 3 || !number(t[1], a) || !number(t[2], b) || b < 0.0 || b > 60.0)
+			return fail("`wind DEGREES SPEED`: the way it blows (a compass bearing: 0 +z, 90 +x) and its speed (0 to 60 m/s)");
+		s.wind.on = true, s.wind.toward = a, s.wind.speed = b;
+		return std::string();
+	}
+	const std::string usage = "`tornado from X Z to X Z [during T0 T1] [width W] [height H] [seed N]`";
+	wind::Tornado k;
+	if (t.size() < 7 || t[1] != "from" || !number(t[2], a) || !number(t[3], b) || t[4] != "to" || !number(t[5], c) || !number(t[6], d)) return fail(usage);
+	k.x0 = a, k.z0 = b, k.x1 = c, k.z1 = d;
+	for (std::size_t i = 7; i < t.size();) {
+		if (t[i] == "during" && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b)) {
+			if (b < a + 12.0) return fail("a tornado lasts at least 12 s (`during T0 T1`): 6 s to form, 6 s to rope out");
+			k.t0 = a, k.t1 = b;
+			i += 3;
+		} else if (i + 1 < t.size() && number(t[i + 1], a)) {
+			if (t[i] == "width" && a >= 2.0 && a <= 1000.0) k.width = a;
+			else if (t[i] == "height" && a >= 50.0 && a <= 5000.0) k.height = a;
+			else if (t[i] == "seed") k.seed = static_cast<int>(a);
+			else return fail("\"" + t[i] + "\": " + usage + " (width 2 to 1000 m, height 50 to 5000 m)");
+			i += 2;
+		} else {
+			return fail("\"" + t[i] + "\": " + usage);
+		}
+	}
+	s.tornadoes.push_back(k);
+	return std::string();
+}
+
 // One line of a film file, if it is a nature line: what it says goes into `s`. `handled` is false when `verb` is not a nature word (the line is parse()'s); the
 // result is "" or what is wrong with the line (parse() adds the file and the line).
 inline std::string natureLine(Spec &s, const std::string &verb, const std::string &line, const std::string &rest, bool &handled) {
@@ -324,7 +360,7 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 			} else if (i + 1 < t.size() && number(t[i + 1], v)) {
 				if (t[i] == "level") sea.level = v, level = true;
 				else if (t[i] == "waves" && v >= 0.0 && v <= 15.0) sea.waves = v;
-				else if (t[i] == "wind") sea.wind = v;
+				else if (t[i] == "wind") sea.wind = v, sea.windSet = true;
 				else if (t[i] == "choppy" && v >= 0.0 && v <= 1.0) sea.choppy = v;
 				else return fail("\"" + t[i] + "\": water takes level, waves (0 to 15 m), wind, choppy (0 to 1) and foam off");
 			} else {
@@ -395,8 +431,8 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 				if (t[i] == "cover" && a > 0.0 && a <= 1.0) c.cover = a;
 				else if (t[i] == "base") c.base = a;
 				else if (t[i] == "size" && a >= 20.0 && a <= 5000.0) c.size = a;
-				else if (t[i] == "wind") c.wind = a;
-				else if (t[i] == "speed" && a >= 0.0) c.speed = a;
+				else if (t[i] == "wind") c.wind = a, c.windSet = true;
+				else if (t[i] == "speed" && a >= 0.0) c.speed = a, c.speedSet = true;
 				else if (t[i] == "density" && a > 0.0 && a <= 10.0) c.density = a;
 				else if (t[i] == "area" && a >= 100.0) c.area = a;
 				else if (t[i] == "seed") c.seed = static_cast<int>(a);
@@ -695,7 +731,7 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 			return fail("`gusts STRENGTH [wind DEGREES] [speed S]`: a strength from 0 to 5 (1 a stiff breeze)");
 		for (std::size_t i = 2; i < t.size(); i += 2) {
 			if (i + 1 >= t.size() || !number(t[i + 1], a)) return fail("\"" + t[i] + "\": gusts take wind and speed, each with a number");
-			if (t[i] == "wind") wind = a;
+			if (t[i] == "wind") wind = a, s.gusts.windSet = true;
 			else if (t[i] == "speed" && a > 0.0) s.gusts.speed = a;
 			else return fail("\"" + t[i] + "\": gusts take wind and speed");
 		}
@@ -728,8 +764,8 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 			if (t[i] == "strength" && v > 0.0 && v <= 1.0) s.storm.strength = v;
 			else if (t[i] == "from" && v >= 0.0) s.storm.t0 = v;
 			else if (t[i] == "to") s.storm.t1 = v;
-			else if (t[i] == "wind") s.storm.wind = v;
-			else if (t[i] == "speed" && v >= 0.0 && v <= 40.0) s.storm.speed = v;
+			else if (t[i] == "wind") s.storm.wind = v, s.storm.windSet = true;
+			else if (t[i] == "speed" && v >= 0.0 && v <= 40.0) s.storm.speed = v, s.storm.speedSet = true;
 			else return fail("\"" + t[i] + "\": a storm takes rain, snow or sand, strength (0 to 1), from T, to T, wind (a facing) and speed (0 to 40 m/s)");
 		}
 		if (s.storm.t1 <= s.storm.t0) return fail("a storm's `to` is after its `from`");
@@ -804,6 +840,8 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		return glowLine(s, verb, line);
 	} else if (verb == "glacier" || verb == "iceberg" || verb == "seaice") {   // ice (film_ice.h)
 		return iceLine(s, verb, line);
+	} else if (verb == "wind" || verb == "tornado") {   // the wind (film_wind.h)
+		return windLine(s, verb, line);
 	} else if (verb == "geyser" || verb == "rockfall" || verb == "avalanche") {   // the land in action (film_geology.h)
 		const std::vector<std::string> t = detail::tokens(line);
 		const std::string where = verb == "geyser" ? "at" : "from";

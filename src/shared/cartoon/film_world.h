@@ -5,6 +5,63 @@
 namespace cartoon {
 namespace film_file {
 
+// Round 9's spectacles in a frame at film time t (nature's `nt`): tornadoes (film_wind.h), ice (film_ice.h), living light (film_glow.h) and the sea's giants
+// (film_giants.h). `exposure`: the frame's (living light is divided by it); `natureAt`: nature's time at a film time.
+inline std::string spectacleText(const Spec &spec, const std::string &header, double t, double nt, double exposure, const std::function<double(double)> &natureAt) {
+	std::string out;
+	const double light = 1.0 / std::max(1.0, exposure);   // (as bright on the screen however far the night camera has opened up)
+	water::Sea lit = spec.seas.empty() ? water::Sea() : spec.seas[0];
+	lit.glow = lit.glow * light;
+	if (!spec.tornadoes.empty()) {   // tornadoes (film_wind.h)
+		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
+		const auto groundAt = [&](double x, double z) { return ground && ground->inside(x, z) ? ground->heightAt(x, z) : (ground ? spec.terrain.y : 0.0); };
+		for (std::size_t i = 0; i < spec.tornadoes.size(); ++i) out += wind::tornadoText(spec.tornadoes[i], static_cast<int>(i), t, nt, groundAt, spec.seas.empty() ? -1e30 : spec.seas[0].level);
+	}
+	if (!spec.glaciers.empty() || !spec.icebergs.empty() || spec.seaIce.on) {   // ice (film_ice.h)
+		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
+		const auto groundAt = [&](double x, double z) { return ground && ground->inside(x, z) ? ground->heightAt(x, z) : (ground ? spec.terrain.y : 0.0); };
+		const double level = spec.seas.empty() ? -1e30 : spec.seas[0].level;
+		for (std::size_t i = 0; i < spec.glaciers.size(); ++i) {
+			const ice::Glacier &g = spec.glaciers[i];
+			double cut = 0.0;   // (each calving takes a slab off the front: the slab falls, the front stands back by its depth)
+			for (double c : g.calving) {
+				if (t < c) {
+					out += ice::slabText(g, cut, -1.0, groundAt, level, nt);   // (the next slab, still standing)
+					break;
+				}
+				if (t < c + 60.0) out += ice::slabText(g, cut, t - c, groundAt, level, nt);
+				if (t >= c + ice::kCalveFall && !spec.seas.empty()) {
+					const Vec3 at = ice::calveSplash(g, cut, groundAt, level);
+					const double since = t - c - ice::kCalveFall, H = g.thickness();
+					out += giants::sprayText(at, since, 3000, 0.55 * std::sqrt(9.81 * H), 0.004 * g.width, 1201 + static_cast<int>(i) * 31 + static_cast<int>(cut), false, lit.glowing());
+					out += giants::foamText(lit, at, since, 0.5 * g.width, nt, 1301 + static_cast<int>(cut));
+				}
+				cut += ice::slabDepth(g);
+			}
+			out += ice::glacierText(g, cut + (g.calving.empty() || t >= g.calving.back() ? 0.0 : ice::slabDepth(g)), groundAt, level);
+		}
+		for (const ice::Iceberg &b : spec.icebergs) out += ice::bergText(b, nt, level > -1e29 ? level : 0.0);
+		if (spec.seaIce.on && !spec.seas.empty()) {
+			Vec3 eye, target;
+			double fov = 40.0;
+			film_subjects::cameraOf(header, eye, target, fov);
+			out += ice::seaIceText(spec.seaIce, spec.seas[0], nt, {-eye.x, eye.y, eye.z});
+		}
+	}
+	if (!spec.fireflies.empty() || !spec.fungi.empty()) {   // living light (film_glow.h)
+		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
+		const auto groundAt = [&](double x, double z) { return ground && ground->inside(x, z) ? ground->heightAt(x, z) : (ground ? spec.terrain.y : 0.0); };
+				for (const glow::Fireflies &f : spec.fireflies) out += glow::firefliesText(f, nt, groundAt, light);
+		for (const glow::Fungi &f : spec.fungi) out += glow::fungiText(f, nt, groundAt, light);
+	}
+	if ((!spec.whales.empty() || !spec.pods.empty()) && !spec.seas.empty()) {   // the sea's giants (film_giants.h)
+		water::Sea sea = spec.seas[0];
+		sea.glow = sea.glow * (light);
+		out += giants::giantsText(spec.whales, spec.pods, sea, spec.hasUnderwater, t, nt, natureAt);
+	}
+	return out;
+}
+
 inline std::string DataFilm::worldAt(const std::string &header, double t) const {
 	std::string out = film_camera::exposed(header, exposureAt(t));
 	const double nt = natureAt(t);   // (nature's time: the clouds, the water, the aurora, the wind, the animals; `timelapse`, `slowmo`)
@@ -38,7 +95,8 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 			const fire::Fire &f = spec.fires[i];
 			if (t < f.t0 || t > f.t1) continue;
 			out += fire::flameText("flame_" + std::to_string(i), f.at, f.size, nt, f.seed);
-			if (f.smoke) out += fire::smokeText("smoke_" + std::to_string(i), f.at + Vec3{0.0, 1.25 * f.size, 0.0}, 2.5 * f.size, 8.0 * f.size, nt, f.seed, 0.6);
+			const Vec3 drift = spec.wind.on ? spec.wind.dir() * (4.0 * f.size * std::min(1.5, spec.wind.speed / 6.0)) : Vec3{0.0, 0.0, 0.0};   // (bent away by the wind)
+			if (f.smoke) out += fire::smokeText("smoke_" + std::to_string(i), f.at + Vec3{0.0, 1.25 * f.size, 0.0}, 2.5 * f.size, 8.0 * f.size, nt, f.seed, 0.6, drift);
 		}
 		const double lavaGlow = 3.0 / std::pow(std::max(1.0, exposureAt(t)), 0.85);   // (exposed for the lava as the night camera opens up: orange, not white)
 		for (const fire::Lava &l : spec.lavas) out += fire::lavaText(film, l, nt, lavaGlow);
@@ -176,49 +234,7 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 		for (const water::River &r : spec.rivers) out += water::riverText(r, nt, ground.get());
 		for (const water::Fall &f : spec.falls) out += f.frozen ? (ground ? std::string() : water::cliffText(f)) + ice::frozenFallText(f) : water::fallText(f, nt, ground.get());
 	}
-	if (!spec.glaciers.empty() || !spec.icebergs.empty() || spec.seaIce.on) {   // ice (film_ice.h)
-		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
-		const auto groundAt = [&](double x, double z) { return ground && ground->inside(x, z) ? ground->heightAt(x, z) : (ground ? spec.terrain.y : 0.0); };
-		const double level = spec.seas.empty() ? -1e30 : spec.seas[0].level;
-		for (std::size_t i = 0; i < spec.glaciers.size(); ++i) {
-			const ice::Glacier &g = spec.glaciers[i];
-			double cut = 0.0;   // (each calving takes a slab off the front: the slab falls, the front stands back by its depth)
-			for (double c : g.calving) {
-				if (t < c) {
-					out += ice::slabText(g, cut, -1.0, groundAt, level, nt);   // (the next slab, still standing)
-					break;
-				}
-				if (t < c + 60.0) out += ice::slabText(g, cut, t - c, groundAt, level, nt);
-				if (t >= c + ice::kCalveFall && !spec.seas.empty()) {
-					const Vec3 at = ice::calveSplash(g, cut, groundAt, level);
-					const double since = t - c - ice::kCalveFall, H = g.thickness();
-					out += giants::sprayText(at, since, 3000, 0.55 * std::sqrt(9.81 * H), 0.004 * g.width, 1201 + static_cast<int>(i) * 31 + static_cast<int>(cut), false, spec.seas[0].glowing());
-					out += giants::foamText(spec.seas[0], at, since, 0.5 * g.width, nt, 1301 + static_cast<int>(cut));
-				}
-				cut += ice::slabDepth(g);
-			}
-			out += ice::glacierText(g, cut + (g.calving.empty() || t >= g.calving.back() ? 0.0 : ice::slabDepth(g)), groundAt, level);
-		}
-		for (const ice::Iceberg &b : spec.icebergs) out += ice::bergText(b, nt, level > -1e29 ? level : 0.0);
-		if (spec.seaIce.on && !spec.seas.empty()) {
-			Vec3 eye, target;
-			double fov = 40.0;
-			film_subjects::cameraOf(header, eye, target, fov);
-			out += ice::seaIceText(spec.seaIce, spec.seas[0], nt, {-eye.x, eye.y, eye.z});
-		}
-	}
-	if (!spec.fireflies.empty() || !spec.fungi.empty()) {   // living light (film_glow.h)
-		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
-		const auto groundAt = [&](double x, double z) { return ground && ground->inside(x, z) ? ground->heightAt(x, z) : (ground ? spec.terrain.y : 0.0); };
-		const double light = 1.0 / std::max(1.0, exposureAt(t));   // (as bright on the screen however far the night camera has opened up)
-		for (const glow::Fireflies &f : spec.fireflies) out += glow::firefliesText(f, nt, groundAt, light);
-		for (const glow::Fungi &f : spec.fungi) out += glow::fungiText(f, nt, groundAt, light);
-	}
-	if ((!spec.whales.empty() || !spec.pods.empty()) && !spec.seas.empty()) {   // the sea's giants (film_giants.h)
-		water::Sea sea = spec.seas[0];
-		sea.glow = sea.glow * (1.0 / std::max(1.0, exposureAt(t)));
-		out += giants::giantsText(spec.whales, spec.pods, sea, spec.hasUnderwater, t, nt, [this](double ft) { return natureAt(ft); });
-	}
+	out += spectacleText(spec, header, t, nt, exposureAt(t), [this](double ft) { return natureAt(ft); });
 	if (!spec.auroras.empty() || !spec.lightnings.empty() || !spec.meteors.empty()) {   // the sky's spectacles (film_skyfx.h)
 		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
 		const Vec3 centre = ground ? Vec3{spec.terrain.x, spec.terrain.y, spec.terrain.z} : Vec3{0.0, 0.0, 0.0};
@@ -305,7 +321,7 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 inline void DataFilm::soundscape(audio::Mix &m) const {
 	const bool eagles = std::any_of(spec.flocks.begin(), spec.flocks.end(), [](const wildlife::Flock &f) { return f.kind == "eagles"; });
 	if (spec.falls.empty() && spec.fires.empty() && spec.lavas.empty() && spec.volcanoes.empty() && spec.wildfires.empty() && !spec.swell.on && spec.herds.empty() && !eagles &&
-		spec.forests.empty() && spec.geysers.empty() && spec.rockfalls.empty() && spec.avalanches.empty() && spec.quakes.empty() && spec.whales.empty() && spec.pods.empty() && spec.glaciers.empty())
+		spec.forests.empty() && spec.geysers.empty() && spec.rockfalls.empty() && spec.avalanches.empty() && spec.quakes.empty() && spec.whales.empty() && spec.pods.empty() && spec.glaciers.empty() && spec.tornadoes.empty())
 		return;
 	namespace ss = soundscape;
 	const ss::Ears ears = ss::earsOf(m.seconds(), [this](double t, Vec3 &eye, Vec3 &target) {
@@ -316,6 +332,11 @@ inline void DataFilm::soundscape(audio::Mix &m) const {
 	const auto groundAt = [&](double x, double z) { return ground ? ground->heightAt(x, z) : 0.0; };
 	const double T = m.seconds();
 	const auto always = [](double) { return 1.0; };
+	for (std::size_t i = 0; i < spec.tornadoes.size(); ++i) {   // a tornado's roar, from its foot, as strong as it is
+		const wind::Tornado &k = spec.tornadoes[i];
+		ss::lay(m, ears, k.t0, std::min(T, k.t1), 0.5, [&k, &groundAt](double t) { const Vec3 f = wind::footAt(k, t); return Vec3{f.x, groundAt(f.x, f.z) + 20.0, f.z}; },
+				[&k](double t) { return 1.2 * wind::strength(k, t); }, ss::roar(40.0, 600.0, 1.0, 1801u + static_cast<unsigned>(i)), 300.0);
+	}
 	for (std::size_t i = 0; i < spec.glaciers.size(); ++i) {   // a calving: the crack, then the roar of the slab hitting the water
 		const ice::Glacier &g = spec.glaciers[i];
 		double cut = 0.0;
