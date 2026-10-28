@@ -145,5 +145,75 @@ inline std::string nebulaText(const std::string &film, const Nebula &n) {
 	return out;
 }
 
+// ---- galaxies ----
+// A galaxy: its kind (spiral: two arms of young blue stars and pink knots of glowing gas winding out from a warm yellow bulge, dust lanes along their inner edges;
+// barred: the same, its arms starting from the ends of a bar; elliptical: a smooth yellow glow, densest in the middle), how big (across its disc), how its disc is
+// tipped from facing the camera (`tilt`, about x) and turned in its plane (`turn`), how bright.
+struct Galaxy {
+	std::string name, kind = "spiral";
+	Vec3 at{0.0, 0.0, -60000.0};
+	double size = 40000.0, tilt = 60.0, turn = 0.0, brightness = 1.0;
+	int seed = 1;
+};
+inline const std::vector<std::string> &galaxyKinds() {
+	static const std::vector<std::string> k = {"spiral", "barred", "elliptical"};
+	return k;
+}
+// The galaxy's disc coordinates of a point p of its box (unit-box coordinates centred, the box's half-sizes `half`, in units of the galaxy's radius): (u, v) in its
+// plane, h out of it.
+inline void galaxyFrame(const Galaxy &g, Vec3 p, double &u, double &v, double &h) {
+	const double ti = g.tilt * kPi / 180.0, tu = g.turn * kPi / 180.0;
+	// undo the tilt about x (the disc is the x-y plane facing +z untilted, so a camera looking down -z sees it face on), then the turn about the disc's axis
+	const double y1 = p.y * std::cos(ti) + p.z * std::sin(ti), z1 = -p.y * std::sin(ti) + p.z * std::cos(ti);
+	u = p.x * std::cos(tu) + y1 * std::sin(tu), v = -p.x * std::sin(tu) + y1 * std::cos(tu), h = z1;
+}
+// A galaxy's voxel at disc coordinates (u, v, h) (its radius 1), per metre for a galaxy `size` across.
+inline Voxel galaxyVoxel(const Galaxy &g, double u, double v, double h) {
+	const int s = g.seed * 131;
+	const double r = std::hypot(u, v), th = std::atan2(v, u);
+	const double bulge = std::exp(-std::pow(r / 0.13, 2.0) - std::pow(h / 0.09, 2.0));
+	Voxel out{};
+	if (g.kind == "elliptical") {
+		const double rr = std::hypot(r, h / 0.6), e = 3.0 * std::exp(-rr / 0.16) * (1.0 - smoothstep(0.6, 1.0, rr));   // (fading out well inside its box)
+		out.sa = Vec3{1.0, 1.0, 1.0} * (e * 0.5 / g.size);   // (not much thinner: the GPU's few collisions in a faint glow come out blotchy)
+		out.le = Vec3{1.0, 0.82, 0.6} * (e > 0.003 ? 1.0 : 0.0);
+		return out;
+	}
+	const double disc = std::exp(-r / 0.32) * std::exp(-std::pow(h / (0.035 + 0.02 * r), 2.0)) * (1.0 - smoothstep(0.85, 1.0, r));
+	// the arms: logarithmic spirals (two of them), from the bulge's edge, or (barred) from the bar's ends
+	const double start = g.kind == "barred" ? 0.22 : 0.08, lr = std::log(std::max(start, r) / start);
+	const double phase = th - 3.2 * lr + (g.kind == "barred" ? 0.0 : 0.6);
+	const double arm = std::pow(0.5 + 0.5 * std::cos(2.0 * phase), 3.0) * smoothstep(start * 0.7, start * 1.4, r);
+	const double lane = std::pow(0.5 + 0.5 * std::cos(2.0 * phase - 0.7), 10.0) * smoothstep(start, start * 2.0, r) * (1.0 - smoothstep(0.7, 0.95, r));   // (dust on the arms' inner edges)
+	const double bar = g.kind == "barred" ? std::exp(-std::pow(u / 0.22, 4.0) - std::pow(v / 0.05, 2.0) - std::pow(h / 0.05, 2.0)) : 0.0;
+	const double grain = clouds::detail::fbm3(u * 18.0 + 3.0, v * 18.0, h * 18.0, s + 1);
+	const double knots = smoothstep(0.62, 0.8, clouds::detail::fbm3(u * 30.0, v * 30.0 - 4.0, h * 30.0, s + 2)) * arm;   // (pink knots of glowing gas)
+	const double stars = disc * (0.25 + 1.6 * arm * (0.6 + 0.8 * grain)) + 1.6 * bulge + bar;
+	const double dust = disc * lane * 3.0;
+	const Vec3 warm{1.0, 0.8, 0.55}, young{0.6, 0.75, 1.0}, pink{1.0, 0.35, 0.55};
+	const Vec3 colour = (warm * (1.6 * bulge + bar + 0.3 * disc) + young * (1.6 * disc * arm) + pink * (2.0 * knots * disc)) * (1.0 / std::max(1e-9, stars + 2.0 * knots * disc));
+	out.sa = Vec3{1.0, 1.0, 1.0} * (stars * 0.4 / g.size) + Vec3{1.0, 1.15, 1.3} * (dust * 6.0 / g.size);
+	out.ss = Vec3{1.0, 1.0, 1.0} * (dust * 1.0 / g.size);
+	out.le = stars > 1e-4 ? colour * (stars / (stars + 15.0 * dust + 1e-9)) * (1.0 + 2.0 * knots) : Vec3{0.0, 0.0, 0.0};
+	return out;
+}
+// A galaxy as scene text: its grid in the box round its (tipped) disc, made once, and the sphere it fills.
+inline std::string galaxyText(const std::string &film, const Galaxy &g) {
+	const double R = 0.5 * g.size, ti = g.tilt * kPi / 180.0, thick = g.kind == "elliptical" ? 0.75 : 0.12;   // (the disc's half-thickness, in radii)
+	const Vec3 half{1.0, std::abs(std::sin(ti)) + thick * std::abs(std::cos(ti)), std::abs(std::cos(ti)) + thick * std::abs(std::sin(ti))};   // (in radii)
+	const double longest = std::max({half.x, half.y, half.z});
+	const int nx = std::max(8, static_cast<int>(144 * half.x / longest)), ny = std::max(8, static_cast<int>(144 * half.y / longest)), nz = std::max(8, static_cast<int>(144 * half.z / longest));
+	char file[200];
+	std::snprintf(file, sizeof file, "galaxy_v4_%s_%s_%d_%.1f_%.1f_%.0f_%.4g.pbrt", g.name.c_str(), g.kind.c_str(), g.seed, g.tilt, g.turn, g.size, g.brightness);
+	const std::string name = "galaxy_" + g.name;
+	const std::string path = rgbGridFile(film, file, name, nx, ny, nz, 0.4, 0.04 * g.brightness, [&](int i, int j, int k) {
+		const Vec3 p{((i + 0.5) / nx * 2.0 - 1.0) * half.x, ((j + 0.5) / ny * 2.0 - 1.0) * half.y, ((k + 0.5) / nz * 2.0 - 1.0) * half.z};
+		double u = 0.0, v = 0.0, h = 0.0;
+		galaxyFrame(g, p, u, v, h);
+		return galaxyVoxel(g, u, v, h);
+	});
+	return "# a galaxy (film_cosmos.h): " + g.name + "\n" + placedGrid(path, name, g.at - half * R, half * (2.0 * R));
+}
+
 }  // namespace cosmos
 }  // namespace cartoon

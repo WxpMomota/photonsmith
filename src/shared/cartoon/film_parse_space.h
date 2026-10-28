@@ -9,7 +9,7 @@ namespace film_file {
 
 // Whether `verb` is a space line's.
 inline bool isSpaceVerb(const std::string &verb) {
-	static const std::vector<std::string> k = {"space", "planet", "moon", "nebula"};
+	static const std::vector<std::string> k = {"space", "planet", "moon", "nebula", "galaxy"};
 	return std::find(k.begin(), k.end(), verb) != k.end();
 }
 
@@ -166,6 +166,25 @@ inline std::string nebulaLine(Spec &s, const std::vector<std::string> &t) {
 	return std::string();
 }
 
+// A `galaxy` line (film_cosmos.h). "" or what is wrong with it.
+inline std::string galaxyLine(Spec &s, const std::vector<std::string> &t) {
+	cosmos::Galaxy g;
+	bool sized = false;
+	const std::string e = bodyLine(t, "`galaxy NAME at X Y Z size S [kind spiral|barred|elliptical] [tilt DEGREES] [turn DEGREES] [brightness B] [seed N]` (size 100 to 400000 m)",
+								   cosmos::galaxyKinds(), g.name, g.kind, g.at, [&](const std::string &w, double a) {
+									   if (w == "size" && a >= 100.0 && a <= 400000.0) return g.size = a, sized = true;
+									   if (w == "tilt" && a >= -90.0 && a <= 90.0) return g.tilt = a, true;
+									   if (w == "turn") return g.turn = a, true;
+									   if (w == "brightness" && a > 0.0 && a <= 20.0) return g.brightness = a, true;
+									   if (w == "seed") return g.seed = static_cast<int>(a), true;
+									   return false;
+								   });
+	if (!e.empty()) return e;
+	if (!sized) return "`galaxy NAME at X Y Z size S ...`: how big it is";
+	s.galaxies.push_back(g);
+	return std::string();
+}
+
 // One space line: what it says goes into `s`. "" or what is wrong with it.
 inline std::string spaceLine(Spec &s, const std::string &verb, const std::string &line) {
 	const std::vector<std::string> t = detail::tokens(line);
@@ -173,6 +192,7 @@ inline std::string spaceLine(Spec &s, const std::string &verb, const std::string
 	if (verb == "planet") return planetLine(s, t);
 	if (verb == "moon") return moonLine(s, t);
 	if (verb == "nebula") return nebulaLine(s, t);
+	if (verb == "galaxy") return galaxyLine(s, t);
 	return "unknown space line \"" + verb + "\"";
 }
 

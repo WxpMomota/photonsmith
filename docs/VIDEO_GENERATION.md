@@ -1156,6 +1156,19 @@ silhouetted against glowing gas behind it; `pillars` - three columns of dust ris
 near its middle. It is one "rgbgrid" medium (72 cubed; it absorbs, scatters and gives out light per voxel) written once into the film's cache, in a sphere round it - the
 camera can fly into it. Its glow is calibrated by eye to about the brightness of a sunlit planet at `brightness 1`.
 
+**Galaxies: `galaxy`.** (film_cosmos.h)
+
+```
+galaxy  swirl  at 0 0 -60000       size 50000  tilt 55                       # `brightness B` (1, up to 20), `seed N`
+galaxy  bar    at 120000 0 -60000  size 50000  kind barred  tilt 20  turn 30
+galaxy  oval   at 240000 0 -60000  size 30000  kind elliptical  tilt 40
+```
+
+A galaxy `size` metres across its disc: `spiral` - two arms of young blue stars winding out from a warm yellow bulge, pink knots of glowing gas along them and dark
+dust lanes on their inner edges; `barred` - the same, its arms starting from the ends of a bright bar through the bulge; `elliptical` - a smooth yellow glow, brightest
+in its middle, fading out. Untilted its disc faces a camera looking down -z; `tilt` tips it about x (90: edge on, its dust lane across it), `turn` turns it in its
+own plane. It is an "rgbgrid" medium in the box round its tipped disc (144 voxels along its longest side), written once into the film's cache.
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

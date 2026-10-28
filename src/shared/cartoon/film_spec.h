@@ -406,6 +406,7 @@ struct Spec {
 	space::Space space;
 	std::vector<planets::Planet> planets;
 	std::vector<cosmos::Nebula> nebulae;
+	std::vector<cosmos::Galaxy> galaxies;
 	std::vector<ground::Track> tracks;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;

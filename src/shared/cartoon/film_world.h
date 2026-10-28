@@ -245,6 +245,7 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 		film_subjects::cameraOf(header, eye, target, fov);
 		out += space::spaceText(spec.key.empty() ? std::string("film") : spec.key, spec.space, space::narrowOnTheSun(spec.space, eye, target, fov));
 	}
+	for (const cosmos::Galaxy &g : spec.galaxies) out += cosmos::galaxyText(spec.key.empty() ? std::string("film") : spec.key, g);   // (film_cosmos.h)
 	for (const cosmos::Nebula &n : spec.nebulae) out += cosmos::nebulaText(spec.key.empty() ? std::string("film") : spec.key, n);   // (film_cosmos.h)
 	if (!spec.planets.empty()) {   // planets and their moons, each where it is now (film_planets.h); an eclipse when one covers the sun
 		const std::string film = spec.key.empty() ? std::string("film") : spec.key;

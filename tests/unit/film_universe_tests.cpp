@@ -350,3 +350,41 @@ TEST(FilmUniverseNebula, GasGlowsDustDarkensAndPillarsStand) {
 	EXPECT_EQ(count(s, "AreaLightSource"), 4u) << "its young stars";
 	expectProblems({{"nebula a at 0 0 0", "how big it is"}, {"nebula a at 0 0 0 size 10", "size 100 to 200000"}, {"nebula a at 0 0 0 size 500 kind glowing", "\"kind\""}});
 }
+
+TEST(FilmUniverseGalaxy, ArmsWindBulgeGlowsAndEllipticalsFade) {
+	cs::Galaxy g;
+	g.name = "swirl", g.size = 50000.0;
+	// the bulge is warm and bright; out in the disc the light comes and goes round each ring (the arms), bluer on them
+	const cs::Voxel middle = cs::galaxyVoxel(g, 0.0, 0.0, 0.0);
+	EXPECT_GT(middle.le.x, middle.le.z) << "a warm bulge";
+	double lo = 1e9, hi = 0.0, blueOnArm = 0.0;
+	for (int k = 0; k < 72; ++k) {
+		const double th = 2.0 * 3.14159265358979 * k / 72.0;
+		const cs::Voxel v = cs::galaxyVoxel(g, 0.5 * std::cos(th), 0.5 * std::sin(th), 0.0);
+		const double light = v.le.x + v.le.y + v.le.z, glow = v.sa.x * g.size;
+		if (glow * light > hi) hi = glow * light, blueOnArm = v.le.z / (v.le.x + 1e-9);
+		lo = std::min(lo, glow * light);
+	}
+	EXPECT_GT(hi, 3.0 * lo + 1e-6) << "arms";
+	EXPECT_GT(blueOnArm, 0.8) << "young blue stars on the arms";
+	EXPECT_LT(cs::galaxyVoxel(g, 0.0, 0.0, 0.3).sa.x, 0.05 * middle.sa.x) << "a thin disc";
+	cs::Galaxy barred = g;
+	barred.kind = "barred";
+	EXPECT_GT(cs::galaxyVoxel(barred, 0.18, 0.0, 0.0).sa.x, 2.0 * cs::galaxyVoxel(barred, 0.0, 0.18, 0.0).sa.x) << "a bar along u";
+	cs::Galaxy oval = g;
+	oval.kind = "elliptical";
+	const double c = cs::galaxyVoxel(oval, 0.0, 0.0, 0.0).sa.x, half = cs::galaxyVoxel(oval, 0.4, 0.0, 0.0).sa.x;
+	EXPECT_GT(c, 5.0 * half) << "brightest in its middle";
+	EXPECT_EQ(cs::galaxyVoxel(oval, 1.0, 0.0, 0.0).sa.x, 0.0) << "fades out inside its box";
+	double u = 0.0, v = 0.0, h = 0.0;
+	cs::Galaxy edge = g;
+	edge.tilt = 90.0;
+	cs::galaxyFrame(edge, cartoon::Vec3{0.0, 0.5, 0.0}, u, v, h);
+	EXPECT_NEAR(std::abs(h), 0.5, 1e-9) << "edge on, up is out of the disc";
+
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("galaxy", "scene s.pbrt\nlength 4\nspace\ngalaxy swirl at 0 0 -60000 size 50000 tilt 55\nshot 0 A\n key 0 0 0  0 0 -100  50\n", film), "");
+	EXPECT_NE(film.sceneAt(1.0).find("MediumInterface \"galaxy_swirl\" \"\""), std::string::npos);
+	expectProblems({{"galaxy a at 0 0 0", "how big it is"}, {"galaxy a at 0 0 0 size 10", "size 100 to 400000"}, {"galaxy a at 0 0 0 size 500 kind round", "\"kind\""},
+					{"galaxy a at 0 0 0 size 500 tilt 120", "\"tilt\""}});
+}
