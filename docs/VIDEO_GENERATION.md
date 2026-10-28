@@ -1313,6 +1313,18 @@ so a craft passing swells, sweeps across the picture and fades; near an astronau
 lands with a deep whoomp and a supernova's blast with a boom and a long rumble; a black hole drones so low it is felt more than heard; a jump to hyperspace rises in a rush
 as the stars stretch, booms at the flash and falls away. All of it is the film's soundscape, under its music and dialogue like a nature film's sounds.
 
+**Re-entry and landing: `descent`.** (film_voyage.h)
+
+```
+descent  pod  from 0 20000 -60000  to 0 0 -2000  start 0  land 30  kind shuttle  size 10  chutes on   # `heat H` (1), `colour R G B`, `seed N`
+```
+
+A craft coming down from `from` (high and fast) at nature's time `start` to touching down at `to` at `land`, along a curve that runs long and shallow and then drops, slowing
+all the way, its nose along its way but never steeper than 35 degrees down. Early on it is wrapped in re-entry's fire: a glowing bow shock before its nose and a burning wake
+streaming back along its path, shedding sparks (`heat H` makes it fiercer, 0 none). Then its three parachutes open (`chutes off` to leave them out); just before it lands its
+retro-rockets fire and kick up a ring of dust from the ground; then it rests where it landed. It roars while it burns, and the retro-rockets' blast and the thump of touching
+down are heard from where it is (sound in space, above). Put a planet with air under it (or land on a terrain) for the ground it comes down to.
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

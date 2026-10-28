@@ -9,7 +9,7 @@ namespace film_file {
 
 // Whether `verb` is a space line's.
 inline bool isSpaceVerb(const std::string &verb) {
-	static const std::vector<std::string> k = {"space", "planet", "moon", "nebula", "galaxy", "star", "blackhole", "comet", "asteroids", "remnant", "ship", "astronaut"};
+	static const std::vector<std::string> k = {"space", "planet", "moon", "nebula", "galaxy", "star", "blackhole", "comet", "asteroids", "remnant", "ship", "astronaut", "descent"};
 	return std::find(k.begin(), k.end(), verb) != k.end();
 }
 
@@ -403,6 +403,12 @@ inline std::string spaceLine(Spec &s, const std::string &verb, const std::string
 	if (verb == "remnant") return remnantLine(s, t);
 	if (verb == "ship") return shipLine(s, t);
 	if (verb == "astronaut") return astronautLine(s, t);
+	if (verb == "descent") {   // (film_voyage.h)
+		cosmos::Descent d;
+		const std::string e = cosmos::descentLine(t, d);
+		if (e.empty()) s.descents.push_back(d);
+		return e;
+	}
 	return "unknown space line \"" + verb + "\"";
 }
 

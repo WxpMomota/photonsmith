@@ -146,6 +146,7 @@ inline std::string universeText(const Spec &spec, const std::string &header, dou
 		out += cosmos::astronautText(a, nt, a.tethered ? &to : nullptr);
 	}
 	for (const cosmos::Ship &sh : spec.ships) out += cosmos::shipText(sh, nt);   // (film_voyage.h)
+	for (const cosmos::Descent &d : spec.descents) out += cosmos::descentText(d, nt);
 	for (const cosmos::Remnant &m : spec.remnants) out += cosmos::remnantText(film, m, nt);   // (film_cosmos.h)
 	for (const cosmos::Belt &b : spec.belts) out += cosmos::beltText(b, nt);
 	for (const cosmos::Comet &c : spec.comets) out += cosmos::cometText(film, c, nt, space::sunDirection(spec.space) * -1.0);
@@ -452,6 +453,7 @@ inline void DataFilm::soundscape(audio::Mix &m) const {
 		for (std::size_t k = 0; k < spec.shots.size(); ++k)
 			if (spec.shots[k].spaceCam.kind == cosmos::SpaceCam::Hyperspace) s.jumps.push_back({spec.shots[k].start, k + 1 < spec.shots.size() ? spec.shots[k + 1].start : spec.length});
 		cosmos::spaceSound(m, ears, s);
+		cosmos::descentSound(m, ears, spec.descents, s.natureAt);
 	}
 	for (std::size_t i = 0; i < spec.tornadoes.size(); ++i) {   // a tornado's roar, from its foot, as strong as it is
 		const wind::Tornado &k = spec.tornadoes[i];

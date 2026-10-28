@@ -5,6 +5,7 @@
 //   ship       a shuttle, a fighter, a freighter, a station or a wheel, flying nose first along its way, its engines glowing, its running lights blinking
 //   astronaut  someone floating in a spacesuit, tumbling slowly, tethered to a point or a ship, loose things drifting round them
 //   spacecam   a shot's camera on a journey: an orbit, a slingshot flyby, a powers-of-ten zoom, a jump to hyperspace
+//   descent    a craft coming down: re-entry's fire, its parachutes, its retro-rockets and the dust they raise as it lands
 //   (space)    light in space: planetshine, the lens's flare and glow; sound in space: the hum, engines, breathing, flares, blasts, the rush of hyperspace
 //
 // Coordinates are pbrt's, as a film file's; meshes are made in story space (x mirrored), as cartoon_lib.h's.
@@ -518,6 +519,158 @@ inline void spaceSound(audio::Mix &m, const soundscape::Ears &ears, const SpaceS
 		}
 		m.put(j.t0 + 0.5 * span, audio::noiseBurst(3.0, 0.005, 1.5, 40.0, 1200.0, 2801u + static_cast<unsigned>(i)), 0.9, 0.0, 0.3);
 	}
+}
+
+// ---- re-entry and landing ----
+// A craft coming down (`descent`): from `from` high and fast at nature's time `start` to touching down at `to` at `land`, along a curve that runs long and shallow and then
+// drops, slowing all the way. Early on it is wrapped in re-entry's fire - a bow shock of glowing plasma before its nose and a burning wake streaming behind it, sparks shed
+// along it; then (`chutes on`) its parachutes open; just before it lands its retro-rockets fire and kick up a ring of dust from the ground; then it rests.
+struct Descent {
+	std::string name;
+	Ship craft;   // what comes down: its kind, size, colour, seed (its place and motion are the descent's)
+	Vec3 from{0.0, 20000.0, -60000.0}, to{0.0, 0.0, -2000.0};
+	double start = 0.0, land = 30.0, heat = 1.0;
+	bool chutes = true;
+};
+// How far along its descent it is at nature's time `nt` (0 .. 1, slowing as it comes), and where it is then (pbrt's).
+inline double descentTime(const Descent &d, double nt) { return std::clamp((nt - d.start) / std::max(1e-6, d.land - d.start), 0.0, 1.0); }   // (the share of its time)
+inline double descentU(const Descent &d, double nt) { return 1.0 - std::pow(1.0 - descentTime(d, nt), 2.2); }
+inline Vec3 descentAt(const Descent &d, double s) {
+	const Vec3 bend{d.to.x, d.to.y + 0.35 * (d.from.y - d.to.y), d.to.z};   // (a long shallow run, then the drop)
+	return d.from * ((1.0 - s) * (1.0 - s)) + bend * (2.0 * s * (1.0 - s)) + d.to * (s * s);
+}
+// How hot it is (0 .. 1) that far along: the fire of re-entry, early in the descent.
+inline double descentHeat(const Descent &d, double s) { return d.heat * smoothstep(0.0, 0.06, s) * (1.0 - smoothstep(0.35, 0.6, s)); }
+inline std::string descentText(const Descent &d, double nt) {
+	const double s = descentU(d, nt), u = descentTime(d, nt), heat = descentHeat(d, s), size = d.craft.size;
+	const Vec3 at = descentAt(d, s), ahead = descentAt(d, std::min(1.0, s + 0.002)) - descentAt(d, std::max(0.0, s - 0.002));
+	Ship c = d.craft;   // (its nose along its way, but never steeper than 35 degrees down: it lands level)
+	c.at = at, c.move = {0.0, 0.0, 0.0}, c.engines = 0;
+	const Vec3 flat{-ahead.x, 0.0, ahead.z};   // (story space)
+	if (length(flat) > 1e-9) c.heading = std::atan2(-flat.z, flat.x) * 180.0 / kPi;
+	c.pitch = std::max(-35.0, std::atan2(ahead.y, std::max(1e-9, std::hypot(ahead.x, ahead.z))) * 180.0 / kPi);
+	std::string out = "# a descent (film_voyage.h): " + d.name + "\n" + shipText(c, nt);
+	const Mat4 M = shipPlacement(c, nt);
+	const auto story = [](Vec3 p) { return Vec3{-p.x, p.y, p.z}; };
+	const double flicker = 0.8 + 0.2 * std::sin(nt * 31.0) * std::sin(nt * 17.0 + 1.0);
+	if (heat > 0.01) {
+		// the bow shock: a glowing lens of plasma before its nose
+		const Vec3 shock = Vec3{1.0, 0.55, 0.3} * (5.0 * heat * flicker);
+		out += "# its re-entry fire\n" + attr(diffuseMaterial({0.0, 0.0, 0.0}), emitMesh(uvSphere(1.0, 20, 10), mul(M, translate(0.55, 0.0, 0.0), scale(0.1, 0.3, 0.3))), &shock);
+		// its burning wake, streaming back along its way - white-hot at the craft, cooling to red as it trails off and thinning - and sparks shed along it
+		const Vec3 back = normalize(ahead * -1.0 + Vec3{1e-12, 0.0, 0.0}), side = normalize(cross(back, Vec3{0.0, 1.0, 0.0}) + Vec3{1e-9, 0.0, 0.0}), up = cross(side, back);
+		const double len = size * (6.0 + 8.0 * heat);
+		for (int part = 0; part < 4; ++part) {
+			Mesh wake;
+			for (int k = 0; k < 7; ++k) {
+				std::vector<Vec3> pts;
+				const double a = 2.0 * kPi * (k + 0.37 * part) / 7.0;
+				for (int i = 0; i <= 6; ++i) {
+					const double v = (part + i / 6.0) / 4.0, spread = size * (0.1 + 0.6 * v * (0.7 + 0.6 * hash01(k, 11))),
+								 wob = 0.12 * size * v * std::sin(nt * 9.0 + k * 1.3 + v * 12.0);
+					pts.push_back(story(at + back * (0.45 * size + len * v) + (side * std::cos(a) + up * std::sin(a)) * spread + up * wob));
+				}
+				const Mesh m = sdf::tubeMesh(pts, size * (0.09 - 0.018 * part), 0.8, 6);
+				const int base = static_cast<int>(wake.verts.size());
+				wake.verts.insert(wake.verts.end(), m.verts.begin(), m.verts.end());
+				wake.normals.insert(wake.normals.end(), m.normals.begin(), m.normals.end());
+				for (const auto &tr : m.tris) wake.tris.push_back({tr[0] + base, tr[1] + base, tr[2] + base});
+			}
+			const double cool = part / 3.0;
+			const Vec3 burn = lerp(Vec3{1.0, 0.8, 0.55}, Vec3{1.0, 0.3, 0.08}, cool) * (4.0 * heat * flicker * std::exp(-0.6 * part));
+			out += attr(diffuseMaterial({0.0, 0.0, 0.0}), emitMesh(wake, identity()), &burn);
+		}
+		for (int k = 0; k < 24; ++k) {
+			const double v = std::fmod(hash01(k, 1) + nt * 0.7, 1.0);
+			const Vec3 p = at + back * (size * (1.0 + 14.0 * v)) + (side * (hash01(k, 2) - 0.5) + up * (hash01(k, 3) - 0.5)) * (size * (0.3 + 1.2 * v));
+			out += emissiveSphere(story(p), size * 0.02, Vec3{1.0, 0.7, 0.35} * (6.0 * heat * (1.0 - v)));
+		}
+	}
+	if (d.chutes && u > 0.55 && u < 0.985) {   // its parachutes: three canopies, opening
+		const double open = smoothstep(0.55, 0.6, u);
+		for (int k = 0; k < 3; ++k) {
+			const double a = 2.0 * kPi * k / 3.0;
+			const Vec3 top = at + Vec3{std::cos(a) * 0.45 * size, 1.6 * size, std::sin(a) * 0.45 * size};
+			std::vector<std::pair<double, double>> dome;
+			for (int i = 0; i <= 8; ++i) {
+				const double b = 0.5 * kPi * i / 8.0;
+				dome.push_back({0.5 * size * open * std::cos(b), 0.3 * size * open * std::sin(b)});
+			}
+			out += attr(diffuseMaterial(k % 2 ? Vec3{0.9, 0.9, 0.88} : Vec3{0.95, 0.45, 0.12}), emitMesh(lathe(dome, 20), translate(-top.x, top.y, top.z)));
+			out += attr(diffuseMaterial({0.8, 0.8, 0.8}), emitMesh(sdf::tubeMesh({story(at), story(top)}, 0.006 * size, 1.0, 4), identity()));
+		}
+	}
+	if (u > 0.93 && u < 1.0) {   // the retro-rockets and the dust they kick up, in its last moments
+		const double burn = smoothstep(0.93, 0.95, u), dust = smoothstep(0.94, 1.0, u);
+		out += emissiveSphere(story(at - Vec3{0.0, 0.25 * size, 0.0}), 0.12 * size, Vec3{1.0, 0.75, 0.45} * (8.0 * burn * flicker));
+		for (int k = 0; k < 28; ++k) {
+			const double a = 2.0 * kPi * k / 28.0 + hash01(k, 7), r = size * (0.6 + 2.2 * dust * (0.7 + 0.6 * hash01(k, 8)));
+			const Vec3 p{d.to.x + std::cos(a) * r, d.to.y + 0.15 * size * dust, d.to.z + std::sin(a) * r};
+			out += attr(diffuseMaterial({0.45, 0.4, 0.34}), emitMesh(uvSphere(size * (0.12 + 0.25 * dust) * (0.7 + 0.6 * hash01(k, 9)), 10, 5), translate(-p.x, p.y, p.z)));
+		}
+	}
+	return out;
+}
+// A descent's sound (film_voyage.h's sound in space): the roar of re-entry's fire while it burns, the retro-rockets' blast and the thump of touching down, from where it is.
+inline void descentSound(audio::Mix &m, const soundscape::Ears &ears, const std::vector<Descent> &all, const std::function<double(double)> &natureAt) {
+	const double T = m.seconds();
+	for (std::size_t i = 0; i < all.size(); ++i) {
+		const Descent &d = all[i];
+		const std::vector<std::vector<float>> roar = soundscape::roar(40.0, 900.0, 0.6, 2901u + static_cast<unsigned>(i));
+		int k = 0;
+		bool retro = false, down = false;
+		for (double t = 0.0; t < T; t += 0.3, ++k) {
+			const double nt = natureAt ? natureAt(t) : t, s = descentU(d, nt), u = descentTime(d, nt), heat = descentHeat(d, s);
+			const Vec3 at = descentAt(d, s);
+			if (heat > 0.01) heard(m, ears, t, at, roar[static_cast<std::size_t>(k) % roar.size()], 0.8 * heat, 3.0 * d.craft.size);
+			if (!retro && u > 0.93) retro = true, heard(m, ears, t, at, audio::noiseBurst(2.5, 0.05, 1.2, 80.0, 2500.0, 2911u + static_cast<unsigned>(i)), 0.7, 3.0 * d.craft.size);
+			if (!down && u >= 1.0) down = true, heard(m, ears, t, at, audio::noiseBurst(1.2, 0.002, 0.5, 40.0, 300.0, 2921u + static_cast<unsigned>(i)), 0.9, 3.0 * d.craft.size);
+		}
+	}
+}
+// The words of a `descent` line into `d`: "" or what is wrong with it.
+inline std::string descentLine(const std::vector<std::string> &t, Descent &d) {
+	const std::string usage = "`descent NAME from X Y Z to X Y Z start T0 land T1 [kind shuttle|fighter|freighter|station|wheel] [size S] [colour R G B] [chutes on|off] [heat H] [seed N]` "
+							  "(land after start; size 1 to 20000 m; heat 0 to 4)";
+	const auto number = [](const std::string &s, double &v) {
+		char *end = nullptr;
+		v = std::strtod(s.c_str(), &end);
+		return !s.empty() && end && *end == '\0';
+	};
+	if (t.size() < 2) return usage;
+	Descent out;
+	out.name = t[1], out.craft.name = t[1];
+	bool from = false, to = false, start = false, land = false;
+	for (std::size_t i = 2; i < t.size();) {
+		const std::string &w = t[i];
+		Vec3 v;
+		double a = 0.0;
+		if ((w == "from" || w == "to" || w == "colour") && i + 3 < t.size() && number(t[i + 1], v.x) && number(t[i + 2], v.y) && number(t[i + 3], v.z)) {
+			if (w == "colour" && (std::min({v.x, v.y, v.z}) < 0.0 || std::max({v.x, v.y, v.z}) > 1.0)) return "\"colour\": " + usage;
+			if (w == "from") out.from = v, from = true;
+			else if (w == "to") out.to = v, to = true;
+			else out.craft.colour = v;
+			i += 4;
+		} else if (w == "kind" && i + 1 < t.size() && std::find(shipKinds().begin(), shipKinds().end(), t[i + 1]) != shipKinds().end()) {
+			out.craft.kind = t[i + 1], i += 2;
+		} else if (w == "chutes" && i + 1 < t.size() && (t[i + 1] == "on" || t[i + 1] == "off")) {
+			out.chutes = t[i + 1] == "on", i += 2;
+		} else if (i + 1 < t.size() && number(t[i + 1], a) &&
+				   ((w == "start") || (w == "land") || (w == "size" && a >= 1.0 && a <= 20000.0) || (w == "heat" && a >= 0.0 && a <= 4.0) || w == "seed")) {
+			if (w == "start") out.start = a, start = true;
+			else if (w == "land") out.land = a, land = true;
+			else if (w == "size") out.craft.size = a;
+			else if (w == "heat") out.heat = a;
+			else out.craft.seed = static_cast<int>(a);
+			i += 2;
+		} else {
+			return "\"" + w + "\": " + usage;
+		}
+	}
+	if (!(from && to && start && land)) return "where from, where to, when it starts and when it lands: " + usage;
+	if (out.land <= out.start) return "\"land\" before \"start\": " + usage;
+	d = out;
+	return std::string();
 }
 
 }  // namespace cosmos

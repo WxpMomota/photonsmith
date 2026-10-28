@@ -751,3 +751,39 @@ TEST(FilmUniverseSound, SpaceHumsEnginesRumbleAsTheyPassABlastBoomsAndSilenceIsA
 	EXPECT_EQ(energy(blast, 0.0, 2.9), 0.0);
 	EXPECT_GT(energy(blast, 3.0, 6.0), 0.0) << "the boom";
 }
+
+// ---- 20. re-entry and landing ---------------------------------------------------------------------------------------------------------------------------------------------
+
+TEST(FilmUniverseDescent, ACraftBurnsInOpensItsChutesFiresItsRocketsAndLands) {
+	cs::Descent d;
+	ASSERT_EQ(cs::descentLine({"descent", "pod", "from", "0", "20000", "-60000", "to", "0", "0", "-2000", "start", "0", "land", "30", "size", "10"}, d), "");
+	EXPECT_LT(length(cs::descentAt(d, cs::descentU(d, 0.0)) - d.from), 1e-6);
+	EXPECT_LT(length(cs::descentAt(d, cs::descentU(d, 30.0)) - d.to), 1e-6) << "down where it lands";
+	EXPECT_LT(length(cs::descentAt(d, cs::descentU(d, 40.0)) - d.to), 1e-6) << "and stays";
+	EXPECT_GT(cs::descentU(d, 3.0), 3.0 / 30.0) << "fast at first, slowing as it comes";
+	EXPECT_GT(cs::descentHeat(d, cs::descentU(d, 2.0)), 0.5) << "re-entry's fire early";
+	EXPECT_EQ(cs::descentHeat(d, cs::descentU(d, 25.0)), 0.0);
+	const std::string burning = cs::descentText(d, 2.0), chutes = cs::descentText(d, 20.0), landing = cs::descentText(d, 28.5);
+	EXPECT_NE(burning.find("# its re-entry fire"), std::string::npos);
+	EXPECT_EQ(chutes.find("# its re-entry fire"), std::string::npos);
+	const std::string canopy = "[ 0.95000 0.45000 0.12000 ]", dust = "[ 0.45000 0.40000 0.34000 ]";
+	EXPECT_NE(chutes.find(canopy), std::string::npos) << "its parachutes";
+	EXPECT_EQ(burning.find(canopy), std::string::npos);
+	cs::Descent bare = d;
+	bare.chutes = false;
+	EXPECT_EQ(cs::descentText(bare, 20.0).find(canopy), std::string::npos) << "no chutes when asked";
+	EXPECT_NE(landing.find(dust), std::string::npos) << "dust as it lands";
+	EXPECT_EQ(cs::descentText(d, 40.0).find(dust), std::string::npos) << "then it rests";
+
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("descent", "scene s.pbrt\nlength 30\nspace hum 0\ndescent pod from 0 20000 -60000 to 0 0 -2000 start 0 land 30 kind shuttle size 10\nshot 0 A\n key 0 0 0  0 0 -100  50\n", film), "");
+	EXPECT_NE(film.sceneAt(2.0).find("# a descent (film_voyage.h): pod"), std::string::npos);
+	cartoon::audio::Mix m(30.0);
+	film.soundscape(m);
+	const std::vector<std::int16_t> pcm = m.finish(0.0, 0.0, 0.89, 0.0);
+	double e = 0.0;
+	for (std::int16_t v : pcm) e += double(v) * v;
+	EXPECT_GT(e, 0.0) << "it roars as it burns and thumps as it lands";
+	expectProblems({{"descent pod from 0 1 0 to 0 0 0 start 5 land 2", "\"land\" before \"start\""}, {"descent pod from 0 1 0 to 0 0 0", "when it starts and when it lands"},
+					{"descent pod from 0 1 0 to 0 0 0 start 0 land 9 chutes maybe", "\"chutes\""}});
+}
