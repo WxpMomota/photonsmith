@@ -46,7 +46,15 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 			const fire::Volcano &v = spec.volcanoes[i];
 			if (t < v.t0 || t > v.t1) continue;
 			const double top = groundAt(v.x, v.z);
-			out += fire::smokeText("plume_" + std::to_string(i), {v.x, top + 40.0, v.z}, 1.1 * v.radius, 2.4 * v.height, nt, 31 + static_cast<int>(i), 3.0, {0.4 * v.radius, 0.0, 0.0});
+			const double wa = v.wind * kPi / 180.0;
+			if (v.column > 0.0)   // a column climbing kilometres, spreading into its umbrella
+				out += fire::ashColumnText("ashcolumn_" + std::to_string(i), {v.x, v.rimY, v.z}, 0.15 * v.radius, v.column, t - v.t0, nt, {std::sin(wa), 0.0, std::cos(wa)}, 31 + static_cast<int>(i),
+										   3e4 * v.height / 400.0);
+			else
+				out += fire::smokeText("plume_" + std::to_string(i), {v.x, top + 40.0, v.z}, 1.1 * v.radius, 2.4 * v.height, nt, 31 + static_cast<int>(i), 3.0, {0.4 * v.radius, 0.0, 0.0});
+			for (std::size_t k = 0; k < v.flows.size(); ++k)   // pyroclastic flows racing down its flanks (their grids end below the column's or the plume's)
+				out += fire::flowText("pyroflow_" + std::to_string(i) + "_" + std::to_string(k), v.flows[k], t - v.flows[k].t, nt, groundAt, v.column > 0.0 ? v.rimY : top + 40.0, v.radius,
+									  v.height, 91 + static_cast<int>(k));
 			char buf[200];
 			std::snprintf(buf, sizeof buf, "LightSource \"point\" \"point3 from\" [ %.3f %.3f %.3f ] \"rgb I\" [ %.1f %.1f %.1f ]\n", v.x, top - 15.0, v.z, 6e4 * v.height / 400.0, 2.2e4 * v.height / 400.0,
 						  4e3 * v.height / 400.0);   // (down in the crater: it lights the plume's base from below, not its whole height)
@@ -312,6 +320,12 @@ inline void DataFilm::soundscape(audio::Mix &m) const {
 		const fire::Volcano &v = spec.volcanoes[i];
 		const Vec3 top{v.x, groundAt(v.x, v.z), v.z};
 		ss::lay(m, ears, v.t0, v.t1, 0.5, [top](double) { return top; }, [](double) { return 0.6; }, ss::roar(35.0, 180.0, 1.4, 601u + static_cast<unsigned>(i)), 400.0);   // (above 35 Hz: what speakers can play)
+		for (std::size_t k = 0; k < v.flows.size(); ++k) {   // a pyroclastic flow's roar, from its front as it races down
+			const fire::PyroclasticFlow &f = v.flows[k];
+			const double radius = v.radius;
+			ss::lay(m, ears, f.t, std::min(T, f.t + 60.0), 0.5, [f, radius](double t) { return fire::flowFront(f, t - f.t, radius); }, [f](double t) { return 0.8 * std::exp(-(t - f.t) / 25.0); },
+					ss::roar(40.0, 900.0, 1.0, 611u + static_cast<unsigned>(i * 7 + k)), 250.0);
+		}
 	}
 	// surf: each wave crashing where it breaks near the camera, its wash after
 	if (spec.swell.on && ground && !spec.seas.empty()) {

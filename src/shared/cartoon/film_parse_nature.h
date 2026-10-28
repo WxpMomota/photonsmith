@@ -40,6 +40,87 @@ inline std::string fogBankLine(Spec &s, const std::string &line) {
 	return std::string();
 }
 
+// A `fire`, `lava`, `volcano` or `wildfire` line (film_fire.h). "" or what is wrong with it.
+inline std::string fireLine(Spec &s, const std::string &verb, const std::string &line) {
+	using detail::number;
+	const auto fail = [](const std::string &what) { return what; };
+	const std::vector<std::string> t = detail::tokens(line);
+	fire::Fire fi;
+	fire::Lava la;
+	fire::Volcano vo;
+	fire::Wildfire wf;
+	std::size_t i = 1;
+	double a = 0.0, b = 0.0, c = 0.0, d = 0.0;
+	const std::string usage = verb == "fire" ? "`fire at X Y Z [size S] [during T0 T1] [smoke off] [seed N]`"
+							  : verb == "lava" ? "`lava from X Z [width W] [speed S] [start T]` (down the land from a vent: it needs a `terrain`)"
+							  : verb == "volcano" ? "`volcano at X Z [height H] [radius R] [erupting T0 T1] [column H] [wind DEGREES] [lightning N] [ashfall A] [flow T [toward DEGREES]]` (raised in the land: it needs a `terrain`)"
+												  : "`wildfire in X0 Z0 X1 Z1 [during T0 T1] [wind DEGREES]`";
+	if (verb == "fire") {
+		if (t.size() < 5 || t[1] != "at" || !number(t[2], fi.at.x) || !number(t[3], fi.at.y) || !number(t[4], fi.at.z)) return fail(usage);
+		i = 5;
+	} else if (verb == "lava" || verb == "volcano") {
+		if (t.size() < 4 || t[1] != (verb == "lava" ? "from" : "at") || !number(t[2], a) || !number(t[3], b)) return fail(usage);
+		(verb == "lava" ? la.x : vo.x) = a, (verb == "lava" ? la.z : vo.z) = b;
+		i = 4;
+	} else {
+		if (t.size() < 6 || t[1] != "in" || !number(t[2], a) || !number(t[3], b) || !number(t[4], c) || !number(t[5], d)) return fail(usage);
+		wf.x0 = std::min(a, c), wf.z0 = std::min(b, d), wf.x1 = std::max(a, c), wf.z1 = std::max(b, d);
+		i = 6;
+	}
+	for (; i < t.size();) {
+		if ((t[i] == "during" || t[i] == "erupting") && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && b > a) {
+			if (verb == "fire") fi.t0 = a, fi.t1 = b;
+			else if (verb == "volcano") vo.t0 = a, vo.t1 = b;
+			else if (verb == "wildfire") wf.t0 = a, wf.t1 = b;
+			else return fail(usage);
+			i += 3;
+		} else if (verb == "fire" && t[i] == "smoke" && i + 1 < t.size() && t[i + 1] == "off") {
+			fi.smoke = false;
+			i += 2;
+		} else if (i + 1 < t.size() && number(t[i + 1], a)) {
+			if (verb == "fire" && t[i] == "size" && a > 0.05 && a <= 100.0) fi.size = a;
+			else if (verb == "fire" && t[i] == "seed") fi.seed = static_cast<int>(a);
+			else if (verb == "lava" && t[i] == "width" && a > 0.0) la.width = a;
+			else if (verb == "lava" && t[i] == "speed" && a > 0.0) la.speed = a;
+			else if (verb == "lava" && t[i] == "start") la.t0 = a;
+			else if (verb == "volcano" && t[i] == "height" && a > 10.0) vo.height = a;
+			else if (verb == "volcano" && t[i] == "radius" && a > 20.0) vo.radius = a;
+			else if (verb == "volcano" && t[i] == "column") {
+				if (a < 300.0 || a > 20000.0) return fail("a volcano's ash column climbs 300 to 20000 m");
+				vo.column = a;
+			} else if (verb == "volcano" && t[i] == "wind") vo.wind = a;
+			else if (verb == "volcano" && t[i] == "lightning") {
+				if (a < 1.0 || a > 100.0) return fail("lightning in an ash column: 1 to 100 strikes");
+				vo.lightning = static_cast<int>(a);
+			} else if (verb == "volcano" && t[i] == "ashfall") {
+				if (a <= 0.0 || a > 4.0) return fail("ashfall: an amount above 0, up to 4");
+				vo.ashfall = a;
+			} else if (verb == "volcano" && t[i] == "flow") {
+				fire::PyroclasticFlow f;
+				f.t = a;
+				vo.flows.push_back(f);
+			} else if (verb == "volcano" && t[i] == "toward") {
+				if (vo.flows.empty()) return fail("`toward DEGREES` is the way a flow goes: after `flow T`");
+				vo.flows.back().toward = a, vo.flows.back().towardSet = true;
+			}
+			else if (verb == "wildfire" && t[i] == "wind") wf.wind = a;
+			else return fail("\"" + t[i] + "\": " + usage);
+			i += 2;
+		} else {
+			return fail("\"" + t[i] + "\": " + usage);
+		}
+	}
+	if (verb == "fire") s.fires.push_back(fi);
+	else if (verb == "lava") s.lavas.push_back(la);
+	else if (verb == "volcano") {
+		if (vo.lightning > 0 && vo.column <= 0.0) return fail("lightning flickers in an ash column: give the volcano a `column H`");
+		for (const fire::PyroclasticFlow &f : vo.flows)
+			if (f.t < vo.t0 || f.t > vo.t1) return fail("a pyroclastic flow comes while the volcano erupts: `flow T` with T in its `erupting T0 T1`");
+		s.volcanoes.push_back(vo);
+	} else s.wildfires.push_back(wf);
+	return std::string();
+}
+
 // One line of a film file, if it is a nature line: what it says goes into `s`. `handled` is false when `verb` is not a nature word (the line is parse()'s); the
 // result is "" or what is wrong with the line (parse() adds the file and the line).
 inline std::string natureLine(Spec &s, const std::string &verb, const std::string &line, const std::string &rest, bool &handled) {
@@ -403,7 +484,7 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		const std::vector<std::string> t = detail::tokens(line);
 		particles::Weather wt;
 		if (t.size() < 2 || std::find(particles::weatherKinds().begin(), particles::weatherKinds().end(), t[1]) == particles::weatherKinds().end())
-			return fail("`weather KIND [AMOUNT] [from T] [to T] [ground Y]`: rain, snow, leaves or dust");
+			return fail("`weather KIND [AMOUNT] [from T] [to T] [ground Y]`: rain, snow, leaves, dust or ash");
 		wt.kind = t[1];
 		std::size_t i = 2;
 		if (i < t.size() && number(t[i], wt.amount)) ++i;
@@ -564,58 +645,7 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		if (verb == "kelp") s.kelps.push_back(kp);
 		else s.corals.push_back(co);
 	} else if (verb == "fire" || verb == "lava" || verb == "volcano" || verb == "wildfire") {
-		const std::vector<std::string> t = detail::tokens(line);
-		fire::Fire fi;
-		fire::Lava la;
-		fire::Volcano vo;
-		fire::Wildfire wf;
-		std::size_t i = 1;
-		double a = 0.0, b = 0.0, c = 0.0, d = 0.0;
-		const std::string usage = verb == "fire" ? "`fire at X Y Z [size S] [during T0 T1] [smoke off] [seed N]`"
-								  : verb == "lava" ? "`lava from X Z [width W] [speed S] [start T]` (down the land from a vent: it needs a `terrain`)"
-								  : verb == "volcano" ? "`volcano at X Z [height H] [radius R] [erupting T0 T1]` (raised in the land: it needs a `terrain`)"
-													  : "`wildfire in X0 Z0 X1 Z1 [during T0 T1] [wind DEGREES]`";
-		if (verb == "fire") {
-			if (t.size() < 5 || t[1] != "at" || !number(t[2], fi.at.x) || !number(t[3], fi.at.y) || !number(t[4], fi.at.z)) return fail(usage);
-			i = 5;
-		} else if (verb == "lava" || verb == "volcano") {
-			if (t.size() < 4 || t[1] != (verb == "lava" ? "from" : "at") || !number(t[2], a) || !number(t[3], b)) return fail(usage);
-			(verb == "lava" ? la.x : vo.x) = a, (verb == "lava" ? la.z : vo.z) = b;
-			i = 4;
-		} else {
-			if (t.size() < 6 || t[1] != "in" || !number(t[2], a) || !number(t[3], b) || !number(t[4], c) || !number(t[5], d)) return fail(usage);
-			wf.x0 = std::min(a, c), wf.z0 = std::min(b, d), wf.x1 = std::max(a, c), wf.z1 = std::max(b, d);
-			i = 6;
-		}
-		for (; i < t.size();) {
-			if ((t[i] == "during" || t[i] == "erupting") && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && b > a) {
-				if (verb == "fire") fi.t0 = a, fi.t1 = b;
-				else if (verb == "volcano") vo.t0 = a, vo.t1 = b;
-				else if (verb == "wildfire") wf.t0 = a, wf.t1 = b;
-				else return fail(usage);
-				i += 3;
-			} else if (verb == "fire" && t[i] == "smoke" && i + 1 < t.size() && t[i + 1] == "off") {
-				fi.smoke = false;
-				i += 2;
-			} else if (i + 1 < t.size() && number(t[i + 1], a)) {
-				if (verb == "fire" && t[i] == "size" && a > 0.05 && a <= 100.0) fi.size = a;
-				else if (verb == "fire" && t[i] == "seed") fi.seed = static_cast<int>(a);
-				else if (verb == "lava" && t[i] == "width" && a > 0.0) la.width = a;
-				else if (verb == "lava" && t[i] == "speed" && a > 0.0) la.speed = a;
-				else if (verb == "lava" && t[i] == "start") la.t0 = a;
-				else if (verb == "volcano" && t[i] == "height" && a > 10.0) vo.height = a;
-				else if (verb == "volcano" && t[i] == "radius" && a > 20.0) vo.radius = a;
-				else if (verb == "wildfire" && t[i] == "wind") wf.wind = a;
-				else return fail("\"" + t[i] + "\": " + usage);
-				i += 2;
-			} else {
-				return fail("\"" + t[i] + "\": " + usage);
-			}
-		}
-		if (verb == "fire") s.fires.push_back(fi);
-		else if (verb == "lava") s.lavas.push_back(la);
-		else if (verb == "volcano") s.volcanoes.push_back(vo);
-		else s.wildfires.push_back(wf);
+		return fireLine(s, verb, line);
 	} else if (verb == "geyser" || verb == "rockfall" || verb == "avalanche") {   // the land in action (film_geology.h)
 		const std::vector<std::string> t = detail::tokens(line);
 		const std::string where = verb == "geyser" ? "at" : "from";

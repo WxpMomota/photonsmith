@@ -8,7 +8,8 @@
 //   lava       a glowing flow down the land from a vent: a ribbon in the lowest ground (as a river finds its way: film_water.h), its surface a crust of dark rock broken by
 //              glowing cracks (an area light with a picture), creeping downhill;
 //   volcano    a cone raised in the land with a crater at its top; erupting, it throws lava fountains and a towering plume of ash, glows in its crater, and lava runs down
-//              its flanks;
+//              its flanks; with a `column`, its ash climbs kilometres in a column that spreads into an umbrella, lightning flickers in it, ash falls round the camera,
+//              and pyroclastic flows - avalanches of hot ash - race down its flanks;
 //   wildfire   a line of flames sweeping across the land with the wind, smoke rising behind it.
 //
 // Flames and smoke are written into each frame (their grids change every frame); their spheres are kept apart, as a renderer follows one medium at a time, and the camera
@@ -17,6 +18,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -39,8 +41,21 @@ struct Lava {
 	double x = 0.0, z = 0.0, width = 6.0, speed = 0.4, t0 = 0.0;
 	std::vector<Vec3> path;   // worked out when the film is loaded (on its terrain)
 };
+// A pyroclastic flow: when it starts down the volcano, the way it goes (a compass bearing, as `wind`; else a way of its own), and its path down the land from the crater's
+// rim (worked out when the film is loaded).
+struct PyroclasticFlow {
+	double t = 0.0, toward = 0.0;
+	bool towardSet = false;
+	std::vector<Vec3> path;
+};
 struct Volcano {
 	double x = 0.0, z = -1500.0, height = 450.0, radius = 900.0, t0 = 0.0, t1 = 1e30;
+	double column = 0.0;    // an ash column this high above the crater, spreading into an umbrella (0: the plume of ash)
+	double wind = 90.0;     // the way the column leans and its umbrella drifts (a compass bearing)
+	int lightning = 0;      // strikes in the column
+	double ashfall = 0.0;   // how much ash falls round the camera (as a `weather` amount)
+	double rimY = 0.0;      // (the crater's rim: worked out when the film is loaded)
+	std::vector<PyroclasticFlow> flows;
 };
 struct Wildfire {
 	double x0 = -200.0, z0 = -200.0, x1 = 200.0, z1 = 200.0, t0 = 0.0, t1 = 30.0, wind = 0.0;
@@ -140,6 +155,156 @@ inline std::string smokeText(const std::string &name, Vec3 base, double width, d
 	std::snprintf(buf, sizeof buf, "AttributeBegin\n  Translate %.4f %.4f %.4f\n  Material \"interface\"\n  MediumInterface \"%s\" \"\"\n  Shape \"sphere\" \"float radius\" [ %.4f ]\nAttributeEnd\n", base.x,
 				  base.y + 0.5 * height, base.z, name.c_str(), radius);
 	return out + buf;
+}
+
+// ---- an eruption's ash ----
+// How long an ash column takes to climb to its height (seconds): a hundred metres a second or more, slowing as it goes.
+inline double columnRise(double column) { return std::clamp(column / 120.0, 6.0, 60.0); }
+// An ash column `since` seconds into its eruption: its top (above the vent) and the radius of its umbrella, the cloud it spreads into where it stops rising.
+inline void columnShape(double column, double since, double &top, double &umbrella) {
+	const double rise = columnRise(column), u = clamp01(since / rise);
+	top = column * std::max(0.05, 1.0 - std::pow(1.0 - u, 1.7));
+	umbrella = 0.6 * column * (1.0 - std::exp(-std::max(0.0, since - 0.7 * rise) / (0.6 * rise)));
+}
+// An ash column at `since` seconds into its eruption, as scene text: a column `ventR` across at the vent (pbrt's: the crater's rim height), widening as it climbs, leaning
+// downwind (`wind`: a unit direction across) and billowing (`nt`: the noise's time), its head spreading into an umbrella that drifts downwind; one grid, in a sphere round it.
+// The lava in the crater lights its foot from inside.
+inline std::string ashColumnText(const std::string &name, Vec3 vent, double ventR, double column, double since, double nt, Vec3 wind, int seed, double glow) {
+	double top = 0.0, umbrella = 0.0;
+	columnShape(column, since, top, umbrella);
+	const double lean = 0.15 * top, rcTop = ventR + 0.18 * top;
+	const double hu = 0.86 * top, ht = 0.1 * top + 0.02 * umbrella;   // (the umbrella: a lens round this height, this thick each way)
+	const double half = (std::max(rcTop, 1.3 * umbrella) + lean + 0.3 * umbrella) * 1.1, height = 1.02 * top + 0.02 * umbrella;
+	const int nx = 56, ny = 56, nz = 56;
+	const double L = 0.06 * column;   // (the billows' size)
+	std::string dens;
+	dens.reserve(static_cast<std::size_t>(nx) * ny * nz * 6);
+	for (int k = 0; k < nz; ++k)
+		for (int j = 0; j < ny; ++j)
+			for (int i = 0; i < nx; ++i) {
+				const double dx = ((i + 0.5) / nx - 0.5) * 2.0 * half, dy = (j + 0.5) / ny * height, dz = ((k + 0.5) / nz - 0.5) * 2.0 * half;
+				const double billow = detail::fbm3(dx / L, dy / L - 0.15 * nt, dz / L, seed);
+				const double bend = lean * (dy / top) * (dy / top);   // (it bends with the wind as it climbs)
+				const double r = std::hypot(dx - wind.x * bend, dz - wind.z * bend), rc = ventR + 0.18 * dy;
+				const double head = std::hypot(r, std::max(0.0, dy - (top - rcTop)));   // (a rounded head)
+				double d = smoothstep(rc, 0.35 * rc, head * (0.65 + 0.7 * billow));
+				if (umbrella > 1.0 && std::abs(dy - hu) < ht) {
+					const double off = lean * (hu / top) * (hu / top) + 0.3 * umbrella;
+					const double ru = std::hypot(dx - wind.x * off, dz - wind.z * off), Ru = umbrella * std::sqrt(1.0 - (dy - hu) * (dy - hu) / (ht * ht));
+					d = std::max(d, smoothstep(Ru, 0.4 * Ru, ru * (0.65 + 0.7 * billow)));
+				}
+				detail::put(dens, d * (0.5 + billow) * smoothstep(0.0, 0.02 * top, dy));
+			}
+	char buf[480];
+	std::string out = "# an ash column (film_fire.h)\nAttributeBegin\n";
+	std::snprintf(buf, sizeof buf, "  Translate %.4f %.4f %.4f\n  Scale %.4f %.4f %.4f\n", vent.x - half, vent.y, vent.z - half, 2.0 * half, height, 2.0 * half);
+	out += buf;
+	std::snprintf(buf, sizeof buf,
+				  "  MakeNamedMedium \"%s\" \"string type\" [ \"uniformgrid\" ] \"integer nx\" [ %d ] \"integer ny\" [ %d ] \"integer nz\" [ %d ] \"rgb sigma_a\" [ 0.012 0.0125 0.013 ] \"rgb sigma_s\" [ 0.008 0.0077 0.0073 ] \"float g\" [ 0.4 ]\n",
+				  name.c_str(), nx, ny, nz);
+	out += buf;
+	out += "    \"float density\" [ " + dens + "]\nAttributeEnd\n";
+	const double radius = std::sqrt(2.0 * half * half + 0.25 * height * height) * 1.01;
+	std::snprintf(buf, sizeof buf, "AttributeBegin\n  Translate %.4f %.4f %.4f\n  Material \"interface\"\n  MediumInterface \"%s\" \"\"\n  Shape \"sphere\" \"float radius\" [ %.4f ]\nAttributeEnd\n", vent.x,
+				  vent.y + 0.5 * height, vent.z, name.c_str(), radius);
+	out += buf;
+	// the column's foot, lit by the fountains of lava in it
+	std::snprintf(buf, sizeof buf, "LightSource \"point\" \"point3 from\" [ %.3f %.3f %.3f ] \"rgb I\" [ %.1f %.1f %.1f ]\n", vent.x, vent.y + 0.04 * top, vent.z, glow, 0.38 * glow, 0.07 * glow);
+	return out + buf;
+}
+
+// A pyroclastic flow `since` seconds after it set off, as scene text: an avalanche of hot ash racing down its path from the rim, fast at first and slowing as it spreads, a
+// ground-hugging cloud thicker and wider the further it has gone, its head billowing highest; behind the head the ash lofts and thins away. One grid round the stretch it
+// has covered, kept below `topLimit` (where the column's own grid starts). `radius`, `height`: the volcano's.
+inline std::string flowText(const std::string &name, const PyroclasticFlow &f, double since, double nt, const std::function<double(double, double)> &groundAt, double topLimit,
+							double radius, double height, int seed) {
+	if (since < 0.0 || since > 120.0 || f.path.size() < 2) return std::string();
+	std::vector<double> along(f.path.size(), 0.0);
+	for (std::size_t i = 1; i < f.path.size(); ++i) along[i] = along[i - 1] + std::hypot(f.path[i].x - f.path[i - 1].x, f.path[i].z - f.path[i - 1].z);
+	const double maxReach = std::max(1.0, std::min(along.back(), 2.4 * radius)), v0 = 0.1 * radius;
+	const double reach = std::max(0.02 * maxReach, maxReach * (1.0 - std::exp(-since * v0 / maxReach)));
+	const auto passed = [&](double s) { return -maxReach / v0 * std::log(std::max(1e-6, 1.0 - std::min(s, reach) / maxReach)); };   // (when the front passed s)
+	// its path to the front, every so far, and how far along each point is
+	std::vector<Vec3> p;
+	std::vector<double> ps;
+	for (int k = 0; k <= 40; ++k) {
+		const double s = reach * k / 40.0;
+		const std::size_t i = static_cast<std::size_t>(std::upper_bound(along.begin(), along.end(), s) - along.begin());
+		const std::size_t b = std::min(i, f.path.size() - 1), a = b > 0 ? b - 1 : 0;
+		const double u = along[b] > along[a] ? clamp01((s - along[a]) / (along[b] - along[a])) : 0.0;
+		const Vec3 q = lerp(f.path[a], f.path[b], u);
+		p.push_back({q.x, groundAt(q.x, q.z), q.z}), ps.push_back(s);
+	}
+	const auto thick = [&](double s, double age) {   // (how high the cloud stands and how wide it is at s)
+		const double headBulge = 1.0 + 0.6 * std::exp(-std::pow((reach - s) / (0.06 * maxReach), 2.0));
+		return std::pair<double, double>{height * (0.15 + 0.25 * s / maxReach) * (1.0 + 0.04 * age) * headBulge, radius * (0.06 + 0.12 * s / maxReach) * (1.0 + 0.03 * age) * (0.7 + 0.3 * headBulge)};
+	};
+	double lo[3] = {1e30, 1e30, 1e30}, hi[3] = {-1e30, -1e30, -1e30};
+	for (std::size_t k = 0; k < p.size(); ++k) {
+		const auto [H, R] = thick(ps[k], since - passed(ps[k]));
+		lo[0] = std::min(lo[0], p[k].x - 1.3 * R), hi[0] = std::max(hi[0], p[k].x + 1.3 * R);
+		lo[2] = std::min(lo[2], p[k].z - 1.3 * R), hi[2] = std::max(hi[2], p[k].z + 1.3 * R);
+		lo[1] = std::min(lo[1], p[k].y - 5.0), hi[1] = std::max(hi[1], p[k].y + 1.3 * H);
+	}
+	hi[1] = std::min(hi[1], topLimit);
+	if (hi[1] <= lo[1] + 1.0) return std::string();
+	const int nx = 56, ny = 40, nz = 56;
+	std::vector<double> nearS(static_cast<std::size_t>(nx) * nz), nearD(nearS.size()), ground(nearS.size());
+	for (int k = 0; k < nz; ++k)
+		for (int i = 0; i < nx; ++i) {   // each column of the grid: the nearest point of the path, how far along it is, the ground under it
+			const double x = lo[0] + (i + 0.5) / nx * (hi[0] - lo[0]), z = lo[2] + (k + 0.5) / nz * (hi[2] - lo[2]);
+			double best = 1e30, bs = 0.0;
+			for (std::size_t q = 0; q + 1 < p.size(); ++q) {
+				const double ex = p[q + 1].x - p[q].x, ez = p[q + 1].z - p[q].z, l2 = ex * ex + ez * ez;
+				const double u = l2 > 0.0 ? clamp01(((x - p[q].x) * ex + (z - p[q].z) * ez) / l2) : 0.0;
+				const double d = std::hypot(x - p[q].x - u * ex, z - p[q].z - u * ez);
+				if (d < best) best = d, bs = ps[q] + u * (ps[q + 1] - ps[q]);
+			}
+			const std::size_t c = static_cast<std::size_t>(k) * nx + i;
+			nearS[c] = bs, nearD[c] = best, ground[c] = groundAt(x, z);
+		}
+	std::string dens;
+	dens.reserve(static_cast<std::size_t>(nx) * ny * nz * 6);
+	for (int k = 0; k < nz; ++k)
+		for (int j = 0; j < ny; ++j)
+			for (int i = 0; i < nx; ++i) {
+				const std::size_t c = static_cast<std::size_t>(k) * nx + i;
+				const double x = lo[0] + (i + 0.5) / nx * (hi[0] - lo[0]), y = lo[1] + (j + 0.5) / ny * (hi[1] - lo[1]), z = lo[2] + (k + 0.5) / nz * (hi[2] - lo[2]);
+				const double age = since - passed(nearS[c]);
+				const auto [H, R] = thick(nearS[c], age);
+				const double above = y - ground[c];
+				const double billow = detail::fbm3(x / (0.04 * radius), (y - 2.0 * nt) / (0.03 * radius), z / (0.04 * radius), seed);
+				const double d = above < -1.0 ? 0.0
+											  : smoothstep(R, 0.3 * R, nearD[c] * (0.6 + 0.8 * billow)) * smoothstep(H, 0.25 * H, std::max(0.0, above) * (0.6 + 0.8 * billow)) *
+													std::exp(-age / 30.0) * (0.6 + 0.8 * billow);
+				detail::put(dens, d);
+			}
+	char buf[480];
+	std::string out = "# a pyroclastic flow (film_fire.h)\nAttributeBegin\n";
+	std::snprintf(buf, sizeof buf, "  Translate %.4f %.4f %.4f\n  Scale %.4f %.4f %.4f\n", lo[0], lo[1], lo[2], hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]);
+	out += buf;
+	std::snprintf(buf, sizeof buf,
+				  "  MakeNamedMedium \"%s\" \"string type\" [ \"uniformgrid\" ] \"integer nx\" [ %d ] \"integer ny\" [ %d ] \"integer nz\" [ %d ] \"rgb sigma_a\" [ 0.03 0.031 0.033 ] \"rgb sigma_s\" [ 0.03 0.0285 0.027 ] \"float g\" [ 0.3 ]\n",
+				  name.c_str(), nx, ny, nz);
+	out += buf;
+	out += "    \"float density\" [ " + dens + "]\nAttributeEnd\n";
+	const double cx = 0.5 * (lo[0] + hi[0]), cy = 0.5 * (lo[1] + hi[1]), cz = 0.5 * (lo[2] + hi[2]);
+	const double rad = 0.5 * std::sqrt((hi[0] - lo[0]) * (hi[0] - lo[0]) + (hi[1] - lo[1]) * (hi[1] - lo[1]) + (hi[2] - lo[2]) * (hi[2] - lo[2])) * 1.01;
+	std::snprintf(buf, sizeof buf, "AttributeBegin\n  Translate %.4f %.4f %.4f\n  Material \"interface\"\n  MediumInterface \"%s\" \"\"\n  Shape \"sphere\" \"float radius\" [ %.4f ]\nAttributeEnd\n", cx, cy, cz,
+				  name.c_str(), rad);
+	return out + buf;
+}
+// Where a pyroclastic flow's front is `since` seconds after it set off (pbrt's), for its roar.
+inline Vec3 flowFront(const PyroclasticFlow &f, double since, double radius) {
+	if (f.path.empty()) return {};
+	double s = 0.0, total = 0.0;
+	for (std::size_t i = 1; i < f.path.size(); ++i) total += std::hypot(f.path[i].x - f.path[i - 1].x, f.path[i].z - f.path[i - 1].z);
+	const double maxReach = std::max(1.0, std::min(total, 2.4 * radius)), reach = maxReach * (1.0 - std::exp(-std::max(0.0, since) * 0.1 * radius / maxReach));
+	for (std::size_t i = 1; i < f.path.size(); ++i) {
+		s += std::hypot(f.path[i].x - f.path[i - 1].x, f.path[i].z - f.path[i - 1].z);
+		if (s >= reach) return f.path[i];
+	}
+	return f.path.back();
 }
 
 // ---- lava ----

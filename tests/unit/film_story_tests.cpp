@@ -560,7 +560,7 @@ TEST(FilmParticles, WeatherStandsStillInTheWorldAndParticlesLiveTheirLives) {
 	for (std::size_t i = 0; i < pcm.size(); ++i) (i < cartoon::audio::kRate * 2 * 0.9 ? before : during) += std::abs(static_cast<double>(pcm[i]));
 	EXPECT_GT(during, 10.0 * before + 1.0) << "the rain is heard while it rains";
 	ff::DataFilm bad;
-	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nweather hail\n", bad).find("rain, snow, leaves or dust"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nweather hail\n", bad).find("rain, snow, leaves, dust or ash"), std::string::npos);
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nparticles smoke at 0 0 0 1 2\n", bad).find("sparks, dust or splash"), std::string::npos);
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nburst splash at 0 0 0 1 rate 5\n", bad).find("a burst takes count"), std::string::npos);
 }

@@ -786,7 +786,7 @@ own (crickets, birds and wind as in Forest Dawn and the Nomai film; a brook of r
 **Weather and particles: `weather`, `particles`, `burst`.** (film_particles.h)
 
 ```
-weather   rain 0.8 from 4 to 14            # rain, snow, leaves or dust; amount 1 a good shower (up to 4); eased in and out over 1.5 s; `ground Y`
+weather   rain 0.8 from 4 to 14            # rain, snow, leaves, dust or ash; amount 1 a good shower (up to 4); eased in and out over 1.5 s; `ground Y`
 particles sparks at 1 0.9 -2  3 5  rate 80 # sparks, dust or a splash thrown from a place from 3 s to 5 s, 80 a second (`speed S`)
 burst     splash at 0 0 -1  6.2  count 60  # all at once
 ```
@@ -905,6 +905,23 @@ cloud with the peaks standing out above. A fog bank pools in the low ground roun
 through both and the camera may be inside either: every renderer samples a volume along each ray up to the nearest surface, and the GPU cuts a grid volume's flight to
 its own box, so a deck's kilometres-wide sphere does not hide a fog bank under it (`pbrt_scenes/fog-under-cloud-deck.pbrt`). `ray_tracer --film-scene KEY@SECONDS OUT.pbrt`
 writes a frame's scene text to look into.
+
+**An eruption: an ash column, lightning in it, falling ash, pyroclastic flows.** (`volcano` options; film_fire.h; nature round 9, 2026-10-27)
+
+```
+volcano  at 0 -1500  height 450  radius 900  erupting 2 60  column 3000  wind 90  lightning 8  ashfall 1  flow 14 toward 20  flow 30
+weather  ash 2                                                 # ash on its own, as rain or snow
+```
+
+`column H` turns the plume into an ash column climbing H metres (300 to 20000) over the crater's rim: about 120 m a second, slowing as it goes (6 to 60 s to the top),
+widening as it climbs and leaning downwind (`wind`, a compass bearing, 90 by default), and once it is up its head spreads into an umbrella (out to 0.6 H from its middle) drifting
+downwind. It is one grey `uniformgrid` of 56 x 56 x 56 written into each frame (some 1 MB of text), its foot lit orange from inside by the lava fountains. `lightning N`
+(1 to 100; it needs a column) flashes N bolts in the column from a third of the way up down to the crater and the upper flanks, the first once the column is half up, each
+lighting the ash round it, its thunder heard. `ashfall A` (up to 4) brings flakes of ash fluttering down round the camera once the umbrella has spread over, until 30 s after
+the eruption. `flow T [toward DEGREES]` sends a pyroclastic flow down from the rim at T (in the eruption), the way given or a way of its own, down the land as lava would go:
+it races off at a tenth of the volcano's radius a second and slows as it spreads, reaching up to 2.4 radii; a grey cloud hugging the ground, thicker and wider the further it
+has gone, its head billowing highest, lofting and thinning away behind over half a minute, its roar heard from its front. Its grid stays below the column's, so the two
+never overlap. The camera may be inside any of them.
 
 **Forests: `forest`.** (film_forest.h)
 
@@ -1213,7 +1230,7 @@ with `mist`.
 
 ```
 fire      at 0 0 -6  size 1.2                          # flames 1.2 m tall (on a terrain, on the ground there); `during T0 T1`, `smoke off`, `seed N`
-volcano   at 0 -1500  height 450  radius 900           # a cone raised in the land, erupting (`erupting T0 T1`)
+volcano   at 0 -1500  height 450  radius 900           # a cone raised in the land, erupting (`erupting T0 T1`; `column`, `lightning`, `ashfall`, `flow`: round 9)
 lava      from 120 -300  width 6  speed 0.4            # a flow down the land from a vent (`start T`)
 wildfire  in -200 -300 200 -100  during 0 20  wind 0   # a fire front sweeping across with the wind
 ```

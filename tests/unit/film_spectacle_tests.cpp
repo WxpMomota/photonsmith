@@ -155,3 +155,89 @@ TEST(FilmSpectacleClouds, ADeckCoversTheSkyWithGapsAndFogBanksLieOnTheLandAndBur
 	}
 }
 
+// ---- 2. an eruption --------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace fire = cartoon::fire;
+
+namespace {
+// The box (corner, then size) of the grid medium `name` in a frame's text.
+std::vector<double> gridBox(const std::string &s, const std::string &name) {
+	const std::size_t at = s.find("MakeNamedMedium \"" + name + "\"");
+	if (at == std::string::npos) return {};
+	const std::size_t begin = s.rfind("AttributeBegin", at);
+	std::vector<double> v = numbersAfter(s, "Translate ", begin);
+	const std::vector<double> sc = numbersAfter(s, "Scale ", begin);
+	v.insert(v.end(), sc.begin(), sc.end());
+	return v;
+}
+}  // namespace
+
+// An ash column climbs fast and slows, spreading into its umbrella only once it is up; lightning flickers in it from part way up, ash falls round the camera once the
+// umbrella is over, and a pyroclastic flow races down from the rim the way it is sent, its cloud reaching further and growing, kept below the column's grid.
+TEST(FilmSpectacleVolcano, AnAshColumnClimbsIntoAnUmbrellaWithLightningAshAndPyroclasticFlows) {
+	double top = 0.0, umbrella = 0.0, top2 = 0.0, umbrella2 = 0.0, top3 = 0.0, umbrella3 = 0.0;
+	fire::columnShape(2400.0, 2.0, top, umbrella);
+	fire::columnShape(2400.0, 0.5 * fire::columnRise(2400.0), top2, umbrella2);
+	fire::columnShape(2400.0, 3.0 * fire::columnRise(2400.0), top3, umbrella3);
+	EXPECT_LT(top, top2);
+	EXPECT_GT(top2 - top, 0.0);
+	EXPECT_NEAR(top3, 2400.0, 1e-6) << "up to its height";
+	EXPECT_EQ(umbrella, 0.0);
+	EXPECT_EQ(umbrella2, 0.0) << "no umbrella while it is still climbing";
+	EXPECT_GT(umbrella3, 0.3 * 2400.0);
+
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("volcano", "scene s.pbrt\nlength 60\nterrain hills size 4000 height 60 seed 2\n"
+								  "volcano at 0 -600 height 300 radius 600 erupting 1 60 column 2400 wind 90 lightning 6 ashfall 1.5 flow 10 toward 180 flow 20\n"
+								  "shot 0 A\n key 0 200 1500  0 600 -600\n",
+						film),
+			  "");
+	ASSERT_EQ(film.spec.volcanoes.size(), 1u);
+	const fire::Volcano &v = film.spec.volcanoes[0];
+	const std::shared_ptr<const cartoon::terrain::Field> land = cartoon::terrain::fieldOf(film.spec.terrain);
+	EXPECT_GT(v.rimY, land->heightAt(0.0, -600.0)) << "the rim stands above the crater's floor";
+	ASSERT_EQ(film.spec.lightnings.size(), 1u);
+	EXPECT_EQ(film.spec.lightnings[0].strikes.size(), 6u);
+	EXPECT_NEAR(film.spec.lightnings[0].base, v.rimY + 0.35 * 2400.0, 1e-6);
+	EXPECT_GE(film.spec.lightnings[0].t0, 1.0 + 0.5 * fire::columnRise(2400.0) - 1e-9);
+	for (const cartoon::skyfx::Strike &st : film.spec.lightnings[0].strikes) EXPECT_LT(std::hypot(st.x, st.z + 600.0), 0.12 * 600.0 + 1e-6) << "over the crater";
+	ASSERT_EQ(std::count_if(film.spec.weather.begin(), film.spec.weather.end(), [](const cartoon::particles::Weather &w) { return w.kind == "ash"; }), 1);
+	// the flows: from the rim, downhill, the first toward 180 degrees (pbrt's -z)
+	ASSERT_EQ(v.flows.size(), 2u);
+	for (const fire::PyroclasticFlow &f : v.flows) {
+		ASSERT_GT(f.path.size(), 20u);
+		EXPECT_LT(f.path.back().y, f.path.front().y - 150.0) << "down the volcano";
+	}
+	EXPECT_LT(v.flows[0].path[20].z, -600.0 - 0.1 * 600.0) << "toward 180: down the far (-z) side";
+
+	const std::string early = film.sceneAt(4.0), mid = film.sceneAt(14.0), late = film.sceneAt(30.0);
+	EXPECT_NE(early.find("ashcolumn_0"), std::string::npos);
+	EXPECT_EQ(early.find("plume_0"), std::string::npos) << "the column instead of the plume";
+	EXPECT_EQ(early.find("pyroflow_0_0"), std::string::npos) << "not yet";
+	EXPECT_NE(mid.find("pyroflow_0_0"), std::string::npos);
+	EXPECT_EQ(mid.find("pyroflow_0_1"), std::string::npos);
+	EXPECT_NE(late.find("pyroflow_0_1"), std::string::npos);
+	const std::vector<double> c0 = gridBox(early, "ashcolumn_0"), c1 = gridBox(late, "ashcolumn_0");
+	ASSERT_EQ(c0.size(), 6u);
+	ASSERT_EQ(c1.size(), 6u);
+	EXPECT_NEAR(c0[1], v.rimY, 1e-3) << "from the rim up";
+	EXPECT_GT(c1[4], 2.0 * c0[4]) << "climbing";
+	EXPECT_GT(c1[3], 2.0 * c0[3]) << "its umbrella spreading";
+	const std::vector<double> f0 = gridBox(mid, "pyroflow_0_0"), f1 = gridBox(late, "pyroflow_0_0");
+	ASSERT_EQ(f0.size(), 6u);
+	ASSERT_EQ(f1.size(), 6u);
+	EXPECT_GT(f1[3] * f1[5], 1.5 * f0[3] * f0[5]) << "reaching further";
+	EXPECT_LE(f1[1] + f1[4], v.rimY + 1e-3) << "kept below the column's grid";
+	EXPECT_EQ(film.sceneAt(4.0).find("pyroflow"), std::string::npos);
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{
+			 {"terrain hills\nvolcano at 0 0 column 100", "300 to 20000"},
+			 {"terrain hills\nvolcano at 0 0 lightning 4", "give the volcano a `column H`"},
+			 {"terrain hills\nvolcano at 0 0 erupting 2 8 flow 20", "while the volcano erupts"},
+			 {"terrain hills\nvolcano at 0 0 toward 90", "after `flow T`"},
+			 {"terrain hills\nvolcano at 0 0 ashfall 9", "up to 4"}}) {
+		const std::string problem = problemOf(line);
+		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
+	}
+	ff::DataFilm ash;
+	EXPECT_EQ(loadFilm("ash", "scene s.pbrt\nlength 4\nweather ash 2\n", ash), "") << "ash is a weather of its own too";
+}

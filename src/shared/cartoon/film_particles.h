@@ -19,7 +19,7 @@
 namespace cartoon {
 namespace particles {
 
-// Weather over the set: its kind (rain, snow, leaves), how much (1 a good shower), from when to when (it eases in and out over 1.5 s), the ground's height.
+// Weather over the set: its kind (rain, snow, leaves, dust, ash), how much (1 a good shower), from when to when (it eases in and out over 1.5 s), the ground's height.
 struct Weather {
 	std::string kind;
 	double amount = 1.0, t0 = 0.0, t1 = 1e30, ground = 0.0;
@@ -34,7 +34,7 @@ struct Emitter {
 	int count = 0;   // (a burst) how many
 };
 inline const std::vector<std::string> &weatherKinds() {
-	static const std::vector<std::string> k = {"rain", "snow", "leaves", "dust"};
+	static const std::vector<std::string> k = {"rain", "snow", "leaves", "dust", "ash"};
 	return k;
 }
 inline const std::vector<std::string> &emitterKinds() {
@@ -86,7 +86,7 @@ inline std::string weatherText(const Weather &w, double t, Vec3 eye, double shut
 	const double s = strength(w, t);
 	if (s <= 0.0) return std::string();
 	constexpr double kTile = 10.0, kReach = 14.0, kTop = 9.0;
-	const int perTile = w.kind == "rain" ? 1400 : w.kind == "snow" ? 1300 : w.kind == "dust" ? 1600 : 60;
+	const int perTile = w.kind == "rain" ? 1400 : w.kind == "snow" ? 1300 : w.kind == "dust" ? 1600 : w.kind == "ash" ? 1100 : 60;
 	const int shown = static_cast<int>(perTile * s * std::max(0.0, w.amount));
 	detail::MeshText mesh, splashes;
 	std::string flakes;
@@ -107,7 +107,7 @@ inline std::string weatherText(const Weather &w, double t, Vec3 eye, double shut
 					if (w.kind == "dust") p.y = w.ground + 0.05 + 3.5 * detail::u01(n, 4) * detail::u01(n, 9) + 0.3 * std::sin(2.0 * t + 6.28 * detail::u01(n, 10));
 				}
 				if (std::hypot(p.x - eye.x, p.z - eye.z) > kReach) continue;
-				if (w.windX != 0.0 || w.windZ != 0.0) {   // (none right at the lens: a drop there is a blur across the picture)
+				if (w.windX != 0.0 || w.windZ != 0.0 || w.kind == "ash") {   // (none right at the lens: a drop or a flake there is a blur across the picture)
 					const Vec3 d = p - eye;
 					if (d.x * d.x + d.y * d.y + d.z * d.z < 1.5 * 1.5) continue;
 				}
@@ -129,6 +129,12 @@ inline std::string weatherText(const Weather &w, double t, Vec3 eye, double shut
 					char buf[160];   // (a little ball: its shadow in a low sun is a dot, not a dash)
 					std::snprintf(buf, sizeof buf, "AttributeBegin\n  Translate %.4f %.4f %.4f\n  Shape \"sphere\" \"float radius\" [ %.4f ]\nAttributeEnd\n", p.x, p.y, p.z, 0.010 + 0.007 * detail::u01(n, 7));
 					flakes += buf;
+				} else if (w.kind == "ash") {   // a flake of ash fluttering down
+					const double ph = 6.28 * detail::u01(n, 5), a = 3.1 * t + ph, b = 2.3 * t + 2.0 * ph;
+					p.x += 0.15 * std::sin(0.8 * t + ph);
+					const Vec3 e1 = normalize(Vec3{std::cos(a), 0.5 * std::sin(b), std::sin(a)}), e2 = normalize(cross(e1, Vec3{std::sin(b), 1.0, std::cos(b)}));
+					const double r = 0.004 + 0.004 * detail::u01(n, 7);
+					mesh.quad(p - e1 * r - e2 * r, p + e1 * r - e2 * r, p + e1 * r + e2 * r, p - e1 * r + e2 * r);
 				} else if (w.kind == "dust") {   // a speck of sand or grit, streaked along the wind
 					const double wl = std::hypot(w.windX, w.windZ);
 					const Vec3 along = wl > 1e-6 ? Vec3{w.windX / wl, 0.0, w.windZ / wl} : Vec3{1.0, 0.0, 0.0};
@@ -147,6 +153,7 @@ inline std::string weatherText(const Weather &w, double t, Vec3 eye, double shut
 		return mesh.text("Material \"diffuse\" \"rgb reflectance\" [ 0.8 0.83 0.88 ]") + splashes.text("Material \"diffuse\" \"rgb reflectance\" [ 0.6 0.63 0.68 ]");
 	if (w.kind == "snow") return flakes.empty() ? std::string() : "AttributeBegin\n  Material \"diffuse\" \"rgb reflectance\" [ 0.92 0.93 0.95 ]\n" + flakes + "AttributeEnd\n";
 	if (w.kind == "dust") return mesh.text("Material \"diffuse\" \"rgb reflectance\" [ 0.55 0.42 0.27 ]");
+	if (w.kind == "ash") return mesh.text("Material \"diffuse\" \"rgb reflectance\" [ 0.2 0.19 0.18 ]");
 	return mesh.text("Material \"diffuse\" \"rgb reflectance\" [ 0.55 0.28 0.07 ]");   // (autumn leaves)
 }
 

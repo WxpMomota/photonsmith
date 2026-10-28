@@ -115,6 +115,8 @@
 //     waterfall at 40 0 -80  width 8  drop 30  facing 180       # the middle of its lip (on a terrain, Y above the ground), how far it drops, which way it pours
 //     clouds   cumulus  cover 0.4  base 900  wind 90  speed 6   # clouds you can see round (film_clouds.h): cumulus, towering or wisps; `size W` across, `density D`,
 //                                                               # `area A` (the square they are spread over, round `at X Z`), `seed N`; they drift and cast shadows
+//                                                               # `clouds deck [thick T]`: one layer to fly through; `fogbank at X Z [depth D] [during T0 T1]`: fog in
+//                                                               # the low ground, burning off
 //     biome    savanna                                         # the land as a biome (savanna, jungle, desert, tundra, arctic): its ground's colours, its plants, its sound
 //     forest   mixed 3000  season autumn                        # conifer, broadleaf, birch, palm, shrub, acacia, kapok, cactus, fern; or mixed (by height), savanna,
 //                                                               # jungle, desert or tundra (a biome's mix): so many trees where the land suits them;
@@ -145,7 +147,8 @@
 //                                                               # tumbling down the slope; `avalanche from X Z [at T]`: a powder cloud racing down; `quake T0 T1`: shaking
 //     fire     at 0 0 -4  size 1.2                              # fire (film_fire.h): flames (glowing volumes, flickering, a light among them, sparks) with smoke above;
 //     lava     from 120 -300  width 6                           # lava creeping down the land from a vent; a volcano raised in the land (`volcano at X Z [height H]
-//     wildfire in -200 -200 200 200  during 0 30  wind 90       # [radius R] [erupting T0 T1]`), and a fire front sweeping across with the wind
+//     wildfire in -200 -200 200 200  during 0 30  wind 90       # [radius R] [erupting T0 T1]`), and a fire front sweeping across with the wind; a volcano's `column H`
+//                                                               # (an ash column with its umbrella), `lightning N` in it, `ashfall A`, `flow T [toward DEG]` (pyroclastic)
 //     timelapse 60                                              # nature 60 times faster: the clouds, the water, the aurora, the wind (the camera and the characters not)
 //     slowmo   22 30 0.3                                        # from 22 s to 30 s nature runs at 0.3 of its speed (0.25 when not given): a high-speed camera's slow motion
 //     exposure auto                                             # (or a factor) the exposure follows the light: 1 by day, opening up through sunset into night
@@ -1043,6 +1046,33 @@ inline Parsed parse(const std::string &text, const std::string &where, const std
 				la.x = v.x + 0.13 * v.radius * std::cos(a), la.z = v.z + 0.13 * v.radius * std::sin(a), la.width = 0.035 * v.radius, la.speed = 0.8, la.t0 = v.t0 - 25.0;   // (already flowing)
 				s.lavas.push_back(la);
 			}
+		for (std::size_t i = 0; i < s.volcanoes.size(); ++i) {   // a volcano's rim; its pyroclastic flows' ways down from it (as lava finds its way); its column's lightning and ash
+			fire::Volcano &v = s.volcanoes[i];
+			v.rimY = -1e30;
+			for (int k = 0; k < 24; ++k) v.rimY = std::max(v.rimY, ground->heightAt(v.x + 0.11 * v.radius * std::cos(kPi * k / 12.0), v.z + 0.11 * v.radius * std::sin(kPi * k / 12.0)));
+			for (std::size_t k = 0; k < v.flows.size(); ++k) {
+				fire::PyroclasticFlow &f = v.flows[k];
+				const double a = (f.towardSet ? f.toward : 360.0 * hash01(static_cast<int>(i * 31 + k), 907)) * kPi / 180.0;
+				water::River way;
+				way.points = {{v.x + 0.15 * v.radius * std::sin(a), v.z + 0.15 * v.radius * std::cos(a)}};
+				way.downhill = true;
+				way.width = 0.05 * v.radius;
+				f.path = water::riverPath(way, ground.get());
+				for (Vec3 &p : f.path) p.y = ground->heightAt(p.x, p.z);
+			}
+			if (v.lightning > 0) {   // in the column, over the crater, from part way up it down to the crater and the flanks
+				skyfx::Lightning l;
+				l.count = v.lightning, l.x = v.x, l.z = v.z, l.radius = 0.12 * v.radius, l.seed = 41 + static_cast<int>(i);
+				l.t0 = v.t0 + 0.5 * fire::columnRise(v.column), l.t1 = std::min(v.t1, s.length);
+				l.base = v.rimY + 0.35 * v.column;
+				if (l.t1 > l.t0) s.lightnings.push_back(l);
+			}
+			if (v.ashfall > 0.0) {   // ash drifting down round the camera, once the umbrella has spread over
+				particles::Weather w;
+				w.kind = "ash", w.amount = v.ashfall, w.t0 = v.t0 + (v.column > 0.0 ? fire::columnRise(v.column) : 10.0), w.t1 = v.t1 + 30.0, w.onLand = true;
+				s.weather.push_back(w);
+			}
+		}
 		for (fire::Lava &l : s.lavas) {
 			water::River way;
 			way.points = {{l.x, l.z}};
