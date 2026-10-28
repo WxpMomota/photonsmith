@@ -1225,6 +1225,25 @@ int main(int argc, char** argv) {
 		std::cout << "spheres" << '\t' << seen << "\t(the most medium spheres in one frame checked)" << std::endl;
 		return EXIT_SUCCESS;
 	}
+	// `ray_tracer --film-scene <key>@<seconds> OUT.pbrt`: writes the scene text of a film's frame at that time (what a render of `cartoon:<key>@<seconds>` draws), to look
+	// into or render by itself. Relative paths in it (Include, pictures) are the film cache's absolute ones or relative to the film's scenes folder.
+	if (argc >= 2 && std::string(argv[1]) == "--film-scene") {
+		const std::string target = argc >= 3 ? argv[2] : "";
+		const std::size_t at = target.rfind('@');
+		const cartoon::Film *film = at == std::string::npos ? nullptr : cartoon::find(target.substr(0, at).c_str());
+		if (!film || argc < 4 || !film->sceneAt) {
+			std::cerr << "usage: " << argv[0] << " --film-scene <film key>@<seconds> OUT.pbrt" << std::endl;
+			return EXIT_FAILURE;
+		}
+		std::ofstream out(argv[3], std::ios::binary);
+		out << film->sceneAt(std::atof(target.c_str() + at + 1));
+		if (!out) {
+			std::cerr << "could not write " << argv[3] << std::endl;
+			return EXIT_FAILURE;
+		}
+		std::cout << argv[3] << std::endl;
+		return EXIT_SUCCESS;
+	}
 	std::cout << "========================================" << std::endl;
 	std::cout << "RAY TRACER LAUNCHER (Unified GPU/CPU)" << std::endl;
 	std::cout << "========================================" << std::endl;

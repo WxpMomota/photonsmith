@@ -327,7 +327,7 @@ TEST(FilmClouds, CloudsHaveFlatBasesNeverOverlapAndDriftWithTheWind) {
 	EXPECT_EQ(film.spec.cloudLayers[0].kind, "towering");
 	EXPECT_DOUBLE_EQ(film.spec.cloudLayers[0].base, 1500.0);
 	EXPECT_DOUBLE_EQ(film.spec.cloudLayers[1].base, 5000.0) << "wisps are high";
-	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"clouds fog", "cumulus, towering or wisps"}, {"clouds cumulus cover 2", "cover (0 to 1)"}}) {
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"clouds fog", "cumulus, towering, wisps or deck"}, {"clouds cumulus cover 2", "cover (0 to 1)"}}) {
 		ff::DataFilm bad;
 		const std::string problem = loadNature("clouds_bad", "scene s.pbrt\nlength 4\n" + line + "\n", bad);
 		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;

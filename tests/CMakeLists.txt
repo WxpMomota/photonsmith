@@ -283,6 +283,7 @@ add_executable(unit_tests
     unit/film_file_tests.cpp
     unit/film_story_tests.cpp
     unit/film_nature_tests.cpp
+    unit/film_spectacle_tests.cpp
     unit/film_whole_tests.cpp
     unit/toon_look_tests.cpp
     unit/height_fog_tests.cpp

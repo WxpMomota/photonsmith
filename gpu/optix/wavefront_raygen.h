@@ -17,6 +17,12 @@ __device__ __forceinline__ bool wf_medium_shape_flight(const GpuMediumShape& s, 
 		a = (-halfB - root) / A;
 		b = (-halfB + root) / A;
 	}
+	if (s.clip) {   // (a grid medium: nothing outside its own box)
+		float c, e;
+		if (!wf_box_slab_intersect(o, d, s.clipMin, s.clipMax, c, e)) return false;
+		a = fmaxf(a, c);
+		b = fminf(b, e);
+	}
 	t0 = fmaxf(a, tFrom);
 	t1 = fminf(b, tTo);
 	return t1 > t0;

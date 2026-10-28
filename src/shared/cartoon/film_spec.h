@@ -296,6 +296,7 @@ struct Spec {
 	surf::Swell swell;   // surf on the sea's shore (`surf`: film_surf.h)
 	// clouds you can see round (`clouds`)
 	std::vector<clouds::Clouds> cloudLayers;
+	std::vector<clouds::FogBank> fogBanks;   // fog lying on the land (`fogbank`)
 	// forests (`forest`), and their trees (planted when the film is loaded, on the land as it is drawn)
 	std::vector<forest::Forest> forests;
 	std::vector<flowers::Meadow> meadows;   // wild flowers (`flowers`: film_flowers.h)

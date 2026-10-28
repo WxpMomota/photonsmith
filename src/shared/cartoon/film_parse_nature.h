@@ -8,6 +8,38 @@
 namespace cartoon {
 namespace film_file {
 
+// A `fogbank` line: fog lying on the land (film_clouds.h). "" or what is wrong with it.
+inline std::string fogBankLine(Spec &s, const std::string &line) {
+	using detail::number;
+	const auto fail = [](const std::string &what) { return what; };
+	const std::vector<std::string> t = detail::tokens(line);
+	clouds::FogBank f;
+	bool placed = false;
+	for (std::size_t i = 1; i < t.size();) {
+		double a = 0.0, b = 0.0;
+		if ((t[i] == "at" || t[i] == "during") && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b)) {
+			if (t[i] == "at") f.x = a, f.z = b, placed = true;
+			else if (b > a) f.t0 = a, f.t1 = b;
+			else return fail("`during T0 T1`: the fog settles in at T0 and has burnt off by T1 (T1 after T0)");
+			i += 3;
+		} else if (i + 1 < t.size() && number(t[i + 1], a)) {
+			if (t[i] == "size" && a >= 20.0 && a <= 20000.0) f.size = a;
+			else if (t[i] == "depth" && a >= 2.0 && a <= 2000.0) f.depth = a;
+			else if (t[i] == "density" && a > 0.0 && a <= 1.0) f.density = a;
+			else if (t[i] == "wind") f.wind = a;
+			else if (t[i] == "speed" && a >= 0.0) f.speed = a;
+			else if (t[i] == "seed") f.seed = static_cast<int>(a);
+			else return fail("\"" + t[i] + "\": a fog bank takes size (20 to 20000 m), depth (2 to 2000 m), density (up to 1 a metre), wind, speed, during T0 T1 and seed");
+			i += 2;
+		} else {
+			return fail("`fogbank at X Z [size W] [depth D] [density S] [wind DEGREES] [speed S] [during T0 T1] [seed N]`: fog lying on the land, D metres deep");
+		}
+	}
+	if (!placed) return fail("`fogbank at X Z ...`: where the fog lies");
+	s.fogBanks.push_back(f);
+	return std::string();
+}
+
 // One line of a film file, if it is a nature line: what it says goes into `s`. `handled` is false when `verb` is not a nature word (the line is parse()'s); the
 // result is "" or what is wrong with the line (parse() adds the file and the line).
 inline std::string natureLine(Spec &s, const std::string &verb, const std::string &line, const std::string &rest, bool &handled) {
@@ -115,10 +147,12 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		const std::vector<std::string> t = detail::tokens(line);
 		clouds::Clouds c;
 		if (t.size() < 2 || std::find(clouds::kinds().begin(), clouds::kinds().end(), t[1]) == clouds::kinds().end())
-			return fail("`clouds KIND [cover C] [base H] [size W] [wind DEGREES] [speed S] [density D] [area A] [at X Z] [seed N]`: cumulus, towering or wisps");
+			return fail("`clouds KIND [cover C] [base H] [size W] [wind DEGREES] [speed S] [density D] [area A] [at X Z] [seed N]`: cumulus, towering, wisps or deck "
+						"(a layer over the whole area, `thick T` deep, that the camera can fly through)");
 		c.kind = t[1];
 		if (c.kind == "towering") c.size = 1500.0, c.base = 1000.0, c.cover = 0.2, c.density = 1.4;
 		else if (c.kind == "wisps") c.size = 1400.0, c.base = 5000.0, c.cover = 0.3, c.density = 0.35, c.area = 12000.0;
+		else if (c.kind == "deck") c.base = 600.0, c.cover = 0.75, c.area = 8000.0, c.speed = 3.0;
 		for (std::size_t i = 2; i < t.size();) {
 			double a = 0.0, b = 0.0;
 			if (t[i] == "at" && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b)) {
@@ -133,13 +167,16 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 				else if (t[i] == "density" && a > 0.0 && a <= 10.0) c.density = a;
 				else if (t[i] == "area" && a >= 100.0) c.area = a;
 				else if (t[i] == "seed") c.seed = static_cast<int>(a);
-				else return fail("\"" + t[i] + "\": clouds take cover (0 to 1), base, size (20 to 5000 m), wind, speed, density (up to 10), area, at X Z and seed");
+				else if (t[i] == "thick" && c.kind == "deck" && a >= 20.0 && a <= 3000.0) c.thick = a;
+				else return fail("\"" + t[i] + "\": clouds take cover (0 to 1), base, size (20 to 5000 m), wind, speed, density (up to 10), area, at X Z and seed, and a deck thick (20 to 3000 m)");
 				i += 2;
 			} else {
 				return fail("\"" + t[i] + "\": clouds take cover, base, size, wind, speed, density, area, at X Z and seed");
 			}
 		}
 		s.cloudLayers.push_back(c);
+	} else if (verb == "fogbank") {   // fog lying on the land (film_clouds.h)
+		return fogBankLine(s, line);
 	} else if (verb == "forest") {
 		const std::vector<std::string> t = detail::tokens(line);
 		forest::Forest f;

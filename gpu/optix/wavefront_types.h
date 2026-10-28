@@ -54,6 +54,11 @@ struct GpuMediumShape {
 	float3 boxMax;
 	int    isBox;
 	int    materialIdx;   // a Medium, CloudMedium, RgbGridMedium or GridMedium material
+	// A grid medium (cloud, rgbgrid, uniformgrid) has no density outside its own box, usually far smaller than the sphere round it: its world-space bounds (clip) cut the
+	// flight too. A cloud deck's sphere is kilometres across and held the camera and everything else, so another volume overlapping it was never sampled.
+	float3 clipMin;
+	float3 clipMax;
+	int    clip;
 };
 
 // A primary or bounce ray pending intersection.

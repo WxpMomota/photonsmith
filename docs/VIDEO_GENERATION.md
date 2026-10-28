@@ -886,8 +886,25 @@ noise; a towering cloud is a tower of billows of every size from a broad base to
 file of the film's cache and named in every frame by an `Include` inside the transform that places it (each stretched along x by up to 1.7, so no two look alike). The clouds are
 spread over a square `area` metres across round `at` X Z (6 km, 12 km for wisps), as many as `cover` asks for, never so close that their spheres overlap (a renderer follows one
 medium at a time); they drift with the `wind` at `speed` and wrap round the area. `sigma_s` is 0.09 per metre times `density`. Several `clouds` lines make layers (keep their
-heights apart). The camera should stay outside the clouds: from inside a cloud's sphere a renderer sees it only in part. They cost little: a frame of a hilly land with a dozen
-cumulus renders in about 2.5 s at 640 x 360 and 128 samples (with the denoiser).
+heights apart). The camera may fly into a cloud (on the Mac it sees one only in part from inside). They cost little: a frame of a hilly land with a dozen cumulus renders
+in about 2.5 s at 640 x 360 and 128 samples (with the denoiser).
+
+**A deck of cloud to fly through, and fog banks: `clouds deck`, `fogbank`.** (film_clouds.h; nature round 9, 2026-10-27)
+
+```
+clouds   deck  base 520  thick 220  cover 0.7  area 7000      # one layer over the area, its gaps letting the sun down
+fogbank  at 0 0  size 1500  depth 60  density 0.05  wind 80  speed 3  during 2 18
+```
+
+A deck is one cloud layer over a square `area` metres across (8 km): a 160 x 14 x 160 grid closed over about its `cover` share of the sky (0.75) by noise, with gaps, a
+flat base at `base` (600 m), a heaving top `thick` metres up (250) and a fading border; `sigma_s` 0.03 per metre times `density` (some 30 m to see through inside). It
+drifts (keep the area bigger than the film's drift, it does not wrap). A camera can climb through it: a grey ceiling with gaps from below, a whiteout inside, a sea of
+cloud with the peaks standing out above. A fog bank pools in the low ground round `at` X Z (a place in a valley or on a lake): `size` metres across (600), its flat top
+`depth` metres over the ground there (40) - lower ground fills deeper, higher stands out of it - dense most of the way up and thinning to a heaving top, in wisps,
+`density` its scattering per metre (0.03). It drifts with `wind` at `speed`, and with `during T0 T1` it settles in at T0 and burns off (sinks) by T1. The land runs
+through both and the camera may be inside either: every renderer samples a volume along each ray up to the nearest surface, and the GPU cuts a grid volume's flight to
+its own box, so a deck's kilometres-wide sphere does not hide a fog bank under it (`pbrt_scenes/fog-under-cloud-deck.pbrt`). `ray_tracer --film-scene KEY@SECONDS OUT.pbrt`
+writes a frame's scene text to look into.
 
 **Forests: `forest`.** (film_forest.h)
 

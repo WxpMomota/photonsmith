@@ -1,0 +1,41 @@
+# @rt-category Test Scenes
+# @rt-description A fog ball with a red ball in it, under a thin cloud deck whose bounding sphere holds the whole set. Checks that a volume inside another's sphere is still drawn.
+# @rt-performance Fast
+# @rt-size 10
+# fog-under-cloud-deck.pbrt -- a uniformgrid deck (a 100 m square, 20 to 25 m up) whose interface sphere (radius 80) encloses the camera, the ground and a fog ball round a
+# red ball. The GPU's wavefront renderer samples the first volume a ray's flight enters and another overlapping one only beyond the first one's far side; with the deck's
+# sphere round everything, the fog ball was never sampled. A grid volume's flight is now cut to its own box (empty outside it), so the deck is the thin slab it is.
+# The CPU and both GPU renderers agree on it (pbrt_example_scenes_tests.cpp).
+LookAt 0 3 -9  0 1 0  0 1 0
+Camera "perspective" "float fov" [ 40 ]
+Film "rgb" "integer xresolution" [ 320 ] "integer yresolution" [ 320 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+WorldBegin
+LightSource "distant" "point3 from" [ 3 8 -4 ] "point3 to" [ 0 0 0 ] "rgb L" [ 3 3 3 ]
+LightSource "infinite" "rgb L" [ 0.25 0.3 0.4 ]
+Material "diffuse" "rgb reflectance" [ 0.5 0.5 0.5 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -20 0 -20   20 0 -20   20 0 20   -20 0 20 ]
+AttributeBegin
+  Material "diffuse" "rgb reflectance" [ 0.7 0.15 0.1 ]
+  Translate 0 1 0
+  Shape "sphere" "float radius" [ 1 ]
+AttributeEnd
+MakeNamedMedium "fog" "string type" [ "homogeneous" ] "rgb sigma_a" [ 0.05 0.05 0.05 ] "rgb sigma_s" [ 0.5 0.5 0.5 ] "float g" [ 0.3 ]
+AttributeBegin
+  Translate 0 1 0
+  Material "interface"
+  MediumInterface "fog" ""
+  Shape "sphere" "float radius" [ 2.5 ]
+AttributeEnd
+AttributeBegin
+  Translate -50 20 -50
+  Scale 100 5 100
+  MakeNamedMedium "deck" "string type" [ "uniformgrid" ] "integer nx" [ 4 ] "integer ny" [ 2 ] "integer nz" [ 4 ] "rgb sigma_a" [ 0 0 0 ] "rgb sigma_s" [ 0.05 0.05 0.05 ] "float g" [ 0.8 ] "float density" [ 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 ]
+AttributeEnd
+AttributeBegin
+  Translate 0 22.5 0
+  Material "interface"
+  MediumInterface "deck" ""
+  Shape "sphere" "float radius" [ 80 ]
+AttributeEnd

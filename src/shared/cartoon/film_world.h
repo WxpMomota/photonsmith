@@ -148,6 +148,12 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 		for (const particles::Emitter &e : spec.emitters) out += particles::emitterText(e, t);
 	}
 	for (const clouds::Clouds &c : spec.cloudLayers) out += clouds::text(spec.key.empty() ? std::string("film") : spec.key, c, nt);   // (film_clouds.h)
+	if (!spec.fogBanks.empty()) {   // fog lying on the land (film_clouds.h): the land runs through it
+		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
+		const auto groundAt = [&](double x, double z) { return ground && ground->inside(x, z) ? ground->heightAt(x, z) : (ground ? spec.terrain.y : 0.0); };
+		for (std::size_t i = 0; i < spec.fogBanks.size(); ++i)
+			out += clouds::fogBankText(spec.key.empty() ? std::string("film") : spec.key, spec.fogBanks[i], static_cast<int>(i), t, nt, groundAt);
+	}
 	if (!spec.seas.empty() || !spec.rivers.empty() || !spec.falls.empty()) {   // water (film_water.h)
 		Vec3 eye, target;
 		double fov = 40.0;

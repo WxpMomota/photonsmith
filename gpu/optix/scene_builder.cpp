@@ -634,14 +634,20 @@ static void warn_lamp_materials_not_reflected(const SceneData& scene) {
 // ray meets its sphere to the sphere's far side, which is right only while nothing is inside - so the camera inside one, or any surface whose bounding box reaches
 // into one (the ground under a smoke plume, a ball in a fog), sends the scene to the wavefront renderer. Conservative: a box corner that dips into the sphere counts.
 static bool something_inside_a_volume(const SceneData& scene, const double camera[3]) {
-	const std::vector<GpuMediumShape> volumes = wavefront_media::shapes(scene.spheres, scene.materials);
+	const std::vector<GpuMediumShape> volumes = wavefront_media::shapes(scene.spheres, scene.materials, nullptr, {&scene.cloudMediums, &scene.rgbGridMediums, &scene.gridMediums});
 	if (volumes.empty()) return false;
 	struct Box { float lo[3] = {1e30f, 1e30f, 1e30f}, hi[3] = {-1e30f, -1e30f, -1e30f};
 		void add(float x, float y, float z) { const float p[3] = {x, y, z}; for (int i = 0; i < 3; ++i) { lo[i] = std::min(lo[i], p[i]); hi[i] = std::max(hi[i], p[i]); } }
 		void add(const float3& p) { add(p.x, p.y, p.z); } };
-	// does a box reach into a volume? (sphere: its centre's distance to the box; box: the boxes overlap)
+	// does a box reach into a volume? (sphere: its centre's distance to the box; box: the boxes overlap; and a grid volume's own box, outside which it is empty)
 	const auto meets = [&volumes](const Box& b) {
 		for (const GpuMediumShape& v : volumes) {
+			if (v.clip) {
+				const float clo[3] = {v.clipMin.x, v.clipMin.y, v.clipMin.z}, chi[3] = {v.clipMax.x, v.clipMax.y, v.clipMax.z};
+				bool overlap = true;
+				for (int i = 0; i < 3; ++i) overlap = overlap && b.lo[i] <= chi[i] && b.hi[i] >= clo[i];
+				if (!overlap) continue;
+			}
 			if (v.isBox) {
 				const float vlo[3] = {v.boxMin.x, v.boxMin.y, v.boxMin.z}, vhi[3] = {v.boxMax.x, v.boxMax.y, v.boxMax.z};
 				bool all = true;

@@ -374,6 +374,13 @@ TEST(PbrtBackendAgreementTest, DiffuseSphereUnderSkyIsExactAtDepthOneOnEveryBack
 	expectChannelMeans("path-depth-furnace", 256, 1, expected, 0.01, 0.03);
 }
 
+// A fog ball (with a ball in it) inside a cloud deck's bounding sphere: the GPU samples the first volume a flight enters and another overlapping one only beyond the
+// first one's far side, so with the deck's sphere round the whole set the fog was never sampled. A grid volume's flight is cut to its own box now (it is empty outside
+// it), so the deck is the thin slab it is, and the GPU draws the fog as the CPU does.
+TEST(PbrtBackendAgreementTest, AFogBallUnderACloudDecksSphereIsDrawnOnTheGpu) {
+	expectChannelMeans("fog-under-cloud-deck", 128, 8, nullptr, 0.04, 0.05, /*cpuRepeats=*/3);
+}
+
 // A grid that scatters without absorbing, differently per colour, is invisible under a uniform sky in every channel. The earlier model
 // (extinction of the brightest channel, albedo sigma_s / max) made the lesser channels absorb: red 0.60, green 0.77 on every backend.
 TEST(PbrtBackendAgreementTest, ChromaticRgbGridFurnaceStaysInvisibleInEveryChannel) {

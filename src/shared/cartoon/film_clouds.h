@@ -1,14 +1,16 @@
 #pragma once
 // film_clouds.h -- clouds you can see round (film_file.h `clouds`): cumulus heaped up from a flat base, towering storm clouds, thin wisps - each a volume of water droplets
 // (a "uniformgrid" medium in a sphere, which every renderer draws: they scatter the sun, are dark underneath and bright at the edges it shines through, and throw moving
-// shadows on the land), spread over the sky round the film, drifting with the wind.
+// shadows on the land), spread over the sky round the film, drifting with the wind - or a deck of cloud over the whole area (`clouds deck`) the camera can fly up through
+// into the sunshine above, its gaps letting the sun down in shafts. And fog banks (`fogbank`): fog lying on the land in a valley or over a lake, drifting.
 //
 // A cloud is a grid of densities (48 x 24 x 48 for a cumulus) made from overlapping blobs - one big one, a ring of smaller ones heaped round it, a flat base where the air
 // stops rising - eaten away at its edges by three-dimensional noise into billows. Each is written once as a MakeNamedMedium in a file of the film's cache and named in every
 // frame by an Include, inside a transform that places, sizes and drifts it; the sphere that holds it is a pass-through shell ("interface"). Clouds are spread out so their
-// spheres never overlap (a renderer follows one medium at a time), and wrap round the area as they drift, so the sky never empties.
+// spheres never overlap (where two overlap, the GPU samples the second only beyond the first one's far side), and wrap round the area as they drift, so the sky never empties.
 //
-// The camera stays outside them: a camera inside a cloud's sphere sees it from within only partly (the renderers enter a shape's medium where a ray crosses its shell).
+// The camera may be inside one, and the land may run through one (a fog bank always has the ground in it): every renderer samples a volume along each ray up to the nearest
+// surface (the GPU's wavefront renderer since 2026-10-27; the default one hands such a frame to it). Only the Mac's renderer still sees a volume from inside in part.
 
 #include <algorithm>
 #include <cmath>
@@ -26,15 +28,33 @@ namespace clouds {
 // A sky of clouds: their kind (cumulus, towering or wisps), how much of the sky they cover (0 to 1), the height of their bases and how big they are (metres across), the
 // wind that drifts them (metres a second, and a facing), how dense (1 a fair-weather cumulus), the area they are spread over (a square this many metres across round
 // x z) and a seed.
+// A deck (`deck`): one layer over the whole area, its base at `base`, `thick` metres deep, `cover` the share of the sky it closes.
 struct Clouds {
 	std::string kind = "cumulus";
-	double cover = 0.35, base = 900.0, size = 800.0, speed = 6.0, wind = 90.0, density = 1.0, area = 6000.0, x = 0.0, z = 0.0;
+	double cover = 0.35, base = 900.0, size = 800.0, speed = 6.0, wind = 90.0, density = 1.0, area = 6000.0, x = 0.0, z = 0.0, thick = 250.0;
 	int seed = 1;
 };
 inline const std::vector<std::string> &kinds() {
-	static const std::vector<std::string> k = {"cumulus", "towering", "wisps"};
+	static const std::vector<std::string> k = {"cumulus", "towering", "wisps", "deck"};
 	return k;
 }
+
+// A fog bank (`fogbank`): fog pooled in the low ground round x z (a place in a valley or on a lake), `size` metres across, its top `depth` metres over the ground at x z
+// (lower ground fills deeper, higher stands out of it), thinning to a ragged top, `density` its
+// scattering per metre (0.03: some 30 m to see through), drifting with a wind of `speed` m/s from `wind` (a facing); it settles in from t0 and burns off - sinking into the
+// ground - by t1 (over a tenth of its time each way, or 3 s when it has only one of them).
+struct FogBank {
+	double x = 0.0, z = 0.0, size = 600.0, depth = 40.0, density = 0.03, wind = 90.0, speed = 1.5, t0 = -1e30, t1 = 1e30;
+	int seed = 1;
+	double heightAt(double t) const {   // its depth now, as a share of `depth`
+		const bool from = t0 > -1e29, until = t1 < 1e29;
+		const double ramp = from && until ? std::max(1e-3, 0.1 * (t1 - t0)) : 3.0;
+		double h = 1.0;
+		if (from) h = std::min(h, (t - t0) / ramp);
+		if (until) h = std::min(h, (t1 - t) / ramp);
+		return std::clamp(h, 0.0, 1.0);
+	}
+};
 
 namespace detail {
 
@@ -125,23 +145,19 @@ inline std::vector<float> densities(const std::string &kind, int variant) {
 	return d;
 }
 
-// The file holding a cloud's medium (a MakeNamedMedium named `name`, over the unit box), made once in the film's cache. Returns the path as a scene file wants it.
-inline std::string cloudFile(const std::string &film, const std::string &kind, int variant, const std::string &name, double density) {
-	char tail[64];
-	std::snprintf(tail, sizeof tail, "_v%d_%.3f.pbrt", variant, density);
-	const std::filesystem::path target = film_cache::dir(film) / (name + tail);   // (one file per cloud: its medium has a name of its own)
+// A file of the film's cache (`fileName`) holding one grid medium named `name` over the unit box: nx x ny x nz densities (x fastest, then y, then z), scattering
+// `sigma` per unit of density and metre (the box is scaled to the world), phase g `g`. Made once (`make` is only called then). Returns the path as a scene file wants it.
+template <class Make>
+inline std::string gridFile(const std::string &film, const std::string &fileName, const std::string &name, int nx, int ny, int nz, double sigma, double g, Make make) {
+	const std::filesystem::path target = film_cache::dir(film) / fileName;
 	std::error_code ec;
 	if (!(std::filesystem::exists(target, ec) && std::filesystem::file_size(target, ec) > 0)) {
-		int nx = 0, ny = 0, nz = 0;
-		double tall = 0.5;
-		detail::gridOf(kind, nx, ny, nz, tall);
-		const std::vector<float> d = densities(kind, variant);
+		const std::vector<float> d = make();
 		std::string text;
 		text.reserve(d.size() * 6 + 400);
 		char buf[320];
-		// sigma_s per metre (the box is scaled to hundreds of metres): a fair-weather cumulus is a few tens of free paths across; g 0.8, as droplets scatter forward
-		std::snprintf(buf, sizeof buf, "MakeNamedMedium \"%s\" \"string type\" [ \"uniformgrid\" ]\n  \"integer nx\" [ %d ] \"integer ny\" [ %d ] \"integer nz\" [ %d ]\n  \"rgb sigma_a\" [ 0 0 0 ] \"rgb sigma_s\" [ %.5f %.5f %.5f ] \"float g\" [ 0.8 ]\n  \"float density\" [\n",
-					  name.c_str(), nx, ny, nz, 0.09 * density, 0.09 * density, 0.09 * density);
+		std::snprintf(buf, sizeof buf, "MakeNamedMedium \"%s\" \"string type\" [ \"uniformgrid\" ]\n  \"integer nx\" [ %d ] \"integer ny\" [ %d ] \"integer nz\" [ %d ]\n  \"rgb sigma_a\" [ 0 0 0 ] \"rgb sigma_s\" [ %.5f %.5f %.5f ] \"float g\" [ %.2f ]\n  \"float density\" [\n",
+					  name.c_str(), nx, ny, nz, sigma, sigma, sigma, g);
 		text += buf;
 		int col = 0;
 		for (float v : d) {
@@ -156,6 +172,113 @@ inline std::string cloudFile(const std::string &film, const std::string &kind, i
 		if (!film_cache::writeOnce(target, text)) throw std::runtime_error("film " + film + ": could not write " + target.string());
 	}
 	return film_cache::scenePath(target);
+}
+
+// The file holding a cloud's medium (a MakeNamedMedium named `name`, over the unit box), made once in the film's cache. Returns the path as a scene file wants it.
+inline std::string cloudFile(const std::string &film, const std::string &kind, int variant, const std::string &name, double density) {
+	char tail[64];
+	std::snprintf(tail, sizeof tail, "_v%d_%.3f.pbrt", variant, density);
+	int nx = 0, ny = 0, nz = 0;
+	double tall = 0.5;
+	detail::gridOf(kind, nx, ny, nz, tall);
+	// sigma_s per metre (the box is scaled to hundreds of metres): a fair-weather cumulus is a few tens of free paths across; g 0.8, as droplets scatter forward
+	// (one file per cloud: its medium has a name of its own)
+	return gridFile(film, name + tail, name, nx, ny, nz, 0.09 * density, 0.8, [&] { return densities(kind, variant); });
+}
+
+// ---- a deck of cloud ----
+// Its grid: 160 x 14 x 160 over the area. A cell is closed where two-dimensional noise passes a threshold set by `cover` (the noise is close to normal round 0.5, spread
+// about 0.1), the layer's top heaves with noise of its own over a flat base, three-dimensional noise tears its edges, and it fades out at the area's border.
+constexpr int kDeckNx = 160, kDeckNy = 14, kDeckNz = 160;
+inline std::vector<float> deckDensities(double cover, int seed) {
+	std::vector<float> d(static_cast<std::size_t>(kDeckNx) * kDeckNy * kDeckNz, 0.0f);
+	const int salt = 7001 + 37 * seed;
+	const double threshold = 0.5 - 0.25 * (std::clamp(cover, 0.0, 1.0) - 0.5);
+	for (int k = 0; k < kDeckNz; ++k)
+		for (int i = 0; i < kDeckNx; ++i) {
+			const double x = (i + 0.5) / kDeckNx, z = (k + 0.5) / kDeckNz;
+			const double fill = smoothstep(threshold - 0.06, threshold + 0.06, detail::fbm3(x * 9.0, 0.37, z * 9.0, salt));
+			const double edge = smoothstep(0.0, 0.06, x) * smoothstep(0.0, 0.06, 1.0 - x) * smoothstep(0.0, 0.06, z) * smoothstep(0.0, 0.06, 1.0 - z);
+			const double top = 0.5 + 0.5 * detail::fbm3(x * 14.0, 0.71, z * 14.0, salt + 5);
+			for (int j = 0; j < kDeckNy; ++j) {
+				const double y = (j + 0.5) / kDeckNy;
+				const double core = fill * edge * smoothstep(0.0, 0.12, y) * (1.0 - smoothstep(top - 0.25, top, y));
+				const double billow = detail::fbm3(x * 40.0, y * 3.0, z * 40.0, salt + 11);
+				const double v = (core - 0.35 * (billow - 0.4)) * 2.5 * smoothstep(0.0, 0.08, core);
+				d[(static_cast<std::size_t>(k) * kDeckNy + j) * kDeckNx + i] = static_cast<float>(std::clamp(v, 0.0, 1.0));
+			}
+		}
+	return d;
+}
+
+// The deck at t (nature's time): one box over the area, drifting with the wind (the area should be bigger than the film's drift); its sphere holds the camera and the land.
+inline std::string deckText(const std::string &film, const Clouds &c, double t) {
+	char name[64], file[96], buf[400];
+	std::snprintf(name, sizeof name, "deck_%d", c.seed);
+	std::snprintf(file, sizeof file, "%s_c%.2f_%.3f.pbrt", name, c.cover, c.density);
+	// sigma_s 0.03 per metre at density 1: some 30 m to see through inside, a few hundred metres of it close to opaque from below; g 0.8
+	const std::string path = gridFile(film, file, name, kDeckNx, kDeckNy, kDeckNz, 0.03 * c.density, 0.8, [&] { return deckDensities(c.cover, c.seed); });
+	const double a = c.wind * kPi / 180.0, dx = std::sin(a) * c.speed * t, dz = std::cos(a) * c.speed * t;
+	const Vec3 centre{c.x + dx, c.base + 0.5 * c.thick, c.z + dz};
+	std::string out = "# a deck of cloud (film_clouds.h)\n";
+	std::snprintf(buf, sizeof buf, "AttributeBegin\n  Translate %.3f %.3f %.3f\n  Scale %.3f %.3f %.3f\n", centre.x - 0.5 * c.area, c.base, centre.z - 0.5 * c.area, c.area, c.thick, c.area);
+	out += buf;
+	out += "  Include \"" + path + "\"\nAttributeEnd\n";
+	std::snprintf(buf, sizeof buf, "AttributeBegin\n  Translate %.3f %.3f %.3f\n  Material \"interface\"\n  MediumInterface \"%s\" \"\"\n  Shape \"sphere\" \"float radius\" [ %.3f ]\nAttributeEnd\n", centre.x,
+				  centre.y, centre.z, name, 0.5 * std::sqrt(2.0 * c.area * c.area + c.thick * c.thick) * 1.01);
+	out += buf;
+	return out;
+}
+
+// ---- fog banks ----
+// A bank's grid: 72 x 12 x 72, round with a ragged edge, dense most of the way up and thinning over its last fifth to a heaving top (fog pooled in a valley has a top you
+// can see), in wisps.
+constexpr int kBankNx = 72, kBankNy = 12, kBankNz = 72;
+inline std::vector<float> bankDensities(int seed) {
+	std::vector<float> d(static_cast<std::size_t>(kBankNx) * kBankNy * kBankNz, 0.0f);
+	const int salt = 9001 + 41 * seed;
+	for (int k = 0; k < kBankNz; ++k)
+		for (int i = 0; i < kBankNx; ++i) {
+			const double x = (i + 0.5) / kBankNx, z = (k + 0.5) / kBankNz;
+			const double r = 2.0 * std::hypot(x - 0.5, z - 0.5) * (0.85 + 0.3 * detail::fbm3(x * 6.0, 0.2, z * 6.0, salt));
+			const double round = 1.0 - smoothstep(0.55, 1.0, r);
+			const double top = 0.8 + 0.2 * detail::fbm3(x * 5.0, 0.6, z * 5.0, salt + 3);
+			for (int j = 0; j < kBankNy; ++j) {
+				const double y = (j + 0.5) / kBankNy;
+				const double wisps = detail::fbm3(x * 12.0, y * 4.0, z * 12.0, salt + 7);
+				const double v = round * (1.0 - smoothstep(top - 0.2, top, y)) * (0.6 + 1.6 * (wisps - 0.5));
+				d[(static_cast<std::size_t>(k) * kBankNy + j) * kBankNx + i] = static_cast<float>(std::clamp(v, 0.0, 1.0));
+			}
+		}
+	return d;
+}
+
+// A fog bank at film time t (nature's time `nt` drifts it), as scene text: fog pools in the low ground with a flat top, the hills standing out of it, so its box runs from a
+// little below the lowest ground under it up to `depth` (times heightAt: it sinks as it burns off) over the ground at its place - a place in the low ground it fills.
+// `groundAt(x, z)` is the land's height (pbrt's x and z). Empty once it has burnt off.
+template <class Ground>
+inline std::string fogBankText(const std::string &film, const FogBank &f, int index, double t, double nt, Ground groundAt) {
+	const double h = f.heightAt(t);
+	if (h <= 0.01) return std::string();
+	char name[64], file[96], buf[400];
+	std::snprintf(name, sizeof name, "fogbank_%d", index);
+	std::snprintf(file, sizeof file, "%s_s%d_%.4f.pbrt", name, f.seed, f.density);
+	const std::string path = gridFile(film, file, name, kBankNx, kBankNy, kBankNz, f.density, 0.6, [&] { return bankDensities(f.seed); });
+	const double a = f.wind * kPi / 180.0;
+	const double cx = f.x + std::sin(a) * f.speed * nt, cz = f.z + std::cos(a) * f.speed * nt;
+	double low = groundAt(cx, cz);
+	for (int j = -2; j <= 2; ++j)
+		for (int i = -2; i <= 2; ++i) low = std::min(low, groundAt(cx + 0.2 * i * f.size, cz + 0.2 * j * f.size));
+	const double level = groundAt(cx, cz) + f.depth * h;   // (the fog's top: `depth` over the ground where it was put, which should be low ground)
+	const double base = std::min(low, level - 1.0) - 2.0, top = level, tall = std::max(1.0, top - base);
+	std::string out = "# a fog bank (film_clouds.h)\n";
+	std::snprintf(buf, sizeof buf, "AttributeBegin\n  Translate %.3f %.3f %.3f\n  Scale %.3f %.3f %.3f\n", cx - 0.5 * f.size, base, cz - 0.5 * f.size, f.size, tall, f.size);
+	out += buf;
+	out += "  Include \"" + path + "\"\nAttributeEnd\n";
+	std::snprintf(buf, sizeof buf, "AttributeBegin\n  Translate %.3f %.3f %.3f\n  Material \"interface\"\n  MediumInterface \"%s\" \"\"\n  Shape \"sphere\" \"float radius\" [ %.3f ]\nAttributeEnd\n", cx,
+				  base + 0.5 * tall, cz, name, 0.5 * std::sqrt(2.0 * f.size * f.size + tall * tall) * 1.01);
+	out += buf;
+	return out;
 }
 
 // Where the clouds are: each its centre at time 0 (pbrt's), its width, and its shape. Spread so their spheres do not overlap.
@@ -195,6 +318,7 @@ inline std::vector<Placed> layout(const Clouds &c) {
 
 // The clouds at t, as scene text.
 inline std::string text(const std::string &film, const Clouds &c, double t) {
+	if (c.kind == "deck") return deckText(film, c, t);
 	const std::vector<Placed> placed = layout(c);
 	const double a = c.wind * kPi / 180.0, dx = std::sin(a) * c.speed * t, dz = std::cos(a) * c.speed * t;
 	std::string out = "# the clouds: " + c.kind + " (film_clouds.h)\n";

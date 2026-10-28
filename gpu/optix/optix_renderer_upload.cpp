@@ -430,9 +430,10 @@ void OptiXRenderer::uploadGridMedia(const std::vector<GpuGridMedium>& gridMedium
 	}
 }
 
-void OptiXRenderer::uploadMediumShapes(const std::vector<SphereData>& spheres, const std::vector<MaterialData>& materials) {
+void OptiXRenderer::uploadMediumShapes(const std::vector<SphereData>& spheres, const std::vector<MaterialData>& materials, const std::vector<CloudMedium<float>>& cloudMediums,
+									  const std::vector<GpuRgbGridMedium>& rgbGridMediums, const std::vector<GpuGridMedium>& gridMediums) {
 	std::vector<unsigned char> isListed;
-	const std::vector<GpuMediumShape> shapes = wavefront_media::shapes(spheres, materials, &isListed);
+	const std::vector<GpuMediumShape> shapes = wavefront_media::shapes(spheres, materials, &isListed, {&cloudMediums, &rgbGridMediums, &gridMediums});
 	numMediumShapes_ = static_cast<unsigned int>(shapes.size());
 	for (CUdeviceptr* p : { &d_mediumShapes_, &d_listedMediumSphere_ }) {
 		if (*p) cudaFree(reinterpret_cast<void*>(*p));

@@ -885,7 +885,8 @@ private:
 
 	/// @brief Upload the volumes the wavefront renderer samples along each ray's flight (wavefront_medium_shapes.h) and the per-sphere flags
 	///        that tell its trace to skip their boundaries (d_mediumShapes_/numMediumShapes_, d_listedMediumSphere_).
-	void uploadMediumShapes(const std::vector<SphereData>& spheres, const std::vector<MaterialData>& materials);
+	void uploadMediumShapes(const std::vector<SphereData>& spheres, const std::vector<MaterialData>& materials, const std::vector<CloudMedium<float>>& cloudMediums,
+							const std::vector<GpuRgbGridMedium>& rgbGridMediums, const std::vector<GpuGridMedium>& gridMediums);
 
 	/// @brief Upload tabulated BSSRDF tables and their four shared flat
 	///        float buffers (d_bssrdfTables_/numBssrdfTables_,

@@ -232,7 +232,7 @@ void OptiXRenderer::uploadGeometryBuffers(const SceneInputs &in, SceneBuildState
 	uploadGridMedia(gridMediums, gridData);
 
 	// The fog/smoke/cloud volumes the wavefront renderer samples along each ray's flight instead of at their boundary (wavefront_medium_shapes.h).
-	uploadMediumShapes(spheres, materials);
+	uploadMediumShapes(spheres, materials, cloudMediums, rgbGridMediums, gridMediums);
 
 	// Tabulated BSSRDF tables (MaterialType::Subsurface, recursive backend
 	// only, Phase 1 - see optix_types.h's GpuBssrdfTable comment). Same
