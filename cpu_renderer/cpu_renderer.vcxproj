@@ -85,6 +85,9 @@
     <!-- the cartoon films' stills as scenes of the scene list (pbrt_discover.h listGenerated); the film code lives only here -->
     <ClCompile Include="..\src\shared\cartoon\cartoon_scenes.cpp" />
     <ClCompile Include="..\src\shared\cartoon\cartoons.cpp" />
+    <ClCompile Include="..\src\shared\cartoon\film_file.cpp" />
+    <ClCompile Include="..\src\shared\cartoon\film_parse.cpp" />
+    <ClCompile Include="..\src\shared\cartoon\film_world.cpp" />
     <!-- BDPT/MLT CLI entry points - see cpu_interface_bdpt.cpp's own file
          comment. Kept as its own translation unit organizationally (keeps
          the BDPT/MLT-specific includes/logic out of cpu_interface.cpp) but

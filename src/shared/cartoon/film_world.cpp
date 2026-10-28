@@ -1,13 +1,14 @@
-#pragma once
-// film_world.h -- a film made from a file (film_file.h): the world round its scene at a moment (sky, land, water, nature, fire, the weather) and its nature's sound
-// placed where it comes from - DataFilm's members, defined after the class (film_file.h includes this at its end).
+// film_world.cpp -- a film made from a file (film_file.h): the world round its scene at a moment (sky, land, water, nature, fire, the weather) and its nature's sound
+// placed where it comes from - DataFilm's members. Compiled once, in cpu_renderer.
+
+#include "film_file.h"
 
 namespace cartoon {
 namespace film_file {
 
 // Round 9's spectacles in a frame at film time t (nature's `nt`): tornadoes (film_wind.h), ice (film_ice.h), living light (film_glow.h) and the sea's giants
 // (film_giants.h). `exposure`: the frame's (living light is divided by it); `natureAt`: nature's time at a film time.
-inline std::string spectacleText(const Spec &spec, const std::string &header, double t, double nt, double exposure, const std::function<double(double)> &natureAt,
+static std::string spectacleText(const Spec &spec, const std::string &header, double t, double nt, double exposure, const std::function<double(double)> &natureAt,
 							  const terrain::Weather &weather) {
 	std::string out;
 	const double light = 1.0 / std::max(1.0, exposure);   // (as bright on the screen however far the night camera has opened up)
@@ -114,7 +115,7 @@ inline std::string spectacleText(const Spec &spec, const std::string &header, do
 
 // Round 10's universe in a frame at film time t (nature's `nt`): the set in space (film_space.h), the bodies in it (film_cosmos.h) and the craft and people travelling
 // among them (film_voyage.h). (The planets are worldAt's: an eclipse needs them all.)
-inline std::string universeText(const Spec &spec, const std::string &header, double t, double nt) {
+static std::string universeText(const Spec &spec, const std::string &header, double t, double nt) {
 	std::string out;
 	const std::string film = spec.key.empty() ? std::string("film") : spec.key;
 	if (spec.space.on) {   // (the set in space: film_space.h)
@@ -156,7 +157,7 @@ inline std::string universeText(const Spec &spec, const std::string &header, dou
 	return out;
 }
 
-inline std::string DataFilm::worldAt(const std::string &header, double t) const {
+std::string DataFilm::worldAt(const std::string &header, double t) const {
 	std::string out = film_camera::exposed(header, exposureAt(t));
 	const double nt = natureAt(t);   // (nature's time: the clouds, the water, the aurora, the wind, the animals; `timelapse`, `slowmo`)
 	if (spec.hasUnderwater) {   // under the sea (film_underwater.h): the water round the camera, the light coming down through it, what drifts and grows in it
@@ -431,7 +432,7 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 	return spec.space.on ? cosmos::withSpaceLook(space::recentred(out), spec.space.flare, spec.space.bloom) : out;   // (a floating origin for a film in space: film_space.h)
 }
 
-inline void DataFilm::soundscape(audio::Mix &m) const {
+void DataFilm::soundscape(audio::Mix &m) const {
 	const bool eagles = std::any_of(spec.flocks.begin(), spec.flocks.end(), [](const wildlife::Flock &f) { return f.kind == "eagles"; });
 	if (spec.falls.empty() && spec.fires.empty() && spec.lavas.empty() && spec.volcanoes.empty() && spec.wildfires.empty() && !spec.swell.on && spec.herds.empty() && !eagles &&
 		spec.forests.empty() && spec.geysers.empty() && spec.rockfalls.empty() && spec.avalanches.empty() && spec.quakes.empty() && spec.whales.empty() && spec.pods.empty() && spec.glaciers.empty() && spec.tornadoes.empty() &&
@@ -650,7 +651,7 @@ inline void DataFilm::soundscape(audio::Mix &m) const {
 	}
 }
 
-inline void DataFilm::thunder(audio::Mix &m) const {
+void DataFilm::thunder(audio::Mix &m) const {
 	for (const skyfx::Lightning &l : spec.lightnings)
 		skyfx::thunder(m, l, [this](double t, double x, double z) {
 			Vec3 eye, target;
@@ -660,7 +661,7 @@ inline void DataFilm::thunder(audio::Mix &m) const {
 		});
 }
 
-inline std::string DataFilm::airMedium() const {
+std::string DataFilm::airMedium() const {
 	const atmosphere::Air a(spec.air.haze);
 	const double A = spec.hasSky ? spec.sky.altitude : 0.0;
 	const atmosphere::RGB R = a.rayleigh * a.rayleighDensity(A);

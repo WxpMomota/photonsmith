@@ -12,6 +12,6 @@ func gpu/optix/optix_raygen.h::__raygen__rg 676
 func gpu/optix/optix_renderer_scene.cpp::OptiXRenderer::buildGeometryGases 310
 func gpu/optix/scene_builder.cpp::apply_loaded_scene_settings 309
 func launcher/main.cpp::main 594
-func src/shared/cartoon/film_parse.h::parse 998
+func src/shared/cartoon/film_parse.cpp::parse 998
 func src/shared/cartoon/film_parse_nature.h::natureLine 647
 func src/shared/cartoon/turtle_escape.h::turtleAt 440

@@ -116,6 +116,9 @@ add_library(cpu_renderer STATIC
     cpu_renderer/cpu_interface_bdpt.cpp
     src/shared/cartoon/cartoon_scenes.cpp
     src/shared/cartoon/cartoons.cpp
+    src/shared/cartoon/film_file.cpp
+    src/shared/cartoon/film_parse.cpp
+    src/shared/cartoon/film_world.cpp
     src/external/stb_image_impl.cpp
     src/external/tinyexr_impl.cpp
     src/external/miniz.c
