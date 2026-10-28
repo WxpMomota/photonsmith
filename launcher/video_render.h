@@ -544,6 +544,15 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
             result = rc;
             return true;
         };
+        // the card's memory: the number of workers was chosen for a typical frame of this size (RunPolicy::framesInFlight), and a film whose scenes are much bigger (Crystal Heart at
+        // 1080p: some 7 GB a frame) does not fit as many - under 1 GB free while they render means the card is paging, and one fewer runs at a time
+        if (use_gpu && !kMetalVideoFrames) {
+            const int device = args.gpu_device >= 0 ? args.gpu_device : (std::getenv("RAY_TRACER_GPU_DEVICE") ? std::atoi(std::getenv("RAY_TRACER_GPU_DEVICE")) : 0);
+            hooks.cardFull = [device] {
+                const long long free = gpu_memory::freeMb(device);
+                return free > 0 && free < 1024;
+            };
+        }
         // (a worker's first frame on a GPU also compiles the shaders when their cache is cold, about 18 minutes for the default renderer: it gets 45)
         return finish(cartoon_render::runWorkers(todo, workers, timeout, hooks, completed, inOrder, 25, cartoon_render::workerMemoryLimitBytes(args), use_gpu ? 45 * 60 : 0) + resumed);
     }

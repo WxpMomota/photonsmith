@@ -314,6 +314,10 @@ inline unsigned long long workerMemoryLimitBytes(const LaunchArgs &args) {
 struct WorkerHooks {
 	std::function<std::unique_ptr<WorkerHandle>(int worker, const std::vector<int> &frames)> start;   // null: it could not be started
 	std::function<bool(int frame, int &result)> poll;   // true and the frame's result when its marker is in; the marker is used up
+	// True while the graphics card's memory is used up (null: never asked). Frames that do not fit side by side are paged to and fro and every worker slows to a crawl, so when it stays
+	// full for `cardFullSeconds` one worker fewer runs at a time (down to one).
+	std::function<bool()> cardFull;
+	double cardFullSeconds = 20.0, cardCheckSeconds = 2.0;
 };
 
 // Renders `todo` (frame numbers) with `workers` long-lived workers: worker w is given every workers-th frame and renders its list in order. The pool watches the markers the workers
@@ -343,6 +347,16 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 	// a worker's first frame may have a longer limit (firstFrameStallSeconds: on a GPU it also compiles the shaders when their cache is cold)
 	const auto limitFor = [&](const Worker &worker) { return worker.framesSinceStart == 0 && stallSeconds > 0 ? (std::max)(stallSeconds, firstFrameStallSeconds) : stallSeconds; };
 	Clock::time_point lastTick = Clock::now();
+	// workers at work (started, frames left); at most `allowed` at a time, one fewer each time the card stays full (hooks.cardFull): the one that began its frame last is stopped (that
+	// frame is begun again later, not counted against it) and waits until another worker has finished its list
+	int allowed = workers;
+	Clock::time_point lastCardCheck = Clock::now(), fullSince = lastCardCheck;
+	bool full = false;
+	const auto atWork = [&] {
+		int n = 0;
+		for (const Worker &x : ws) n += x.handle && !x.remaining.empty() ? 1 : 0;
+		return n;
+	};
 	auto report = [&](int frame, int rc, double took) {
 		result[frame] = rc;
 		finished.insert(frame);
@@ -361,10 +375,29 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 		lastTick = now;
 		if (gap > std::chrono::seconds(5))
 			for (Worker &worker : ws) worker.last += gap;
+		if (hooks.cardFull && allowed > 1 && seconds(lastCardCheck) >= hooks.cardCheckSeconds) {
+			lastCardCheck = Clock::now();
+			if (!hooks.cardFull()) {
+				full = false;
+			} else if (!full) {
+				full = true, fullSince = lastCardCheck;
+			} else if (seconds(fullSince) >= hooks.cardFullSeconds && atWork() > 1) {
+				Worker *latest = nullptr;
+				for (Worker &x : ws)
+					if (x.handle && !x.remaining.empty() && (!latest || x.last > latest->last)) latest = &x;
+				latest->handle->kill();
+				latest->handle.reset();
+				allowed = atWork();
+				full = false;
+				std::cerr << "\nNote: the graphics card's memory is used up (these frames do not fit " << allowed + 1 << " at a time); going on with " << allowed << " worker" << (allowed == 1 ? "" : "s")
+						  << " at a time." << std::endl;
+			}
+		}
 		for (std::size_t w = 0; w < ws.size(); ++w) {
 			Worker &worker = ws[w];
 			if (worker.remaining.empty()) continue;
 			if (!worker.handle) {
+				if (atWork() >= allowed) continue;   // (stopped for the card's memory: it waits for a worker to finish)
 				worker.last = Clock::now();
 				worker.handle = hooks.start(static_cast<int>(w), std::vector<int>(worker.remaining.begin(), worker.remaining.end()));
 				worker.framesSinceStart = 0;

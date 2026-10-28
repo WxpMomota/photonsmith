@@ -1157,6 +1157,70 @@ TEST(CartoonWorkers, AWorkerThatHoldsTooMuchMemoryIsReplacedBetweenFramesAndEver
 	EXPECT_EQ(handed.size(), 4u);
 }
 
+TEST(CartoonWorkers, WhenTheCardsMemoryStaysFullOneWorkerFewerRunsAndEveryFrameStillComesOut) {
+	cartoon_render::WorkerHooks hooks;
+	std::set<int> markers;
+	struct Made {
+		FakeWorker *w;
+		std::shared_ptr<bool> killed;   // (the pool destroys a worker once it has stopped it: `w` is only used while this is false)
+	};
+	std::vector<Made> made;
+	std::vector<std::vector<int>> lists;
+	int mostAtOnceAfterTheStop = 0;
+	bool stopped = false;
+	const auto atWork = [&] {
+		int n = 0;
+		for (const Made &m : made) n += !*m.killed && m.w->alive ? 1 : 0;
+		return n;
+	};
+	hooks.start = [&](int, const std::vector<int> &frames) -> std::unique_ptr<cartoon_render::WorkerHandle> {
+		lists.push_back(frames);
+		auto w = std::make_unique<FakeWorker>();
+		w->frames = frames;
+		w->killedOut = std::make_shared<bool>(false);
+		made.push_back({w.get(), w->killedOut});
+		if (stopped) mostAtOnceAfterTheStop = std::max(mostAtOnceAfterTheStop, atWork());
+		return w;
+	};
+	int looks = 0;
+	hooks.poll = [&](int frame, int &rc) {
+		// each live worker finishes a frame every few looks (not all at once: the pool has to get a look in while they are at work)
+		if (++looks % 6 == 0)
+			for (const Made &m : made)
+				if (!*m.killed && m.w->alive && m.w->next < m.w->frames.size()) {
+					markers.insert(m.w->frames[m.w->next++]);
+					if (m.w->next == m.w->frames.size()) m.w->alive = false;
+				}
+		if (markers.count(frame) == 0) return false;
+		markers.erase(frame);
+		rc = 0;
+		return true;
+	};
+	int asked = 0;
+	hooks.cardFull = [&] {
+		++asked;
+		for (const Made &m : made) stopped = stopped || *m.killed;
+		return true;   // always full
+	};
+	hooks.cardFullSeconds = 0.0, hooks.cardCheckSeconds = 0.0;
+	std::vector<int> handed;
+	const int ok = cartoon_render::runWorkers({0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, 2, 0, hooks, [](int, int, double) {}, [&](int f, int) { handed.push_back(f); }, 1);
+	EXPECT_EQ(ok, 10) << "no frame lost or given up";
+	EXPECT_EQ(handed, (std::vector<int>{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}));
+	int killed = 0;
+	for (const Made &m : made) killed += *m.killed ? 1 : 0;
+	EXPECT_EQ(killed, 1) << "one worker stopped; with one left there is nothing more to stop";
+	ASSERT_EQ(lists.size(), 3u) << "the stopped worker's frames are taken up again later";
+	EXPECT_LE(mostAtOnceAfterTheStop, 0) << "and only once the other worker has finished its list";
+	EXPECT_GT(asked, 0);
+
+	// a card with room: nothing is stopped
+	made.clear(), lists.clear(), markers.clear(), handed.clear();
+	hooks.cardFull = [] { return false; };
+	EXPECT_EQ(cartoon_render::runWorkers({0, 1, 2, 3, 4, 5}, 2, 0, hooks, [](int, int, double) {}, [&](int f, int) { handed.push_back(f); }, 1), 6);
+	EXPECT_EQ(lists.size(), 2u);
+}
+
 TEST(CartoonWorkers, TheMemoryLimitIsTheFlagThenTheEnvironmentThenEightGigabytes) {
 	const char *saved = std::getenv("RAY_TRACER_WORKER_MAX_MB");
 	const std::string before = saved ? saved : "";
