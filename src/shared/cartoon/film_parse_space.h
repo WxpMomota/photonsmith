@@ -189,11 +189,13 @@ inline std::string galaxyLine(Spec &s, const std::vector<std::string> &t) {
 inline std::string starLine(Spec &s, const std::vector<std::string> &t) {
 	cosmos::Star st;
 	bool sized = false;
-	const std::string e = bodyLine(t, "`star NAME at X Y Z radius R [kind sun|red|orange|white|blue] [temperature K] [brightness B] [seed N]` (radius 10 to 200000 m, 1500 to 50000 K)",
+	const std::string e = bodyLine(t, "`star NAME at X Y Z radius R [kind sun|red|orange|white|blue] [temperature K] [brightness B] [prominences N] [flare T] ... [seed N]` (radius 10 to 200000 m, 1500 to 50000 K, 0 to 40 prominences)",
 								   cosmos::starKinds(), st.name, st.kind, st.at, [&](const std::string &w, double a) {
 									   if (w == "radius" && a >= 10.0 && a <= 200000.0) return st.radius = a, sized = true;
 									   if (w == "temperature" && a >= 1500.0 && a <= 50000.0) return st.temperature = a, true;
 									   if (w == "brightness" && a > 0.0 && a <= 20.0) return st.brightness = a, true;
+									   if (w == "prominences" && a >= 0.0 && a <= 40.0) return st.prominences = static_cast<int>(a), true;
+									   if (w == "flare") return st.flares.push_back(a), true;
 									   if (w == "seed") return st.seed = static_cast<int>(a), true;
 									   return false;
 								   });

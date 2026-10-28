@@ -216,11 +216,14 @@ inline std::string galaxyText(const std::string &film, const Galaxy &g) {
 }
 
 // ---- stars ----
-// A star close up: its kind (or its own temperature), where, how big, how bright.
+// A star close up: its kind (or its own temperature), where, how big, how bright; its prominences (arcs of glowing plasma looping off its limb) and the flares that
+// burst from it at their times.
 struct Star {
 	std::string name, kind = "sun";
 	Vec3 at{0.0, 0.0, -30000.0};
 	double radius = 5000.0, temperature = 0.0, brightness = 1.0;
+	int prominences = 0;
+	std::vector<double> flares;   // (nature's times)
 	int seed = 1;
 	double kelvin() const {
 		if (temperature > 0.0) return temperature;
@@ -274,7 +277,25 @@ inline Voxel starGlowVoxel(const Star &s, double x, double y, double z) {
 	v.le = space::blackbody(s.kelvin()) * glow;
 	return v;
 }
-// A star at nature's time `nt` as scene text: its glowing surface (turning slowly) and its glow.
+// Prominence k of a star at nature's time `nt`: an arc of plasma rising off the limb and falling back, its ends on the surface, swaying - as a tube (story space mesh).
+inline Mesh prominence(const Star &s, int k, double nt) {
+	const int sd = s.seed * 171 + k;
+	const double lat = (hash01(sd, 1) - 0.5) * 1.2, lon = 2.0 * kPi * hash01(sd, 2), span = 0.12 + 0.18 * hash01(sd, 3), height = 0.15 + 0.35 * hash01(sd, 4);
+	const Vec3 c{std::cos(lat) * std::cos(lon), std::sin(lat), std::cos(lat) * std::sin(lon)};
+	const Vec3 t0 = normalize(cross(c, Vec3{0.0, 1.0, 0.0}) + Vec3{1e-9, 0.0, 0.0}), t1 = cross(c, t0);
+	const double turn = 2.0 * kPi * hash01(sd, 6);
+	const Vec3 t = t0 * std::cos(turn) + t1 * std::sin(turn);   // (which way its feet lie on the surface)
+	std::vector<Vec3> pts;
+	for (int i = 0; i <= 24; ++i) {
+		const double u = i / 24.0, a = (u - 0.5) * span * 2.0, rise = std::sin(kPi * u) * height * (1.0 + 0.15 * std::sin(0.3 * nt + k));
+		const Vec3 base = normalize(c * std::cos(a) + t * std::sin(a));
+		const Vec3 q = s.at + base * (s.radius * (0.98 + rise)) + c * (0.01 * s.radius * std::sin(5.0 * u + 0.5 * nt + k));
+		pts.push_back({-q.x, q.y, q.z});
+	}
+	return sdf::tubeMesh(pts, s.radius * (0.012 + 0.012 * hash01(sd, 5)), 0.6, 8);
+}
+// A star at nature's time `nt` as scene text: its glowing surface (turning slowly), its glow, its prominences, and any flare under way - a blaze on its surface and a
+// cloud of plasma thrown off it, swelling and fading over a minute.
 inline std::string starText(const std::string &film, const Star &s, double nt) {
 	char buf[400];
 	std::string out = "# a star (film_cosmos.h): " + s.name + "\nAttributeBegin\n";
@@ -293,6 +314,39 @@ inline std::string starText(const std::string &film, const Star &s, double nt) {
 		return starGlowVoxel(s, ((i + 0.5) / N * 2.0 - 1.0) * 3.0, ((j + 0.5) / N * 2.0 - 1.0) * 3.0, ((k + 0.5) / N * 2.0 - 1.0) * 3.0);
 	});
 	out += placedGrid(path, name, s.at - Vec3{3.0, 3.0, 3.0} * s.radius, Vec3{6.0, 6.0, 6.0} * s.radius);
+	// prominences
+	if (s.prominences > 0) {
+		Mesh all;
+		for (int k = 0; k < s.prominences; ++k) {
+			const Mesh m = prominence(s, k, nt);
+			const int base = static_cast<int>(all.verts.size());
+			all.verts.insert(all.verts.end(), m.verts.begin(), m.verts.end());
+			all.normals.insert(all.normals.end(), m.normals.begin(), m.normals.end());
+			for (const auto &tr : m.tris) all.tris.push_back({tr[0] + base, tr[1] + base, tr[2] + base});
+		}
+		const Vec3 L = Vec3{1.0, 0.16, 0.05} * (1.4 * s.brightness);   // (deep red: brighter and it burns out to pale yellow)
+		out += "# its prominences\n" + attr(diffuseMaterial({0.0, 0.0, 0.0}), emitMesh(all, identity()), &L);
+	}
+	// flares
+	for (std::size_t k = 0; k < s.flares.size(); ++k) {
+		const double since = nt - s.flares[k];
+		if (since < 0.0 || since > 60.0) continue;
+		const int sd = s.seed * 191 + static_cast<int>(k);
+		const double lat = (hash01(sd, 1) - 0.5) * 0.8, lon = 2.0 * kPi * hash01(sd, 2);
+		const Vec3 c{std::cos(lat) * std::cos(lon), std::sin(lat), std::cos(lat) * std::sin(lon)};
+		const double blaze = std::exp(-since / 4.0) * smoothstep(0.0, 0.5, since);
+		const Vec3 spot = s.at + c * (s.radius * 1.002);
+		out += "# a flare\n" + emissiveSphere({-spot.x, spot.y, spot.z}, s.radius * 0.04 * (1.0 + 0.5 * since / 4.0), Vec3{1.0, 0.95, 0.85} * (30.0 * blaze * s.brightness));
+		// the cloud of plasma thrown off: a swelling, fading shell of glowing blobs
+		const double reach = s.radius * (1.0 + 0.08 * since), fade = std::exp(-since / 25.0) * smoothstep(0.0, 2.0, since);
+		if (fade < 0.01) continue;
+		const Vec3 t1 = normalize(cross(c, Vec3{0.0, 1.0, 0.0}) + Vec3{1e-9, 0.0, 0.0}), t2 = cross(c, t1);
+		for (int b = 0; b < 40; ++b) {
+			const double a = 2.0 * kPi * hash01(sd * 31 + b, 3), spread = 0.35 * std::sqrt(hash01(sd * 31 + b, 4));
+			const Vec3 d = normalize(c + (t1 * std::cos(a) + t2 * std::sin(a)) * spread), q = s.at + d * (reach * (0.97 + 0.1 * hash01(sd * 31 + b, 5)));
+			out += emissiveSphere({-q.x, q.y, q.z}, s.radius * (0.025 + 0.02 * hash01(sd * 31 + b, 6)) * (1.0 + 0.06 * since), Vec3{1.0, 0.35, 0.12} * (1.6 * fade * s.brightness));
+		}
+	}
 	return out;
 }
 

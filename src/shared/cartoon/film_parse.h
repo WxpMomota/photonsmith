@@ -153,7 +153,8 @@
 //     planet   home ocean  at 0 0 -20000  radius 6000           # a planet (film_planets.h): rocky, desert, ice, ocean, gas or lava; `tilt`, `spin SECONDS`
 //     nebula   veil  at 0 0 -30000  size 20000  kind pillars    # the universe beyond (film_cosmos.h): a glowing cloud of gas and dust (emission, dark, pillars)
 //     galaxy   swirl  at 0 0 -80000  size 50000  tilt 60        # a galaxy: spiral, barred or elliptical, tipped by `tilt`, turned by `turn`
-//     star     vega  at 0 0 -30000  radius 5000  kind blue      # a star close up: sun, red, orange, white, blue (or `temperature K`)
+//     star     vega  at 0 0 -30000  radius 5000  kind blue      # a star close up: sun, red, orange, white, blue (or `temperature K`);
+//                                                               # `prominences N` looping off its limb, `flare T` bursting from it
 //     closeup  size 16                                         # the ground close up (film_ground.h): ripples, drifts, pebbles, footprints, wet sand; `tracks from
 //                                                               # X Z to X Z [during T0 T1] [kind boots|paws|hooves]`: a trail of footprints made over its time
 //     caustics traced                                          # the net of light under water traced from the rippling surface (film_caustics.h);

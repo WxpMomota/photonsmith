@@ -1183,6 +1183,16 @@ A star seen close: a glowing ball in the colour of its temperature (red 3200 K, 
 slowly; round it a glow (a small emitting grid out to three radii, streaked a little) that falls off with height. It is a light: it lights planets near it. The `space`
 sun is a separate thing (the far sun in the sky); turn it off (`space sun off`) for a film round another star.
 
+**Flares and prominences: `star ... prominences N flare T`.** (film_cosmos.h)
+
+```
+star  sol  at 0 0 -30000  radius 5000  kind sun  prominences 14  flare 2  flare 18     # 0 to 40 prominences; as many flares as you like, each at its time
+```
+
+Prominences are arcs of glowing plasma rising off the star's limb and falling back into it, each rooted at both ends in the surface, up to half a radius high, swaying slowly;
+they glow orange-red and are seen best against the black beside the star. A flare at time T (nature's time) blazes on the surface - a white-hot spot that flares in half a
+second and fades over a few - and throws off a cloud of plasma: a shell of glowing blobs that swells outward and fades over a minute, then is gone.
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

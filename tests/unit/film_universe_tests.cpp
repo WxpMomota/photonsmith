@@ -351,6 +351,8 @@ TEST(FilmUniverseNebula, GasGlowsDustDarkensAndPillarsStand) {
 	expectProblems({{"nebula a at 0 0 0", "how big it is"}, {"nebula a at 0 0 0 size 10", "size 100 to 200000"}, {"nebula a at 0 0 0 size 500 kind glowing", "\"kind\""}});
 }
 
+// ---- 8. galaxies ----------------------------------------------------------------------------------------------------------------------------------------------------------
+
 TEST(FilmUniverseGalaxy, ArmsWindBulgeGlowsAndEllipticalsFade) {
 	cs::Galaxy g;
 	g.name = "swirl", g.size = 50000.0;
@@ -389,6 +391,8 @@ TEST(FilmUniverseGalaxy, ArmsWindBulgeGlowsAndEllipticalsFade) {
 					{"galaxy a at 0 0 0 size 500 tilt 120", "\"tilt\""}});
 }
 
+// ---- 9. stars close up ----------------------------------------------------------------------------------------------------------------------------------------------------
+
 TEST(FilmUniverseStar, ColourFollowsTemperatureSpotsAreDarkAndItGlows) {
 	cs::Star sun;
 	sun.name = "sol";
@@ -424,4 +428,28 @@ TEST(FilmUniverseStar, ColourFollowsTemperatureSpotsAreDarkAndItGlows) {
 	EXPECT_NE(s.find("\"string filename\" [ \""), std::string::npos) << "its surface picture";
 	expectProblems({{"star a at 0 0 0", "how big it is"}, {"star a at 0 0 0 radius 1", "radius 10 to 200000"}, {"star a at 0 0 0 radius 500 kind green", "\"kind\""},
 					{"star a at 0 0 0 radius 500 temperature 900", "\"temperature\""}});
+}
+
+// ---- 10. flares and prominences -------------------------------------------------------------------------------------------------------------------------------------------
+
+TEST(FilmUniverseFlares, ProminencesLoopOffTheLimbAndFlaresBurstThenFade) {
+	cs::Star sun;
+	sun.name = "sol", sun.radius = 1000.0, sun.prominences = 6;
+	// a prominence: its ends on the surface, its middle well above it
+	const cartoon::Mesh m = cs::prominence(sun, 2, 0.0);
+	ASSERT_FALSE(m.verts.empty());
+	double lowest = 1e9, highest = 0.0;
+	for (const cartoon::Vec3 &v : m.verts) {
+		const double r = std::sqrt(v.x * v.x + v.y * v.y + (v.z - sun.at.z) * (v.z - sun.at.z));   // (its at.x is 0: story x is pbrt's mirrored)
+		lowest = std::min(lowest, r), highest = std::max(highest, r);
+	}
+	EXPECT_LT(lowest, 1.0 * sun.radius) << "rooted in the surface";
+	EXPECT_GT(highest, 1.1 * sun.radius) << "looping above it";
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("flares", "scene s.pbrt\nlength 90\nspace sun off\nstar sol at 0 0 -30000 radius 5000 prominences 8 flare 10\nshot 0 A\n key 0 0 0  0 0 -100  50\n", film), "");
+	EXPECT_NE(film.sceneAt(1.0).find("# its prominences"), std::string::npos);
+	EXPECT_EQ(film.sceneAt(5.0).find("# a flare"), std::string::npos) << "not before its time";
+	EXPECT_NE(film.sceneAt(12.0).find("# a flare"), std::string::npos);
+	EXPECT_EQ(film.sceneAt(80.0).find("# a flare"), std::string::npos) << "over a minute later it is gone";
+	expectProblems({{"star a at 0 0 0 radius 500 prominences 99", "\"prominences\""}});
 }
