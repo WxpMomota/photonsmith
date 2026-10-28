@@ -350,5 +350,127 @@ inline std::string starText(const std::string &film, const Star &s, double nt) {
 	return out;
 }
 
+// ---- black holes ----
+// A black hole: its shadow (`radius`: the black disc the camera sees), its accretion disc out to `disc` radii - streams of gas going round it, white-hot inside and
+// orange-red further out, the inner ones faster, brighter and bluer on the side coming towards the camera - tipped from edge-on by `tilt` (about x) and turned by `turn`
+// (about y); the far side of its disc bent by its gravity over the top of its shadow (and, fainter, under it), a thin bright ring hugging the shadow; with `jets L` two
+// beams of plasma knots L radii long shooting out of its poles. Not a true lens: the stars behind it are not bent.
+struct BlackHole {
+	std::string name;
+	Vec3 at{0.0, 0.0, -30000.0};
+	double radius = 2000.0, disc = 8.0, tilt = 8.0, turn = 0.0, spin = 1.0, jets = 0.0, brightness = 1.0;
+	int seed = 1;
+};
+// Its disc's frame (pbrt's): the axis n and two directions e1, e2 in its plane.
+inline void blackHoleFrame(const BlackHole &b, Vec3 &n, Vec3 &e1, Vec3 &e2) {
+	const double ti = b.tilt * kPi / 180.0, tu = b.turn * kPi / 180.0;
+	n = {std::sin(tu) * std::sin(ti), std::cos(ti), std::cos(tu) * std::sin(ti)};
+	e1 = {std::cos(tu), 0.0, -std::sin(tu)};
+	e2 = cross(n, e1);
+}
+// One stream of the disc: its radius (in the hole's radii, from 3: the innermost stable orbit, to `disc`), where along its orbit it starts at nature's time `nt` and
+// how long it is (radians), how thick and how high off the disc's plane (radii), how bright.
+struct DiscStream {
+	double r = 3.0, phi = 0.0, span = 0.5, thick = 0.04, height = 0.0, glow = 1.0;
+};
+inline DiscStream discStream(const BlackHole &b, int k, double nt) {
+	const int sd = b.seed * 211 + k;
+	DiscStream s;
+	s.r = 3.0 + (b.disc - 3.0) * std::pow(hash01(sd, 1), 1.6);   // (more of them inside)
+	const double omega = 0.6 * b.spin * std::pow(3.0 / s.r, 1.5);   // (an orbit's pace, Kepler's: ten seconds a turn at the inner edge)
+	s.phi = 2.0 * kPi * hash01(sd, 2) + omega * nt;
+	s.span = 0.6 + 1.2 * hash01(sd, 3);
+	s.thick = (0.03 + 0.05 * hash01(sd, 4)) * std::pow(s.r / 3.0, 0.4);
+	s.height = 0.06 * (hash01(sd, 5) - 0.5) * (s.r / 3.0);
+	s.glow = (0.4 + hash01(sd, 6)) * std::pow(3.0 / s.r, 1.2);
+	return s;
+}
+// The gas's temperature at radius r (radii): hottest at the inner edge.
+inline double discKelvin(double r) { return 6500.0 * std::pow(3.0 / std::max(3.0, r), 0.6); }   // (warm white inside, orange out to red: a film's palette, not a real disc's X-ray heat)
+// Doppler beaming: how much brighter (above 1) or dimmer gas moving round at radius r looks, its direction of travel `v` and the direction to the camera `c` (unit).
+inline double beaming(double r, Vec3 v, Vec3 c) {
+	const double beta = 0.45 * std::sqrt(3.0 / std::max(3.0, r)), gamma = 1.0 / std::sqrt(1.0 - beta * beta);
+	return 1.0 / (gamma * (1.0 - beta * dot(v, c)));
+}
+// The point of the hole's frame at angle phi, radius r, height h (radii) - pbrt's.
+inline Vec3 discPoint(const BlackHole &b, double phi, double r, double h) {
+	Vec3 n, e1, e2;
+	blackHoleFrame(b, n, e1, e2);
+	return b.at + (e1 * std::cos(phi) + e2 * std::sin(phi)) * (r * b.radius) + n * (h * b.radius);
+}
+// A black hole at nature's time `nt`, seen from `eye` (pbrt's), as scene text.
+inline std::string blackHoleText(const BlackHole &b, double nt, Vec3 eye) {
+	std::string out = "# a black hole (film_cosmos.h): " + b.name + "\n";
+	char buf[320];
+	std::snprintf(buf, sizeof buf, "AttributeBegin\n  Translate %.4f %.4f %.4f\n  Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]\n  Shape \"sphere\" \"float radius\" [ %.4f ]\nAttributeEnd\n",
+				  b.at.x, b.at.y, b.at.z, b.radius);
+	out += "# its shadow\n" + std::string(buf);
+	Vec3 n, e1, e2;
+	blackHoleFrame(b, n, e1, e2);
+	// the camera's view of it: w towards the camera, `up` the disc's axis as the camera sees it, `right` across
+	const Vec3 w = normalize(eye - b.at + Vec3{1e-9, 0.0, 0.0});
+	Vec3 up = n - w * dot(n, w);
+	up = length(up) > 1e-6 ? normalize(up) : normalize(cross(w, e1));
+	const Vec3 right = cross(up, w);
+	const auto story = [](Vec3 p) { return Vec3{-p.x, p.y, p.z}; };
+	const auto emit = [&](const std::vector<Vec3> &pts, double thick, Vec3 L, const char *what) {
+		if (pts.size() < 2 || !(L.x + L.y + L.z > 1e-4)) return;
+		out += std::string(what) + attr(diffuseMaterial({0.0, 0.0, 0.0}), emitMesh(sdf::tubeMesh(pts, thick * b.radius, 0.3, 6), identity()), &L);
+	};
+	const int streams = 260;
+	for (int k = 0; k < streams; ++k) {
+		const DiscStream s = discStream(b, k, nt);
+		std::vector<Vec3> pts, bent;
+		double beam = 0.0;
+		bool bentDone = false;   // (one stretch behind the hole: its image is one arc)
+		for (int i = 0; i <= 16; ++i) {
+			const double phi = s.phi + s.span * i / 16.0;
+			const Vec3 p = discPoint(b, phi, s.r, s.height), d = normalize(p - b.at - n * dot(p - b.at, n));
+			pts.push_back(story(p));
+			beam += beaming(s.r, cross(n, d) * (b.spin < 0.0 ? -1.0 : 1.0), normalize(eye - p)) / 17.0;
+			// its lensed image: the part behind the hole (as the camera sees it) bent up over the shadow's top, its angle round the shadow from how far across it is
+			const double across = dot(d, right), behind = -dot(d, w - n * dot(w, n));
+			if (!bentDone && behind > 0.0) {
+				const double psi = std::atan2(behind, across), ri = 1.15 + 0.12 * (s.r - 3.0);
+				bent.push_back(story(b.at + (right * std::cos(psi) + up * std::sin(psi)) * (ri * b.radius) + w * (0.05 * b.radius)));
+			} else if (!bentDone) {
+				bentDone = bent.size() >= 2;
+				if (!bentDone) bent.clear();
+			}
+		}
+		const double boost = std::pow(std::clamp(beam, 0.5, 1.7), 3.0);
+		const Vec3 colour = space::blackbody(discKelvin(s.r) * std::clamp(beam, 0.6, 1.6));
+		emit(pts, s.thick, colour * (0.7 * s.glow * boost * b.brightness), "");   // (brighter and its colours burn out to white)
+		emit(bent, s.thick * 0.6, colour * (0.6 * s.glow * b.brightness), "");
+		if (bent.size() >= 2) {   // and its fainter second image, under the shadow
+			std::vector<Vec3> under;
+			for (const Vec3 &q : bent) {
+				const Vec3 p = story(q) - b.at;
+				under.push_back(story(b.at + right * dot(p, right) * 0.85 - up * dot(p, up) * 0.85 + w * (0.05 * b.radius)));
+			}
+			emit(under, s.thick * 0.4, colour * (0.25 * s.glow * b.brightness), "");
+		}
+	}
+	// the photon ring: light that went round the hole, hugging its shadow
+	std::vector<Vec3> ring;
+	for (int i = 0; i <= 96; ++i) {
+		const double a = 2.0 * kPi * i / 96.0;
+		ring.push_back(story(b.at + (right * std::cos(a) + up * std::sin(a)) * (1.03 * b.radius) + w * (0.05 * b.radius)));
+	}
+	emit(ring, 0.012, space::blackbody(6000.0) * (1.2 * b.brightness), "# its photon ring\n");
+	// jets: knots of plasma streaming out of its poles, swelling and fading as they go
+	if (b.jets > 1.5) {
+		for (int side = -1; side <= 1; side += 2)
+			for (int k = 0; k < 40; ++k) {
+				const double f = std::fmod(k / 40.0 + nt * 0.04 * b.spin / std::max(1.0, b.jets / 10.0) + 10.0, 1.0);
+				const double along = 1.3 + (b.jets - 1.3) * f, wob = 0.15 * std::sin(nt * 0.7 + k);
+				const Vec3 p = b.at + n * (side * along * b.radius) + e1 * (wob * f * b.radius);
+				const double flick = 0.7 + 0.3 * std::sin(nt * 3.0 + k * 1.7);
+				out += emissiveSphere(story(p), b.radius * (0.12 + 0.6 * f), Vec3{0.55, 0.7, 1.0} * (1.2 * (1.0 - f) * (1.0 - f) * flick * b.brightness));
+			}
+	}
+	return out;
+}
+
 }  // namespace cosmos
 }  // namespace cartoon

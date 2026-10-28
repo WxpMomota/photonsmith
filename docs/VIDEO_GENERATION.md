@@ -1193,6 +1193,19 @@ Prominences are arcs of glowing plasma rising off the star's limb and falling ba
 they glow orange-red and are seen best against the black beside the star. A flare at time T (nature's time) blazes on the surface - a white-hot spot that flares in half a
 second and fades over a few - and throws off a cloud of plasma: a shell of glowing blobs that swells outward and fades over a minute, then is gone.
 
+**Black holes: `blackhole`.** (film_cosmos.h)
+
+```
+blackhole  maw  at 0 0 -30000  radius 2000  tilt 8  jets 18     # `disc D` (8, 4 to 30 radii), `turn`, `spin S` (1; negative turns it the other way), `brightness`, `seed`
+```
+
+A black hole as films show it: its shadow, a black ball `radius` across, and round it an accretion disc out to `disc` radii - 260 streams of gas going round, white-hot at the
+inner edge (three radii) and orange to red further out, the inner ones faster (Kepler's pace: ten seconds a turn at the inner edge, slower outside). The side of the disc coming
+towards the camera is brighter and bluer, the side going away dimmer and redder (Doppler beaming, worked out for where the camera is in every frame). `tilt` tips it from edge-on
+(8 degrees: nearly edge-on, the classic view). The part of the disc behind the hole is also drawn bent up over the top of the shadow, and fainter under it, with a thin bright
+photon ring hugging the shadow - the way its gravity bends that light towards the camera; these follow the camera too. `jets L` adds two beams of blue-white plasma knots
+streaming out of its poles to L radii. It is a cartoon of the lens, not a lens: the stars behind it are not bent.
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

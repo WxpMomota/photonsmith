@@ -245,6 +245,12 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 		film_subjects::cameraOf(header, eye, target, fov);
 		out += space::spaceText(spec.key.empty() ? std::string("film") : spec.key, spec.space, space::narrowOnTheSun(spec.space, eye, target, fov));
 	}
+	if (!spec.blackHoles.empty()) {   // (film_cosmos.h: drawn for where the camera is)
+		Vec3 eye, target;
+		double fov = 40.0;
+		film_subjects::cameraOf(header, eye, target, fov);
+		for (const cosmos::BlackHole &b : spec.blackHoles) out += cosmos::blackHoleText(b, nt, {-eye.x, eye.y, eye.z});
+	}
 	for (const cosmos::Star &st : spec.stars) out += cosmos::starText(spec.key.empty() ? std::string("film") : spec.key, st, nt);   // (film_cosmos.h)
 	for (const cosmos::Galaxy &g : spec.galaxies) out += cosmos::galaxyText(spec.key.empty() ? std::string("film") : spec.key, g);   // (film_cosmos.h)
 	for (const cosmos::Nebula &n : spec.nebulae) out += cosmos::nebulaText(spec.key.empty() ? std::string("film") : spec.key, n);   // (film_cosmos.h)

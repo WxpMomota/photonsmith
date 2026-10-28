@@ -453,3 +453,30 @@ TEST(FilmUniverseFlares, ProminencesLoopOffTheLimbAndFlaresBurstThenFade) {
 	EXPECT_EQ(film.sceneAt(80.0).find("# a flare"), std::string::npos) << "over a minute later it is gone";
 	expectProblems({{"star a at 0 0 0 radius 500 prominences 99", "\"prominences\""}});
 }
+
+// ---- 11. black holes ------------------------------------------------------------------------------------------------------------------------------------------------------
+
+TEST(FilmUniverseBlackHole, DiscIsHotterInsideComingSideBrighterAndTheFarSideBendsOverTheTop) {
+	cs::BlackHole b;
+	b.name = "maw", b.at = {0.0, 0.0, -30000.0}, b.radius = 2000.0;
+	EXPECT_GT(cs::discKelvin(3.0), 2.0 * cs::discKelvin(12.0)) << "hotter inside";
+	EXPECT_GT(cs::beaming(3.0, {1.0, 0.0, 0.0}, {1.0, 0.0, 0.0}), 1.5) << "gas coming towards the camera looks brighter";
+	EXPECT_LT(cs::beaming(3.0, {-1.0, 0.0, 0.0}, {1.0, 0.0, 0.0}), 0.7) << "and going away dimmer";
+	const cs::DiscStream inner = cs::discStream(b, 3, 0.0), later = cs::discStream(b, 3, 5.0);
+	EXPECT_GE(inner.r, 3.0);
+	EXPECT_LE(inner.r, b.disc);
+	EXPECT_GT(later.phi, inner.phi) << "going round";
+	// edge-on from the front: the lensed far side is over the shadow's top, the photon ring round it
+	const std::string s = cs::blackHoleText(b, 0.0, {0.0, 0.0, 0.0});
+	EXPECT_NE(s.find("# its shadow"), std::string::npos);
+	EXPECT_NE(s.find("# its photon ring"), std::string::npos);
+	EXPECT_GT(count(s, "AreaLightSource"), 260u) << "its streams, their bent images";
+	b.jets = 10.0;
+	EXPECT_GT(count(cs::blackHoleText(b, 0.0, {0.0, 0.0, 0.0}), "AreaLightSource"), count(s, "AreaLightSource") + 30u) << "its jets' knots";
+
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("hole", "scene s.pbrt\nlength 4\nspace sun off\nblackhole maw at 0 0 -30000 radius 2000 jets 12\nshot 0 A\n key 0 0 0  0 0 -100  50\n", film), "");
+	EXPECT_NE(film.sceneAt(1.0).find("# a black hole (film_cosmos.h): maw"), std::string::npos);
+	expectProblems({{"blackhole a at 0 0 0", "how big it is"}, {"blackhole a at 0 0 0 radius 1", "radius 10 to 100000"}, {"blackhole a at 0 0 0 radius 500 disc 2", "\"disc\""},
+					{"blackhole a at 0 0 0 radius 500 jets 1", "\"jets\""}});
+}
