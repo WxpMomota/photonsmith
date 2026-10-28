@@ -218,7 +218,10 @@ def main():
         modes.append("livepreview_objects")
     if args.live_preview and IS_MAC and "livepreview_arrange" not in modes:
         modes.append("livepreview_arrange")   # Save arrangement of a Scene Builder scene, opened again in the Builder
-    waits = {"quitwarm": 240, "builder": 300, "composite": 180, "videoframes": 180, "modelthumbs": 1800, "livepreview": 240, "livepreview_objects": 150, "livepreview_arrange": 90}
+    # diagnostics: the app itself waits up to 120 s for the report (its Network section waits on the network), so less than that here fails it from outside.
+    # composite renders the starter scene three times on the CPU: ~90 s on 16 threads, so a 4-core CI runner needs about four times that.
+    waits = {"quitwarm": 240, "builder": 300, "composite": 480, "diagnostics": 180, "videoframes": 180, "modelthumbs": 1800, "livepreview": 240, "livepreview_objects": 150,
+             "livepreview_arrange": 90}
     ok = True
     try:
         for mode in modes:
