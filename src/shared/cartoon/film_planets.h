@@ -6,6 +6,10 @@
 //              ice (white and pale blue, crossed by long brown cracks), ocean (continents of forest, grass, desert and mountain under swirls of cloud, blue seas
 //              that catch the sun in a glint, white polar caps), gas (a giant: bands of cloud torn into eddies along their edges, a great oval storm) and lava
 //              (dark crust broken by glowing rivers of lava - they light its night side);
+//   air        (`air S [colour blue|orange|white|green]`) a shell of air round it, thinning with height (a scale height of 1.2% of its radius), that scatters the
+//              sunlight - blue most, as air does (Rayleigh), or an orange haze, white cloud or green - so its rim glows against space, its day side is a little
+//              hazed, and along the line between day and night the light through the air comes red; one grid (film_clouds.h's kind, in the film's cache) in a
+//              sphere round the planet;
 //   surface    a picture painted once for the kind and its seed (the sphere's own pbrt coordinates: row 0 its north pole), on pbrt's sphere turned so its poles are
 //              up (tipped by `tilt`) and spinning once every `spin` seconds; an ocean world's seas glossy (a coated surface whose roughness is a second picture).
 //
@@ -18,6 +22,7 @@
 #include <vector>
 
 #include "cartoon_lib.h"
+#include "film_cache.h"
 #include "film_clouds.h"
 #include "film_sky.h"
 #include "film_space.h"
@@ -30,7 +35,13 @@ struct Planet {
 	Vec3 at{0.0, 0.0, -20000.0};
 	double radius = 4000.0, tilt = 15.0, spin = 600.0;
 	int seed = 1;
+	double air = 0.0;                 // how thick its air is (0 none, 1 an Earth's)
+	std::string airColour = "blue";   // blue (Rayleigh), orange (a haze), white (cloud), green
 };
+inline const std::vector<std::string> &airColours() {
+	static const std::vector<std::string> k = {"blue", "orange", "white", "green"};
+	return k;
+}
 inline const std::vector<std::string> &kinds() {
 	static const std::vector<std::string> k = {"rocky", "desert", "ice", "ocean", "gas", "lava"};
 	return k;
@@ -172,6 +183,78 @@ inline std::string placement(const Planet &p, double nt) {
 				  std::fmod(360.0 * nt / std::max(1.0, p.spin), 360.0));
 	return buf;
 }
+// ---- air ----
+constexpr int kAirN = 144;
+constexpr double kAirScale = 0.012, kAirTop = 8.0;   // (the scale height as a share of the radius; the shell's top in scale heights)
+// The air's grid over the box round a planet of radius 1 (half-width 1 + kAirTop scale heights): its density by height, 1 at the ground (and below it, inside the
+// planet, so the trilinear look-up does not dip at the surface), falling off by e every scale height, 0 above the top.
+inline std::vector<float> airDensities() {
+	const int n = kAirN;
+	const double half = 1.0 + kAirTop * kAirScale;
+	std::vector<float> d(static_cast<std::size_t>(n) * n * n, 0.0f);
+	for (int k = 0; k < n; ++k)
+		for (int j = 0; j < n; ++j)
+			for (int i = 0; i < n; ++i) {
+				const double x = ((i + 0.5) / n - 0.5) * 2.0 * half, y = ((j + 0.5) / n - 0.5) * 2.0 * half, z = ((k + 0.5) / n - 0.5) * 2.0 * half;
+				const double r = std::sqrt(x * x + y * y + z * z), h = (r - 1.0) / kAirScale;
+				if (r < 0.96 || h > kAirTop) continue;
+				d[(static_cast<std::size_t>(k) * n + j) * n + i] = static_cast<float>(h <= 0.0 ? 1.0 : std::exp(-h) * (1.0 - smoothstep(kAirTop - 1.5, kAirTop, h)));
+			}
+	return d;
+}
+// The air's scattering per metre at the ground for a planet (blue the strongest for Rayleigh air), its phase g.
+inline Vec3 airSigma(const Planet &p, double &g) {
+	const double tangent = std::sqrt(2.0 * kPi * kAirScale) * p.radius;   // (the path along the ground's tangent through the air, its density integrated)
+	const double k = 1.5 * p.air / tangent;
+	g = p.airColour == "blue" ? 0.0 : 0.4;
+	if (p.airColour == "orange") return Vec3{1.0, 0.62, 0.3} * (0.6 * k);
+	if (p.airColour == "white") return Vec3{1.0, 1.0, 1.0} * (0.5 * k);
+	if (p.airColour == "green") return Vec3{0.35, 1.0, 0.55} * (0.7 * k);
+	return Vec3{0.12, 0.35, 1.0} * k;
+}
+// The file holding a planet's air (a MakeNamedMedium over the unit box), made once in the film's cache.
+inline std::string airFile(const std::string &film, const Planet &p, const std::string &name) {
+	double g = 0.0;
+	const Vec3 sg = airSigma(p, g);
+	char file[160];
+	std::snprintf(file, sizeof file, "air_v1_%s_%.6g_%.6g_%.6g_%.2f.pbrt", name.c_str(), sg.x, sg.y, sg.z, g);
+	const std::filesystem::path target = film_cache::dir(film) / file;
+	std::error_code ec;
+	if (!(std::filesystem::exists(target, ec) && std::filesystem::file_size(target, ec) > 0)) {
+		const std::vector<float> d = airDensities();
+		std::string text;
+		text.reserve(d.size() * 3 + 400);
+		char buf[400];
+		std::snprintf(buf, sizeof buf, "MakeNamedMedium \"%s\" \"string type\" [ \"uniformgrid\" ]\n  \"integer nx\" [ %d ] \"integer ny\" [ %d ] \"integer nz\" [ %d ]\n  \"rgb sigma_a\" [ 0 0 0 ] \"rgb sigma_s\" [ %.6g %.6g %.6g ] \"float g\" [ %.2f ]\n  \"float density\" [\n",
+					  name.c_str(), kAirN, kAirN, kAirN, sg.x, sg.y, sg.z, g);
+		text += buf;
+		int col = 0;
+		for (float v : d) {
+			if (v <= 0.0f) text += "0 ";
+			else {
+				std::snprintf(buf, sizeof buf, "%.4f ", v);
+				text += buf;
+			}
+			if (++col == 32) text += "\n", col = 0;
+		}
+		text += "\n  ]\n";
+		if (!film_cache::writeOnce(target, text)) throw std::runtime_error("film " + film + ": could not write " + target.string());
+	}
+	return film_cache::scenePath(target);
+}
+// A planet's air as scene text: its grid in the box round it, and the pass-through sphere it fills.
+inline std::string airText(const std::string &film, const Planet &p) {
+	if (p.air <= 0.0) return std::string();
+	const std::string name = "air_" + p.name;
+	const double half = p.radius * (1.0 + kAirTop * kAirScale);
+	char buf[320];
+	std::snprintf(buf, sizeof buf, "AttributeBegin\n  Translate %.4f %.4f %.4f\n  Scale %.4f %.4f %.4f\n", p.at.x - half, p.at.y - half, p.at.z - half, 2.0 * half, 2.0 * half, 2.0 * half);
+	std::string out = "# its air (film_planets.h)\n" + std::string(buf) + "  Include \"" + airFile(film, p, name) + "\"\nAttributeEnd\n";
+	std::snprintf(buf, sizeof buf, "AttributeBegin\n  Translate %.4f %.4f %.4f\n  Material \"interface\"\n  MediumInterface \"%s\" \"\"\n  Shape \"sphere\" \"float radius\" [ %.4f ]\nAttributeEnd\n", p.at.x,
+				  p.at.y, p.at.z, name.c_str(), half * 1.74);
+	return out + buf;
+}
+
 // A planet at nature's time `nt`, as scene text.
 inline std::string planetText(const std::string &film, const Planet &p, double nt) {
 	const Pictures pic = pictures(film, p);
@@ -190,7 +273,7 @@ inline std::string planetText(const std::string &film, const Planet &p, double n
 	}
 	char buf[96];
 	std::snprintf(buf, sizeof buf, "  Shape \"sphere\" \"float radius\" [ %.4f ]\nAttributeEnd\n", p.radius);
-	return out + buf;
+	return out + buf + airText(film, p);
 }
 
 }  // namespace planets

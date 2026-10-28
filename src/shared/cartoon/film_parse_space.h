@@ -47,7 +47,7 @@ inline std::string spaceSetLine(Spec &s, const std::vector<std::string> &t) {
 inline std::string planetLine(Spec &s, const std::vector<std::string> &t) {
 	using detail::number;
 	const auto fail = [](const std::string &what) { return what; };
-	const std::string usage = "`planet NAME KIND at X Y Z radius R [tilt DEGREES] [spin SECONDS] [seed N]` (rocky, desert, ice, ocean, gas or lava)";
+	const std::string usage = "`planet NAME KIND at X Y Z radius R [tilt DEGREES] [spin SECONDS] [air S [colour blue|orange|white|green]] [seed N]` (rocky, desert, ice, ocean, gas or lava)";
 	if (t.size() < 3) return fail(usage);
 	planets::Planet p;
 	p.name = t[1], p.kind = t[2];
@@ -60,12 +60,16 @@ inline std::string planetLine(Spec &s, const std::vector<std::string> &t) {
 		if (t[i] == "at" && i + 3 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && number(t[i + 3], c)) {
 			p.at = {a, b, c}, placed = true;
 			i += 4;
+		} else if (t[i] == "colour" && i + 1 < t.size() && std::find(planets::airColours().begin(), planets::airColours().end(), t[i + 1]) != planets::airColours().end()) {
+			p.airColour = t[i + 1];
+			i += 2;
 		} else if (i + 1 < t.size() && number(t[i + 1], a)) {
 			if (t[i] == "radius" && a >= 1.0 && a <= 200000.0) p.radius = a, sized = true;
 			else if (t[i] == "tilt" && a >= -180.0 && a <= 180.0) p.tilt = a;
 			else if (t[i] == "spin" && a != 0.0) p.spin = a;
 			else if (t[i] == "seed") p.seed = static_cast<int>(a);
-			else return fail("\"" + t[i] + "\": " + usage + " (radius 1 to 200000 m)");
+			else if (t[i] == "air" && a >= 0.0 && a <= 10.0) p.air = a;
+			else return fail("\"" + t[i] + "\": " + usage + " (radius 1 to 200000 m, air 0 to 10)");
 			i += 2;
 		} else {
 			return fail("\"" + t[i] + "\": " + usage);

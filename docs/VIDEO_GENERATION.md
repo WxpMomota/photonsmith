@@ -1070,9 +1070,10 @@ No ground, no sky, no air (a film with `space` has no `sky`, `storm`, `air` or `
 painted into the sky's picture - their brightnesses spread as the real sky's (each magnitude fainter about two and a half times as many, from -1 to 9), their colours
 from their temperatures (a black body's, worked out from Planck's law through the CIE curves: most a little orange, a few blue-white, some deep red), the faint ones
 crowding towards the Milky Way. It is not a catalogue of the real stars: the constellations are not there. The Milky Way is a band of light round a great circle,
-brighter and wider towards its centre (bearing 66, on the horizon), knotted with star clouds and broken by dark lanes of dust. The sun is a glowing ball a thousand
-kilometres off at `sun BEARING ELEVATION` (degrees; 60 15 by default), its light the films' sunlight (3 units of irradiance) times `sunlight`, so a planet's night
-side is dark and shadows are as soft as the sun is big.
+brighter and wider towards its centre (bearing 66, on the horizon), knotted with star clouds and broken by dark lanes of dust. The sun is a disc painted into the same
+picture at `sun BEARING ELEVATION` (degrees; 60 15 by default), `sunsize` across, a little darker towards its rim, so bright that its light is the films' sunlight (3
+units of irradiance) times `sunlight`: the sky light's importance sampling finds it, a planet's night side is dark and shadows are as soft as the sun is big. (Not a
+glowing ball far off, as the Nomai film's sun: the wavefront renderer, which draws every frame with a volume in it, lights almost nothing with so small and far a sphere.)
 
 **A floating origin.** The GPU renderers lose texture precision far from the origin (a textured planet 75 km out was drawn in blocks a few hundred metres across, on
 both GPU renderers; the cause is not yet found), so every frame of a film with `space` is moved - its camera and its whole world, by the same whole number of
@@ -1091,6 +1092,19 @@ its poles up, tipped by `tilt`, turning once every `spin` seconds of nature's ti
 desert and mountain by latitude under swirls of cloud, white caps; its seas are smooth, a coated surface whose roughness is a second picture, so they catch the sun in a
 glint), `gas` (a giant: bands of cloud torn into eddies at their edges, a great oval storm) and `lava` (dark crust broken by glowing rivers of lava that light its night
 side). Each needs `at X Y Z` and a `radius` (1 to 200 000 m), and its own name.
+
+**A planet's air: `planet ... air S [colour C]`.** (film_planets.h)
+
+```
+planet  home  ocean   at 0 0 -20000      radius 6000  air 1                 # 0 to 10; 1 an Earth's
+planet  dune  desert  at 40000 0 -20000  radius 6000  air 1  colour orange  # blue (the default), orange, white or green
+```
+
+A shell of air round the planet, densest at its ground and thinning by e every scale height (1.2% of its radius), nothing above eight of them. It scatters sunlight
+- `blue` as air does (Rayleigh: blue about eight times as strongly as red, scattering evenly every way), `orange` a haze (forward-scattering), `white` cloud, `green` -
+so its rim glows against space, the day side is a little hazed, and along the line between day and night the light through the air comes red. Thick enough at `air 1`
+that a line of sight grazing the ground passes through about one and a half of its own lengths in blue. It is one grid (144 cubed) written once into the film's cache,
+in a sphere round the planet; the frame is then drawn by the wavefront renderer, which samples it along every ray.
 
 **Forests: `forest`.** (film_forest.h)
 

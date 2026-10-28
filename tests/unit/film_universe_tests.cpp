@@ -91,12 +91,11 @@ TEST(FilmUniverseSpace, TheStarsHaveTheirColoursTheMilkyWayIsABandAndTheSunIsWhe
 	EXPECT_NE(s.find("# space (film_space.h)"), std::string::npos);
 	EXPECT_EQ(count(s, "LightSource \"distant\""), 0u) << "the set's own sun left out";
 	EXPECT_EQ(s.find("\"rgb L\" [ 0.2 0.25 0.3 ]"), std::string::npos) << "and its sky";
-	const std::vector<double> at = numbersAfter(s, "Translate ", s.find("AreaLightSource", s.find("# space")));
-	ASSERT_EQ(at.size(), 3u);
-	const cartoon::Vec3 d = sp::direction(200.0, 10.0) * sp::kSunDistance;
-	EXPECT_NEAR(at[0], d.x, 1.0);
-	EXPECT_NEAR(at[1], d.y, 1.0);
-	EXPECT_NEAR(at[2], d.z, 1.0);
+	EXPECT_EQ(s.find("AreaLightSource", s.find("# space")), std::string::npos) << "the sun is in the sky's picture, not a ball";
+	EXPECT_NE(s.find("_sun1_200.00_10.00_"), std::string::npos) << "the picture made for the sun where the line puts it";
+	ff::DataFilm dark;
+	ASSERT_EQ(loadFilm("nosun", "scene s.pbrt\nlength 4\nspace sun off\nshot 0 A\n key 0 0 0  0 0 -100  50\n", dark), "");
+	EXPECT_NE(dark.sceneAt(1.0).find("_sun0_"), std::string::npos);
 	expectProblems({{"space\nspace", "one `space` line"}, {"space stars 9", "stars and milkyway 0 to 4"}, {"space\nsky 12:00 12:00", "no `sky` with it"}});
 }
 
@@ -150,4 +149,39 @@ TEST(FilmUniversePlanets, KindsHaveTheirSurfacesPlanetsSpinAndAFarCameraIsBrough
 	expectProblems({{"planet a moon at 0 0 0 radius 10", "rocky, desert, ice, ocean, gas or lava"},
 					{"planet a rocky at 0 0 0", "where it is and how big"},
 					{"planet a rocky at 0 0 0 radius 10\nplanet a ice at 5 0 0 radius 10", "already a planet called a"}});
+}
+
+// ---- 3. a planet's air -----------------------------------------------------------------------------------------------------------------------------------------------------
+
+// The air is densest at the ground and thins by e every scale height, nothing above its top; Rayleigh air scatters blue the most; a planet with air has its grid in a
+// sphere round it.
+TEST(FilmUniverseAir, AirThinsWithHeightScattersBlueAndSurroundsThePlanet) {
+	const std::vector<float> d = pl::airDensities();
+	const int n = pl::kAirN;
+	const double half = 1.0 + pl::kAirTop * pl::kAirScale;
+	const auto at = [&](double r) {   // (along +x from the middle)
+		const int i = std::clamp(static_cast<int>((r / (2.0 * half) + 0.5) * n), 0, n - 1), j = n / 2, k = n / 2;
+		return d[(static_cast<std::size_t>(k) * n + j) * n + i];
+	};
+	EXPECT_NEAR(at(1.0 - 0.01), 1.0f, 1e-6f) << "at the ground (and just under it)";
+	EXPECT_LT(at(1.0 + 4.0 * pl::kAirScale), 0.06f) << "thin four scale heights up";
+	EXPECT_LT(at(half - 0.001), 1e-3f) << "next to nothing at its top";
+	pl::Planet p;
+	p.name = "home", p.radius = 6000.0, p.air = 1.0;
+	double g = 0.0;
+	const cartoon::Vec3 sigma = pl::airSigma(p, g);
+	EXPECT_GT(sigma.z, 2.0 * sigma.x) << "blue scattered most";
+	EXPECT_EQ(g, 0.0);
+	p.airColour = "orange";
+	EXPECT_GT(pl::airSigma(p, g).x, pl::airSigma(p, g).z);
+
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("air", "scene s.pbrt\nlength 4\nspace\nplanet home ocean at 0 0 -20000 radius 6000 air 1\nplanet bare rocky at 20000 0 -20000 radius 3000\n"
+							  "shot 0 A\n key 0 0 0  0 0 -100  50\n",
+						film),
+			  "");
+	const std::string s = film.sceneAt(1.0);
+	EXPECT_EQ(count(s, "# its air (film_planets.h)"), 1u) << "only the planet with air";
+	EXPECT_NE(s.find("MediumInterface \"air_home\" \"\""), std::string::npos);
+	expectProblems({{"planet a rocky at 0 0 0 radius 10 air 20", "air 0 to 10"}});
 }

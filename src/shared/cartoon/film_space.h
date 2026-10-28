@@ -6,7 +6,9 @@
 //              sky's are (each magnitude fainter two and a half times as many), their colours from their temperatures (most a little orange, a few blue-white,
 //              some deep red), crowding towards the band of the Milky Way; not a catalogue of the real stars - the constellations are not there;
 //   Milky Way  a band of light round a great circle, brightest towards its centre, broken by dark lanes of dust and knotted with star clouds;
-//   the sun    a glowing ball a thousand kilometres off (its light the films' 3 units of irradiance, its shadows its own size), so a planet's night side is dark.
+//   the sun    a disc in the sky's picture as big as the sun looks, so bright that it gives the films' 3 units of irradiance; the sky light's importance sampling
+//              finds it, its shadows are its own size, and a planet's night side is dark. (Not a glowing ball a thousand kilometres off, as the Nomai film's: the
+//              wavefront renderer - the one a frame with a volume in it is drawn by - lights almost nothing with so small and far a sphere, 2026-10-27.)
 //
 // Scale: the GPU works in single precision, so keep a space film's world within a few hundred kilometres of the origin - planets a few thousand to some tens of
 // thousands of metres across, set some tens of kilometres off - and let the camera's moves and the cuts tell the distances (the Nomai film's giant is 17.5 km).
@@ -35,7 +37,7 @@ struct Space {
 	bool sun = true;
 	int seed = 1;
 };
-constexpr double kSunDistance = 1.0e6;
+
 
 // A direction from a bearing and an elevation (degrees; pbrt's).
 inline Vec3 direction(double bearing, double elevation) {
@@ -102,7 +104,8 @@ inline double milkyWayAt(Vec3 w, int seed) {
 // The starfield as the sky's picture (an infinite light's equal-angle picture, film_sky.h's layout: row 0 straight up), written once into the film's cache.
 inline std::string starfieldPicture(const std::string &film, const Space &s) {
 	char name[96];
-	std::snprintf(name, sizeof name, "space_v3_%d_%.2f_%.2f", s.seed, s.stars, s.milkyWay);
+	std::snprintf(name, sizeof name, "space_v4_%d_%.2f_%.2f_sun%d_%.2f_%.2f_%.3f_%.3f", s.seed, s.stars, s.milkyWay, s.sun ? 1 : 0, s.sunBearing, s.sunElevation, s.sunSize,
+				  s.sunStrength);
 	const int W = 4096, H = 2048;
 	return film_sky::picture(film, name, W, H, [&](std::vector<float> &rgb) {
 		// the pixel a direction falls in (film_sky::render's mapping: story space w = (-sin theta cos phi, cos theta, -sin theta sin phi); pbrt's x is story's -x)
@@ -125,6 +128,33 @@ inline std::string starfieldPicture(const std::string &film, const Space &s) {
 				const std::size_t q = (static_cast<std::size_t>(row) * W + col) * 3;
 				rgb[q] = static_cast<float>(c.x), rgb[q + 1] = static_cast<float>(c.y), rgb[q + 2] = static_cast<float>(c.z);
 			}
+		// the sun: a disc of the radiance that gives its irradiance, a little darker towards its rim, each pixel by how much of it the disc covers (16 x 16 samples)
+		if (s.sun) {
+			const Vec3 sd = direction(s.sunBearing, s.sunElevation);
+			const double ar = 0.5 * s.sunSize * kPi / 180.0, L = 3.0 * s.sunStrength / (kPi * ar * ar * (1.0 - 0.6 / 3.0));   // (the limb darkening's share taken out)
+			const Vec3 colour = blackbody(5800.0);
+			int row = 0, col = 0;
+			pixelOf(sd, row, col);
+			const int reach = 2 + static_cast<int>(ar / kPi * H / std::max(0.05, std::sin(std::acos(std::clamp(sd.y, -1.0, 1.0))))) + static_cast<int>(ar / kPi * H);
+			for (int dr = -reach; dr <= reach; ++dr)
+				for (int dc = -reach; dc <= reach; ++dc) {
+					const int rr = row + dr;
+					if (rr < 0 || rr >= H) continue;
+					const int cc = ((col + dc) % W + W) % W;
+					double sum = 0.0;
+					for (int a = 0; a < 16; ++a)
+						for (int b = 0; b < 16; ++b) {
+							const double theta = (rr + (a + 0.5) / 16.0) / H * kPi, phi = (cc + (b + 0.5) / 16.0) / W * 2.0 * kPi;
+							const Vec3 w{std::sin(theta) * std::cos(phi), std::cos(theta), -std::sin(theta) * std::sin(phi)};
+							const double off = std::acos(std::clamp(dot(w, sd), -1.0, 1.0)) / ar;
+							if (off < 1.0) sum += 1.0 - 0.6 * (1.0 - std::sqrt(1.0 - off * off));   // (limb darkening)
+						}
+					if (sum <= 0.0) continue;
+					const Vec3 c = colour * (L * sum / 256.0);
+					const std::size_t q = (static_cast<std::size_t>(rr) * W + cc) * 3;
+					rgb[q] += static_cast<float>(c.x), rgb[q + 1] += static_cast<float>(c.y), rgb[q + 2] += static_cast<float>(c.z);
+				}
+		}
 		// the stars: magnitudes from -1 to 9, each fainter magnitude about 2.5 times as many; the faint ones crowding to the Milky Way
 		const int count = static_cast<int>(60000.0 * std::clamp(s.stars, 0.0, 4.0));
 		for (int k = 0; k < count; ++k) {
@@ -192,16 +222,11 @@ inline std::string recentred(const std::string &scene) {
 	return out + "AttributeEnd\n";
 }
 
-// The set in space as scene text: the starfield (the sky's picture as an infinite light) and the sun (a glowing ball a thousand kilometres off).
+// Which way the sun is (pbrt's, unit).
+inline Vec3 sunDirection(const Space &s) { return direction(s.sunBearing, s.sunElevation); }
+// The set in space as scene text: the starfield, with the sun in it (the sky's picture as an infinite light).
 inline std::string spaceText(const std::string &film, const Space &s) {
-	std::string out = "# space (film_space.h)\nLightSource \"infinite\" \"string filename\" [ \"" + starfieldPicture(film, s) + "\" ]\n";
-	if (s.sun) {
-		const double radius = kSunDistance * std::tan(0.5 * s.sunSize * kPi / 180.0);
-		const double L = 3.0 * s.sunStrength / (kPi * std::pow(radius / kSunDistance, 2.0));
-		const Vec3 p = direction(s.sunBearing, s.sunElevation) * kSunDistance;
-		out += emissiveSphere({-p.x, p.y, p.z}, radius, blackbody(5800.0) * L);
-	}
-	return out;
+	return "# space (film_space.h)\nLightSource \"infinite\" \"string filename\" [ \"" + starfieldPicture(film, s) + "\" ]\n";
 }
 
 }  // namespace space
