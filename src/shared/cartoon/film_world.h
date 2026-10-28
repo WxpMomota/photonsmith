@@ -122,6 +122,8 @@ inline std::string universeText(const Spec &spec, const std::string &header, dou
 		double fov = 40.0;
 		film_subjects::cameraOf(header, eye, target, fov);
 		out += space::spaceText(film, spec.space, space::narrowOnTheSun(spec.space, eye, target, fov));
+		if (spec.space.planetshine > 0.0 && spec.space.sun)   // (film_voyage.h)
+			out += cosmos::planetshineText(spec.planets, nt, {-eye.x, eye.y, eye.z}, space::sunDirection(spec.space), spec.space.planetshine * spec.space.sunStrength);
 	}
 	if (!spec.blackHoles.empty()) {   // (film_cosmos.h: drawn for where the camera is)
 		Vec3 eye, target;
@@ -425,7 +427,7 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 		out += "# " + c.name + " (" + c.kind + ")\n" + kind.text(m);
 	}
 	out = shot_lighting::withLights(out, shotLightsAt(header, t));
-	return spec.space.on ? space::recentred(out) : out;   // (a floating origin for a film in space: film_space.h)
+	return spec.space.on ? cosmos::withSpaceLook(space::recentred(out), spec.space.flare, spec.space.bloom) : out;   // (a floating origin for a film in space: film_space.h)
 }
 
 inline void DataFilm::soundscape(audio::Mix &m) const {

@@ -1292,6 +1292,19 @@ every second: the powers-of-ten shot from a galaxy to a planet (the floating ori
 stars stretch into streaks of light round the camera as it lunges forward, a white flash fills the screen halfway, and it comes out at `to` as the streaks shrink back to
 stars. `fov F` sets the lens for any of them.
 
+**Light in space: `space ... flare F bloom B planetshine S`.** (film_voyage.h, lens_look.h)
+
+```
+space  sun 60 10  flare 0.4  bloom 0.15  planetshine 2
+```
+
+In space there is no air to soften the light, so what makes it look photographed is the lens. `flare F` (0 to 1) adds a lens flare from the brightest lights in the
+picture - the sun, a flash, a star's blaze, not a lit planet: a streak drawn out sideways from each and a row of ghosts mirrored through the picture's centre in the amber,
+blue, green and rose of a lens's coatings. `bloom B` spreads their glow (as `# @rt-look bloom`). Both go into each frame's look line (and are a `# @rt-look flare F` for any
+scene: lens_look.h). `planetshine S` lights what is near a planet with the planet: its sunlit face as a broad lamp in its surface's colour, as bright as how much of that face
+is turned to the camera and how big the planet looks - so the night side of a ship, a moon or an astronaut beside a bright planet is filled with its blue or ochre light rather
+than black (the path tracer finds that light too, but slowly and noisily; this is a fill on top of it).
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

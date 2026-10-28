@@ -5,6 +5,7 @@
 //   ship       a shuttle, a fighter, a freighter, a station or a wheel, flying nose first along its way, its engines glowing, its running lights blinking
 //   astronaut  someone floating in a spacesuit, tumbling slowly, tethered to a point or a ship, loose things drifting round them
 //   spacecam   a shot's camera on a journey: an orbit, a slingshot flyby, a powers-of-ten zoom, a jump to hyperspace
+//   (space)    light in space: planetshine, the lens's flare and glow
 //
 // Coordinates are pbrt's, as a film file's; meshes are made in story space (x mirrored), as cartoon_lib.h's.
 
@@ -19,6 +20,7 @@
 #include "../camera_keyframes.h"
 #include "cartoon_lib.h"
 #include "film_cosmos.h"
+#include "film_planets.h"
 
 namespace cartoon {
 namespace cosmos {
@@ -371,6 +373,48 @@ inline std::string spaceCamLine(const std::vector<std::string> &t, SpaceCam &c) 
 	if (out.kind == SpaceCam::Hyperspace && !to) return "where it comes out (`to X Y Z`): " + usage;
 	c = out;
 	return std::string();
+}
+
+// ---- light in space ----
+// A planet's light on what is near it (`space ... planetshine S`): the sunlit planet as a broad lamp in its surface's colour, as bright as how much of its lit face the
+// camera's corner of space sees and how big it looks from there - a fill on the night sides of ships, moons and astronauts beside it. A spotlight halfway from the camera
+// to the planet's surface, aimed at the camera (a distant light from the planet's direction would be shadowed by the planet itself, and a point light would light the
+// planet too); none when the planet is far or turned dark side on.
+inline std::string planetshineText(const std::vector<planets::Planet> &bodies, double nt, Vec3 eye, Vec3 sunDir, double strength) {
+	std::string out;
+	for (std::size_t i = 0; i < bodies.size(); ++i) {
+		const planets::Planet &p = bodies[i];
+		const Vec3 c = planets::centreAt(bodies, i, nt), toEye = eye - c;
+		const double d = std::max(length(toEye), p.radius * 1.001), lit = 0.5 * (1.0 + dot(toEye * (1.0 / d), sunDir)), size = std::pow(p.radius / d, 2.0);
+		const double amount = strength * lit * size * 3.0;
+		if (amount < 1e-4) continue;
+		Vec3 albedo{0.0, 0.0, 0.0};   // (its surface's colour, on average)
+		for (int k = 0; k < 64; ++k) {
+			const double z = 2.0 * (k + 0.5) / 64.0 - 1.0, a = 2.39996 * k;
+			double sea = 0.0, glow = 0.0;
+			albedo = albedo + planets::surfaceAt(p, {std::sqrt(1.0 - z * z) * std::cos(a), std::sqrt(1.0 - z * z) * std::sin(a), z}, sea, glow) * (1.0 / 64.0);
+		}
+		const double r = 0.5 * (d - p.radius), I = amount * r * r;   // (as bright at the camera as the planet's light: E = I / r^2)
+		const Vec3 from = eye + (c - eye) * (r / d);
+		char buf[400];
+		std::snprintf(buf, sizeof buf, "LightSource \"spot\" \"point3 from\" [ %.4f %.4f %.4f ] \"point3 to\" [ %.4f %.4f %.4f ] \"float coneangle\" [ 70 ] \"float conedelta\" [ 20 ] \"rgb I\" [ %.6g %.6g %.6g ]\n",
+					  from.x, from.y, from.z, eye.x, eye.y, eye.z, albedo.x * I, albedo.y * I, albedo.z * I);
+		out += "# planetshine from " + p.name + " (film_voyage.h)\n" + buf;
+	}
+	return out;
+}
+// A frame's scene text with the look of space (`space ... flare F bloom B`): the lens's flare and glow added to its `# @rt-look` line (lens_look.h; later words win), or a
+// line of their own at its top. As it was when neither is asked for.
+inline std::string withSpaceLook(std::string scene, double flare, double bloom) {
+	if (flare <= 0.0 && bloom <= 0.0) return scene;
+	char words[96];
+	std::snprintf(words, sizeof words, " flare %.3f bloom %.3f", flare, bloom);
+	const std::size_t look = scene.find("# @rt-look");
+	if (look == std::string::npos) return "# @rt-look" + std::string(words) + "\n" + scene;
+	std::size_t end = scene.find('\n', look);
+	if (end == std::string::npos) end = scene.size();
+	if (end > look && scene[end - 1] == '\r') --end;
+	return scene.insert(end, words);
 }
 
 }  // namespace cosmos

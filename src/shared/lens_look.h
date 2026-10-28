@@ -1,6 +1,6 @@
 #pragma once
-// lens_look.h -- what a film camera and its grading add to a picture: bloom (the glow a bright light spreads through the lens), a vignette (darker corners), warmth (a
-// white balance towards amber or blue) and saturation. Applied to the LINEAR picture, after the render and the denoiser and before the tone map, so a bright light's glow
+// lens_look.h -- what a film camera and its grading add to a picture: bloom (the glow a bright light spreads through the lens), a lens flare (a streak and ghosts of the
+// brightest lights), a vignette (darker corners), warmth (a white balance towards amber or blue) and saturation. Applied to the LINEAR picture, after the render and the denoiser and before the tone map, so a bright light's glow
 // is as strong as the light really is (a glow added after the tone map is the same for a candle and the sun). Every step is linear in the light except the vignette's and
 // the bloom's spreading, both of which keep the picture's total light (the bloom moves light, it does not add any): exposure commutes with all of it.
 //
@@ -27,6 +27,7 @@ namespace lens_look {
 struct Look {
 	double bloom = 0.0;         // 0..1: the share of the light the lens spreads into a glow (0.1 subtle, 0.3 dreamy)
 	double bloomRadius = 0.05;  // the widest glow's reach, as a share of the picture's width
+	double flare = 0.0;         // 0..1: a lens flare from the brightest lights (above four times white): a streak sideways and ghosts mirrored through the centre
 	double vignette = 0.0;      // 0..1: how much darker the corners are than the centre
 	double warmth = 0.0;        // -1..1: towards blue (cool, night) or amber (warm, dawn); the picture's brightness stays the same
 	double saturation = 1.0;    // 0 = grey, 1 = as rendered, above 1 = more colourful
@@ -40,7 +41,7 @@ struct Look {
 			if (lift[k] != 0.0 || gamma[k] != 1.0 || gain[k] != 1.0 || tint[k] != 1.0) return true;
 		return false;
 	}
-	bool active() const { return bloom > 0.0 || vignette > 0.0 || warmth != 0.0 || saturation != 1.0 || graded(); }
+	bool active() const { return bloom > 0.0 || flare > 0.0 || vignette > 0.0 || warmth != 0.0 || saturation != 1.0 || graded(); }
 };
 
 // Values that were set (a flag, a scene line) override `base`; a negative bloom/vignette or a saturation below 0 means "not given" in `given`.
@@ -86,10 +87,11 @@ inline std::string parse(const std::string &text, Look &out) {
 		if (!(in >> v) || !std::isfinite(v)) return "\"" + word + "\" needs a number after it";
 		if (word == "bloom") out.bloom = std::clamp(v, 0.0, 1.0);
 		else if (word == "bloom-radius") out.bloomRadius = std::clamp(v, 0.001, 0.5);
+		else if (word == "flare") out.flare = std::clamp(v, 0.0, 1.0);
 		else if (word == "vignette") out.vignette = std::clamp(v, 0.0, 1.0);
 		else if (word == "warmth") out.warmth = std::clamp(v, -1.0, 1.0);
 		else if (word == "saturation") out.saturation = std::clamp(v, 0.0, 3.0);
-		else return "unknown word \"" + word + "\" (bloom, bloom-radius, vignette, warmth, saturation, lift, gamma, gain, tint)";
+		else return "unknown word \"" + word + "\" (bloom, bloom-radius, flare, vignette, warmth, saturation, lift, gamma, gain, tint)";
 	}
 	return "";
 }
@@ -153,6 +155,55 @@ inline void apply(float *rgb, int w, int h, const Look &look) {
 	const std::size_t n = static_cast<std::size_t>(w) * static_cast<std::size_t>(h);
 	for (std::size_t i = 0; i < n * 3; ++i)
 		if (!std::isfinite(rgb[i])) rgb[i] = 0.0f;
+
+	if (look.flare > 0.0) {
+		// A lens flare: the brightest lights (what is above four times white - the sun, a flash; not a lit planet) at a quarter of the size, drawn out into a streak
+		// sideways, and ghosts of them - soft discs in the colours of a lens's coatings on the line through the picture's centre - added on top.
+		const int fw = (std::max)(1, w / 4), fh = (std::max)(1, h / 4);
+		std::vector<float> bright(static_cast<std::size_t>(fw) * static_cast<std::size_t>(fh) * 3, 0.0f);
+		for (int y = 0; y < fh; ++y)
+			for (int x = 0; x < fw; ++x) {
+				double c[3] = {0.0, 0.0, 0.0};
+				for (int dy = 0; dy < 4; ++dy)
+					for (int dx = 0; dx < 4; ++dx) {
+						const std::size_t at = (static_cast<std::size_t>((std::min)(h - 1, y * 4 + dy)) * static_cast<std::size_t>(w) + static_cast<std::size_t>((std::min)(w - 1, x * 4 + dx))) * 3;
+						for (int k = 0; k < 3; ++k) c[k] += rgb[at + k] / 16.0;
+					}
+				const double lum = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2], over = lum > 4.0 ? (lum - 4.0) / lum : 0.0;
+				for (int k = 0; k < 3; ++k) bright[(static_cast<std::size_t>(y) * static_cast<std::size_t>(fw) + static_cast<std::size_t>(x)) * 3 + k] = static_cast<float>(c[k] * over);
+			}
+		std::vector<float> streak = bright;
+		for (int pass = 0; pass < 3; ++pass) detail::boxPass(streak, fw, fh, (std::max)(1, fw / 10), true);
+		// the ghosts: soft round discs on the line from the lights' centre through the picture's centre, each as bright as the lights' share of the picture spread over it
+		double total = 0.0, cu = 0.0, cv = 0.0, flux[3] = {0.0, 0.0, 0.0};
+		for (int y = 0; y < fh; ++y)
+			for (int x = 0; x < fw; ++x) {
+				const float *b = &bright[(static_cast<std::size_t>(y) * static_cast<std::size_t>(fw) + static_cast<std::size_t>(x)) * 3];
+				const double e = 0.2126 * b[0] + 0.7152 * b[1] + 0.0722 * b[2];
+				total += e, cu += e * (x + 0.5) / fw, cv += e * (y + 0.5) / fh;
+				for (int k = 0; k < 3; ++k) flux[k] += b[k] / (static_cast<double>(fw) * fh);
+			}
+		if (total > 0.0) cu /= total, cv /= total;
+		const double scales[4] = {-0.55, -1.25, 0.4, -0.25}, radii[4] = {0.03, 0.06, 0.02, 0.045}, weights[4] = {0.004, 0.003, 0.003, 0.004};
+		const double tints[4][3] = {{1.0, 0.55, 0.25}, {0.35, 0.55, 1.0}, {0.55, 1.0, 0.6}, {1.0, 0.4, 0.85}};
+		const double aspect = static_cast<double>(h) / w, f = look.flare;
+		ppm_text::parallel_ranges(n, [&](std::size_t begin, std::size_t end) {
+			for (std::size_t i = begin; i < end; ++i) {
+				const double u = (static_cast<double>(i % static_cast<std::size_t>(w)) + 0.5) / w, v = (static_cast<double>(i / static_cast<std::size_t>(w)) + 0.5) / h;
+				const std::size_t q = (static_cast<std::size_t>((std::min)(fh - 1, static_cast<int>(v * fh))) * static_cast<std::size_t>(fw) + static_cast<std::size_t>((std::min)(fw - 1, static_cast<int>(u * fw)))) * 3;
+				for (int k = 0; k < 3; ++k) {
+					double add = 0.05 * streak[q + static_cast<std::size_t>(k)] * (k == 0 ? 0.8 : k == 2 ? 1.25 : 1.0);   // (the streak a little blue)
+					if (total > 0.0)
+						for (int g = 0; g < 4; ++g) {
+							const double du = u - (0.5 + scales[g] * (cu - 0.5)), dv = (v - (0.5 + scales[g] * (cv - 0.5))) * aspect, r = radii[g];
+							const double disc = 1.0 - std::clamp((std::sqrt(du * du + dv * dv) - 0.7 * r) / (0.3 * r), 0.0, 1.0);   // (its edge soft)
+							if (disc > 0.0) add += weights[g] * tints[g][k] * flux[k] * aspect / (3.14159265358979 * r * r) * disc;   // (its share of the picture: pi r^2 / aspect)
+						}
+					rgb[i * 3 + k] += static_cast<float>(f * add);
+				}
+			}
+		});
+	}
 
 	if (look.bloom > 0.0) {
 		// The glow is three Gaussians of the whole picture (a tight halo, a middle one and a wide haze, like a real lens's veiling glare), mixed in with weight `bloom`.

@@ -161,6 +161,7 @@
 //     remnant  crab at 0 0 -40000  size 12000  blast 3          # a dying star: a `supernova` (at `blast T`), a `pulsar` (`period`), a `planetary` nebula
 //     ship     ark  at 0 0 -500  kind shuttle  size 60  move 0 0 -40   # a craft: shuttle, fighter, freighter, station, wheel; engines, running lights
 //   (in a shot) spacecam flyby 0 0 -30000 radius 9000 from 20    # the camera's journey: orbit, flyby (a slingshot), zoom (powers of ten), hyperspace
+//     space    flare 0.4  bloom 0.15  planetshine 2           # light in space: the lens's flare and glow, the planets' light on what is near them
 //     astronaut kim at 0 0 -6  tether ark  floaters 6  tumble 5    # someone floating in a spacesuit, tethered to a point or a ship, loose things round them
 //     closeup  size 16                                         # the ground close up (film_ground.h): ripples, drifts, pebbles, footprints, wet sand; `tracks from
 //                                                               # X Z to X Z [during T0 T1] [kind boots|paws|hooves]`: a trail of footprints made over its time

@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "../../src/shared/cartoon/cartoons.h"
+#include "../../src/shared/lens_look.h"
 
 namespace ff = cartoon::film_file;
 
@@ -675,4 +676,42 @@ TEST(FilmUniverseSpaceCam, OrbitsKeepTheirDistanceFlybysAreFastestNearestZoomsAr
 	EXPECT_NE(film.sceneAt(0.0), film.sceneAt(9.0)) << "the camera goes round";
 	expectProblems({{"shot 0 A\nspacecam orbit 0 0 0", "how far"}, {"shot 0 A\nspacecam zoom 0 0 0 from 10", "from how far and to how far"}, {"shot 0 A\nspacecam warp 0 0 0", "spacecam orbit"},
 					{"shot 0 A\nspacecam hyperspace 0 0 0", "where it comes out"}, {"shot 0 A\n key 0 0 0  0 0 -1  50\nspacecam orbit 0 0 0 radius 5", "has a `spacecam` line and"}});
+}
+
+// ---- 18. light in space ---------------------------------------------------------------------------------------------------------------------------------------------------
+
+TEST(FilmUniverseLight, TheSunFlaresTheLensAPlanetLightsItsNeighboursAndTheLookIsInTheFrame) {
+	// a flare: a dim picture is left alone; one with a sun in it gets a ghost across the centre and a streak beside the sun
+	const int w = 160, h = 90;
+	std::vector<float> dim(static_cast<std::size_t>(w) * h * 3, 0.5f), sun = dim;
+	for (int y = 20; y < 28; ++y)
+		for (int x = 120; x < 128; ++x)
+			for (int k = 0; k < 3; ++k) sun[(static_cast<std::size_t>(y) * w + x) * 3 + k] = 400.0f;
+	lens_look::Look look;
+	ASSERT_EQ(lens_look::parse("flare 1", look), "");
+	std::vector<float> a = dim;
+	lens_look::apply(a.data(), w, h, look);
+	EXPECT_EQ(a, dim) << "nothing bright enough to flare";
+	std::vector<float> b = sun;
+	lens_look::apply(b.data(), w, h, look);
+	const auto px = [&](const std::vector<float> &img, int x, int y) { return img[(static_cast<std::size_t>(y) * w + x) * 3 + 1]; };
+	// the sun's centre is at (124, 24); the ghost of scale -0.55 at (80 - 0.55 * 44, 45 + 0.55 * 21) = (56, 57)
+	EXPECT_GT(px(b, 56, 57), px(sun, 56, 57) + 0.05f) << "a ghost across the centre";
+	EXPECT_GT(px(b, 100, 24), px(sun, 100, 24) + 0.05f) << "a streak beside the sun";
+	EXPECT_NEAR(px(b, 56, 10), px(sun, 56, 10), 0.02f) << "and not everywhere";
+
+	// planetshine: a lit planet beside the camera lights it; a planet showing its night side does not
+	cartoon::planets::Planet p;
+	p.name = "home", p.at = {0.0, 0.0, -10000.0}, p.radius = 4000.0;
+	const std::string lit = cs::planetshineText({p}, 0.0, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}, 1.0), dark = cs::planetshineText({p}, 0.0, {0.0, 0.0, 0.0}, {0.0, 0.0, -1.0}, 1.0);
+	EXPECT_NE(lit.find("LightSource \"spot\""), std::string::npos);
+	EXPECT_EQ(dark.find("LightSource"), std::string::npos);
+
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("light", "scene s.pbrt\nlength 4\nspace sun 0 0 flare 0.4 bloom 0.2 planetshine 2\nplanet home rocky at 0 0 -10000 radius 4000\nshot 0 A\n key 0 0 0  0 0 -100  50\n", film), "");
+	const std::string s = film.sceneAt(1.0);
+	EXPECT_EQ(s.rfind("# @rt-look", 0), 0u) << "the look is the frame's first line";
+	EXPECT_NE(s.find("flare 0.400 bloom 0.200"), std::string::npos);
+	EXPECT_NE(s.find("# planetshine from home"), std::string::npos);
+	expectProblems({{"space flare 2", "flare and bloom 0 to 1"}, {"space planetshine -1", "planetshine 0 to 10"}});
 }
