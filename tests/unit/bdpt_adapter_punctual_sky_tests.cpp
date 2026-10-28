@@ -145,6 +145,26 @@ TEST(BDPTAdapterPunctualSky, DistantLightIsSampledAsDelta) {
 	EXPECT_NEAR(les.ray_d[1], 1.0, 1e-9);
 }
 
+// A distant light's shadow ray must reach past everything in the scene, however far away: a planet (radius 6000, 9000 away) between a small
+// ship and a distant light shining from behind it blocks the light, as on the GPU and in pbrt-v4 (the light sits 2 * sceneRadius out). A space film
+// once looked as if the CPU let such a light through; it was run-to-run noise, and this pins the geometry.
+TEST(BDPTAdapterPunctualSky, DistantLightBehindAFarPlanetIsBlocked) {
+	auto world = makeGeometryOnlyWorld();
+	world->add(make_shared<sphere>(point3(0, 0, -9000), 6000.0, make_shared<lambertian>(color(0.5, 0.5, 0.5))));
+	const double towardPlanet[3] = {0.0, 0.0, -1.0}, awayFromPlanet[3] = {0.0, 0.0, 1.0};
+	for (const double* side : {towardPlanet, awayFromPlanet}) {
+		camera cam;
+		cam.punct_lights = make_shared<punctual_light_list>();
+		cam.punct_lights->add_distant(vec3(side[0], side[1], side[2]), color(2, 2, 2));
+		BDPTSceneAdapter adapter(*world, cam);
+		const double P[3] = {side[0] * 1.001, side[1] * 1.001, side[2] * 1.001};   // just off the small sphere, on the light's side
+		BDPTLightSample<double> ls{};
+		ASSERT_TRUE(adapter.SampleLight(random_double(), P, ls));
+		EXPECT_EQ(adapter.Unoccluded(P, ls.p_light), side == awayFromPlanet)
+			<< (side == towardPlanet ? "the planet must block a distant light shining from behind it" : "nothing blocks the light from the open side");
+	}
+}
+
 TEST(BDPTAdapterPunctualSky, SkyLightIsSampledAsRealDistributionNotDelta) {
 	camera cam;
 	cam.sky = std::make_shared<sky_light>(color(0.5, 0.6, 0.9));
