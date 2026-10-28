@@ -37,6 +37,7 @@
 #include "film_ice.h"
 #include "film_wind.h"
 #include "film_ground.h"
+#include "film_space.h"
 #include "film_flowers.h"
 #include "film_geology.h"
 #include "film_soundscape.h"
@@ -399,6 +400,8 @@ struct Spec {
 	std::vector<wind::Tornado> tornadoes;
 	// the ground close up (`closeup`, `tracks`)
 	ground::Closeup closeup;
+	// the universe (round 10: film_parse_space.h)
+	space::Space space;
 	std::vector<ground::Track> tracks;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;

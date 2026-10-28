@@ -303,7 +303,7 @@ class DataFilm {
 		spoken.clear();
 		for (const speech::Line &l : spec.lines) spoken.push_back(speech::syllablesOf(l));
 		if (spec.actingWords) actFromWords();
-		if (spec.hasSky) leaveOutSkyLights();
+		if (spec.hasSky || spec.space.on) leaveOutSkyLights();
 		for (const Spec::Prop &pr : spec.props)
 			if (std::find(scene.names.begin(), scene.names.end(), pr.name) == scene.names.end())
 				return filePath + ":" + std::to_string(pr.line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + pr.name + "`";

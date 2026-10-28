@@ -3,7 +3,7 @@
 // events, weather, particles and the set's sound, and the wet and snowy ground, gusts, mist, surf, storms, the air, fog, the world under water, fire, the
 // land in action, slow motion, time-lapse and exposure. parse() hands every line to natureLine() first.
 
-#include "film_spec.h"
+#include "film_parse_space.h"   // (and film_spec.h)
 
 namespace cartoon {
 namespace film_file {
@@ -905,6 +905,8 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		return iceLine(s, verb, line);
 	} else if (verb == "wind" || verb == "tornado") {   // the wind (film_wind.h)
 		return windLine(s, verb, line);
+	} else if (isSpaceVerb(verb)) {   // the universe (film_parse_space.h)
+		return spaceLine(s, verb, line);
 	} else if (verb == "closeup" || verb == "tracks") {   // the ground close up (film_ground.h)
 		return groundLine(s, verb, line);
 	} else if (verb == "caustics") {   // the net of light under water (film_caustics.h)

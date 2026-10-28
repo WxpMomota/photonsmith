@@ -1052,6 +1052,28 @@ with a heel and a tread, paws with a pad and four toes, cloven hooves), deep in 
 0.5 m above the sea's level is wet sand the wash has just left: its ripples washed smooth, dark, under a film of water as smooth as glass (`coateddiffuse` roughness 0),
 so the sky shows in it. It needs a `terrain`. The patch is some 100 000 points (at the defaults): keep it for shots near the ground.
 
+### The universe (round 10, 2026-10-27)
+
+Films set in space: planets and their air, rings and moons, nebulae, galaxies, stars, comets, black holes, ships and the people in them. Their lines are read by
+film_parse_space.h; each feature's own file is named with it. **Scale:** the GPU works in single precision, so keep a space film's world within a few hundred kilometres
+of the origin - planets a few thousand to some tens of thousands of metres across, some tens of kilometres off - and let the cuts and the camera's moves tell the real
+distances (the Nomai film's gas giant is 17.5 km across at 60 km).
+
+**A set in space: `space`.** (film_space.h)
+
+```
+scene   film_assets/wild/set.pbrt
+space   stars 1  milkyway 1  sun 200 10          # `sunsize DEGREES` (0.53), `sunlight S` (1), `sun off`, `seed N`
+```
+
+No ground, no sky, no air (a film with `space` has no `sky`, `storm`, `air` or `fog`; the set's own sky lights are left out): black, with some 60 000 stars all round,
+painted into the sky's picture - their brightnesses spread as the real sky's (each magnitude fainter about two and a half times as many, from -1 to 9), their colours
+from their temperatures (a black body's, worked out from Planck's law through the CIE curves: most a little orange, a few blue-white, some deep red), the faint ones
+crowding towards the Milky Way. It is not a catalogue of the real stars: the constellations are not there. The Milky Way is a band of light round a great circle,
+brighter and wider towards its centre (bearing 66, on the horizon), knotted with star clouds and broken by dark lanes of dust. The sun is a glowing ball a thousand
+kilometres off at `sun BEARING ELEVATION` (degrees; 60 15 by default), its light the films' sunlight (3 units of irradiance) times `sunlight`, so a planet's night
+side is dark and shadows are as soft as the sun is big.
+
 **Forests: `forest`.** (film_forest.h)
 
 ```
