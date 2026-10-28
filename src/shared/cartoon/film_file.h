@@ -1797,6 +1797,8 @@ class DataFilm {
 			key.target[1] = target.y;
 			key.target[2] = target.z;
 			key.fov = shot.follow.fov;
+		} else if (shot.spaceCam.kind != cosmos::SpaceCam::None) {   // a journey in space (film_voyage.h)
+			key = cosmos::spaceCamKey(shot.spaceCam, (t - shot.start) / span);
 		} else if (shot.move.kind != Shot::Move::None) {
 			key = moveKey(shot, t, span);
 		} else {

@@ -4,6 +4,7 @@
 //
 //   ship       a shuttle, a fighter, a freighter, a station or a wheel, flying nose first along its way, its engines glowing, its running lights blinking
 //   astronaut  someone floating in a spacesuit, tumbling slowly, tethered to a point or a ship, loose things drifting round them
+//   spacecam   a shot's camera on a journey: an orbit, a slingshot flyby, a powers-of-ten zoom, a jump to hyperspace
 //
 // Coordinates are pbrt's, as a film file's; meshes are made in story space (x mirrored), as cartoon_lib.h's.
 
@@ -11,9 +12,11 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
+#include "../camera_keyframes.h"
 #include "cartoon_lib.h"
 #include "film_cosmos.h"
 
@@ -255,6 +258,119 @@ inline std::string astronautText(const Astronaut &a, double nt, const Vec3 *teth
 		}
 	}
 	return out;
+}
+
+// ---- the camera's journeys ----
+// A shot's camera on a journey in space (`spacecam`), about the point `at` (pbrt's), over the whole shot: an `orbit` round it `radius` away, from bearing `from` through
+// `degrees`, `elevation` up; a slingshot `flyby` - in from far away, swinging past it `radius` away fastest where it is nearest and out again, looking ahead with it beside
+// the way; a powers-of-ten `zoom` - from `from` metres away to `to` metres, out along `bearing` and `elevation`, the distance changing by the same factor every second;
+// or a jump to `hyperspace` - at `at` looking along `bearing` and `elevation`, the stars stretching into streaks, a white flash halfway, out at `to` with the streaks
+// shrinking back to stars.
+struct SpaceCam {
+	enum Kind { None, Orbit, Flyby, Zoom, Hyperspace } kind = None;
+	Vec3 at, to;
+	double radius = 10000.0, degrees = 90.0, from = 0.0, elevation = 10.0, near0 = 1.0e6, near1 = 100.0, fov = 0.0;
+};
+// The camera of a journey `u` of the way through its shot (0 .. 1).
+inline camera_keyframes::Key spaceCamKey(const SpaceCam &c, double u) {
+	u = std::clamp(u, 0.0, 1.0);
+	Vec3 eye = c.at + Vec3{0.0, 0.0, 1.0} * c.radius, target = c.at;
+	switch (c.kind) {
+		case SpaceCam::Orbit: eye = c.at + space::direction(c.from + c.degrees * u, c.elevation) * c.radius; break;
+		case SpaceCam::Flyby: {   // a hyperbola about `at`, nearest (`radius`) at the bearing `from`; its parameter runs fastest in the middle (a slingshot)
+			const Vec3 n = space::direction(c.from, c.elevation), side = normalize(cross(Vec3{0.0, 1.0, 0.0}, n) + Vec3{1e-9, 0.0, 0.0});
+			const auto at = [&](double v) {
+				const double w = 3.0 * std::asinh(30.0 * (2.0 * v - 1.0)) / std::asinh(30.0);
+				return c.at + n * (c.radius * std::cosh(w)) + side * (c.radius * std::sinh(w));
+			};
+			eye = at(u);
+			const Vec3 ahead = normalize(at(std::min(1.0, u + 0.002)) - at(std::max(0.0, u - 0.002)) + Vec3{1e-12, 0.0, 0.0}), toIt = normalize(c.at - eye);
+			target = eye + normalize(ahead * 1.3 + toIt) * c.radius;   // (looking ahead, the body off to the side as it swings past)
+			break;
+		}
+		case SpaceCam::Zoom: eye = c.at + space::direction(c.from, c.elevation) * (c.near0 * std::pow(c.near1 / c.near0, smoothstep(0.0, 1.0, u))); break;
+		case SpaceCam::Hyperspace: {
+			const Vec3 forward = space::direction(c.from, c.elevation);
+			const double lurch = std::pow(smoothstep(0.25, 0.5, u), 2.0) * 50.0;   // (a lunge forward as it goes)
+			eye = (u < 0.5 ? c.at : c.to) + forward * (u < 0.5 ? lurch : 50.0 * (1.0 - smoothstep(0.5, 0.65, u)));
+			target = eye + forward * 1000.0;
+			break;
+		}
+		default: break;
+	}
+	camera_keyframes::Key key;
+	key.pos[0] = eye.x, key.pos[1] = eye.y, key.pos[2] = eye.z;
+	key.target[0] = target.x, key.target[1] = target.y, key.target[2] = target.z;
+	key.fov = c.fov;
+	return key;
+}
+// A jump to hyperspace `u` of the way through its shot, as scene text: streaks of starlight round the camera, stretching as it goes and shrinking as it comes out, and the
+// flash halfway.
+inline std::string hyperspaceText(const SpaceCam &c, double u) {
+	const camera_keyframes::Key key = spaceCamKey(c, u);
+	const Vec3 eye{key.pos[0], key.pos[1], key.pos[2]}, forward = space::direction(c.from, c.elevation);
+	const Vec3 side = normalize(cross(forward, Vec3{0.0, 1.0, 0.0}) + Vec3{1e-9, 0.0, 0.0}), up = cross(side, forward);
+	const double stretch = u < 0.5 ? smoothstep(0.2, 0.48, u) : 1.0 - smoothstep(0.52, 0.75, u);
+	std::string out = "# a jump to hyperspace (film_voyage.h)\n";
+	if (stretch > 0.01) {
+		Mesh all;
+		for (int k = 0; k < 260; ++k) {
+			const double a = 2.0 * kPi * hash01(k, 1), off = 15.0 + 90.0 * hash01(k, 2), ahead = 60.0 + 600.0 * hash01(k, 3);
+			const Vec3 head = eye + forward * ahead + (side * std::cos(a) + up * std::sin(a)) * off, tail = head - forward * (stretch * (100.0 + 500.0 * hash01(k, 4)) + 0.5);
+			const Mesh m = sdf::tubeMesh({{-tail.x, tail.y, tail.z}, {-head.x, head.y, head.z}}, 0.25 + 0.2 * hash01(k, 5), 0.3, 5);
+			const int base = static_cast<int>(all.verts.size());
+			all.verts.insert(all.verts.end(), m.verts.begin(), m.verts.end());
+			all.normals.insert(all.normals.end(), m.normals.begin(), m.normals.end());
+			for (const auto &tr : m.tris) all.tris.push_back({tr[0] + base, tr[1] + base, tr[2] + base});
+		}
+		const Vec3 L = Vec3{0.75, 0.85, 1.0} * (2.0 + 4.0 * stretch);
+		out += attr(diffuseMaterial({0.0, 0.0, 0.0}), emitMesh(all, identity()), &L);
+	}
+	const double flash = std::exp(-std::pow((u - 0.5) / 0.025, 2.0));
+	if (flash > 0.01) out += emissiveSphere({-(eye.x + forward.x * 30.0), eye.y + forward.y * 30.0, eye.z + forward.z * 30.0}, 25.0, Vec3{1.0, 1.0, 1.0} * (30.0 * flash));
+	return out;
+}
+inline const std::vector<std::string> &spaceCamKinds() {
+	static const std::vector<std::string> k = {"orbit", "flyby", "zoom", "hyperspace"};
+	return k;
+}
+// A `spacecam` line's words into `c`: "" or what is wrong with it.
+inline std::string spaceCamLine(const std::vector<std::string> &t, SpaceCam &c) {
+	const std::string usage =
+		"`spacecam orbit X Y Z radius R [degrees D] [from BEARING] [elevation E] [fov F]`, `spacecam flyby X Y Z radius R [from BEARING] [elevation E] [fov F]`, "
+		"`spacecam zoom X Y Z from D0 to D1 [bearing B] [elevation E] [fov F]` or `spacecam hyperspace X Y Z to X Y Z [bearing B] [elevation E] [fov F]`";
+	const auto number = [](const std::string &s, double &v) {
+		char *end = nullptr;
+		v = std::strtod(s.c_str(), &end);
+		return !s.empty() && end && *end == '\0';
+	};
+	if (t.size() < 5 || std::find(spaceCamKinds().begin(), spaceCamKinds().end(), t[1]) == spaceCamKinds().end()) return usage;
+	SpaceCam out;
+	out.kind = t[1] == "orbit" ? SpaceCam::Orbit : t[1] == "flyby" ? SpaceCam::Flyby : t[1] == "zoom" ? SpaceCam::Zoom : SpaceCam::Hyperspace;
+	if (!number(t[2], out.at.x) || !number(t[3], out.at.y) || !number(t[4], out.at.z)) return "where it is about: " + usage;
+	bool radius = false, from = false, to = false;
+	for (std::size_t i = 5; i < t.size(); i += 2) {
+		double v = 0.0;
+		const std::string &w = t[i];
+		if (out.kind == SpaceCam::Hyperspace && w == "to" && i + 3 < t.size() && number(t[i + 1], out.to.x) && number(t[i + 2], out.to.y) && number(t[i + 3], out.to.z)) {
+			to = true, i += 2;
+			continue;
+		}
+		if (i + 1 >= t.size() || !number(t[i + 1], v)) return "\"" + w + "\": " + usage;
+		const bool distance = out.kind == SpaceCam::Zoom && (w == "from" || w == "to");
+		if ((out.kind == SpaceCam::Orbit || out.kind == SpaceCam::Flyby) && w == "radius" && v > 0.0) out.radius = v, radius = true;
+		else if (out.kind == SpaceCam::Orbit && w == "degrees") out.degrees = v;
+		else if (distance && v > 0.0) (w == "from" ? out.near0 : out.near1) = v, (w == "from" ? from : to) = true;
+		else if (!distance && (w == "from" || w == "bearing")) out.from = v;
+		else if (w == "elevation" && v >= -90.0 && v <= 90.0) out.elevation = v;
+		else if (w == "fov" && v > 0.0 && v < 180.0) out.fov = v;
+		else return "\"" + w + "\": " + usage;
+	}
+	if ((out.kind == SpaceCam::Orbit || out.kind == SpaceCam::Flyby) && !radius) return "how far (`radius R`): " + usage;
+	if (out.kind == SpaceCam::Zoom && !(from && to)) return "from how far and to how far (`from D0 to D1`): " + usage;
+	if (out.kind == SpaceCam::Hyperspace && !to) return "where it comes out (`to X Y Z`): " + usage;
+	c = out;
+	return std::string();
 }
 
 }  // namespace cosmos

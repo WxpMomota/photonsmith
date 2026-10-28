@@ -1272,6 +1272,26 @@ arms and legs drifting in the slow sway of zero-g; where `at` says at nature's t
 tilted axis. A `tether` is a lazy line from their waist - sagging and swaying - to a point, or to a `ship` named before them (it follows the ship). `floaters N` sets loose
 things drifting and spinning round them: wrenches, bolts and wobbling globes of water. `lamps off` puts out the helmet lamps.
 
+**The camera's journeys: `spacecam`.** (film_voyage.h; a line of a shot, in place of its `key`s)
+
+```
+shot 0 Round
+  spacecam orbit  0 0 -30000  radius 9000  degrees 120  from 0  elevation 15     # round a planet, 120 degrees over the shot
+shot 10 Past
+  spacecam flyby  0 0 -30000  radius 5000  from 30                             # a slingshot: in from far, swinging past, out again
+shot 20 Down
+  spacecam zoom   0 0 -30000  from 1000000  to 4000  bearing 0  elevation 20   # powers of ten: the same factor closer every second
+shot 30 Jump
+  spacecam hyperspace  0 0 0  to 500000 0 0  bearing 90  elevation 0           # streaks, a flash halfway, out at `to`
+```
+
+A shot's camera on a journey about a point, over the whole shot. An `orbit` goes round it `radius` away from the bearing `from` through `degrees`, `elevation` up. A `flyby` is a
+slingshot: in from far away, swinging past it nearest (`radius`) at the bearing `from` and out the other side - fastest where it is nearest - looking ahead along its way with
+the body passing beside it. A `zoom` closes from `from` metres to `to` metres (or opens, the other way) along `bearing` and `elevation`, the distance changing by the same factor
+every second: the powers-of-ten shot from a galaxy to a planet (the floating origin keeps it sharp). A `hyperspace` jump looks along `bearing`/`elevation` from the point: the
+stars stretch into streaks of light round the camera as it lunges forward, a white flash fills the screen halfway, and it comes out at `to` as the streaks shrink back to
+stars. `fov F` sets the lens for any of them.
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

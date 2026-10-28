@@ -54,7 +54,7 @@ inline std::string firstWord(const std::string &line) {
 inline std::string indentOf(const std::string &line) { return line.substr(0, line.find_first_not_of(" \t")); }
 // The words of the camera of a shot (what `Use this view` takes away).
 inline bool cameraWord(const std::string &w) {
-	return w == "key" || w == "follow" || w == "auto" || w == "side" || w == "orbit" || w == "crane" || w == "push" || w == "track" || w == "fly";
+	return w == "key" || w == "follow" || w == "auto" || w == "side" || w == "orbit" || w == "crane" || w == "push" || w == "track" || w == "fly" || w == "spacecam";
 }
 inline std::string num(double v) {
 	char buf[32];

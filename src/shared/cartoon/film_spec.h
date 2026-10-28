@@ -110,6 +110,7 @@ struct Shot {
 	Vec3 flyAt;
 	std::vector<std::pair<double, std::string>> focus;   // who is in focus from when (the first from the shot's start)
 	double aperture = 0.0;
+	cosmos::SpaceCam spaceCam;   // (`spacecam`) a journey in space (film_voyage.h)
 	shot_lighting::Lighting lighting;   // (`lighting`) key, fill and rim lights round the subject, from the camera
 	std::string lightOn;                // ... on this character's chest ("": what the camera looks at)
 };

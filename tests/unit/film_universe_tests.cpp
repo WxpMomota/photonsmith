@@ -640,3 +640,39 @@ TEST(FilmUniverseAstronaut, AstronautsDriftAndTumbleTheirLimbsSwayAndTheirTether
 	EXPECT_NE(film.sceneAt(1.0).find("# its tether"), std::string::npos);
 	expectProblems({{"astronaut a at 0 0 0 tether nobody", "no ship of that name"}, {"astronaut a at 0 0 0 suit 2 1 1", "\"suit\""}, {"astronaut a at 0 0 0 floaters 99", "\"floaters\""}});
 }
+
+// ---- 17. the camera's journeys --------------------------------------------------------------------------------------------------------------------------------------------
+
+TEST(FilmUniverseSpaceCam, OrbitsKeepTheirDistanceFlybysAreFastestNearestZoomsArePowersOfTenAndJumpsFlash) {
+	const auto eyeOf = [](const cs::SpaceCam &c, double u) {
+		const camera_keyframes::Key k = cs::spaceCamKey(c, u);
+		return cartoon::Vec3{k.pos[0], k.pos[1], k.pos[2]};
+	};
+	cs::SpaceCam c;
+	ASSERT_EQ(cs::spaceCamLine({"spacecam", "orbit", "0", "0", "-30000", "radius", "9000", "degrees", "120"}, c), "");
+	EXPECT_NEAR(length(eyeOf(c, 0.0) - c.at), 9000.0, 1e-6);
+	EXPECT_NEAR(length(eyeOf(c, 1.0) - c.at), 9000.0, 1e-6);
+	EXPECT_NEAR(length(eyeOf(c, 1.0) - eyeOf(c, 0.0)), 2.0 * 9000.0 * std::cos(10.0 * 3.14159265358979 / 180.0) * std::sin(60.0 * 3.14159265358979 / 180.0), 1.0) << "120 degrees round";
+
+	ASSERT_EQ(cs::spaceCamLine({"spacecam", "flyby", "0", "0", "-30000", "radius", "5000"}, c), "");
+	EXPECT_NEAR(length(eyeOf(c, 0.5) - c.at), 5000.0, 1.0) << "nearest halfway";
+	EXPECT_GT(length(eyeOf(c, 0.0) - c.at), 5.0 * 5000.0) << "in from far away";
+	EXPECT_GT(length(eyeOf(c, 0.51) - eyeOf(c, 0.49)), 1.5 * length(eyeOf(c, 0.03) - eyeOf(c, 0.01))) << "fastest where it is nearest";
+
+	ASSERT_EQ(cs::spaceCamLine({"spacecam", "zoom", "0", "0", "0", "from", "1000000", "to", "10"}, c), "");
+	EXPECT_NEAR(length(eyeOf(c, 0.0)), 1.0e6, 1e-3);
+	EXPECT_NEAR(length(eyeOf(c, 1.0)), 10.0, 1e-6);
+	EXPECT_NEAR(length(eyeOf(c, 0.5)), std::sqrt(1.0e6 * 10.0), 1.0) << "the same factor every second";
+
+	ASSERT_EQ(cs::spaceCamLine({"spacecam", "hyperspace", "0", "0", "0", "to", "500000", "0", "0"}, c), "");
+	EXPECT_LT(length(eyeOf(c, 0.1)), 1.0);
+	EXPECT_LT(length(eyeOf(c, 0.9) - cartoon::Vec3{500000.0, 0.0, 0.0}), 1.0) << "out where it goes";
+	EXPECT_EQ(count(cs::hyperspaceText(c, 0.05), "AreaLightSource"), 0u) << "stars, not streaks, before";
+	EXPECT_GE(count(cs::hyperspaceText(c, 0.5), "AreaLightSource"), 2u) << "streaks and the flash";
+
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("journey", "scene s.pbrt\nlength 10\nspace\nplanet home rocky at 0 0 -30000 radius 3000\nshot 0 A\n spacecam orbit 0 0 -30000 radius 9000\n", film), "");
+	EXPECT_NE(film.sceneAt(0.0), film.sceneAt(9.0)) << "the camera goes round";
+	expectProblems({{"shot 0 A\nspacecam orbit 0 0 0", "how far"}, {"shot 0 A\nspacecam zoom 0 0 0 from 10", "from how far and to how far"}, {"shot 0 A\nspacecam warp 0 0 0", "spacecam orbit"},
+					{"shot 0 A\nspacecam hyperspace 0 0 0", "where it comes out"}, {"shot 0 A\n key 0 0 0  0 0 -1  50\nspacecam orbit 0 0 0 radius 5", "has a `spacecam` line and"}});
+}

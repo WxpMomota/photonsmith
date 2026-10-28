@@ -160,6 +160,7 @@
 //     asteroids belt at 0 0 -30000  radius 20000  count 4000      # rocks by the thousand: a `ring` going round (`width`, `tilt`) or a drifting `field`
 //     remnant  crab at 0 0 -40000  size 12000  blast 3          # a dying star: a `supernova` (at `blast T`), a `pulsar` (`period`), a `planetary` nebula
 //     ship     ark  at 0 0 -500  kind shuttle  size 60  move 0 0 -40   # a craft: shuttle, fighter, freighter, station, wheel; engines, running lights
+//   (in a shot) spacecam flyby 0 0 -30000 radius 9000 from 20    # the camera's journey: orbit, flyby (a slingshot), zoom (powers of ten), hyperspace
 //     astronaut kim at 0 0 -6  tether ark  floaters 6  tumble 5    # someone floating in a spacesuit, tethered to a point or a ship, loose things round them
 //     closeup  size 16                                         # the ground close up (film_ground.h): ripples, drifts, pebbles, footprints, wet sand; `tracks from
 //                                                               # X Z to X Z [during T0 T1] [kind boots|paws|hooves]`: a trail of footprints made over its time
@@ -340,6 +341,10 @@ inline Parsed parse(const std::string &text, const std::string &where, const std
 		}
 		if (!s.shots.back().fly.empty()) {
 			if (!shotText.empty() || s.shots.back().following || s.shots.back().coverage) return "the shot \"" + s.shots.back().name + "\" has a `fly` line and `key`, `follow` or `auto` lines too";
+			return std::string();
+		}
+		if (s.shots.back().spaceCam.kind != cosmos::SpaceCam::None) {   // (a journey in space: film_voyage.h)
+			if (!shotText.empty() || s.shots.back().following || s.shots.back().coverage) return "the shot \"" + s.shots.back().name + "\" has a `spacecam` line and `key`, `follow` or `auto` lines too";
 			return std::string();
 		}
 		if (s.shots.back().following || s.shots.back().coverage) {
@@ -883,6 +888,9 @@ inline Parsed parse(const std::string &text, const std::string &where, const std
 				}
 			}
 			if (shot.fly.size() < 2) return fail("`fly X Z X Z [X Z ...] [height H] [look X Y Z] [fov F]`: at least two waypoints");
+		} else if (verb == "spacecam") {   // a journey in space (film_voyage.h)
+			if (s.shots.empty()) return fail("`spacecam` belongs to a shot: start one with `shot 0 NAME` first");
+			if (const std::string e = cosmos::spaceCamLine(detail::tokens(line), s.shots.back().spaceCam); !e.empty()) return fail(e);
 		} else if (verb == "lighting") {   // key, fill and rim lights round the shot's subject (shot_lighting.h)
 			if (s.shots.empty()) return fail("`lighting` belongs to a shot: start one with `shot 0 NAME` first");
 			Shot &shot = s.shots.back();
@@ -1007,7 +1015,7 @@ inline Parsed parse(const std::string &text, const std::string &where, const std
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, set, cast, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, mute, music, toon, voices, acting, lighting, terrain, water, river, waterfall, clouds, fogbank, forest, flock, herd, whale, dolphins, bioluminescence, fireflies, fungi, glacier, iceberg, seaice, wind, tornado, optics, caustics, closeup, tracks, space, planet, moon, nebula, galaxy, star, blackhole, comet, asteroids, remnant, ship, astronaut, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, set, cast, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, spacecam, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, mute, music, toon, voices, acting, lighting, terrain, water, river, waterfall, clouds, fogbank, forest, flock, herd, whale, dolphins, bioluminescence, fireflies, fungi, glacier, iceberg, seaice, wind, tornado, optics, caustics, closeup, tracks, space, planet, moon, nebula, galaxy, star, blackhole, comet, asteroids, remnant, ship, astronaut, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
 		}
 	}
 	n = shotLine;

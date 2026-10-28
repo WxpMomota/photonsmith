@@ -115,7 +115,6 @@ inline std::string spectacleText(const Spec &spec, const std::string &header, do
 // Round 10's universe in a frame at film time t (nature's `nt`): the set in space (film_space.h), the bodies in it (film_cosmos.h) and the craft and people travelling
 // among them (film_voyage.h). (The planets are worldAt's: an eclipse needs them all.)
 inline std::string universeText(const Spec &spec, const std::string &header, double t, double nt) {
-	(void)t;
 	std::string out;
 	const std::string film = spec.key.empty() ? std::string("film") : spec.key;
 	if (spec.space.on) {   // (the set in space: film_space.h)
@@ -129,6 +128,11 @@ inline std::string universeText(const Spec &spec, const std::string &header, dou
 		double fov = 40.0;
 		film_subjects::cameraOf(header, eye, target, fov);
 		for (const cosmos::BlackHole &b : spec.blackHoles) out += cosmos::blackHoleText(b, nt, {-eye.x, eye.y, eye.z});
+	}
+	for (std::size_t k = 0; k < spec.shots.size(); ++k) {   // a jump to hyperspace under way (film_voyage.h)
+		const Shot &shot = spec.shots[k];
+		const double end = k + 1 < spec.shots.size() ? spec.shots[k + 1].start : spec.length;
+		if (shot.spaceCam.kind == cosmos::SpaceCam::Hyperspace && t >= shot.start && t < end) out += cosmos::hyperspaceText(shot.spaceCam, (t - shot.start) / std::max(1e-6, end - shot.start));
 	}
 	for (const cosmos::Astronaut &a : spec.astronauts) {   // (film_voyage.h: a tether to a ship goes to where the ship is now)
 		Vec3 to = a.tether;
