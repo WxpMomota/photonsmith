@@ -204,20 +204,21 @@ struct LaunchArgs {
 	// instead of always spending the full samples_per_pixel budget on every
 	// pixel - see camera::adaptive_sampling's own comment (camera.h) and
 	// src/shared/adaptive_sampling.h. Off by default: renders exactly
-	// samples_per_pixel samples per pixel, unchanged from before this
-	// existed. Same "CPU default path tracer only" scope cut as sampler
-	// above - relies on that integrator's own stratified sampling loop.
+	// samples_per_pixel samples per pixel. The CPU path tracer and both
+	// GPU renderers (GpuCameraParams::adaptiveThreshold); a film video's
+	// frames turn it on by themselves on a GPU (cartoon_render.h, frameFlags).
 	bool adaptive_sampling  = false;
+	// --no-adaptive: a film video's frames sample every pixel samples_per_pixel times.
+	bool no_adaptive = false;
 	// Also write the render's passes (albedo, normal, depth, uv, coverage) - see src/TheRestOfYourLife/aov_pass.h. Into the same file when the output is an .exr
 	// (a multilayer EXR with the beauty's R/G/B), else into <stem>.aovs.exr beside the image. Any backend; single images only.
 	bool aovs = false;
 	// The toon look on the picture (src/shared/toon_look.h, launcher/toon_frame.h): cel shading, ink lines, stronger colour - the scene's own `# @rt-toon` style, or the default.
 	// A scene with that line has the look without the flag.
 	bool toon = false;
-	// Target relative standard error of a pixel's running luminance mean -
-	// see pixel_convergence::has_converged()'s own comment. Only consulted
-	// when adaptive_sampling is true. 0.01 matches Blender Cycles' own
-	// adaptive_threshold default.
+	// The noise a pixel may keep, in display units (pixel_convergence_rule.h):
+	// 0.003 (default) is under one level of 255. Only consulted when
+	// adaptive_sampling is true.
 	double adaptive_threshold = render_defaults::kAdaptiveThreshold;
 	// Stops claiming new scanlines once this many seconds have elapsed
 	// since the render started - see camera::time_limit_seconds's own
@@ -569,18 +570,22 @@ inline FlagResult handle_quality_flag(const std::string& arg, int argc, char** a
 	} else if (arg == render_flags::kAdaptive) {
 		out.adaptive_sampling = true;
 		consumed_args.insert(i);
+	} else if (arg == render_flags::kNoAdaptive) {
+		out.no_adaptive = true;
+		out.adaptive_sampling = false;
+		consumed_args.insert(i);
 	} else if (arg == render_flags::kAdaptiveThreshold && i + 1 < argc) {
 		// On a parse failure, still reset to the default the error
 		// message claims (a prior --adaptive-threshold's value must not
 		// survive this one failing to parse) - resetOnFailure=true.
 		parseDoubleFlag(argv, i, consumed_args, out.adaptive_threshold,
-						"Invalid --adaptive-threshold value, using default (0.01)\n", true, 0.01,
+						"Invalid --adaptive-threshold value, using default (0.003)\n", true, render_defaults::kAdaptiveThreshold,
 						[](double v) {
 							if (v <= 0.0) {
 								std::cerr << "Warning: --adaptive-threshold " << v
 										  << " is <= 0, every pixel would need a perfectly zero-variance "
-											 "estimate to ever stop early - using default (0.01)\n";
-								return 0.01;
+											 "estimate to ever stop early - using default (0.003)\n";
+								return render_defaults::kAdaptiveThreshold;
 							}
 							return v;
 						});
@@ -1144,11 +1149,14 @@ inline void print_launch_help(const char* program) {
 				  << "  " << render_flags::kAdaptive << " : Stop sampling a pixel once it's converged instead of\n"
 				  << "               always spending the full samples-per-pixel budget on every\n"
 				  << "               pixel - samples_per_pixel becomes a ceiling, not a fixed count.\n"
-				  << "               Off by default. CPU default path tracer only.\n"
-				  << "  " << render_flags::kAdaptiveThreshold << " VALUE: Target relative noise level for\n"
-				  << "               " << render_flags::kAdaptive << " to consider a pixel converged (default 0.01,\n"
-				  << "               matching Blender Cycles' own default). Lower = cleaner but\n"
-				  << "               slower; only consulted when " << render_flags::kAdaptive << " is passed.\n"
+				  << "               Off by default (on for a film video's frames on a GPU). The CPU\n"
+				  << "               path tracer and both GPU renderers (on the GPU a pixel is\n"
+				  << "               checked from an eighth of the samples on).\n"
+				  << "  " << render_flags::kNoAdaptive << " : A film video samples every pixel the full count.\n"
+				  << "  " << render_flags::kAdaptiveThreshold << " VALUE: The noise a pixel may keep, as it would show\n"
+				  << "               in the picture (gamma 2.2, 0..1), for " << render_flags::kAdaptive << " to stop it\n"
+				  << "               (default 0.003, under one level of 255). Lower = cleaner but\n"
+				  << "               slower; only consulted when " << render_flags::kAdaptive << " is on.\n"
 				  << "  " << render_flags::kTimeLimit << " SECONDS: Stop rendering once this many seconds have\n"
 				  << "               elapsed, instead of always running until every scanline is\n"
 				  << "               done - useful for previews or a fixed render-farm time budget.\n"

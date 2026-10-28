@@ -57,6 +57,7 @@ extern "C" void wf_launch_evaluate_materials(
 	unsigned int                 numLights,
 	const PunctualLightGPU*      d_punctualLights,
 	unsigned int                 numPunctualLights,
+	unsigned int                 punctualPerHit,
 	const TextureData*           d_textures,
 	const unsigned char*         d_texturePixels,
 	int                          maxDepth,
@@ -146,6 +147,7 @@ extern "C" void wf_launch_evaluate_materials_simple(
 	unsigned int                 numLights,
 	const PunctualLightGPU*      d_punctualLights,
 	unsigned int                 numPunctualLights,
+	unsigned int                 punctualPerHit,
 	const TextureData*           d_textures,
 	const unsigned char*         d_texturePixels,
 	int                          maxDepth,
@@ -209,6 +211,7 @@ extern "C" void wf_launch_evaluate_materials_dielectric(
 	unsigned int                 numLights,
 	const PunctualLightGPU*      d_punctualLights,
 	unsigned int                 numPunctualLights,
+	unsigned int                 punctualPerHit,
 	const TextureData*           d_textures,
 	const unsigned char*         d_texturePixels,
 	int                          maxDepth,
@@ -554,6 +557,7 @@ extern "C" void wf_launch_resolve_bssrdf_exit(
 	unsigned int                 numLights,
 	const PunctualLightGPU*      d_punctualLights,
 	unsigned int                 numPunctualLights,
+	unsigned int                 punctualPerHit,
 	const TextureData*           d_textures,
 	const unsigned char*         d_texturePixels,
 	float3                       skyColor,
@@ -584,7 +588,13 @@ extern "C" void wf_launch_normalize_framebuffer(
 
 extern "C" void wf_launch_normalize_aov_buffers(
 	unsigned int numPixels, float3* d_albedoBuffer, float3* d_normalBuffer,
-	unsigned int samplesPerPixel, cudaStream_t stream);
+	unsigned int samplesPerPixel, const float4* d_adaptiveStats, cudaStream_t stream);
+
+// --adaptive: after a sample pass (`batch` samples a still-sampled pixel), each such pixel's new samples into its statistics, and the converged ones out of the mask
+// (adaptive_sampling_update, wavefront_kernels_accumulate.cu). d_activeCount may be null (no count this pass).
+extern "C" void wf_launch_adaptive_sampling_update(
+	const float3* d_framebuffer, const float* d_weightBuffer, float3* d_prevFramebuffer, float* d_prevWeight, float4* d_stats,
+	unsigned char* d_activeMask, unsigned int numPixels, unsigned int batch, float threshold, float exposure, unsigned int minSamples, int* d_activeCount, cudaStream_t stream);
 
 extern "C" void wf_reset_queue_counter(int* d_counter, cudaStream_t stream);
 

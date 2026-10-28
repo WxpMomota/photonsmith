@@ -181,6 +181,8 @@ struct LaunchParams {
 	// Per pixel (py * width + px): the time of the sample now being traced (motion blur: optix_raygen.h writes it), so that its shadow rays see moving geometry where its
 	// camera ray did (trace_shadow_ray). Null when the scene has no motion.
 	float* rayTimes;
+	// --adaptive (camera.adaptiveThreshold > 0): the samples the pixels actually took, summed (one atomic add a pixel), for the log. Null otherwise.
+	unsigned long long* adaptiveSamplesTaken;
 };
 
 // Hit group data (per-geometry instance in SBT)

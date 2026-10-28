@@ -469,6 +469,14 @@ extern "C" int optix_render_main(
 		if (options.regularize) cameraExtra.regularize = 1;
 		if (options.seed >= 0) cameraExtra.userSeed = static_cast<int>(options.seed);
 		if (options.max_component_value != 1e9) cameraExtra.maxComponentValue = static_cast<float>(options.max_component_value);
+		// --adaptive / --adaptive-threshold: both GPU renderers stop sampling a pixel once it has converged (GpuCameraParams::adaptiveThreshold), checked
+		// from an eighth of the samples on (at least 16) so that every pixel has a fair estimate of its own noise first. The rule (pixel_convergence_rule.h)
+		// judges the noise in the exposed picture.
+		if (options.adaptive_sampling && options.adaptive_threshold > 0.0) {
+			cameraExtra.adaptiveThreshold = static_cast<float>(options.adaptive_threshold);
+			cameraExtra.adaptiveExposure = static_cast<float>(options.exposure);
+			cameraExtra.adaptiveMinSamples = static_cast<unsigned int>(samples_per_pixel / 8 > 16 ? samples_per_pixel / 8 : 16);   // (not std::max: <windows.h>'s macro)
+		}
 		if (options.crop_x0 != 0.0 || options.crop_y0 != 0.0 || options.crop_x1 != 1.0 || options.crop_y1 != 1.0) {
 			cameraExtra.cropX0 = static_cast<int>(std::lround(options.crop_x0 * image_width));
 			cameraExtra.cropX1 = static_cast<int>(std::lround(options.crop_x1 * image_width));

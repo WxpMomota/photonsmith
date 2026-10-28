@@ -1,6 +1,6 @@
 // wavefront_kernels_accumulate.cu
 // CUDA compute kernels: accumulate_miss, accumulate_shadow,
-// reset_queue_counter, normalize_framebuffer, normalize_aov_buffers
+// reset_queue_counter, normalize_framebuffer, normalize_aov_buffers, adaptive_sampling_update
 // (Kernels 3-6 of the original wavefront_kernels.cu) - framebuffer/queue
 // bookkeeping kernels grouped together since each is small. Split out for
 // the same independent-recompilation reason as the other
@@ -14,6 +14,7 @@
 
 #include "wavefront_device_helpers.h"
 #include "wavefront_nrc_types.h"  // NrcTrainingRecord - accumulate_shadow's own isNrcTrainingRay redirect
+#include "../../src/shared/pixel_convergence_rule.h"  // adaptive_sampling_update: when a pixel has enough samples
 
 // ============================================================================
 // Kernel 3 — accumulate_miss
@@ -284,16 +285,67 @@ extern "C" __global__ void normalize_aov_buffers(
 	float3*      albedoBuffer,
 	float3*      normalBuffer,
 	unsigned int numPixels,
-	unsigned int samplesPerPixel
+	unsigned int samplesPerPixel,
+	const float4* adaptiveStats   // --adaptive: a pixel's own sample count is its .x (adaptive_sampling_update); null: samplesPerPixel each
 ) {
 	unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx >= numPixels) return;
-	if (samplesPerPixel == 0) {
+	const float taken = adaptiveStats ? adaptiveStats[idx].x : float(samplesPerPixel);
+	if (taken <= 0.0f) {
 		albedoBuffer[idx] = make_float3(0.0f, 0.0f, 0.0f);
 		normalBuffer[idx] = make_float3(0.0f, 0.0f, 0.0f);
 		return;
 	}
-	float inv = 1.0f / float(samplesPerPixel);
+	float inv = 1.0f / taken;
 	albedoBuffer[idx] = albedoBuffer[idx] * inv;
 	normalBuffer[idx] = normalBuffer[idx] * inv;
+}
+
+// --adaptive on the wavefront renderer, after each sample pass: what the pass added to a still-sampled pixel's accumulated colour over what it
+// added to its filter weight is the mean of the `batch` samples it traced there (every contribution of a sample lands within its own pass; a
+// pass traces several samples a pixel once few pixels are left - renderSampleLoop). That batch mean goes into the pixel's statistics (stats:
+// x = samples taken, y = batches, z = mean brightness, w = West's weighted sum of squared deviations), and a pixel that has converged
+// (pixel_convergence_rule.h, the CPU's rule) leaves activeMask, so generate_camera_rays skips it from then on. activeCount (when not null)
+// counts the pixels still sampled.
+extern "C" __global__ void adaptive_sampling_update(
+	const float3*  framebuffer,
+	const float*   weightBuffer,
+	float3*        prevFramebuffer,
+	float*         prevWeight,
+	float4*        stats,
+	unsigned char* activeMask,
+	unsigned int   numPixels,
+	unsigned int   batch,
+	float          threshold,
+	float          exposure,
+	unsigned int   minSamples,
+	int*           activeCount
+) {
+	const unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx >= numPixels || !activeMask[idx]) return;
+	const float3 c = framebuffer[idx];
+	const float w = weightBuffer[idx];
+	const float3 dc = c - prevFramebuffer[idx];
+	const float dw = w - prevWeight[idx];
+	prevFramebuffer[idx] = c;
+	prevWeight[idx] = w;
+	float4 st = stats[idx];
+	st.x += float(batch);
+	if (fabsf(dw) > 1e-8f) {
+		const float lum = (0.2126f * dc.x + 0.7152f * dc.y + 0.0722f * dc.z) / dw;
+		if (isfinite(lum)) {
+			st.y += 1.0f;
+			pixel_convergence::weighted_add(st.x, float(batch), lum, st.z, st.w);
+		}
+	}
+	stats[idx] = st;
+	bool done = false;
+	if (st.x >= float(minSamples) && st.y >= 2.0f) {
+		const float sampleVariance = st.w / (st.y - 1.0f);
+		done = pixel_convergence::converged_by_standard_error(st.z, sqrtf(fmaxf(sampleVariance, 0.0f) / st.x), threshold, exposure);
+	}
+	if (done)
+		activeMask[idx] = 0;
+	else if (activeCount)
+		atomicAdd(activeCount, 1);
 }

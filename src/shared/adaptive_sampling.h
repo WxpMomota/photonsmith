@@ -29,6 +29,7 @@
 
 #include "lowdiscrepancy.h"  // ReverseBits32 - row_visit_order()'s own comment
 #include "octahedral_variance.h"
+#include "pixel_convergence_rule.h"   // converged(): the rule, shared with the GPU renderers
 
 #include <algorithm>
 #include <cmath>
@@ -47,35 +48,14 @@ inline double luminance(double r, double g, double b) {
 	return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-// True once the running estimate's standard error, relative to its own
-// mean, drops below `threshold` - i.e. "confident enough in this pixel's
-// average brightness that more samples wouldn't change it much". Requires
-// at least 2 samples (Welford's variance is undefined below that).
-//
-// A near-black pixel (mean below `black_floor`, AFTER `exposure` is
-// applied - see this parameter's own note below) is treated as converged
-// unconditionally rather than divided into a permanently-large relative
-// error by a near-zero mean - matches Cycles' own behavior of not
-// endlessly re-sampling background/shadow pixels that are correctly
-// converging to (near) zero.
-//
-// `exposure` - camera::exposure's own flat post-multiply, 1.0 (default) if
-// not passed - is applied to `mean` ONLY for this near-black comparison,
-// not to the relative-error check above (that ratio is already scale-
-// invariant under any positive multiplier, exposure included). Without
-// this, a raw pre-exposure radiance below `black_floor` would fast-track
-// as "converged" after just 2 samples even under a large --exposure
-// (common for a deliberately dark/night scene boosted in post) that turns
-// those same pixels into visible, noise-sensitive midtones once applied -
-// the floor would silently stop protecting exactly the pixels a chosen
-// exposure was about to make matter.
-inline bool has_converged(const VarianceEstimator<double> &estimator, double threshold,
-						   double black_floor = 1e-4, double exposure = 1.0) {
+// True once the pixel's estimate - its noise carried to the exposed picture through a gamma-2.2 response - is below `threshold` display
+// units (pixel_convergence_rule.h's converged(): the rule, its reasons, and the 1e-4 black floor); `exposure` is camera::exposure's flat
+// post-multiply, which decides how bright, and so how visible, the pixel's noise ends up. Requires at least 2 samples.
+// The rule itself is pixel_convergence_rule.h's converged(), which the GPU renderers apply too: the pixel's noise in the exposed picture.
+inline bool has_converged(const VarianceEstimator<double> &estimator, double threshold, double exposure = 1.0) {
 	if (estimator.Count() < 2) return false;
-	const double mean = estimator.Mean();
-	if (mean * exposure < black_floor) return true;
-	const double standard_error = std::sqrt(estimator.Variance() / static_cast<double>(estimator.Count()));
-	return (standard_error / mean) < threshold;
+	const double n = static_cast<double>(estimator.Count());
+	return converged<double>(n, estimator.Mean(), estimator.Variance() * (n - 1.0), threshold, exposure);
 }
 
 // A permutation of {0, ..., n-1} such that ANY prefix of the permuted

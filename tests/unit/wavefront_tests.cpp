@@ -22,6 +22,7 @@
 #include <numeric>
 #include <fstream>
 #include <cstdio>
+#include "../../src/shared/render_flag_names.h"   // render_defaults::kAdaptiveThreshold
 
 // ============================================================================
 // Work-item type tests (host-side, no CUDA)
@@ -506,6 +507,47 @@ TEST_F(WavefrontRenderTest, DifferentSPPProducesDifferentOutput) {
 	EXPECT_GT(avg_diff, 0.001f)
 		<< "Wavefront renders at 10spp and 1000spp are identical "
 		<< "(avg_diff=" << avg_diff << "); random sampling should differ";
+}
+
+// --adaptive on both GPU renderers (pixel_convergence_rule.h; the default renderer stops a pixel's sample loop, the wavefront one takes it out of
+// its camera-ray mask and batches the rest): at the default threshold the picture keeps its brightness, and a threshold no pixel can miss stops
+// every pixel at the first check (an eighth of the samples), which shows as the noise of that many samples. Run on the Cornell box for each
+// renderer in turn. (A loose threshold darkens it: a pixel lit by the small lamp through rare paths can look settled before those paths arrive -
+// 0.02 read 1.8% dark in linear terms, the default 0.003 0.01%.)
+TEST_F(WavefrontRenderTest, AdaptiveSamplingKeepsThePictureOnBothGpuRenderers) {
+	auto totalVariation = [](const WFPPMImage& img) {
+		double tv = 0.0;
+		for (int y = 0; y < img.height; ++y)
+			for (int x = 0; x + 1 < img.width; ++x)
+				for (int c = 0; c < 3; ++c) tv += std::abs(img.pixels[(y * img.width + x) * 3 + c] - img.pixels[(y * img.width + x + 1) * 3 + c]);
+		return tv;
+	};
+	for (const char* wavefront : {"1", "0"}) {
+#ifdef _WIN32
+		_putenv_s("RAY_TRACER_WAVEFRONT", wavefront);
+#else
+		setenv("RAY_TRACER_WAVEFRONT", wavefront, 1);
+#endif
+		const std::string tag = std::string(wavefront[0] == '1' ? "wavefront" : "recursive");
+		auto full = renderWF(("ad_full_" + tag + ".ppm").c_str(), 120, 120, 256, 8);
+		ASSERT_TRUE(full.valid) << tag;
+		WFPPMImage at[2];
+		const double thresholds[2] = {render_defaults::kAdaptiveThreshold, 1.0};
+		for (int k = 0; k < 2; ++k) {
+			const std::string name = "ad_" + std::to_string(k) + "_" + tag + ".ppm";
+			files_.push_back(name);
+			RenderOptions opts;
+			opts.adaptive_sampling = true;
+			opts.adaptive_threshold = thresholds[k];
+			ASSERT_EQ(optix_render_main(120, 120, 256, 8, name.c_str(), "A1", 278, 278, -800, 0, opts), 0) << tag;
+			at[k] = wf_load_ppm(name.c_str());
+			ASSERT_TRUE(at[k].valid) << tag;
+		}
+		const float b = wf_avg_brightness(full);
+		EXPECT_NEAR(wf_avg_brightness(at[0]) / b, 1.0f, 0.01f) << tag << ": --adaptive at its default threshold changed the picture's brightness";
+		EXPECT_NEAR(wf_avg_brightness(at[1]) / b, 1.0f, 0.04f) << tag << ": --adaptive stopping every pixel at 32 samples changed its brightness";
+		EXPECT_GT(totalVariation(at[1]), 1.3 * totalVariation(full)) << tag << ": every pixel should have stopped at 32 of 256 samples and be noisier";
+	}
 }
 
 // --denoise on the wavefront backend (WavefrontPathTracer's own independent

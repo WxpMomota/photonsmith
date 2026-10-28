@@ -52,6 +52,7 @@ extern "C" __global__ void evaluate_materials_dielectric(
 	unsigned int numLights,
 	const PunctualLightGPU* punctualLights,
 	unsigned int numPunctualLights,
+	unsigned int punctualPerHit,
 	// Needed only for a textured (pbrt AreaLightSource "filename") NEE
 	// target - see wf_finish_material_scatter()'s own comment.
 	const TextureData* textures,
@@ -376,7 +377,7 @@ extern "C" __global__ void evaluate_materials_dielectric(
 		h.pixelIndex, h.depth,
 		spheres, quads, triangles, bilinearPatches, disks, cylinders, materials,
 		lightIndices, lightKinds, aliasTable, numLights,
-		punctualLights, numPunctualLights,
+		punctualLights, numPunctualLights, punctualPerHit,
 		skyColor, shadow_eps, skyDist, portalLight,
 		shadowQueue, nextRayQueue, framebuffer,
 		textures, texturePixels, h.uv_u, h.uv_v, h.time, restirReservoirs, restirCtx,

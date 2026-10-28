@@ -112,7 +112,7 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 	const MaterialData* materials,
 	const int* lightIndices, const GpuLightKind* lightKinds,
 	const GpuAliasEntry* aliasTable, unsigned int numLights,
-	const PunctualLightGPU* punctualLights, unsigned int numPunctualLights,
+	const PunctualLightGPU* punctualLights, unsigned int numPunctualLights, unsigned int punctualPerHit,
 	float3 skyColor, float shadow_eps, const GpuSkyDistribution& skyDist,
 	const GpuPortalLight& portalLight,
 	WorkQueue<ShadowRayWorkItem>& shadowQueue,
@@ -882,7 +882,15 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 	// reference (camera.h punct_lights loop): pdf=1 by construction, so no
 	// MIS weight or pdf division, just beta * BRDF * cos_theta * Li per light.
 	// -------------------------------------------------------------------------
-	for (unsigned int pli = 0; pli < numPunctualLights; ++pli) {
+	// The lights this hit sends shadow rays to: all of them, or - when the shadow queue cannot hold one ray per light per hit (a 1080p frame
+	// with dozens of lamps: WavefrontPathTracer::allocateQueues) - punctualPerHit of them in a row from a light picked at random, each weighted
+	// numPunctualLights / punctualPerHit. Every light is picked with probability punctualPerHit / numPunctualLights, so the picture is the same
+	// on average, only noisier; the queue used to drop the rays that did not fit, which darkened those lights.
+	const unsigned int plCount = (punctualPerHit > 0u && punctualPerHit < numPunctualLights) ? punctualPerHit : numPunctualLights;
+	const unsigned int plStart = (plCount < numPunctualLights) ? min(static_cast<unsigned int>(wf_rand(seed) * float(numPunctualLights)), numPunctualLights - 1u) : 0u;
+	const float plWeight = float(numPunctualLights) / float(plCount > 0u ? plCount : 1u);
+	for (unsigned int plj = 0; plj < plCount; ++plj) {
+		const unsigned int pli = (plStart + plj) % numPunctualLights;
 		float3 wi, Li; float t_max;
 		if (!wf_eval_punctual_light(punctualLights[pli], hit_point, wi, Li, t_max)) continue;
 		// See the area-light block above for the RoughDielectric two-sided
@@ -928,7 +936,7 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 				Li_spec[i] = sc * poly(swl.lambda[i]) * dev_sample_d65(swl.lambda[i]);
 		}
 
-		SS Ld = (bsdf_val * cos_l) * throughput * bsdf_color * Li_spec;
+		SS Ld = (bsdf_val * cos_l * plWeight) * throughput * bsdf_color * Li_spec;
 
 		// See wf_push_nee_shadow_ray's own comment for why this is a combined
 		// normal+direction offset, not the normal alone, why the normal term

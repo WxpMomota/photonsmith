@@ -138,8 +138,7 @@ inline color camera::render_pixel(int i, int j, RenderSamplers& smp, const hitta
             const int s_j = adaptive_row_order[row_idx];
             if (adaptive_sampling &&
                 luminance_estimator.Count() >= min_samples_before_check &&
-                pixel_convergence::has_converged(luminance_estimator, adaptive_threshold,
-                                                  1e-4, exposure))
+                pixel_convergence::has_converged(luminance_estimator, adaptive_threshold, exposure))
                 break;
             for (int s_i = 0; s_i < sqrt_spp; s_i++) {
                 // Sample index for Halton: unique per (s_i, s_j) stratum

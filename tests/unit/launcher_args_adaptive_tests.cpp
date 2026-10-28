@@ -36,14 +36,14 @@ TEST(LauncherArgsAdaptive, DefaultIsOffWithDefaultThreshold) {
 	LaunchArgs args;
 	ASSERT_TRUE(parse({}, args));
 	EXPECT_FALSE(args.adaptive_sampling);
-	EXPECT_DOUBLE_EQ(args.adaptive_threshold, 0.01);
+	EXPECT_DOUBLE_EQ(args.adaptive_threshold, render_defaults::kAdaptiveThreshold);
 }
 
 TEST(LauncherArgsAdaptive, FlagAloneEnablesWithDefaultThreshold) {
 	LaunchArgs args;
 	ASSERT_TRUE(parse({"--adaptive"}, args));
 	EXPECT_TRUE(args.adaptive_sampling);
-	EXPECT_DOUBLE_EQ(args.adaptive_threshold, 0.01);
+	EXPECT_DOUBLE_EQ(args.adaptive_threshold, render_defaults::kAdaptiveThreshold);
 }
 
 TEST(LauncherArgsAdaptive, ThresholdCanBeSetWithoutTheFlag) {
@@ -67,17 +67,17 @@ TEST(LauncherArgsAdaptive, BothTogether) {
 TEST(LauncherArgsAdaptive, ZeroThresholdFallsBackToDefault) {
 	LaunchArgs args;
 	ASSERT_TRUE(parse({"--adaptive-threshold", "0"}, args));
-	EXPECT_DOUBLE_EQ(args.adaptive_threshold, 0.01);
+	EXPECT_DOUBLE_EQ(args.adaptive_threshold, render_defaults::kAdaptiveThreshold);
 }
 
 TEST(LauncherArgsAdaptive, NegativeThresholdFallsBackToDefault) {
 	LaunchArgs args;
 	ASSERT_TRUE(parse({"--adaptive-threshold", "-0.5"}, args));
-	EXPECT_DOUBLE_EQ(args.adaptive_threshold, 0.01);
+	EXPECT_DOUBLE_EQ(args.adaptive_threshold, render_defaults::kAdaptiveThreshold);
 }
 
 TEST(LauncherArgsAdaptive, InvalidThresholdValueFallsBackToDefault) {
 	LaunchArgs args;
 	ASSERT_TRUE(parse({"--adaptive-threshold", "not-a-number"}, args));
-	EXPECT_DOUBLE_EQ(args.adaptive_threshold, 0.01);
+	EXPECT_DOUBLE_EQ(args.adaptive_threshold, render_defaults::kAdaptiveThreshold);
 }

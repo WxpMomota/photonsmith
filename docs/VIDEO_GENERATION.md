@@ -1392,6 +1392,16 @@ Create different videos from the same scene (each run clears and re-populates `o
 | Samples/Pixel | 10-50 | 100-1000 |
 | Render Time (GPU) | 1-5 min | 10-60 min |
 
+**Adaptive sampling (on by default for a film on a GPU).** A film's frames are rendered with `--adaptive`: a pixel stops taking samples once the
+noise it would show in the picture (gamma 2.2) is under `--adaptive-threshold` (default 0.003, under one level of 255 before the denoiser), checked
+from an eighth of the samples on (`src/shared/pixel_convergence_rule.h`, the same rule on the CPU and both GPU renderers; the wavefront renderer
+traces several samples of each remaining pixel in one pass once few are left). `--no-adaptive` turns it off. Measured at 1920x1080, 500 samples,
+50 bounces: a landscape frame (Fire and Ice) 13.6 s -> 4.7 s at 0.005 and 6.7 s at 0.0025, with the denoised picture's error against a 3000-sample
+reference up 17% and 4% (and its brightness 0.17% lower at 0.003); a lamp-lit cartoon (Turtle Escape, Ball Parade) and a foggy one (Crystal Heart)
+are still too noisy at 500 samples for a pixel to stop (raw noise of 4-6 levels of 255 that the denoiser removes), so they cost what they did. A
+loose threshold darkens a little: a pixel lit through rare paths can look settled before they arrive (the Cornell box: 1.8% dark at 0.02). What a
+frame took is in the worker's log: `[OptiX] Adaptive sampling: N samples a pixel on average`.
+
 ## Troubleshooting
 
 ### What happened during a long render

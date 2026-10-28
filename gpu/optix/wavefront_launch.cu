@@ -26,7 +26,7 @@ extern "C" __global__ void evaluate_materials(
 	const SphereData*, const QuadData*, const TriangleData*, const BilinearPatchData*, const DiskData*, const CylinderData*, const MaterialData*,
 	const int*, const GpuLightKind*, const GpuAliasEntry*,
 	unsigned int,
-	const PunctualLightGPU*, unsigned int,
+	const PunctualLightGPU*, unsigned int, unsigned int,
 	const TextureData*, const unsigned char*,
 	int,
 	const CloudMedium<float>*, unsigned int,
@@ -47,7 +47,7 @@ extern "C" __global__ void evaluate_materials_simple(
 	const SphereData*, const QuadData*, const TriangleData*, const BilinearPatchData*, const DiskData*, const CylinderData*, const MaterialData*,
 	const int*, const GpuLightKind*, const GpuAliasEntry*,
 	unsigned int,
-	const PunctualLightGPU*, unsigned int,
+	const PunctualLightGPU*, unsigned int, unsigned int,
 	const TextureData*, const unsigned char*,
 	int,
 	float3, float, GpuSkyDistribution, GpuPortalLight, float,
@@ -62,7 +62,7 @@ extern "C" __global__ void evaluate_materials_dielectric(
 	const SphereData*, const QuadData*, const TriangleData*, const BilinearPatchData*, const DiskData*, const CylinderData*, const MaterialData*,
 	const int*, const GpuLightKind*, const GpuAliasEntry*,
 	unsigned int,
-	const PunctualLightGPU*, unsigned int,
+	const PunctualLightGPU*, unsigned int, unsigned int,
 	const TextureData*, const unsigned char*,
 	int,
 	float3, float, GpuSkyDistribution, GpuPortalLight, bool, float,
@@ -70,7 +70,8 @@ extern "C" __global__ void evaluate_materials_dielectric(
 	GpuGiOriginContext*, GpuGiSample*,
 	WfLightBvhContext);
 extern "C" __global__ void accumulate_miss(WorkQueue<MissWorkItem>, int, float3*, float3, GpuSkyDistribution, GpuPortalLight, float, float3*, float3*, float4*);
-extern "C" __global__ void normalize_aov_buffers(float3*, float3*, unsigned int, unsigned int);
+extern "C" __global__ void normalize_aov_buffers(float3*, float3*, unsigned int, unsigned int, const float4*);
+extern "C" __global__ void adaptive_sampling_update(const float3*, const float*, float3*, float*, float4*, unsigned char*, unsigned int, unsigned int, float, float, unsigned int, int*);
 extern "C" __global__ void accumulate_shadow(WorkQueue<ShadowRayWorkItem>, int, const float*, float3*, float, GpuGiSample*, float3*, NrcTrainingRecord*);
 // ---- forward declarations of the NRC training kernels from wavefront_kernels_nrc.cu ----
 extern "C" __global__ void nrc_generate_training_rays(WorkQueue<RayWorkItem>, int, GpuCameraParams, unsigned int);
@@ -119,7 +120,7 @@ extern "C" __global__ void resolve_bssrdf_exit(
 	const SphereData*, const QuadData*, const TriangleData*, const BilinearPatchData*, const DiskData*, const CylinderData*, const MaterialData*,
 	const int*, const GpuLightKind*, const GpuAliasEntry*,
 	unsigned int,
-	const PunctualLightGPU*, unsigned int,
+	const PunctualLightGPU*, unsigned int, unsigned int,
 	const TextureData*, const unsigned char*,
 	float3, float, GpuSkyDistribution, GpuPortalLight, float,
 	GpuGiOriginContext*, GpuGiSample*,
@@ -229,6 +230,7 @@ extern "C" void wf_launch_evaluate_materials(
 	unsigned int                 numLights,
 	const PunctualLightGPU*      d_punctualLights,
 	unsigned int                 numPunctualLights,
+	unsigned int                 punctualPerHit,
 	const TextureData*           d_textures,
 	const unsigned char*         d_texturePixels,
 	int                          maxDepth,
@@ -279,7 +281,7 @@ extern "C" void wf_launch_evaluate_materials(
 		d_framebuffer,
 		d_spheres, d_quads, d_triangles, d_bilinearPatches, d_disks, d_cylinders, d_materials,
 		d_lightIndices, d_lightKinds, d_aliasTable,
-		numLights, d_punctualLights, numPunctualLights,
+		numLights, d_punctualLights, numPunctualLights, punctualPerHit,
 		d_textures, d_texturePixels, maxDepth,
 		d_cloudMediums, numCloudMediums,
 		d_rgbGridMediums, d_rgbGridData,
@@ -314,6 +316,7 @@ extern "C" void wf_launch_evaluate_materials_simple(
 	unsigned int                 numLights,
 	const PunctualLightGPU*      d_punctualLights,
 	unsigned int                 numPunctualLights,
+	unsigned int                 punctualPerHit,
 	const TextureData*           d_textures,
 	const unsigned char*         d_texturePixels,
 	int                          maxDepth,
@@ -347,7 +350,7 @@ extern "C" void wf_launch_evaluate_materials_simple(
 		d_framebuffer,
 		d_spheres, d_quads, d_triangles, d_bilinearPatches, d_disks, d_cylinders, d_materials,
 		d_lightIndices, d_lightKinds, d_aliasTable,
-		numLights, d_punctualLights, numPunctualLights,
+		numLights, d_punctualLights, numPunctualLights, punctualPerHit,
 		d_textures, d_texturePixels, maxDepth,
 		skyColor, shadowRayEpsilon, skyDist, portalLight, maxComponentValue,
 		d_albedoBuffer, d_normalBuffer, d_worldPosBuffer, d_restirReservoirs, restirCtx,
@@ -375,6 +378,7 @@ extern "C" void wf_launch_evaluate_materials_dielectric(
 	unsigned int                 numLights,
 	const PunctualLightGPU*      d_punctualLights,
 	unsigned int                 numPunctualLights,
+	unsigned int                 punctualPerHit,
 	const TextureData*           d_textures,
 	const unsigned char*         d_texturePixels,
 	int                          maxDepth,
@@ -403,7 +407,7 @@ extern "C" void wf_launch_evaluate_materials_dielectric(
 		d_framebuffer,
 		d_spheres, d_quads, d_triangles, d_bilinearPatches, d_disks, d_cylinders, d_materials,
 		d_lightIndices, d_lightKinds, d_aliasTable,
-		numLights, d_punctualLights, numPunctualLights,
+		numLights, d_punctualLights, numPunctualLights, punctualPerHit,
 		d_textures, d_texturePixels,
 		maxDepth,
 		skyColor, shadowRayEpsilon, skyDist, portalLight, regularize, maxComponentValue,
@@ -875,6 +879,7 @@ extern "C" void wf_launch_resolve_bssrdf_exit(
 	unsigned int                 numLights,
 	const PunctualLightGPU*      d_punctualLights,
 	unsigned int                 numPunctualLights,
+	unsigned int                 punctualPerHit,
 	const TextureData*           d_textures,
 	const unsigned char*         d_texturePixels,
 	float3                       skyColor,
@@ -896,7 +901,7 @@ extern "C" void wf_launch_resolve_bssrdf_exit(
 		d_framebuffer,
 		d_spheres, d_quads, d_triangles, d_bilinearPatches, d_disks, d_cylinders, d_materials,
 		d_lightIndices, d_lightKinds, d_aliasTable,
-		numLights, d_punctualLights, numPunctualLights,
+		numLights, d_punctualLights, numPunctualLights, punctualPerHit,
 		d_textures, d_texturePixels,
 		skyColor, shadowRayEpsilon, skyDist, portalLight, maxComponentValue,
 		d_giOriginContext, d_giCandidateOut,
@@ -913,12 +918,22 @@ extern "C" void wf_launch_normalize_framebuffer(
 
 extern "C" void wf_launch_normalize_aov_buffers(
 	unsigned int numPixels, float3* d_albedoBuffer, float3* d_normalBuffer,
-	unsigned int samplesPerPixel, cudaStream_t stream)
+	unsigned int samplesPerPixel, const float4* d_adaptiveStats, cudaStream_t stream)
 {
 	dim3 block(256);
 	dim3 grid((numPixels + 255) / 256);
 	normalize_aov_buffers<<<grid, block, 0, (cudaStream_t)stream>>>(
-		d_albedoBuffer, d_normalBuffer, numPixels, samplesPerPixel);
+		d_albedoBuffer, d_normalBuffer, numPixels, samplesPerPixel, d_adaptiveStats);
+}
+
+extern "C" void wf_launch_adaptive_sampling_update(
+	const float3* d_framebuffer, const float* d_weightBuffer, float3* d_prevFramebuffer, float* d_prevWeight, float4* d_stats,
+	unsigned char* d_activeMask, unsigned int numPixels, unsigned int batch, float threshold, float exposure, unsigned int minSamples, int* d_activeCount, cudaStream_t stream)
+{
+	dim3 block(256);
+	dim3 grid((numPixels + 255) / 256);
+	adaptive_sampling_update<<<grid, block, 0, (cudaStream_t)stream>>>(
+		d_framebuffer, d_weightBuffer, d_prevFramebuffer, d_prevWeight, d_stats, d_activeMask, numPixels, batch, threshold, exposure, minSamples, d_activeCount);
 }
 
 extern "C" void wf_reset_queue_counter(int* d_counter, cudaStream_t stream)

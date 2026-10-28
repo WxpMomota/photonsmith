@@ -61,6 +61,7 @@ extern "C" __global__ void resolve_bssrdf_exit(
 	unsigned int numLights,
 	const PunctualLightGPU* punctualLights,
 	unsigned int numPunctualLights,
+	unsigned int punctualPerHit,
 	// Needed only for a textured (pbrt AreaLightSource "filename") NEE
 	// target - see wf_finish_material_scatter()'s own comment.
 	const TextureData* textures,
@@ -177,7 +178,7 @@ extern "C" __global__ void resolve_bssrdf_exit(
 		item.pixelIndex, item.depth,
 		spheres, quads, triangles, bilinearPatches, disks, cylinders, materials,
 		lightIndices, lightKinds, aliasTable, numLights,
-		punctualLights, numPunctualLights,
+		punctualLights, numPunctualLights, punctualPerHit,
 		skyColor, shadow_eps, skyDist, portalLight,
 		shadowQueue, nextRayQueue, framebuffer,
 		textures, texturePixels, /*uv_u=*/0.0f, /*uv_v=*/0.0f, item.time,

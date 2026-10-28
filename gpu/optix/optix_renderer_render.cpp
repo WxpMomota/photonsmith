@@ -16,6 +16,7 @@
 #include "gpu_bump_map.h"   // gpu_make_bump_footprint(): the camera's minimum pixel differentials, for the bump-map footprint of a bounced hit
 #include "wavefront_path_tracer.h"
 #include "sppm_path_tracer.h"
+#include "adaptive_sampling_report.h"   // --adaptive's log line
 #include <cuda.h>
 #include <iostream>
 #include <cstdlib>
@@ -340,14 +341,14 @@ bool OptiXRenderer::render(
 
 	// The transient device buffers of this render, freed however it ends: an early return or a throwing CUDA_CHECK below used to leak them (a Live Preview that fails
 	// on every frame lost a framebuffer a frame).
-	CUdeviceptr d_framebuffer = 0, d_statsBounceRays = 0, d_statsShadowRays = 0, d_rayTimes = 0;
+	CUdeviceptr d_framebuffer = 0, d_statsBounceRays = 0, d_statsShadowRays = 0, d_rayTimes = 0, d_adaptiveTaken = 0;
 	struct FreeOnExit {
-		CUdeviceptr *buffers[4];
+		CUdeviceptr *buffers[5];
 		~FreeOnExit() {
 			for (CUdeviceptr *b : buffers)
 				if (*b) cudaFree(reinterpret_cast<void*>(*b));
 		}
-	} freeOnExit{{&d_framebuffer, &d_statsBounceRays, &d_statsShadowRays, &d_rayTimes}};
+	} freeOnExit{{&d_framebuffer, &d_statsBounceRays, &d_statsShadowRays, &d_rayTimes, &d_adaptiveTaken}};
 	// Motion blur: a float a pixel for the time of the sample being traced, read by its shadow rays (LaunchParams::rayTimes)
 	if (gpuCam.motionBlurEnabled) CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_rayTimes), static_cast<size_t>(width) * height * sizeof(float)));
 
@@ -388,7 +389,13 @@ bool OptiXRenderer::render(
 		CUDA_CHECK(cudaMemset(reinterpret_cast<void*>(d_statsShadowRays), 0, sizeof(unsigned long long)));
 	}
 
-	const LaunchParams params = makeLaunchParams(width, height, samplesPerPixel, maxDepth, gpuCam, d_framebuffer, d_albedo, d_normal, d_statsBounceRays, d_statsShadowRays, d_rayTimes);
+	LaunchParams params = makeLaunchParams(width, height, samplesPerPixel, maxDepth, gpuCam, d_framebuffer, d_albedo, d_normal, d_statsBounceRays, d_statsShadowRays, d_rayTimes);
+	// --adaptive: the samples the pixels took, for the log line below
+	if (gpuCam.adaptiveThreshold > 0.0f) {
+		CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_adaptiveTaken), sizeof(unsigned long long)));
+		CUDA_CHECK(cudaMemset(reinterpret_cast<void*>(d_adaptiveTaken), 0, sizeof(unsigned long long)));
+		params.adaptiveSamplesTaken = reinterpret_cast<unsigned long long*>(d_adaptiveTaken);
+	}
 
 
 	// Upload launch params
@@ -439,6 +446,11 @@ bool OptiXRenderer::render(
 
 	std::cout << "[OptiX] Rendered " << width << "x" << height
 		<< " @ " << samplesPerPixel << " spp\n";
+	if (d_adaptiveTaken) {
+		unsigned long long taken = 0;
+		CUDA_CHECK(cudaMemcpy(&taken, reinterpret_cast<void*>(d_adaptiveTaken), sizeof(unsigned long long), cudaMemcpyDeviceToHost));
+		printAdaptiveSummary(taken, static_cast<unsigned long long>(width) * height, samplesPerPixel);
+	}
 
 	// [REC-STATS] - recursive-backend counterpart to wavefront's own
 	// "[WF-STATS]" block (wavefront_path_tracer.cpp), same RAY_TRACER_STATS

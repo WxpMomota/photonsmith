@@ -602,7 +602,7 @@ private:
         const MaterialData* d_materials, unsigned int numMaterials,
         const int* d_lightIndices, const GpuLightKind* d_lightKinds,
         const GpuAliasEntry* d_aliasTable, unsigned int numLights,
-        const PunctualLightGPU* d_punctualLights, unsigned int numPunctualLights,
+        const PunctualLightGPU* d_punctualLights, unsigned int numPunctualLights, unsigned int punctualPerHit,
         float3* d_framebuffer, float3 skyColor, float shadowRayEpsilon, GpuSkyDistribution skyDist, GpuPortalLight portalLight);
     // Twin of launchEvaluateMaterials() above, scoped to simpleHitQueue's
     // Lambertian/Metal hits (see wavefront_types.h's WavefrontQueues::
@@ -619,7 +619,7 @@ private:
         const MaterialData* d_materials, unsigned int numMaterials,
         const int* d_lightIndices, const GpuLightKind* d_lightKinds,
         const GpuAliasEntry* d_aliasTable, unsigned int numLights,
-        const PunctualLightGPU* d_punctualLights, unsigned int numPunctualLights,
+        const PunctualLightGPU* d_punctualLights, unsigned int numPunctualLights, unsigned int punctualPerHit,
         float3* d_framebuffer, float3 skyColor, float shadowRayEpsilon, GpuSkyDistribution skyDist, GpuPortalLight portalLight, float maxComponentValue);
     // Twin of launchEvaluateMaterialsSimple() above, scoped to
     // dielectricHitQueue's Dielectric/RoughDielectric hits (see
@@ -637,7 +637,7 @@ private:
         const MaterialData* d_materials, unsigned int numMaterials,
         const int* d_lightIndices, const GpuLightKind* d_lightKinds,
         const GpuAliasEntry* d_aliasTable, unsigned int numLights,
-        const PunctualLightGPU* d_punctualLights, unsigned int numPunctualLights,
+        const PunctualLightGPU* d_punctualLights, unsigned int numPunctualLights, unsigned int punctualPerHit,
         float3* d_framebuffer, float3 skyColor, float shadowRayEpsilon, GpuSkyDistribution skyDist, GpuPortalLight portalLight);
     // Neither this nor launchAccumulateMiss() below take the AOV guide
     // buffers as launchX-style params - like textures (see setTextures()'s
@@ -655,14 +655,14 @@ private:
         const CylinderData* d_cylinders, unsigned int numCylinders,
         const int* d_lightIndices, const GpuLightKind* d_lightKinds,
         const GpuAliasEntry* d_aliasTable, unsigned int numLights,
-        const PunctualLightGPU* d_punctualLights, unsigned int numPunctualLights,
+        const PunctualLightGPU* d_punctualLights, unsigned int numPunctualLights, unsigned int punctualPerHit,
         float3* d_framebuffer, float3 skyColor, float shadowRayEpsilon, GpuSkyDistribution skyDist, GpuPortalLight portalLight, float maxComponentValue);
     void launchNormalizeFramebuffer(unsigned int numPixels, const float* d_weightBuffer, float3* d_framebuffer);
     // Denoiser guide-layer AOV normalization (--denoise only) - plain mean
     // over samplesPerPixel, not filter-weighted like launchNormalizeFramebuffer()
     // above. See normalize_aov_buffers()'s own comment (wavefront_kernels.cu).
     void launchNormalizeAovBuffers(unsigned int numPixels, float3* d_albedoBuffer,
-        float3* d_normalBuffer, unsigned int samplesPerPixel);
+        float3* d_normalBuffer, unsigned int samplesPerPixel, const float4* d_adaptiveStats = nullptr);
     int  readQueueSize(int* d_counter);
     // The counters of a bounce, all at once, with ONE round trip to the GPU (a copy of the whole counter block and one synchronize): a bounce needed a synchronize for each counter it read,
     // about fourteen a bounce, and a render is thousands of bounces. The count of counter `c` (d_hitCounter_ ...) is blockCount(block, c); the block is valid until the next call.
@@ -999,6 +999,12 @@ private:
     CUdeviceptr  d_gridData_ = 0;
     unsigned int gridDataCount_ = 0;
     CUdeviceptr  d_mediumShapes_ = 0;       ///< see setMediumShapes()
+    // --adaptive in an offline render (camera.adaptiveThreshold > 0, not Live Preview, which brings its own mask): per pixel the accumulated colour
+    // and weight after the last pass, its statistics (float4) and whether it is still sampled; and the count of those. See render()'s sample loop.
+    CUdeviceptr  d_adaptivePrevFb_ = 0, d_adaptivePrevW_ = 0, d_adaptiveStats_ = 0, d_adaptiveMask_ = 0, d_adaptiveActive_ = 0;
+    int          adaptiveCapacity_ = 0;
+    // The point lights a hit sends shadow rays to (allocateQueues): all of them, or fewer when the shadow queue cannot hold a ray to each from every hit.
+    int          punctualPerHit_ = 0;
     unsigned int numMediumShapes_ = 0;
     CUdeviceptr  d_listedMediumSphere_ = 0;
     bool         haveInstancedTriangles_ = false;  ///< see setInstancedGeometryFlags()

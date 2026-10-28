@@ -48,6 +48,10 @@ inline std::vector<std::string> forwardedFlags(const LaunchArgs &args) {
 inline std::vector<std::string> frameFlags(const LaunchArgs &args, const cartoon::Film &film, bool gpu) {
 	std::vector<std::string> flags = forwardedFlags(args);
 	if (gpu && film.meta.wavefront && !args.use_wavefront) flags.push_back("--wavefront");
+	// On a GPU a film samples adaptively unless --no-adaptive: a pixel stops once the noise it would show is under --adaptive-threshold (pixel_convergence_rule.h).
+	// Measured at 1080p and 500 samples: a landscape frame (Fire and Ice) 2-3x faster for the same denoised picture; lamp-lit and foggy cartoons are still too
+	// noisy at 500 samples for their pixels to stop, and cost what they did.
+	if (gpu && !args.adaptive_sampling && !args.no_adaptive) flags.push_back("--adaptive");
 	flags.push_back("--ppm-only");   // (the video makes the PNG of every frame itself: video_render.h, BackgroundPngConverter)
 	return flags;
 }

@@ -23,6 +23,7 @@
 #include "rgb_to_spectrum_table.h"
 #include <optix_stack_size.h>
 #include "optix_module_parallel.h"
+#include "adaptive_sampling_report.h"   // --adaptive's log line
 #include <cuda.h>
 #include <algorithm>
 #include <fstream>
@@ -112,6 +113,9 @@ struct RenderCall {
 	CUdeviceptr d_weight{};
 	float* d_weightPtr{};
 	CUdeviceptr d_activePixelMaskPtr{};
+	// --adaptive in an offline render: on (camera.adaptiveThreshold > 0 and no Live Preview mask), and the samples the pixels have taken so far
+	bool adaptive{};
+	unsigned long long adaptiveSamples{};
 	bool needsAovGuideBuffers{};
 	bool needsWorldPosHistory{};
 	float3* d_albedoAovPtr{};
@@ -202,6 +206,28 @@ bool WavefrontPathTracer::renderPrepareBuffers(RenderCall &rc) {
 		CUDA_CHECK(cudaMemcpyAsync(reinterpret_cast<void*>(d_activePixelMask_), activePixelMaskHost_,
 									numPixels * sizeof(unsigned char), cudaMemcpyHostToDevice, stream_));
 		d_activePixelMaskPtr = d_activePixelMask_;
+	}
+	// --adaptive in an offline render (Live Preview brings the mask above): every pixel starts in the mask with empty statistics, and
+	// renderSampleLoop() takes the converged ones out after each pass (adaptive_sampling_update). The colour and weight buffers above start at zero,
+	// so the "last pass" copies do too.
+	rc.adaptive = !activePixelMaskHost_ && camera.adaptiveThreshold > 0.0f;
+	if (rc.adaptive) {
+		if (adaptiveCapacity_ != numPixels) {
+			for (CUdeviceptr* b : {&d_adaptivePrevFb_, &d_adaptivePrevW_, &d_adaptiveStats_, &d_adaptiveMask_})
+				if (*b) { cudaFree(reinterpret_cast<void*>(*b)); *b = 0; }
+			CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_adaptivePrevFb_), numPixels * sizeof(float3)));
+			CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_adaptivePrevW_), numPixels * sizeof(float)));
+			CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_adaptiveStats_), numPixels * sizeof(float4)));
+			CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_adaptiveMask_), numPixels * sizeof(unsigned char)));
+			adaptiveCapacity_ = numPixels;
+		}
+		if (!d_adaptiveActive_) CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_adaptiveActive_), sizeof(int)));
+		CUDA_CHECK(cudaMemsetAsync(reinterpret_cast<void*>(d_adaptivePrevFb_), 0, numPixels * sizeof(float3), stream_));
+		CUDA_CHECK(cudaMemsetAsync(reinterpret_cast<void*>(d_adaptivePrevW_), 0, numPixels * sizeof(float), stream_));
+		CUDA_CHECK(cudaMemsetAsync(reinterpret_cast<void*>(d_adaptiveStats_), 0, numPixels * sizeof(float4), stream_));
+		CUDA_CHECK(cudaMemsetAsync(reinterpret_cast<void*>(d_adaptiveMask_), 1, numPixels * sizeof(unsigned char), stream_));
+		d_activePixelMaskPtr = d_adaptiveMask_;
+		rc.adaptiveSamples = 0;
 	}
 
 	// Denoiser guide-layer AOV buffers (--denoise, OR SVGF - see this
@@ -755,7 +781,7 @@ void WavefrontPathTracer::evaluateBounceMaterials(RenderCall &rc, int numHits, i
 		reinterpret_cast<const GpuAliasEntry*>(d_alias_table),
 		num_lights,
 		reinterpret_cast<const PunctualLightGPU*>(d_punctual_lights),
-		num_punctual_lights,
+		num_punctual_lights, static_cast<unsigned int>(punctualPerHit_),
 		d_fbPtr, camera.backgroundColor, camera.shadowRayEpsilon, camera.skyDist, camera.portalLight);
 
 	// ------------------------------------------------------------------
@@ -787,7 +813,7 @@ void WavefrontPathTracer::evaluateBounceMaterials(RenderCall &rc, int numHits, i
 		reinterpret_cast<const GpuAliasEntry*>(d_alias_table),
 		num_lights,
 		reinterpret_cast<const PunctualLightGPU*>(d_punctual_lights),
-		num_punctual_lights,
+		num_punctual_lights, static_cast<unsigned int>(punctualPerHit_),
 		d_fbPtr, camera.backgroundColor, camera.shadowRayEpsilon, camera.skyDist, camera.portalLight, camera.maxComponentValue);
 
 	// ------------------------------------------------------------------
@@ -812,7 +838,7 @@ void WavefrontPathTracer::evaluateBounceMaterials(RenderCall &rc, int numHits, i
 		reinterpret_cast<const GpuAliasEntry*>(d_alias_table),
 		num_lights,
 		reinterpret_cast<const PunctualLightGPU*>(d_punctual_lights),
-		num_punctual_lights,
+		num_punctual_lights, static_cast<unsigned int>(punctualPerHit_),
 		d_fbPtr, camera.backgroundColor, camera.shadowRayEpsilon, camera.skyDist, camera.portalLight);
 
 	// ------------------------------------------------------------------
@@ -885,7 +911,7 @@ void WavefrontPathTracer::runBssrdfProbeStage(RenderCall &rc, WavefrontLaunchPar
 			reinterpret_cast<const GpuAliasEntry*>(d_alias_table),
 			num_lights,
 			reinterpret_cast<const PunctualLightGPU*>(d_punctual_lights),
-			num_punctual_lights,
+			num_punctual_lights, static_cast<unsigned int>(punctualPerHit_),
 			d_fbPtr, camera.backgroundColor, camera.shadowRayEpsilon, camera.skyDist, camera.portalLight, camera.maxComponentValue);
 
 		CUDA_CHECK(cudaStreamSynchronize(stream_));
@@ -977,7 +1003,15 @@ void WavefrontPathTracer::renderSampleLoop(RenderCall &rc) {
 	// -------------------------------------------------------------------------
 	// Outer sample loop
 	// -------------------------------------------------------------------------
-	for (int sampleIdx = 0; sampleIdx < samples_per_pixel; ++sampleIdx) {
+	// --adaptive: once few pixels are left, a pass traces `batch` samples of each (up to 16, as many as the ray queue holds): every pass costs its
+	// launches and round trips to the GPU however few rays it has, and at 50 bounces that was most of an adaptive render.
+	int adaptiveLive = numPixels;   // (the pixels still sampled at the last count)
+	for (int sampleIdx = 0, batch = 1; sampleIdx < samples_per_pixel; sampleIdx += batch) {
+		batch = 1;
+		if (rc.adaptive) {
+			const int room = queueCapacity_ / (adaptiveLive > 0 ? adaptiveLive : 1);
+			batch = std::max(1, std::min({16, room, samples_per_pixel - sampleIdx}));
+		}
 
 		// ReSTIR GI's per-pixel scratch (see wavefront_kernels_restir.cu's
 		// own restir_gi_finalize header comment) is genuinely this SAMPLE's
@@ -999,10 +1033,12 @@ void WavefrontPathTracer::renderSampleLoop(RenderCall &rc) {
 
 		// Reset ray queue counter, generate primary rays
 		resetQueueCounter(reinterpret_cast<int*>(d_rayCounter_));
-		launchGenerateCameraRays(width, height, sampleIdx, camera, d_weightPtr, checkerboardActive,
-			reinterpret_cast<const unsigned char*>(d_activePixelMaskPtr));
+		for (int b = 0; b < batch; ++b)
+			launchGenerateCameraRays(width, height, sampleIdx + b, camera, d_weightPtr, checkerboardActive,
+				reinterpret_cast<const unsigned char*>(d_activePixelMaskPtr));
 		// How many rays the next bounce traces: this read waits for the camera rays, and each bounce below brings the count for the one after it with its other counters.
 		int pendingRays = readQueueSize(reinterpret_cast<int*>(d_rayCounter_));
+		rc.adaptiveSamples += static_cast<unsigned long long>(pendingRays);   // (one camera ray a pixel still sampled)
 
 		// -------------------------------------------------------------------------
 		// Inner bounce loop
@@ -1127,13 +1163,29 @@ void WavefrontPathTracer::renderSampleLoop(RenderCall &rc) {
 		//
 		// Throttled to progressPrintInterval (plus always the last sample,
 		// so the bar still reaches 100%) - see that variable's own comment.
-		const bool isLastSample = sampleIdx == samples_per_pixel - 1;
-		if ((sampleIdx + 1) % progressPrintInterval == 0 || isLastSample) {
-			const int completed = (int)((long long)height * (sampleIdx + 1) / samples_per_pixel);
+		// --adaptive: this pass's samples into each pixel's statistics and the converged pixels out of the mask; from the first check on, the pixels
+		// still sampled are counted (they size the next pass's batches), and the render ends when there are none.
+		bool allConverged = false;
+		if (rc.adaptive) {
+			const bool count = static_cast<unsigned int>(sampleIdx + batch) >= camera.adaptiveMinSamples;
+			if (count) CUDA_CHECK(cudaMemsetAsync(reinterpret_cast<void*>(d_adaptiveActive_), 0, sizeof(int), stream_));
+			wf_launch_adaptive_sampling_update(d_fbPtr, d_weightPtr, reinterpret_cast<float3*>(d_adaptivePrevFb_), reinterpret_cast<float*>(d_adaptivePrevW_),
+				reinterpret_cast<float4*>(d_adaptiveStats_), reinterpret_cast<unsigned char*>(d_adaptiveMask_), static_cast<unsigned int>(numPixels),
+				static_cast<unsigned int>(batch), camera.adaptiveThreshold, camera.adaptiveExposure, camera.adaptiveMinSamples, count ? reinterpret_cast<int*>(d_adaptiveActive_) : nullptr, stream_);
+			if (count) {
+				adaptiveLive = readQueueSize(reinterpret_cast<int*>(d_adaptiveActive_));
+				allConverged = adaptiveLive == 0;
+			}
+		}
+		const bool isLastSample = sampleIdx + batch >= samples_per_pixel || allConverged;
+		if ((sampleIdx + batch) / progressPrintInterval != sampleIdx / progressPrintInterval || isLastSample) {
+			const int completed = (int)((long long)height * (sampleIdx + batch) / samples_per_pixel);
 			std::cout << "Scanlines remaining: " << (height - completed) << "\r" << std::flush;
 		}
-		++stats.samplesCompleted;
+		stats.samplesCompleted += batch;
+		if (allConverged) break;
 	}
+	if (rc.adaptive) printAdaptiveSummary(rc.adaptiveSamples, static_cast<unsigned long long>(numPixels), static_cast<unsigned int>(samples_per_pixel));
 
 	// -------------------------------------------------------------------------
 	// Normalize (raw radiance + AOVs)
@@ -1188,7 +1240,7 @@ void WavefrontPathTracer::renderFinish(RenderCall &rc) {
 	// either flag rather than duplicated per consumer.
 	if (needsAovGuideBuffers) {
 		launchNormalizeAovBuffers((unsigned int)numPixels, d_albedoAovPtr, d_normalAovPtr,
-			(unsigned int)samples_per_pixel);
+			(unsigned int)samples_per_pixel, rc.adaptive ? reinterpret_cast<const float4*>(d_adaptiveStats_) : nullptr);
 		CUDA_CHECK(cudaStreamSynchronize(stream_));
 	}
 	// Optional OptiX AI denoiser post-process (--denoise, this backend's own
@@ -1465,6 +1517,9 @@ void WavefrontPathTracer::cleanup() {
 	fbCapacity_ = 0;
 	if (d_activePixelMask_) { cudaFree(reinterpret_cast<void*>(d_activePixelMask_)); d_activePixelMask_ = 0; }
 	activePixelMaskCapacity_ = 0;
+	for (CUdeviceptr* b : {&d_adaptivePrevFb_, &d_adaptivePrevW_, &d_adaptiveStats_, &d_adaptiveMask_, &d_adaptiveActive_})
+		if (*b) { cudaFree(reinterpret_cast<void*>(*b)); *b = 0; }
+	adaptiveCapacity_ = 0;
 	if (d_worldPos_) { cudaFree(reinterpret_cast<void*>(d_worldPos_)); d_worldPos_ = 0; }
 	worldPosCapacity_ = 0;
 
@@ -1517,4 +1572,4 @@ void WavefrontPathTracer::cleanup() {
 // for why cpu_renderer.vcxproj itself can't carry this) and
 // tests/CMakeLists.txt's source list - there is no single shared target
 // providing this dependency to every consumer once.
-#include "../../src/data/rgb_spectrum_table_data.cpp"
+#include "../../src/data/rgb_spectrum_table_data.cpp"

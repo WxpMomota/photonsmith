@@ -1,5 +1,6 @@
 // optix_raygen.h -- Ray generation program
 // Included by optix_programs.cu
+#include "../../src/shared/pixel_convergence_rule.h"   // --adaptive: when a pixel has enough samples
 
 extern "C" __global__ void __raygen__rg() {
 	// Get pixel coordinates
@@ -39,6 +40,11 @@ extern "C" __global__ void __raygen__rg() {
 	// are null (denoising not requested for this render).
 	float3 albedo_sum = make_float3(0.0f, 0.0f, 0.0f);
 	float3 normal_sum = make_float3(0.0f, 0.0f, 0.0f);
+	// --adaptive (params.camera.adaptiveThreshold > 0): the samples taken and a running mean and spread of their brightness; the loop stops once
+	// they say the pixel has converged (pixel_convergence_rule.h, the CPU's rule), checked every 4th sample from adaptiveMinSamples on. The sample
+	// positions are a Halton sequence, so the samples a pixel stops at still cover it evenly.
+	unsigned int taken = 0;
+	float lumMean = 0.0f, lumM2 = 0.0f;
 
 	for (unsigned int s = 0; s < params.samplesPerPixel; ++s) {
 		// Fresh, independently-hashed seed per sample (pixel, sample index, and
@@ -653,7 +659,16 @@ extern "C" __global__ void __raygen__rg() {
 		// filter_w applied here, not folded into throughput - see this
 		// sample's own throughput-declaration comment for why.
 		pixel_color = pixel_color + filter_w * radiance;
+		++taken;
+		if (params.camera.adaptiveThreshold > 0.0f) {
+			const float lum = 0.2126f * radiance.x + 0.7152f * radiance.y + 0.0722f * radiance.z;
+			pixel_convergence::welford_add(float(taken), lum, lumMean, lumM2);
+			if (taken >= params.camera.adaptiveMinSamples && (taken & 3u) == 0u &&
+			    pixel_convergence::converged(float(taken), lumMean, lumM2, params.camera.adaptiveThreshold, params.camera.adaptiveExposure))
+				break;
+		}
 	}  // end sample loop
+	if (params.adaptiveSamplesTaken) atomicAdd(params.adaptiveSamplesTaken, (unsigned long long)taken);
 
 	// Reconstruction filter: weighted_sum / weight_sum (pbrt-v4 film
 	// formula), matching CPU camera.h exactly - see this loop's own
@@ -671,9 +686,9 @@ extern "C" __global__ void __raygen__rg() {
 	// OptiXRenderer::render()'s own alloc site). Skipping the write entirely
 	// when null avoids wasted bandwidth on the (default) non-denoise path.
 	if (params.albedoBuffer) {
-		params.albedoBuffer[idx_flat] = albedo_sum / float(params.samplesPerPixel);
+		params.albedoBuffer[idx_flat] = albedo_sum / float(taken > 0u ? taken : 1u);   // (the samples this pixel took: --adaptive stops some early)
 	}
 	if (params.normalBuffer) {
-		params.normalBuffer[idx_flat] = normal_sum / float(params.samplesPerPixel);
+		params.normalBuffer[idx_flat] = normal_sum / float(taken > 0u ? taken : 1u);
 	}
 }

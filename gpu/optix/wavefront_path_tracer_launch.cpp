@@ -59,8 +59,10 @@ bool WavefrontPathTracer::allocateQueues(int numPixels, int numPunctualLights) {
 	// for a later kernel pass, have no equivalent capacity to overflow).
 	const int maxShadowRaysPerHit = 2 + std::max(0, numPunctualLights);
 	// In 64 bits (the product of pixels and lights overflowed an int at about a thousand point lights), and at most half the graphics card's free memory: a 1080p film with
-	// thirty point lights asked for some 6 GB. A capped queue drops the shadow rays that do not fit (WorkQueue::push), which darkens, so it is said once.
+	// thirty point lights asked for some 6 GB. When that is not enough for a ray to every point light from every hit, a hit sends rays to punctualPerHit_ of them
+	// (a random run of them, weighted: wf_finish_material_scatter) - the queue used to drop the rays that did not fit (WorkQueue::push), which darkened those lights.
 	long long wantedShadow = static_cast<long long>(numPixels) * maxShadowRaysPerHit;
+	punctualPerHit_ = std::max(0, numPunctualLights);
 	{
 		size_t freeBytes = 0, totalBytes = 0;
 		const long long perItem = static_cast<long long>(sizeof(ShadowRayWorkItem) + sizeof(float));
@@ -69,12 +71,14 @@ bool WavefrontPathTracer::allocateQueues(int numPixels, int numPunctualLights) {
 		most = std::max<long long>(most, numPixels);   // (one shadow ray a pixel at least, as every other queue)
 		if (wantedShadow > most) {
 			static bool said = false;
+			punctualPerHit_ = static_cast<int>(std::max<long long>(1, most / std::max(1, numPixels) - 2));
 			if (!said) {
 				said = true;
-				std::cerr << "Warning: the wavefront renderer's shadow-ray queue for " << numPunctualLights << " point/spot lights at this size would need " << wantedShadow
-						  << " entries; it holds " << most << " (half the graphics card's free memory), so some point-light shadow rays are dropped and those lights look dimmer." << std::endl;
+				std::cout << "[WavefrontPathTracer] A shadow ray to each of the " << numPunctualLights << " point/spot lights from every hit would need " << wantedShadow
+						  << " queue entries at this size, more than half the graphics card's free memory holds (" << most << "): each hit samples " << punctualPerHit_
+						  << " of them, picked at random (the same picture on average, a little noisier)." << std::endl;
 			}
-			wantedShadow = most;
+			wantedShadow = static_cast<long long>(numPixels) * (2 + punctualPerHit_);
 		}
 	}
 	const int shadowCapacity = static_cast<int>(wantedShadow);
@@ -250,7 +254,7 @@ void WavefrontPathTracer::launchEvaluateMaterials(
 	const MaterialData*  d_materials, unsigned int numMaterials,
 	const int*           d_lightIndices, const GpuLightKind* d_lightKinds,
 	const GpuAliasEntry* d_aliasTable,  unsigned int numLights,
-	const PunctualLightGPU* d_punctualLights, unsigned int numPunctualLights,
+	const PunctualLightGPU* d_punctualLights, unsigned int numPunctualLights, unsigned int punctualPerHit,
 	float3*              d_framebuffer, float3 skyColor, float shadowRayEpsilon,
 	GpuSkyDistribution skyDist, GpuPortalLight portalLight)
 {
@@ -288,7 +292,7 @@ void WavefrontPathTracer::launchEvaluateMaterials(
 		d_cylinders, numCylinders,
 		d_materials, numMaterials,
 		d_lightIndices, d_lightKinds, d_aliasTable, numLights,
-		d_punctualLights, numPunctualLights,
+		d_punctualLights, numPunctualLights, punctualPerHit,
 		reinterpret_cast<const TextureData*>(d_textures_),
 		reinterpret_cast<const unsigned char*>(d_texturePixels_),
 		maxDepth,
@@ -369,7 +373,7 @@ void WavefrontPathTracer::launchEvaluateMaterialsSimple(
 	const MaterialData*  d_materials, unsigned int numMaterials,
 	const int*           d_lightIndices, const GpuLightKind* d_lightKinds,
 	const GpuAliasEntry* d_aliasTable,  unsigned int numLights,
-	const PunctualLightGPU* d_punctualLights, unsigned int numPunctualLights,
+	const PunctualLightGPU* d_punctualLights, unsigned int numPunctualLights, unsigned int punctualPerHit,
 	float3*              d_framebuffer, float3 skyColor, float shadowRayEpsilon,
 	GpuSkyDistribution skyDist, GpuPortalLight portalLight, float maxComponentValue)
 {
@@ -399,7 +403,7 @@ void WavefrontPathTracer::launchEvaluateMaterialsSimple(
 		d_cylinders, numCylinders,
 		d_materials, numMaterials,
 		d_lightIndices, d_lightKinds, d_aliasTable, numLights,
-		d_punctualLights, numPunctualLights,
+		d_punctualLights, numPunctualLights, punctualPerHit,
 		reinterpret_cast<const TextureData*>(d_textures_),
 		reinterpret_cast<const unsigned char*>(d_texturePixels_),
 		maxDepth,
@@ -444,7 +448,7 @@ void WavefrontPathTracer::launchEvaluateMaterialsDielectric(
 	const MaterialData*  d_materials, unsigned int numMaterials,
 	const int*           d_lightIndices, const GpuLightKind* d_lightKinds,
 	const GpuAliasEntry* d_aliasTable,  unsigned int numLights,
-	const PunctualLightGPU* d_punctualLights, unsigned int numPunctualLights,
+	const PunctualLightGPU* d_punctualLights, unsigned int numPunctualLights, unsigned int punctualPerHit,
 	float3*              d_framebuffer, float3 skyColor, float shadowRayEpsilon,
 	GpuSkyDistribution skyDist, GpuPortalLight portalLight)
 {
@@ -474,7 +478,7 @@ void WavefrontPathTracer::launchEvaluateMaterialsDielectric(
 		d_cylinders, numCylinders,
 		d_materials, numMaterials,
 		d_lightIndices, d_lightKinds, d_aliasTable, numLights,
-		d_punctualLights, numPunctualLights,
+		d_punctualLights, numPunctualLights, punctualPerHit,
 		reinterpret_cast<const TextureData*>(d_textures_),
 		reinterpret_cast<const unsigned char*>(d_texturePixels_),
 		maxDepth,
@@ -1256,7 +1260,7 @@ void WavefrontPathTracer::launchResolveBssrdfExit(
 	const CylinderData* d_cylinders, unsigned int numCylinders,
 	const int* d_lightIndices, const GpuLightKind* d_lightKinds,
 	const GpuAliasEntry* d_aliasTable, unsigned int numLights,
-	const PunctualLightGPU* d_punctualLights, unsigned int numPunctualLights,
+	const PunctualLightGPU* d_punctualLights, unsigned int numPunctualLights, unsigned int punctualPerHit,
 	float3* d_framebuffer, float3 skyColor, float shadowRayEpsilon,
 	GpuSkyDistribution skyDist, GpuPortalLight portalLight, float maxComponentValue)
 {
@@ -1286,7 +1290,7 @@ void WavefrontPathTracer::launchResolveBssrdfExit(
 		d_cylinders, numCylinders,
 		d_materials, numMaterials,
 		d_lightIndices, d_lightKinds, d_aliasTable, numLights,
-		d_punctualLights, numPunctualLights,
+		d_punctualLights, numPunctualLights, punctualPerHit,
 		reinterpret_cast<const TextureData*>(d_textures_),
 		reinterpret_cast<const unsigned char*>(d_texturePixels_),
 		skyColor, shadowRayEpsilon, skyDist, portalLight, maxComponentValue,
@@ -1303,9 +1307,9 @@ void WavefrontPathTracer::launchNormalizeFramebuffer(
 }
 
 void WavefrontPathTracer::launchNormalizeAovBuffers(
-	unsigned int numPixels, float3* d_albedoBuffer, float3* d_normalBuffer, unsigned int samplesPerPixel)
+	unsigned int numPixels, float3* d_albedoBuffer, float3* d_normalBuffer, unsigned int samplesPerPixel, const float4* d_adaptiveStats)
 {
-	wf_launch_normalize_aov_buffers(numPixels, d_albedoBuffer, d_normalBuffer, samplesPerPixel, stream_);
+	wf_launch_normalize_aov_buffers(numPixels, d_albedoBuffer, d_normalBuffer, samplesPerPixel, d_adaptiveStats, stream_);
 }
 
 // ============================================================================

@@ -484,4 +484,11 @@ struct GpuCameraParams {
 	float3 cameraMediumSigmaA;
 	float3 cameraMediumSigmaS;
 	float3 cameraMediumLeRaw;
+
+	// --adaptive on the GPU (src/shared/pixel_convergence_rule.h, the CPU's rule): a pixel stops taking samples once the standard error of its
+	// brightness, relative to its mean, is below adaptiveThreshold - checked from adaptiveMinSamples on. 0 (the zero-init default) samples every
+	// pixel samplesPerPixel times. adaptiveExposure: --exposure, which carries a pixel's noise to the picture the rule judges.
+	float        adaptiveThreshold;
+	float        adaptiveExposure;
+	unsigned int adaptiveMinSamples;
 };

@@ -71,7 +71,7 @@ TEST(PixelConvergenceHasConverged, NearBlackPixelConvergesUnconditionally) {
 	e.Add(0.0);
 	e.Add(1e-6);
 	e.Add(2e-6);
-	EXPECT_TRUE(has_converged(e, 0.001, /*black_floor=*/1e-4));
+	EXPECT_TRUE(has_converged(e, 0.001));
 }
 
 TEST(PixelConvergenceHasConverged, TighterThresholdNeedsMoreSamples) {
@@ -95,19 +95,32 @@ TEST(PixelConvergenceHasConverged, ExposureAffectsNearBlackShortcut) {
 	e.Add(2e-5);  // below the 1e-4 default black_floor on its own
 	// At exposure=1.0 (default), this is still near-black - converges
 	// unconditionally regardless of its (high) relative variance.
-	EXPECT_TRUE(has_converged(e, 0.001, 1e-4, 1.0));
+	EXPECT_TRUE(has_converged(e, 0.001, 1.0));
 	// At exposure=50.0, the same raw mean (1e-5) scales to 5e-4, ABOVE the
 	// 1e-4 floor - no longer near-black, so it falls through to the
-	// ordinary relative-error test, which this high-variance pair (0.0 vs
-	// 2e-5, a 2x spread) fails.
-	EXPECT_FALSE(has_converged(e, 0.001, 1e-4, 50.0));
+	// ordinary noise test, which this high-variance pair (0.0 vs 2e-5, a
+	// 2x spread) fails.
+	EXPECT_FALSE(has_converged(e, 0.001, 50.0));
 }
 
 TEST(PixelConvergenceHasConverged, DefaultExposureMatchesNoExposureArgument) {
 	VarianceEstimator<double> e;
 	e.Add(0.0);
 	e.Add(5e-5);
-	EXPECT_EQ(has_converged(e, 0.001, 1e-4), has_converged(e, 0.001, 1e-4, 1.0));
+	EXPECT_EQ(has_converged(e, 0.001), has_converged(e, 0.001, 1.0));
+}
+
+// The rule judges noise as it shows in the picture (gamma 2.2), not relative to the mean: with the same relative spread, a dark pixel is done
+// sooner than a bright one, and a relative rule (the old one) asked a dark pixel in fog for thousands of samples.
+TEST(PixelConvergenceHasConverged, ADarkPixelMayKeepMoreRelativeNoiseThanABrightOne) {
+	VarianceEstimator<double> dark, bright;
+	for (int i = 0; i < 32; ++i) {
+		dark.Add(0.005); dark.Add(0.015);     // mean 0.01, spread 50%
+		bright.Add(0.5); bright.Add(1.5);      // mean 1, the same 50%
+	}
+	// both standard errors are 6.3% of their means; in display units about 0.0035 and 0.029
+	EXPECT_TRUE(has_converged(dark, 0.01));
+	EXPECT_FALSE(has_converged(bright, 0.01));
 }
 
 // ---------------------------------------------------------------------------

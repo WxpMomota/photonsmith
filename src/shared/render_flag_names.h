@@ -47,6 +47,7 @@ namespace render_flags {
 	constexpr const char* kSaturation    = "--saturation";
 	constexpr const char* kSampler       = "--sampler";
 	constexpr const char* kAdaptive      = "--adaptive";
+	constexpr const char* kNoAdaptive    = "--no-adaptive";   // (a film video samples adaptively unless told not to: cartoon_render.h, frameFlags)
 	constexpr const char* kAovs          = "--aovs";
 	constexpr const char* kToon          = "--toon";
 	constexpr const char* kAdaptiveThreshold = "--adaptive-threshold";
@@ -102,6 +103,6 @@ namespace render_defaults {
 	constexpr int kMltMaxDepth = 5;
 	constexpr double kAoMaxDist = 1e10;       // pbrt-v4's "effectively unbounded"
 	constexpr double kAoIllumScale = 1.0;
-	constexpr double kAdaptiveThreshold = 0.01;
+	constexpr double kAdaptiveThreshold = 0.003;   // the noise left in a pixel, in display units (pixel_convergence_rule.h): under one level of 255
 	constexpr double kDenoiseBlend = 0.0;
 }

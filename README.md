@@ -107,7 +107,7 @@ Both in full, with the output locations, the macOS Metal and universal-binary op
 - ✅ **Real triangle meshes**: OBJ loading with BVH, per-face `.mtl` materials, and real `map_Kd` image-texture sampling (not just flat colors) on both CPU and GPU
 - ✅ **Stochastic Progressive Photon Mapping (SPPM)**, an alternative integrator for hard caustic/glass scenes a standard path tracer struggles to converge — on the CPU, and on the GPU for sphere/quad scenes (see [Known Limitations](#-known-limitations))
 - ✅ **Bidirectional Path Tracing (BDPT) and Metropolis Light Transport (MLT)**, additional alternative integrators (CPU-only, `--bdpt`/`--mlt`) for scenes with difficult light transport
-- ✅ **Adaptive sampling** (`--adaptive`): stops sampling pixels that have already converged (CPU; opt-in on Metal)
+- ✅ **Adaptive sampling** (`--adaptive`): stops sampling pixels whose remaining noise would not show (CPU and both OptiX GPU renderers - on by default for film videos; opt-in on Metal)
 - ✅ **Volumetric media**: homogeneous participating media, procedural (Perlin-noise) cloud/fog, and heterogeneous NanoVDB grid media (CPU and OptiX; the blackbody glow of a temperature grid is CPU-only)
 - ✅ **Anti-aliasing** through multi-sampling, **ACES filmic tone mapping** + sRGB output
 
