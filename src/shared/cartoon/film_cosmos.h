@@ -11,6 +11,7 @@
 // Coordinates are pbrt's, as a film file's.
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
@@ -627,6 +628,107 @@ inline std::string beltText(const Belt &b, double nt) {
 		out += nature::placeObject("belt_" + b.name + "_" + std::to_string(r.shape), mul(translate(-r.at.x, r.at.y, r.at.z), rotate(r.axis, r.degrees), scale(r.size, r.size, r.size)));
 	}
 	return out;
+}
+
+// ---- dying stars ----
+// What a star leaves when it dies, `size` across: a `supernova` - a red giant that blows up at `blast T` (nature's time) in a white flash that fades over seconds, its shell of
+// glowing gas (red outside, blue-white inside, torn into filaments) racing out to its size and slowing; a `pulsar` - a spinning neutron star whose two beams of light sweep
+// round like a lighthouse's (`period` seconds a turn), in a small glowing cloud of its wind (a ring round its waist and jets out of its poles); or a `planetary` nebula - a
+// glowing shell blown off a dying star, an hourglass of teal gas rimmed with red round a tiny white-hot dwarf.
+struct Remnant {
+	std::string name, kind = "supernova";
+	Vec3 at{0.0, 0.0, -30000.0};
+	double size = 10000.0, blast = 0.0, period = 4.0, tilt = 20.0, brightness = 1.0;
+	int seed = 1;
+};
+inline const std::vector<std::string> &remnantKinds() {
+	static const std::vector<std::string> k = {"supernova", "pulsar", "planetary"};
+	return k;
+}
+// A remnant's glow at (x, y, z) of its box (-1 .. 1 each way, its radius 1): how much and its colour.
+inline void remnantGlow(const Remnant &m, double x, double y, double z, double &amount, Vec3 &colour) {
+	const int s = m.seed * 331;
+	amount = 0.0, colour = {0.0, 0.0, 0.0};
+	if (m.kind == "supernova") {
+		const double r = std::sqrt(x * x + y * y + z * z), warp = 0.12 * (clouds::detail::fbm3(x * 2.5, y * 2.5, z * 2.5, s + 1) - 0.5);
+		const double shell = std::exp(-std::pow((r + warp - 0.82) / 0.09, 2.0));
+		const double strands = std::pow(detail::ridge(clouds::detail::fbm3(x * 7.0, y * 7.0, z * 7.0, s + 2)), 4.0), knots = smoothstep(0.65, 0.8, clouds::detail::fbm3(x * 14.0, y * 14.0, z * 14.0, s + 3));
+		amount = shell * (0.25 + 1.8 * strands + 1.2 * knots) + 0.15 * std::exp(-std::pow(r / 0.5, 2.0));   // (and a faint glow filling it)
+		colour = lerp(Vec3{0.35, 0.6, 1.0}, Vec3{1.0, 0.25, 0.15}, smoothstep(0.7, 0.9, r + warp)) + Vec3{0.6, 0.55, 0.3} * knots;
+	} else if (m.kind == "pulsar") {   // its wind: a ring round its waist and jets out of its poles, blue-white
+		const double rho = std::hypot(x, z), ring = std::exp(-std::pow((rho - 0.4) / 0.1, 2.0) - std::pow(y / 0.06, 2.0)), jet = std::exp(-std::pow(rho / (0.05 + 0.1 * std::abs(y)), 2.0)) * (1.0 - smoothstep(0.6, 1.0, std::abs(y)));
+		const double fog = std::exp(-std::pow(std::sqrt(x * x + y * y + z * z) / 0.45, 2.0)) * (0.5 + clouds::detail::fbm3(x * 5.0, y * 5.0, z * 5.0, s + 4));
+		amount = 1.2 * ring + 0.9 * jet + 0.35 * fog;
+		colour = Vec3{0.55, 0.7, 1.0} + Vec3{0.3, 0.1, 0.0} * fog;
+	} else {   // planetary: an hourglass shell
+		const double rr = std::sqrt(x * x + z * z + std::pow(1.3 * y / (1.0 + 0.7 * std::abs(y)), 2.0)) / 0.55, warp = 0.08 * (clouds::detail::fbm3(x * 4.0, y * 4.0, z * 4.0, s + 5) - 0.5);
+		const double shell = std::exp(-std::pow((rr + warp - 1.0) / 0.13, 2.0)), inside = 0.25 * (1.0 - smoothstep(0.6, 1.0, rr));
+		amount = shell * (0.8 + 0.6 * clouds::detail::fbm3(x * 9.0, y * 9.0, z * 9.0, s + 6)) + inside;
+		colour = lerp(Vec3{0.2, 0.85, 0.8}, Vec3{1.0, 0.2, 0.25}, smoothstep(0.95, 1.12, rr + warp));
+	}
+	amount *= 1.0 - smoothstep(0.92, 1.0, std::max({std::abs(x), std::abs(y), std::abs(z)}));
+}
+// A pulsar's beams at nature's time `nt`: two cones of light out of its poles, sweeping round its spin axis (story space mesh).
+inline Mesh pulsarBeams(const Remnant &m, double nt) {
+	const double ti = m.tilt * kPi / 180.0, a = 2.0 * kPi * nt / std::max(0.05, m.period);
+	const Vec3 axis = normalize(Vec3{std::sin(ti) * std::cos(a), std::cos(ti), std::sin(ti) * std::sin(a)});
+	const Vec3 u = normalize(cross(axis, Vec3{1.0, 0.0, 0.0}) + Vec3{0.0, 0.0, 1e-9}), v = cross(axis, u);
+	const double length = 0.9 * m.size, spread = 0.04 * length;
+	Mesh out;
+	for (int side = -1; side <= 1; side += 2) {
+		const int base = static_cast<int>(out.verts.size());
+		const Vec3 apex = m.at + axis * (side * 0.004 * m.size), end = m.at + axis * (side * length);
+		out.verts.push_back({-apex.x, apex.y, apex.z});
+		out.normals.push_back(axis * static_cast<double>(side));
+		for (int i = 0; i < 16; ++i) {
+			const double t = 2.0 * kPi * i / 16.0;
+			const Vec3 d = u * std::cos(t) + v * std::sin(t), p = end + d * spread;
+			out.verts.push_back({-p.x, p.y, p.z});
+			const Vec3 nn = normalize(d);
+			out.normals.push_back({-nn.x, nn.y, nn.z});
+		}
+		for (int i = 0; i < 16; ++i) {
+			const int p0 = base + 1 + i, p1 = base + 1 + (i + 1) % 16;
+			out.tris.push_back(side > 0 ? std::array<int, 3>{base, p1, p0} : std::array<int, 3>{base, p0, p1});
+		}
+	}
+	return out;
+}
+// A remnant at nature's time `nt` as scene text.
+inline std::string remnantText(const std::string &film, const Remnant &m, double nt) {
+	std::string out = "# a " + m.kind + " (film_cosmos.h): " + m.name + "\n";
+	double R = 0.5 * m.size;   // (how far its glow reaches now)
+	if (m.kind == "supernova") {
+		const double since = nt - m.blast;
+		if (since < 0.0) {   // the red giant before it
+			return out + emissiveSphere({-m.at.x, m.at.y, m.at.z}, 0.03 * m.size, space::blackbody(3400.0) * (1.5 * m.brightness));
+		}
+		const double flash = std::exp(-since / 5.0) * smoothstep(0.0, 0.4, since);
+		if (flash > 0.01) out += "# its flash\n" + emissiveSphere({-m.at.x, m.at.y, m.at.z}, m.size * (0.02 + 0.05 * flash), Vec3{1.0, 0.97, 0.92} * (40.0 * flash * m.brightness));
+		R *= 1.0 - std::exp(-(since + 0.05) / 10.0);   // (racing out, slowing)
+		if (R < 0.01 * m.size) return out;
+	} else if (m.kind == "pulsar") {
+		out += emissiveSphere({-m.at.x, m.at.y, m.at.z}, 0.006 * m.size, Vec3{0.8, 0.9, 1.0} * (8.0 * m.brightness));
+		const Vec3 L = Vec3{0.6, 0.75, 1.0} * (0.9 * m.brightness);
+		out += "# its beams\n" + attr(diffuseMaterial({0.0, 0.0, 0.0}), emitMesh(pulsarBeams(m, nt), identity()), &L);
+		R *= 0.6;   // (its wind's cloud is smaller than the reach of its beams)
+	} else {
+		out += emissiveSphere({-m.at.x, m.at.y, m.at.z}, 0.008 * m.size, space::blackbody(40000.0) * (6.0 * m.brightness));
+	}
+	const int N = 96;
+	char file[200];
+	std::snprintf(file, sizeof file, "remnant_v3_%s_%s_%d_%.0f_%.4g.pbrt", m.name.c_str(), m.kind.c_str(), m.seed, m.size, m.brightness);
+	const std::string name = "remnant_" + m.name;
+	const std::string path = rgbGridFile(film, file, name, N, N, N, 0.0, 0.006 * m.brightness, [&](int i, int j, int k) {
+		double e = 0.0;
+		Vec3 colour;
+		remnantGlow(m, (i + 0.5) / N * 2.0 - 1.0, (j + 0.5) / N * 2.0 - 1.0, (k + 0.5) / N * 2.0 - 1.0, e, colour);
+		Voxel v;
+		v.sa = Vec3{1.0, 1.0, 1.0} * (std::min(e, 3.0) * 12.0 / m.size);   // (per metre at its full size: about one through its shell)
+		v.le = e > 0.003 ? colour * std::min(e, 3.0) : Vec3{0.0, 0.0, 0.0};   // (how much as well as what colour: where it is thick a glow shows only its light, so its filaments are in that)
+		return v;
+	});
+	return out + placedGrid(path, name, m.at - Vec3{R, R, R}, Vec3{2.0 * R, 2.0 * R, 2.0 * R});
 }
 
 }  // namespace cosmos

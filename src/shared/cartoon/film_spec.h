@@ -411,6 +411,7 @@ struct Spec {
 	std::vector<cosmos::BlackHole> blackHoles;
 	std::vector<cosmos::Comet> comets;
 	std::vector<cosmos::Belt> belts;
+	std::vector<cosmos::Remnant> remnants;
 	std::vector<ground::Track> tracks;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;

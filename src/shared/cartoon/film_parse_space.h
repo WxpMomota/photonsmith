@@ -9,7 +9,7 @@ namespace film_file {
 
 // Whether `verb` is a space line's.
 inline bool isSpaceVerb(const std::string &verb) {
-	static const std::vector<std::string> k = {"space", "planet", "moon", "nebula", "galaxy", "star", "blackhole", "comet", "asteroids"};
+	static const std::vector<std::string> k = {"space", "planet", "moon", "nebula", "galaxy", "star", "blackhole", "comet", "asteroids", "remnant"};
 	return std::find(k.begin(), k.end(), verb) != k.end();
 }
 
@@ -279,6 +279,27 @@ inline std::string beltLine(Spec &s, const std::vector<std::string> &t) {
 	return std::string();
 }
 
+// A `remnant` line (film_cosmos.h). "" or what is wrong with it.
+inline std::string remnantLine(Spec &s, const std::vector<std::string> &t) {
+	cosmos::Remnant m;
+	bool sized = false;
+	const std::string e = bodyLine(t, "`remnant NAME at X Y Z size S [kind supernova|pulsar|planetary] [blast T] [period P] [tilt DEGREES] [brightness B] [seed N]` "
+									  "(size 100 to 400000 m, period 0.05 to 600 s)",
+								   cosmos::remnantKinds(), m.name, m.kind, m.at, [&](const std::string &w, double a) {
+									   if (w == "size" && a >= 100.0 && a <= 400000.0) return m.size = a, sized = true;
+									   if (w == "blast") return m.blast = a, true;
+									   if (w == "period" && a >= 0.05 && a <= 600.0) return m.period = a, true;
+									   if (w == "tilt" && a >= -90.0 && a <= 90.0) return m.tilt = a, true;
+									   if (w == "brightness" && a > 0.0 && a <= 20.0) return m.brightness = a, true;
+									   if (w == "seed") return m.seed = static_cast<int>(a), true;
+									   return false;
+								   });
+	if (!e.empty()) return e;
+	if (!sized) return "`remnant NAME at X Y Z size S ...`: how big it is";
+	s.remnants.push_back(m);
+	return std::string();
+}
+
 // One space line: what it says goes into `s`. "" or what is wrong with it.
 inline std::string spaceLine(Spec &s, const std::string &verb, const std::string &line) {
 	const std::vector<std::string> t = detail::tokens(line);
@@ -291,6 +312,7 @@ inline std::string spaceLine(Spec &s, const std::string &verb, const std::string
 	if (verb == "blackhole") return blackHoleLine(s, t);
 	if (verb == "comet") return cometLine(s, t);
 	if (verb == "asteroids") return beltLine(s, t);
+	if (verb == "remnant") return remnantLine(s, t);
 	return "unknown space line \"" + verb + "\"";
 }
 

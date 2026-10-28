@@ -1229,6 +1229,20 @@ tenth as thick and thickest in its middle, its rocks going round at Kepler's pac
 negative turns it the other way), tipped by `tilt` and turned by `turn`; a `field` is a ball `radius` round whose rocks drift slowly. Every rock is a placement of one of
 eight rock shapes (lumpy, cratered), so 20000 of them (the most) cost little. Real belts are almost empty; these are as crowded as a film wants them.
 
+**Dying stars: `remnant`.** (film_cosmos.h)
+
+```
+remnant  crab   at 0 0 -40000       size 12000  kind supernova  blast 3     # a red giant until nature's time 3, then it blows up
+remnant  vela   at 60000 0 -40000   size 8000   kind pulsar  period 2  tilt 25
+remnant  ring   at 120000 0 -40000  size 6000   kind planetary
+```
+
+A `supernova` is a red giant until `blast T`; then a white flash swells and fades over a few seconds while its shell of gas races out - torn into filaments and knots,
+blue-white inside and red at its edge - slowing as it nears its `size`. A `pulsar` is a tiny blue-white star whose two beams of light, out of poles tipped `tilt` from its
+spin axis, sweep round once every `period` seconds like a lighthouse's, in a smaller glowing cloud of its wind (a ring round its waist, jets from its poles). A `planetary`
+nebula is an hourglass shell of teal gas rimmed with red round a tiny white-hot dwarf. Each glow is one grid in the film's cache (a supernova's is the same grid, placed
+bigger as it grows: it brightens as it spreads).
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

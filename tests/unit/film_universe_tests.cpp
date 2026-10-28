@@ -548,3 +548,44 @@ TEST(FilmUniverseBelt, RocksFillTheBandOrTheBallMostAreSmallAndTheyGoRound) {
 	EXPECT_EQ(count(s, "ObjectInstance \"belt_ring_"), 300u);
 	expectProblems({{"asteroids a at 0 0 0 count 0", "\"count\""}, {"asteroids a at 0 0 0 kind cloud", "\"kind\""}, {"asteroids a at 0 0 0 radius 5", "\"radius\""}});
 }
+
+// ---- 14. dying stars ------------------------------------------------------------------------------------------------------------------------------------------------------
+
+TEST(FilmUniverseRemnant, ASupernovaFlashesAndItsShellGrowsAPulsarSweepsAndAPlanetaryNebulaIsAShell) {
+	cs::Remnant sn;
+	sn.name = "crab", sn.size = 10000.0, sn.blast = 5.0;
+	double e = 0.0, eMiddle = 0.0;
+	cartoon::Vec3 rim, middle;
+	cs::remnantGlow(sn, 0.82, 0.0, 0.0, e, rim);
+	cs::remnantGlow(sn, 0.45, 0.0, 0.0, eMiddle, middle);
+	EXPECT_GT(e, eMiddle) << "its gas is in a shell";
+	const std::string before = cs::remnantText("zz_remnant_test", sn, 2.0), flash = cs::remnantText("zz_remnant_test", sn, 6.0), later = cs::remnantText("zz_remnant_test", sn, 40.0);
+	EXPECT_EQ(before.find("Include"), std::string::npos) << "a red giant, nothing blown off yet";
+	EXPECT_NE(flash.find("# its flash"), std::string::npos);
+	EXPECT_EQ(later.find("# its flash"), std::string::npos) << "faded";
+	const auto boxScale = [](const std::string &s) {
+		const std::size_t at = s.find("Scale ");
+		return at == std::string::npos ? 0.0 : std::atof(s.c_str() + at + 6);
+	};
+	EXPECT_GT(boxScale(later), 2.0 * boxScale(flash)) << "the shell grows";
+
+	cs::Remnant p = sn;
+	p.kind = "pulsar", p.period = 4.0;
+	const cartoon::Mesh b0 = cs::pulsarBeams(p, 0.0), b1 = cs::pulsarBeams(p, 1.0);
+	ASSERT_EQ(b0.verts.size(), b1.verts.size());
+	EXPECT_GT(length(b0.verts[5] - b1.verts[5]), 100.0) << "its beams sweep round";
+	EXPECT_NE(cs::remnantText("zz_remnant_test", p, 0.0).find("# its beams"), std::string::npos);
+
+	cs::Remnant pn = sn;
+	pn.kind = "planetary";
+	cs::remnantGlow(pn, 0.55, 0.0, 0.0, e, rim);
+	cs::remnantGlow(pn, 0.2, 0.0, 0.0, eMiddle, middle);
+	EXPECT_GT(e, eMiddle);
+	EXPECT_GT(middle.y, middle.x) << "teal inside";
+	cs::remnantGlow(pn, 0.65, 0.0, 0.0, e, rim);
+	EXPECT_GT(rim.x, rim.y) << "red at its rim";
+	std::error_code ec;
+	std::filesystem::remove_all(cartoon::film_cache::dir("zz_remnant_test"), ec);
+
+	expectProblems({{"remnant a at 0 0 0", "how big it is"}, {"remnant a at 0 0 0 size 500 kind nova", "\"kind\""}, {"remnant a at 0 0 0 size 500 period 0", "\"period\""}});
+}
