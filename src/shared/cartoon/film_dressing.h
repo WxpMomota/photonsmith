@@ -181,7 +181,14 @@ struct SkyStorm {
 	double level = 0.0;
 	std::string kind = "rain";
 };
-inline std::string skyText(const std::string &film, const Sky &s, double t, double length, double rainbow = 0.0, const SkyStorm &storm = SkyStorm()) {
+// The sky's optics (round 9 `optics`): a halo and sun dogs round the sun, a fogbow opposite it, crepuscular rays, alpenglow on the peaks round sunset, the green
+// flash as the sun's last sliver goes (each 0 none .. 1, the green flash on or off).
+struct SkyOptics {
+	double halo = 0.0, fogbow = 0.0, rays = 0.0, alpenglow = 0.0;
+	double exposure = 1.0;   // (the frame's: the green flash is divided by it, so it shows green, not white, however far the camera has opened up)
+	bool greenFlash = false;
+};
+inline std::string skyText(const std::string &film, const Sky &s, double t, double length, double rainbow = 0.0, const SkyStorm &storm = SkyStorm(), const SkyOptics &optics = SkyOptics()) {
 	double el = 0.0, facing = 0.0;
 	const double hour = hourAt(s, t, length);
 	sunAt(s, hour, el, facing);
@@ -228,6 +235,25 @@ inline std::string skyText(const std::string &film, const Sky &s, double t, doub
 	fs.afterglow = std::round(0.45 * low * 20.0) / 20.0;
 	fs.belt = std::round(0.3 * smoothstep(-6.0, -1.0, el) * (1.0 - smoothstep(1.0, 6.0, el)) * 20.0) / 20.0;
 	fs.rainbow = std::round(std::max(0.0, std::min(1.0, rainbow)) * 20.0) / 20.0;
+	fs.halo = std::round(clamp01(optics.halo) * 20.0) / 20.0, fs.fogbow = std::round(clamp01(optics.fogbow) * 20.0) / 20.0, fs.rays = std::round(clamp01(optics.rays) * 20.0) / 20.0;
+	if (optics.alpenglow > 0.0) {   // alpenglow: a rose light from just over the horizon where the sun went, round sunset - the peaks catch it, the valleys are in their shadow
+		const double a = optics.alpenglow * smoothstep(-6.0, -2.0, el) * (1.0 - smoothstep(0.5, 2.5, el));
+		if (a > 0.0) {
+			const double e = 1.2 * d2r;
+			std::snprintf(buf, sizeof buf, "LightSource \"distant\" \"point3 from\" [ %.5f %.5f %.5f ] \"point3 to\" [ 0 0 0 ] \"rgb L\" [ %.5f %.5f %.5f ]\n", std::cos(e) * std::sin(facing * d2r),
+						  std::sin(e), std::cos(e) * std::cos(facing * d2r), 1.1 * a, 0.42 * a, 0.55 * a);
+			out += buf;
+		}
+	}
+	if (optics.greenFlash) {   // the green flash: as the sun's last sliver sets (or its first rises), a green fleck where it is, for a moment
+		const double g = std::exp(-std::pow((el + 0.2) / 0.18, 2.0)), f = g / std::max(1.0, optics.exposure);
+		if (g > 0.02) {
+			const double e = 0.12 * d2r, D = 30000.0;
+			std::snprintf(buf, sizeof buf, "AttributeBegin\n  Translate %.3f %.3f %.3f\n  AreaLightSource \"diffuse\" \"rgb L\" [ %.3f %.3f %.3f ]\n  Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]\n  Shape \"sphere\" \"float radius\" [ %.2f ]\nAttributeEnd\n",
+						  D * std::cos(e) * std::sin(facing * d2r), D * std::sin(e), D * std::cos(e) * std::cos(facing * d2r), 0.25 * f, 2.2 * f, 0.6 * f, D * std::tan(0.12 * d2r));
+			out += "# the green flash (film_dressing.h)\n" + std::string(buf);
+		}
+	}
 	if (stormy > 0.0) {   // the storm's deck of cloud, dark beneath, over all but a little of the sky; the sky under it dim and grey (ochre in a dust storm)
 		film_sky::Clouds deck;
 		deck.altitude = 1400.0, deck.scaleAlong = 7000.0, deck.scaleAcross = 3500.0, deck.coverage = std::min(0.97, 0.4 + 0.6 * stormy), deck.softness = 0.22;

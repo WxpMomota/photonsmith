@@ -1005,6 +1005,20 @@ Only the coat, legs, plumage, head and tail grow it - not hooves, antlers, eyes 
 are triangles, not pbrt curves: each pose is an object instance, and an instance holds only triangles and spheres. A pose with its coat is its own object
 (`anim_wolves_run_3_coat100`), so a herd still costs a few poses.
 
+**The sky's optics: `optics`.** (film_sky.h, film_dressing.h; nature round 9, 2026-10-27)
+
+```
+optics   halo 1  rays 0.8  fogbow 0.7  alpenglow 1  greenflash     # each 0 to 1; any of them
+```
+
+Painted into the sky's picture, as bright as the sky they are on (as the rainbow is): `halo` the 22-degree ring round the sun (reddish on its inner edge, the sky inside it
+a little darker), sun dogs at the sun's height just outside it (red towards the sun, a white tail away from it) and a faint 46-degree ring; `fogbow` a broad white bow 40
+degrees round the point opposite the sun, faintly orange outside and blue inside; `rays` crepuscular rays, beams of light and shadow fanning from the sun low in the sky,
+and fainter anticrepuscular rays converging opposite it. A sky without them keeps its old picture (its cached file's name is unchanged). `alpenglow` is a rose light
+from 1.2 degrees above the horizon where the sun went, from 2.5 degrees before sunset to 6 degrees after: the peaks catch it while the valleys are in their shadow.
+`greenflash` puts a green fleck where the sun's last sliver sets (or first rises) for the moment its centre is 0.05 to 0.35 degrees below the horizon, divided by the
+frame's exposure so it shows green; it sits 30 km out at the true horizon, so mountains hide it as they hide the sun - look over the sea or a plain.
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

@@ -61,6 +61,9 @@ struct Spec {
 	Vec3 afterglowColour = {1.0, 0.42, 0.16};
 	double belt = 0.0;               // the pink band opposite the sun at twilight (the belt of Venus)
 	double rainbow = 0.0;            // a rainbow round the point opposite the sun (0 none .. 1 a bright one): the primary bow at 42 degrees, the secondary at 51
+	double halo = 0.0;               // (round 9 `optics`) ice-crystal halos: the 22-degree ring round the sun, sun dogs either side of it, a faint 46-degree ring
+	double fogbow = 0.0;             // a fogbow: a broad white bow round the point opposite the sun
+	double rays = 0.0;               // crepuscular rays: beams of light and shadow fanning out from the sun (and converging opposite it)
 	double shafts = 0.0;             // a storm's rain shafts (0 none .. 1): grey curtains hanging from the cloud base to the horizon here and there round the sky
 	Vec3 shaftColour = {0.30, 0.32, 0.36};   // (their colour against a bright sky: dust for a dust storm)
 	std::vector<Clouds> clouds;
@@ -199,6 +202,10 @@ inline std::string fileName(const Spec &s) {
 		std::snprintf(b, sizeof b, "|r%.3f", s.rainbow);
 		key += b;
 	}
+	if (s.halo > 0.0 || s.fogbow > 0.0 || s.rays > 0.0) {
+		std::snprintf(b, sizeof b, "|o%.3f %.3f %.3f", s.halo, s.fogbow, s.rays);
+		key += b;
+	}
 	for (const Clouds &c : s.clouds) {
 		std::snprintf(b, sizeof b, "|%.1f %.1f %.1f %.2f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.1f %.1f %.1f %d", c.altitude, c.scaleAlong, c.scaleAcross, c.direction, c.coverage,
 					  c.softness, c.opacity, c.lit.x, c.lit.y, c.lit.z, c.shade.x, c.shade.y, c.shade.z, c.silver, c.offsetX, c.offsetZ, c.haze, 0.0, 0.0, c.seed);
@@ -208,6 +215,51 @@ inline std::string fileName(const Spec &s) {
 	std::snprintf(name, sizeof name, "_%016llx.hdr", static_cast<unsigned long long>(std::hash<std::string>()(key)));
 	return s.name + name;
 }
+
+namespace detail {
+// The sky's optics in direction w (story space; `gamma` degrees from the sun, `elevDeg` above the horizon) over the clear sky's colour c: halos and sun dogs, a fogbow,
+// crepuscular rays. Each as bright as the sky it is on, as the rainbow is.
+inline Vec3 optics(const Spec &s, Vec3 c, Vec3 w, Vec3 sunDir, double gamma, double elevDeg) {
+	const double bright = 0.7 * luminance(c) + 0.03;
+	if (s.halo > 0.0 && s.sunElevation > -1.0) {
+		// the 22-degree ring: reddish on its inside edge, white beyond; the sky inside it a little darker; a faint 46-degree ring
+		const double r22 = std::exp(-std::pow((gamma - 22.3) / 0.9, 2.0)), inner = std::exp(-std::pow((gamma - 21.6) / 0.5, 2.0));
+		c = c + Vec3{1.0, 0.95, 0.9} * (s.halo * bright * 0.55 * r22) + Vec3{0.6, 0.2, 0.05} * (s.halo * bright * 0.5 * inner);
+		if (gamma < 21.5) c = c * (1.0 - 0.12 * s.halo);
+		c = c + Vec3{0.9, 0.9, 0.95} * (s.halo * bright * 0.12 * std::exp(-std::pow((gamma - 46.0) / 1.5, 2.0)));
+		// sun dogs: bright spots at the sun's height, a little outside the ring either side, red towards the sun, with a white tail away from it
+		const double off = 22.3 / std::max(0.3, std::cos(s.sunElevation * kPi / 180.0));   // (further out in azimuth the higher the sun)
+		const double dy = elevDeg - s.sunElevation, level = std::exp(-std::pow(dy / 0.8, 2.0));
+		for (int side = -1; side <= 1; side += 2) {
+			const Vec3 dog = direction(s.sunElevation, s.sunAzimuth + side * off);
+			const double a = std::acos(std::clamp(dot(w, dog), -1.0, 1.0)) * 180.0 / kPi, spot = std::exp(-std::pow(a / 1.1, 2.0));
+			const double dogGamma = std::acos(std::clamp(dot(dog, sunDir), -1.0, 1.0)) * 180.0 / kPi;   // (a white tail at its height, away from the sun)
+			const double tail = gamma > dogGamma + 0.5 && a < 25.0 ? level * std::exp(-(gamma - dogGamma) / 6.0) : 0.0;
+			c = c + Vec3{1.0, 0.92, 0.8} * (s.halo * bright * 2.2 * spot) + Vec3{0.7, 0.15, 0.0} * (s.halo * bright * 1.2 * spot * clamp01((dogGamma - gamma) / 1.0 + 0.5)) +
+				Vec3{1.0, 1.0, 1.0} * (s.halo * bright * 0.25 * tail * (1.0 - spot));
+		}
+	}
+	if (s.fogbow > 0.0 && elevDeg > -1.0) {   // a broad white bow at 40 degrees round the point opposite the sun, faintly orange outside, bluish inside
+		const double ang = 180.0 - gamma;
+		c = c + Vec3{1.0, 1.0, 1.0} * (s.fogbow * bright * 0.7 * std::exp(-std::pow((ang - 39.5) / 2.2, 2.0))) + Vec3{0.5, 0.25, 0.05} * (s.fogbow * bright * 0.25 * std::exp(-std::pow((ang - 42.5) / 1.0, 2.0))) +
+			Vec3{0.05, 0.12, 0.3} * (s.fogbow * bright * 0.2 * std::exp(-std::pow((ang - 36.5) / 1.0, 2.0)));
+	}
+	if (s.rays > 0.0 && elevDeg > -1.0) {   // crepuscular rays: beams fanning from the sun, strongest low in the sky near it; anticrepuscular rays converging opposite it
+		for (int k = 0; k < 2; ++k) {
+			const Vec3 axis = k == 0 ? sunDir : sunDir * -1.0;
+			Vec3 e1 = cross(axis, Vec3{0.0, 1.0, 0.0});
+			if (length(e1) < 1e-6) e1 = Vec3{1.0, 0.0, 0.0};
+			e1 = normalize(e1);
+			const Vec3 e2 = cross(e1, axis);
+			const double around = std::atan2(dot(w, e2), dot(w, e1)), from = std::acos(std::clamp(dot(w, axis), -1.0, 1.0)) * 180.0 / kPi;
+			const double beams = nature::fbm2(5.0 * std::cos(around) + 9.0, 5.0 * std::sin(around), 701) - 0.5;
+			const double reach = std::exp(-from / (k == 0 ? 35.0 : 25.0)) * (1.0 - smoothstep(25.0, 60.0, elevDeg)) * (k == 0 ? 1.0 : 0.4);
+			c = c * (1.0 + s.rays * 1.1 * beams * reach);
+		}
+	}
+	return c;
+}
+}  // namespace detail
 
 // The sky's picture: width x width/2 linear RGB floats, row 0 straight up.
 inline std::vector<float> render(const Spec &s) {
@@ -282,6 +334,7 @@ inline std::vector<float> render(const Spec &s) {
 				if (ang < 40.4) c = c * (1.0 + 0.25 * s.rainbow * std::exp(-(40.4 - ang) / 6.0));            // (brighter inside the bow)
 				if (ang > 42.8 && ang < 50.4) c = c * (1.0 - 0.15 * s.rainbow);                            // (Alexander's dark band between them)
 			}
+			if (s.halo > 0.0 || s.fogbow > 0.0 || s.rays > 0.0) c = detail::optics(s, c, w, sunDir, gamma, elevDeg);
 			if (s.shafts > 0.0 && elevDeg > -2.0 && elevDeg < 14.0) {   // rain shafts: curtains in bands round the horizon, streaked down, thinning towards the cloud base
 				const double az = std::atan2(w.x, -w.z), ca = std::cos(az), sa = std::sin(az);   // (noise round a circle: no seam behind)
 				const double band = smoothstep(0.52, 0.7, nature::fbm2(2.2 * ca + 3.0, 2.2 * sa + 0.5, 611)) * (0.6 + 0.4 * nature::noise2(40.0 * ca, 40.0 * sa + elevDeg * 0.08, 613));

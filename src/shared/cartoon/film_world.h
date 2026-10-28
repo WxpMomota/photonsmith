@@ -193,7 +193,9 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 		for (const Spec::Rainbow &r : spec.rainbows) rainbow = std::max(rainbow, r.strength * smoothstep(r.t0, r.t0 + 2.0, t) * (1.0 - smoothstep(r.t1 - 2.0, r.t1, t)));
 		dressing::SkyStorm storm;
 		storm.level = spec.storm.levelAt(t), storm.kind = spec.storm.kind;
-		out += "# the sun and sky at " + std::to_string(dressing::hourAt(spec.sky, t, spec.storyEnd)) + " h (film_dressing.h)\n" + dressing::skyText(spec.key, spec.sky, t, spec.storyEnd, rainbow, storm);
+		dressing::SkyOptics optics = spec.optics;
+		optics.exposure = exposureAt(t);
+		out += "# the sun and sky at " + std::to_string(dressing::hourAt(spec.sky, t, spec.storyEnd)) + " h (film_dressing.h)\n" + dressing::skyText(spec.key, spec.sky, t, spec.storyEnd, rainbow, storm, optics);
 	}
 	out += dressingAt(t);
 	if (!spec.weather.empty() || !spec.emitters.empty()) {   // weather round the camera, and particles (film_particles.h)

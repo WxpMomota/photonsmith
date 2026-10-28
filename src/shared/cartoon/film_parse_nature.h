@@ -304,6 +304,28 @@ inline std::string windLine(Spec &s, const std::string &verb, const std::string 
 	return std::string();
 }
 
+// An `optics` line (film_dressing.h, film_sky.h): the sky's halos, fogbow, rays, alpenglow and green flash. "" or what is wrong with it.
+inline std::string opticsLine(Spec &s, const std::string &line) {
+	using detail::number;
+	const auto fail = [](const std::string &what) { return what; };
+	const std::vector<std::string> t = detail::tokens(line);
+	const std::string usage = "`optics [halo S] [fogbow S] [rays S] [alpenglow S] [greenflash]` (each 0 to 1)";
+	if (t.size() < 2) return fail(usage);
+	for (std::size_t i = 1; i < t.size();) {
+		double a = 0.0;
+		if (t[i] == "greenflash") {
+			s.optics.greenFlash = true;
+			++i;
+		} else if (i + 1 < t.size() && number(t[i + 1], a) && a >= 0.0 && a <= 1.0 && (t[i] == "halo" || t[i] == "fogbow" || t[i] == "rays" || t[i] == "alpenglow")) {
+			(t[i] == "halo" ? s.optics.halo : t[i] == "fogbow" ? s.optics.fogbow : t[i] == "rays" ? s.optics.rays : s.optics.alpenglow) = a;
+			i += 2;
+		} else {
+			return fail("\"" + t[i] + "\": " + usage);
+		}
+	}
+	return std::string();
+}
+
 // One line of a film file, if it is a nature line: what it says goes into `s`. `handled` is false when `verb` is not a nature word (the line is parse()'s); the
 // result is "" or what is wrong with the line (parse() adds the file and the line).
 inline std::string natureLine(Spec &s, const std::string &verb, const std::string &line, const std::string &rest, bool &handled) {
@@ -844,6 +866,8 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		return iceLine(s, verb, line);
 	} else if (verb == "wind" || verb == "tornado") {   // the wind (film_wind.h)
 		return windLine(s, verb, line);
+	} else if (verb == "optics") {   // the sky's optics (film_sky.h, film_dressing.h)
+		return opticsLine(s, line);
 	} else if (verb == "geyser" || verb == "rockfall" || verb == "avalanche") {   // the land in action (film_geology.h)
 		const std::vector<std::string> t = detail::tokens(line);
 		const std::string where = verb == "geyser" ? "at" : "from";

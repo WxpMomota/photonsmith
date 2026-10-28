@@ -570,3 +570,59 @@ TEST(FilmSpectacleFur, StrandsKeepTheirPlacesLieBackAndCoatTheHerd) {
 		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
 	}
 }
+
+// ---- 8. the sky's optics ---------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace sky = cartoon::film_sky;
+
+// The halo is a ring 22 degrees round the sun with sun dogs at its height, the fogbow a broad white bow 40 degrees from the point opposite it, the rays beams fanning from
+// it; a sky without them keeps its old picture's name; round sunset alpenglow lights the peaks and the green flash shows for a moment as the sun goes.
+TEST(FilmSpectacleOptics, HaloSunDogsFogbowRaysAlpenglowAndTheGreenFlash) {
+	sky::Spec plain;
+	plain.width = 512, plain.sunElevation = 8.0, plain.sunAzimuth = 0.0;
+	sky::Spec optic = plain;
+	optic.halo = 1.0, optic.fogbow = 1.0;
+	EXPECT_NE(sky::fileName(plain), sky::fileName(optic));
+	sky::Spec same = plain;
+	same.halo = same.fogbow = same.rays = 0.0;
+	EXPECT_EQ(sky::fileName(plain), sky::fileName(same)) << "a sky without optics keeps its name (its cached picture)";
+	const std::vector<float> a = sky::render(plain), b = sky::render(optic);
+	const int W = plain.width, H = W / 2;
+	const auto lum = [&](const std::vector<float> &img, cartoon::Vec3 w) {   // (story-space direction -> the picture's pixel: render()'s mapping turned round)
+		w = cartoon::normalize(w);
+		const double theta = std::acos(std::clamp(w.y, -1.0, 1.0)), phi = std::atan2(-w.z, -w.x);
+		const int row = std::clamp(static_cast<int>(theta / cartoon::kPi * H), 0, H - 1);
+		const int col = std::clamp(static_cast<int>((phi < 0.0 ? phi + 2.0 * cartoon::kPi : phi) / (2.0 * cartoon::kPi) * W), 0, W - 1);
+		const std::size_t q = (static_cast<std::size_t>(row) * W + col) * 3;
+		return 0.2126 * img[q] + 0.7152 * img[q + 1] + 0.0722 * img[q + 2];
+	};
+	const auto gain = [&](cartoon::Vec3 w) { return lum(b, w) / std::max(1e-9, lum(a, w)); };
+	// straight above the sun: on the ring at 22 degrees, inside it at 15
+	EXPECT_GT(gain(sky::direction(8.0 + 22.3, 0.0)), 1.15 * gain(sky::direction(8.0 + 15.0, 0.0))) << "the 22-degree ring";
+	EXPECT_GT(gain(sky::direction(8.0, 22.3 / std::cos(8.0 * cartoon::kPi / 180.0))), gain(sky::direction(8.0 + 22.3, 0.0))) << "a sun dog brighter than the ring";
+	// the rays: beams round the sun - the sky 20 degrees from it varies round the sun far more with them
+	sky::Spec rayed = plain;
+	rayed.rays = 1.0;
+	const std::vector<float> r = sky::render(rayed);
+	double spreadRays = 0.0;
+	for (int k = 0; k < 24; ++k) {
+		const double around = 2.0 * cartoon::kPi * k / 24.0;
+		const cartoon::Vec3 w = sky::direction(8.0 + 20.0 * std::sin(around), 20.0 * std::cos(around));
+		spreadRays = std::max(spreadRays, std::abs(lum(r, w) / std::max(1e-9, lum(a, w)) - 1.0));
+	}
+	EXPECT_GT(spreadRays, 0.1) << "beams of light and shadow";
+	// the fogbow: 39.5 degrees from the point opposite the sun (here 8 degrees below the horizon, opposite): at 31.5 degrees up behind
+	EXPECT_GT(gain(sky::direction(31.5, 180.0)), 1.1 * gain(sky::direction(20.0, 180.0))) << "the fogbow";
+
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("optics", "scene s.pbrt\nlength 60\nsky 19:00 20:30 south 0 latitude 46 day 172\noptics alpenglow 1 greenflash halo 0.5\nshot 0 A\n key 0 2 0  100 5 0  40\n", film), "");
+	EXPECT_EQ(film.sceneAt(5.0).find("# the green flash"), std::string::npos);
+	const std::string dusk = film.sceneAt(32.0);
+	EXPECT_NE(dusk.find("# the green flash"), std::string::npos) << "as the sun's last sliver goes";
+	EXPECT_EQ(count(dusk, "LightSource \"distant\""), 2u) << "the setting sun and the alpenglow";
+	EXPECT_EQ(count(film.sceneAt(5.0), "LightSource \"distant\""), 1u) << "no alpenglow in daylight";
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"optics", "`optics [halo S]"}, {"optics halo 2", "\"halo\""}, {"optics sparkle 1", "\"sparkle\""}}) {
+		const std::string problem = problemOf(line);
+		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
+	}
+}
