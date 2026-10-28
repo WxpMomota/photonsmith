@@ -3,6 +3,7 @@
 // are film_cosmos.h's).
 //
 //   ship       a shuttle, a fighter, a freighter, a station or a wheel, flying nose first along its way, its engines glowing, its running lights blinking
+//   astronaut  someone floating in a spacesuit, tumbling slowly, tethered to a point or a ship, loose things drifting round them
 //
 // Coordinates are pbrt's, as a film file's; meshes are made in story space (x mirrored), as cartoon_lib.h's.
 
@@ -170,6 +171,89 @@ inline std::string shipText(const Ship &s, double nt) {
 	const Mat4 M = shipPlacement(s, nt);
 	std::string out = "# a " + s.kind + " (film_cosmos.h): " + s.name + "\n";
 	for (const ShipPart &p : shipParts(s, nt, enginesOn)) out += attr(p.material, emitMesh(p.mesh, mul(M, p.place)), p.lit ? &p.light : nullptr);
+	return out;
+}
+
+// ---- astronauts ----
+// Someone floating in a spacesuit, `size` tall (1.8 m): a white suit (or `suit R G B`), a backpack, a helmet with a gold visor and two lamps, limbs drifting in the slow
+// sway of zero-g; where `at` says at nature's time 0, drifting `move` metres a second and tumbling `tumble` degrees a second about a tilted axis; held by a `tether` - a
+// lazy line from its waist to a point (or to a `ship`, by name, wherever it is now); with `floaters N` loose things drifting round it (tools, bolts, wobbling globes of
+// water).
+struct Astronaut {
+	std::string name, tetherShip;
+	Vec3 at{0.0, 0.0, -6.0}, move{0.0, 0.0, 0.0}, suit{0.92, 0.92, 0.9};
+	Vec3 tether{0.0, 0.0, 0.0};
+	bool tethered = false, lamps = true;
+	double size = 1.8, tumble = 4.0;
+	int floaters = 0, seed = 1;
+};
+// The story-space transform of its parts (a 1.8 m figure, its waist at its own origin, up +y, facing +z) at nature's time `nt`.
+inline Mat4 astronautPlacement(const Astronaut &a, double nt) {
+	const Vec3 at = a.at + a.move * nt;
+	const Vec3 axis = normalize(Vec3{0.3 + hash01(a.seed, 1), 0.4, 0.2 + hash01(a.seed, 2)});
+	return mul(translate(-at.x, at.y, at.z), rotate(axis, std::fmod(360.0 * hash01(a.seed, 3) + a.tumble * nt, 360.0)), scale(a.size / 1.8));
+}
+// Where its waist is (pbrt's) at nature's time `nt`: where a tether is clipped on.
+inline Vec3 astronautWaist(const Astronaut &a, double nt) {
+	const Vec3 p = transformPoint(astronautPlacement(a, nt), {0.0, 0.0, -0.18});
+	return {-p.x, p.y, p.z};
+}
+// An astronaut at nature's time `nt` as scene text: its suit, its limbs swaying, its lamps, its tether to `tetherTo` (pbrt's) when it has one, and its floaters.
+inline std::string astronautText(const Astronaut &a, double nt, const Vec3 *tetherTo = nullptr) {
+	const Mat4 M = astronautPlacement(a, nt);
+	const std::string suit = diffuseMaterial(a.suit), pack = diffuseMaterial(a.suit * 0.8), dark = diffuseMaterial({0.15, 0.15, 0.16}), visor = metalMaterial({1.0, 0.78, 0.34}, 0.03);
+	std::string out = "# an astronaut (film_cosmos.h): " + a.name + "\n";
+	const auto part = [&](const Mesh &m, const Mat4 &place, const std::string &material) { out += attr(material, emitMesh(m, mul(M, place))); };
+	const auto sway = [&](int k, double amount) { return amount * std::sin(0.55 * nt + 1.7 * k + a.seed); };
+	part(roundedBox(0.46, 0.6, 0.3, 0.1), translate(0.0, 0.3, 0.0), suit);   // its torso (the waist at 0)
+	part(roundedBox(0.42, 0.52, 0.18, 0.06), translate(0.0, 0.33, -0.24), pack);
+	part(box(0.18, 0.1, 0.03), translate(0.0, 0.4, 0.16), dark);   // (the panel on its chest)
+	part(uvSphere(0.17, 24, 12), translate(0.0, 0.78, 0.0), suit);
+	part(uvSphere(0.15, 24, 12), mul(translate(0.0, 0.78, 0.06), scale(0.95, 0.82, 0.95)), visor);
+	// its limbs: tubes through shoulder, elbow, hand (hip, knee, foot), drifting
+	for (int side = -1; side <= 1; side += 2) {
+		const double sx = side;
+		const Vec3 shoulder{0.28 * sx, 0.5, 0.0}, elbow{(0.42 + sway(side, 0.05)) * sx, 0.28 + sway(side + 3, 0.06), 0.12}, hand{(0.46 + sway(side + 5, 0.06)) * sx, 0.1 + sway(side + 7, 0.1), 0.3};
+		part(sdf::tubeMesh({shoulder, elbow, hand}, 0.075, 0.9, 10), identity(), suit);
+		part(uvSphere(0.065, 12, 6), translate(hand.x, hand.y, hand.z), dark);
+		const Vec3 hip{0.12 * sx, -0.02, 0.0}, knee{(0.16 + sway(side + 9, 0.03)) * sx, -0.38, 0.18 + sway(side + 11, 0.06)}, foot{0.15 * sx, -0.78 + sway(side + 13, 0.05), 0.02};
+		part(sdf::tubeMesh({hip, knee, foot}, 0.09, 0.9, 10), identity(), suit);
+		part(roundedBox(0.13, 0.12, 0.26, 0.04), translate(foot.x, foot.y - 0.04, foot.z + 0.05), dark);
+	}
+	if (a.lamps) {
+		const Vec3 L{1.0, 0.9, 0.75};
+		for (int side = -1; side <= 1; side += 2) {
+			const Vec3 L2 = L * 8.0;
+			out += attr(diffuseMaterial({0.0, 0.0, 0.0}), emitMesh(uvSphere(0.025, 10, 5), mul(M, translate(0.15 * side, 0.86, 0.1))), &L2);
+		}
+	}
+	if (tetherTo) {   // a lazy line from its waist, sagging and swaying a little
+		const Vec3 w = astronautWaist(a, nt), t = *tetherTo, d = t - w;
+		const Vec3 side = normalize(cross(d, Vec3{0.0, 1.0, 0.0}) + Vec3{1e-6, 0.0, 0.0}), bow = normalize(cross(side, d) + Vec3{0.0, 1e-6, 0.0});
+		std::vector<Vec3> pts;
+		for (int i = 0; i <= 40; ++i) {
+			const double u = i / 40.0, belly = std::sin(kPi * u) * length(d) * (0.12 + 0.04 * std::sin(0.4 * nt + a.seed));
+			const Vec3 p = w + d * u + bow * belly + side * (std::sin(2.0 * kPi * u + 0.7 * nt) * std::sin(kPi * u) * 0.05 * length(d));
+			pts.push_back({-p.x, p.y, p.z});
+		}
+		out += "# its tether\n" + attr(diffuseMaterial({0.85, 0.75, 0.3}), emitMesh(sdf::tubeMesh(pts, 0.012 * a.size / 1.8, 1.0, 6), identity()));
+	}
+	// loose things drifting round it
+	for (int k = 0; k < a.floaters; ++k) {
+		const int sd = a.seed * 401 + k;
+		const Vec3 home = a.at + a.move * nt + Vec3{hash01(sd, 1) - 0.5, hash01(sd, 2) - 0.5, hash01(sd, 3) - 0.5} * (3.0 * a.size) +
+						  Vec3{hash01(sd, 4) - 0.5, hash01(sd, 5) - 0.5, hash01(sd, 6) - 0.5} * (0.1 * a.size * nt);
+		const Mat4 place = mul(translate(-home.x, home.y, home.z), rotate(normalize(Vec3{hash01(sd, 7), hash01(sd, 8), 0.3}), std::fmod(nt * (20.0 + 40.0 * hash01(sd, 9)), 360.0)), scale(a.size / 1.8));
+		const int what = k % 3;
+		if (what == 0) {   // a wrench
+			out += attr(metalMaterial({0.7, 0.7, 0.72}, 0.2), emitMesh(box(0.22, 0.03, 0.012), place) + emitMesh(torus(0.025, 0.01, 12, 6), mul(place, translate(0.12, 0.0, 0.0), rotate({1.0, 0.0, 0.0}, 90.0))));
+		} else if (what == 1) {   // a bolt
+			out += attr(metalMaterial({0.6, 0.55, 0.45}, 0.15), emitMesh(capsule(0.012, 0.06, 8, 2), place));
+		} else {   // a globe of water, wobbling
+			const double wob = 0.12 * std::sin(nt * 3.0 + k);
+			out += attr(glassMaterial(1.33), emitMesh(uvSphere(0.04, 16, 8), mul(place, scale(1.0 + wob, 1.0 - wob, 1.0 + 0.5 * wob))));
+		}
+	}
 	return out;
 }
 

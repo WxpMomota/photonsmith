@@ -9,7 +9,7 @@ namespace film_file {
 
 // Whether `verb` is a space line's.
 inline bool isSpaceVerb(const std::string &verb) {
-	static const std::vector<std::string> k = {"space", "planet", "moon", "nebula", "galaxy", "star", "blackhole", "comet", "asteroids", "remnant", "ship"};
+	static const std::vector<std::string> k = {"space", "planet", "moon", "nebula", "galaxy", "star", "blackhole", "comet", "asteroids", "remnant", "ship", "astronaut"};
 	return std::find(k.begin(), k.end(), verb) != k.end();
 }
 
@@ -340,6 +340,50 @@ inline std::string shipLine(Spec &s, const std::vector<std::string> &t) {
 	return std::string();
 }
 
+// An `astronaut` line (film_cosmos.h). "" or what is wrong with it.
+inline std::string astronautLine(Spec &s, const std::vector<std::string> &t) {
+	const std::string usage = "`astronaut NAME at X Y Z [move DX DY DZ] [tumble DEGREES] [size H] [suit R G B] [tether X Y Z | tether SHIP] [floaters N] [lamps on|off] [seed N]` "
+							  "(size 0.3 to 20 m, floaters 0 to 40, a ship named before it)";
+	cosmos::Astronaut a;
+	std::vector<std::string> rest;   // (its three-number words first, and a tether: what is left is a body's line)
+	for (std::size_t i = 0; i < t.size(); ++i) {
+		double x = 0.0, y = 0.0, z = 0.0;
+		const bool three = i + 3 < t.size() && detail::number(t[i + 1], x) && detail::number(t[i + 2], y) && detail::number(t[i + 3], z);
+		if ((t[i] == "move" || t[i] == "suit") && i + 3 < t.size()) {
+			if (!three || (t[i] == "suit" && (std::min({x, y, z}) < 0.0 || std::max({x, y, z}) > 1.0))) return "\"" + t[i] + "\": " + usage;
+			(t[i] == "move" ? a.move : a.suit) = {x, y, z};
+			i += 3;
+		} else if (t[i] == "tether" && three) {
+			a.tether = {x, y, z}, a.tethered = true;
+			i += 3;
+		} else if (t[i] == "tether" && i + 1 < t.size()) {
+			const bool known = std::any_of(s.ships.begin(), s.ships.end(), [&](const cosmos::Ship &sh) { return sh.name == t[i + 1]; });
+			if (!known) return "\"tether " + t[i + 1] + "\": no ship of that name before it - " + usage;
+			a.tetherShip = t[i + 1], a.tethered = true;
+			i += 1;
+		} else {
+			rest.push_back(t[i]);
+		}
+	}
+	std::string kind;
+	const std::string e = bodyLine(
+		rest, usage, {}, a.name, kind, a.at,
+		[&](const std::string &w, double v) {
+			if (w == "tumble" && v >= -360.0 && v <= 360.0) return a.tumble = v, true;
+			if (w == "size" && v >= 0.3 && v <= 20.0) return a.size = v, true;
+			if (w == "floaters" && v >= 0.0 && v <= 40.0) return a.floaters = static_cast<int>(v), true;
+			if (w == "seed") return a.seed = static_cast<int>(v), true;
+			return false;
+		},
+		[&](const std::string &w, const std::string &v) {
+			if (w == "lamps" && (v == "on" || v == "off")) return a.lamps = v == "on", true;
+			return false;
+		});
+	if (!e.empty()) return e;
+	s.astronauts.push_back(a);
+	return std::string();
+}
+
 // One space line: what it says goes into `s`. "" or what is wrong with it.
 inline std::string spaceLine(Spec &s, const std::string &verb, const std::string &line) {
 	const std::vector<std::string> t = detail::tokens(line);
@@ -354,6 +398,7 @@ inline std::string spaceLine(Spec &s, const std::string &verb, const std::string
 	if (verb == "asteroids") return beltLine(s, t);
 	if (verb == "remnant") return remnantLine(s, t);
 	if (verb == "ship") return shipLine(s, t);
+	if (verb == "astronaut") return astronautLine(s, t);
 	return "unknown space line \"" + verb + "\"";
 }
 

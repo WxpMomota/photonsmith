@@ -1259,6 +1259,19 @@ at its bow and one great engine; a `station` modules round a hub with wings of s
 `spin` turns a minute. `colour R G B` paints its hull. Its engines glow blue-white and flicker while it moves (`engines on|off` to choose), and it carries running lights - red
 to port, green to starboard, a white strobe (`lights off` to put them out).
 
+**Astronauts and zero-g: `astronaut`.** (film_cosmos.h)
+
+```
+ship       ark  at 0 0 -40  kind shuttle  size 30  move 0 0 -2
+astronaut  kim  at 0 0 -10  tether ark  floaters 6  tumble 5           # tethered to the ship (named before it) wherever it is now
+astronaut  lee  at 3 1 -8   tether 0 0 -30  suit 0.95 0.55 0.2  move 0.05 0 0
+```
+
+Someone floating in a spacesuit `size` tall (1.8 m): a white suit (or `suit R G B`), a backpack, a helmet with a gold visor that mirrors what is round it and two lamps,
+arms and legs drifting in the slow sway of zero-g; where `at` says at nature's time 0, drifting `move` metres a second and tumbling `tumble` degrees a second (4) about a
+tilted axis. A `tether` is a lazy line from their waist - sagging and swaying - to a point, or to a `ship` named before them (it follows the ship). `floaters N` sets loose
+things drifting and spinning round them: wrenches, bolts and wobbling globes of water. `lamps off` puts out the helmet lamps.
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

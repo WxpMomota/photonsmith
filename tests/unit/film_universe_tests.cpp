@@ -618,3 +618,25 @@ TEST(FilmUniverseShip, CraftFlyNoseFirstTheirEnginesGlowWhileTheyMoveAndWheelsSp
 	EXPECT_NE(film.sceneAt(1.0).find("# a freighter (film_cosmos.h): ark"), std::string::npos);
 	expectProblems({{"ship a at 0 0 0 kind tug", "\"kind\""}, {"ship a at 0 0 0 colour 2 0 0", "\"colour\""}, {"ship a at 0 0 0 engines maybe", "\"engines\""}, {"ship a at 0 0 0 size 0", "\"size\""}});
 }
+
+// ---- 16. astronauts -------------------------------------------------------------------------------------------------------------------------------------------------------
+
+TEST(FilmUniverseAstronaut, AstronautsDriftAndTumbleTheirLimbsSwayAndTheirTetherFollowsTheShip) {
+	cs::Astronaut a;
+	a.name = "kim", a.at = {0.0, 0.0, -6.0}, a.move = {0.1, 0.0, 0.0}, a.floaters = 6;
+	const cartoon::Vec3 w0 = cs::astronautWaist(a, 0.0), w10 = cs::astronautWaist(a, 10.0);
+	EXPECT_LT(length(w0 - a.at), 0.5) << "its waist is where it is";
+	EXPECT_NEAR(w10.x - w0.x, 1.0, 0.5) << "drifting";
+	const std::string s0 = cs::astronautText(a, 0.0), s1 = cs::astronautText(a, 1.0);
+	EXPECT_NE(s0, s1) << "limbs sway, it tumbles";
+	EXPECT_EQ(count(s0, "AreaLightSource"), 2u) << "its two lamps";
+	EXPECT_NE(s0.find("Material \"dielectric\""), std::string::npos) << "a globe of water among its floaters";
+	EXPECT_EQ(s0.find("# its tether"), std::string::npos);
+	const cartoon::Vec3 hook{0.0, 0.0, -20.0};
+	EXPECT_NE(cs::astronautText(a, 0.0, &hook).find("# its tether"), std::string::npos);
+
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("astronaut", "scene s.pbrt\nlength 4\nspace\nship ark at 0 0 -40 kind shuttle size 30 move 0 0 -2\nastronaut kim at 0 0 -10 tether ark floaters 3\nshot 0 A\n key 0 0 0  0 0 -10  50\n", film), "");
+	EXPECT_NE(film.sceneAt(1.0).find("# its tether"), std::string::npos);
+	expectProblems({{"astronaut a at 0 0 0 tether nobody", "no ship of that name"}, {"astronaut a at 0 0 0 suit 2 1 1", "\"suit\""}, {"astronaut a at 0 0 0 floaters 99", "\"floaters\""}});
+}

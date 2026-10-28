@@ -414,6 +414,7 @@ struct Spec {
 	std::vector<cosmos::Belt> belts;
 	std::vector<cosmos::Remnant> remnants;
 	std::vector<cosmos::Ship> ships;
+	std::vector<cosmos::Astronaut> astronauts;
 	std::vector<ground::Track> tracks;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;

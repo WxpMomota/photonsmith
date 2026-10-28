@@ -112,6 +112,43 @@ inline std::string spectacleText(const Spec &spec, const std::string &header, do
 	return out;
 }
 
+// Round 10's universe in a frame at film time t (nature's `nt`): the set in space (film_space.h), the bodies in it (film_cosmos.h) and the craft and people travelling
+// among them (film_voyage.h). (The planets are worldAt's: an eclipse needs them all.)
+inline std::string universeText(const Spec &spec, const std::string &header, double t, double nt) {
+	(void)t;
+	std::string out;
+	const std::string film = spec.key.empty() ? std::string("film") : spec.key;
+	if (spec.space.on) {   // (the set in space: film_space.h)
+		Vec3 eye, target;
+		double fov = 40.0;
+		film_subjects::cameraOf(header, eye, target, fov);
+		out += space::spaceText(film, spec.space, space::narrowOnTheSun(spec.space, eye, target, fov));
+	}
+	if (!spec.blackHoles.empty()) {   // (film_cosmos.h: drawn for where the camera is)
+		Vec3 eye, target;
+		double fov = 40.0;
+		film_subjects::cameraOf(header, eye, target, fov);
+		for (const cosmos::BlackHole &b : spec.blackHoles) out += cosmos::blackHoleText(b, nt, {-eye.x, eye.y, eye.z});
+	}
+	for (const cosmos::Astronaut &a : spec.astronauts) {   // (film_voyage.h: a tether to a ship goes to where the ship is now)
+		Vec3 to = a.tether;
+		for (const cosmos::Ship &sh : spec.ships)
+			if (sh.name == a.tetherShip) {
+				const Vec3 p = transformPoint(cosmos::shipPlacement(sh, nt), {-0.2, 0.0, 0.0});
+				to = {-p.x, p.y, p.z};
+			}
+		out += cosmos::astronautText(a, nt, a.tethered ? &to : nullptr);
+	}
+	for (const cosmos::Ship &sh : spec.ships) out += cosmos::shipText(sh, nt);   // (film_voyage.h)
+	for (const cosmos::Remnant &m : spec.remnants) out += cosmos::remnantText(film, m, nt);   // (film_cosmos.h)
+	for (const cosmos::Belt &b : spec.belts) out += cosmos::beltText(b, nt);
+	for (const cosmos::Comet &c : spec.comets) out += cosmos::cometText(film, c, nt, space::sunDirection(spec.space) * -1.0);
+	for (const cosmos::Star &st : spec.stars) out += cosmos::starText(film, st, nt);
+	for (const cosmos::Galaxy &g : spec.galaxies) out += cosmos::galaxyText(film, g);
+	for (const cosmos::Nebula &n : spec.nebulae) out += cosmos::nebulaText(film, n);
+	return out;
+}
+
 inline std::string DataFilm::worldAt(const std::string &header, double t) const {
 	std::string out = film_camera::exposed(header, exposureAt(t));
 	const double nt = natureAt(t);   // (nature's time: the clouds, the water, the aurora, the wind, the animals; `timelapse`, `slowmo`)
@@ -239,25 +276,7 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 		const std::size_t camera = out.find("Camera \"");
 		if (camera != std::string::npos) out = out.substr(0, camera) + nature::mistBeforeCamera(m) + out.substr(camera) + nature::mistBoundary(m);
 	}
-	if (spec.space.on) {   // (the set in space: film_space.h)
-		Vec3 eye, target;
-		double fov = 40.0;
-		film_subjects::cameraOf(header, eye, target, fov);
-		out += space::spaceText(spec.key.empty() ? std::string("film") : spec.key, spec.space, space::narrowOnTheSun(spec.space, eye, target, fov));
-	}
-	if (!spec.blackHoles.empty()) {   // (film_cosmos.h: drawn for where the camera is)
-		Vec3 eye, target;
-		double fov = 40.0;
-		film_subjects::cameraOf(header, eye, target, fov);
-		for (const cosmos::BlackHole &b : spec.blackHoles) out += cosmos::blackHoleText(b, nt, {-eye.x, eye.y, eye.z});
-	}
-	for (const cosmos::Ship &sh : spec.ships) out += cosmos::shipText(sh, nt);   // (film_cosmos.h)
-	for (const cosmos::Remnant &m : spec.remnants) out += cosmos::remnantText(spec.key.empty() ? std::string("film") : spec.key, m, nt);   // (film_cosmos.h)
-	for (const cosmos::Belt &b : spec.belts) out += cosmos::beltText(b, nt);   // (film_cosmos.h)
-	for (const cosmos::Comet &c : spec.comets) out += cosmos::cometText(spec.key.empty() ? std::string("film") : spec.key, c, nt, space::sunDirection(spec.space) * -1.0);   // (film_cosmos.h)
-	for (const cosmos::Star &st : spec.stars) out += cosmos::starText(spec.key.empty() ? std::string("film") : spec.key, st, nt);   // (film_cosmos.h)
-	for (const cosmos::Galaxy &g : spec.galaxies) out += cosmos::galaxyText(spec.key.empty() ? std::string("film") : spec.key, g);   // (film_cosmos.h)
-	for (const cosmos::Nebula &n : spec.nebulae) out += cosmos::nebulaText(spec.key.empty() ? std::string("film") : spec.key, n);   // (film_cosmos.h)
+	out += universeText(spec, header, t, nt);   // (round 10: space and what is in it)
 	if (!spec.planets.empty()) {   // planets and their moons, each where it is now (film_planets.h); an eclipse when one covers the sun
 		const std::string film = spec.key.empty() ? std::string("film") : spec.key;
 		for (std::size_t i = 0; i < spec.planets.size(); ++i) {
