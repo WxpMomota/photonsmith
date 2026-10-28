@@ -2,6 +2,7 @@
 #include "icon_tint.h"
 #include "scene_technique_notes.h"
 #include "scene_metadata_client.h"
+#include "../src/shared/render_flag_names.h"   // render_defaults::kAdaptiveThreshold
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGroupBox>
@@ -1405,7 +1406,7 @@ QString MainWindow::advancedFlagsSummary(const AdvancedRenderFlags &flags) {
 	if (!flags.accelerator.isEmpty()) parts << tr("Accelerator: %1").arg(flags.accelerator.toHtmlEscaped());
 	if (!flags.splitMethod.isEmpty()) parts << tr("Split method: %1").arg(flags.splitMethod.toHtmlEscaped());
 	if (flags.adaptiveSampling) {
-		parts << ((flags.adaptiveThreshold != 0.01)
+		parts << ((flags.adaptiveThreshold != render_defaults::kAdaptiveThreshold)
 			? tr("Adaptive sampling: on (threshold %1)").arg(flags.adaptiveThreshold)
 			: tr("Adaptive sampling: on"));
 	}

@@ -7,6 +7,7 @@
 #include "settings_keys.h"
 
 #include "../src/shared/scene_descriptor.h"
+#include "../src/shared/render_flag_names.h"   // render_defaults::kAdaptiveThreshold
 
 #include <cmath>
 
@@ -545,17 +546,17 @@ void MainWindow::buildSamplingGroup(QWidget *optionsTab, QVBoxLayout *layout) {
 		tr("Stops adding more samples to a pixel once it already looks\n"
 		"clean, instead of always spending the full Samples budget on\n"
 		"every pixel - Samples becomes a ceiling, not a fixed amount every\n"
-		"pixel must use. CPU default path tracer only."));
+		"pixel must use. The CPU path tracer and both GPU renderers."));
 	styleCheckBox(m_adaptiveSamplingCheck);
 	m_adaptiveThresholdSpin = new QDoubleSpinBox(optionsTab);
 	m_adaptiveThresholdSpin->setRange(0.0001, 1.0);
 	m_adaptiveThresholdSpin->setDecimals(4);
-	m_adaptiveThresholdSpin->setValue(0.01);
-	m_adaptiveThresholdSpin->setSingleStep(0.005);
+	m_adaptiveThresholdSpin->setValue(render_defaults::kAdaptiveThreshold);
+	m_adaptiveThresholdSpin->setSingleStep(0.001);
 	m_adaptiveThresholdSpin->setEnabled(false);
 	m_adaptiveThresholdSpin->setToolTip(
-		tr("How clean a pixel must look before it's considered done.\n"
-		"Lower = cleaner but slower. 0.01 matches Blender Cycles' own default."));
+		tr("How much noise a pixel may keep, as it would show in the picture.\n"
+		"Lower = cleaner but slower. The default, 0.003, is under one level of 255."));
 	styleSpinBox(m_adaptiveThresholdSpin);
 	connect(m_adaptiveSamplingCheck, &QCheckBox::toggled, m_adaptiveThresholdSpin, &QDoubleSpinBox::setEnabled);
 	{

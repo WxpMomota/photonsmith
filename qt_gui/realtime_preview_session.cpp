@@ -1032,8 +1032,7 @@ if (useAdaptive) {
 		const int numPixels = m_width * m_height;
 		for (int pixel = 0; pixel < numPixels; ++pixel) {
 			const bool converged = m_pixelVariance[pixel].Count() >= kMinBatchesBeforeConverged &&
-				pixel_convergence::has_converged(m_pixelVariance[pixel], m_adaptiveSamplingThreshold,
-												  /*black_floor=*/1e-4, m_exposure);
+				pixel_convergence::has_converged(m_pixelVariance[pixel], m_adaptiveSamplingThreshold, m_exposure);   // (the 1e-4 black floor is the rule's own)
 			m_activePixelMask[pixel] = converged ? uint8_t{0} : uint8_t{1};
 		}
 	}
