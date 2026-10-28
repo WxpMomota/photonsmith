@@ -240,6 +240,7 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 		if (camera != std::string::npos) out = out.substr(0, camera) + nature::mistBeforeCamera(m) + out.substr(camera) + nature::mistBoundary(m);
 	}
 	if (spec.space.on) out += space::spaceText(spec.key.empty() ? std::string("film") : spec.key, spec.space);   // (the set in space: film_space.h)
+	for (const planets::Planet &p : spec.planets) out += planets::planetText(spec.key.empty() ? std::string("film") : spec.key, p, nt);   // (film_planets.h)
 	if (spec.hasSky) {
 		double rainbow = 0.0;   // (eased in and out over two seconds)
 		for (const Spec::Rainbow &r : spec.rainbows) rainbow = std::max(rainbow, r.strength * smoothstep(r.t0, r.t0 + 2.0, t) * (1.0 - smoothstep(r.t1 - 2.0, r.t1, t)));
@@ -369,7 +370,8 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 		m.face = faces::faceAt(c.feelings, t);
 		out += "# " + c.name + " (" + c.kind + ")\n" + kind.text(m);
 	}
-	return shot_lighting::withLights(out, shotLightsAt(header, t));
+	out = shot_lighting::withLights(out, shotLightsAt(header, t));
+	return spec.space.on ? space::recentred(out) : out;   // (a floating origin for a film in space: film_space.h)
 }
 
 inline void DataFilm::soundscape(audio::Mix &m) const {

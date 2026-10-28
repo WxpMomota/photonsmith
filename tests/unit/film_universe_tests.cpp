@@ -99,3 +99,55 @@ TEST(FilmUniverseSpace, TheStarsHaveTheirColoursTheMilkyWayIsABandAndTheSunIsWhe
 	EXPECT_NEAR(at[2], d.z, 1.0);
 	expectProblems({{"space\nspace", "one `space` line"}, {"space stars 9", "stars and milkyway 0 to 4"}, {"space\nsky 12:00 12:00", "no `sky` with it"}});
 }
+
+// ---- 2. planets ------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace pl = cartoon::planets;
+
+// An ocean world has seas (glossy) and land, a lava world glows along its cracks, a gas giant has no sea; a planet turns with its spin; a film in space is moved so its
+// camera is near the origin, objects' definitions kept outside the move.
+TEST(FilmUniversePlanets, KindsHaveTheirSurfacesPlanetsSpinAndAFarCameraIsBroughtNearTheOrigin) {
+	const auto shares = [](const pl::Planet &p, double &seaShare, double &glowShare) {
+		seaShare = glowShare = 0.0;
+		int n = 0;
+		for (int j = 0; j < 40; ++j)
+			for (int i = 0; i < 80; ++i, ++n) {
+				double sea = 0.0, glow = 0.0;
+				pl::surfaceAt(p, pl::detail::dirOf(i, j, 80, 40), sea, glow);
+				seaShare += sea > 0.5, glowShare += glow > 0.3;
+			}
+		seaShare /= n, glowShare /= n;
+	};
+	pl::Planet ocean, lava, gas;
+	ocean.kind = "ocean", lava.kind = "lava", gas.kind = "gas";
+	double sea = 0.0, glow = 0.0;
+	shares(ocean, sea, glow);
+	EXPECT_GT(sea, 0.2) << "seas";
+	EXPECT_LT(sea, 0.9) << "and land";
+	shares(lava, sea, glow);
+	EXPECT_GT(glow, 0.02) << "glowing rivers of lava";
+	shares(gas, sea, glow);
+	EXPECT_EQ(sea, 0.0);
+	EXPECT_NE(pl::placement(ocean, 0.0), pl::placement(ocean, 30.0)) << "it turns";
+
+	const std::string scene = "LookAt -75000 0 0  -75000 0 -20000  0 1 0\nCamera \"perspective\"\nWorldBegin\nShape \"sphere\"\nObjectBegin \"rock\"\nShape \"sphere\"\nObjectEnd\nObjectInstance \"rock\"\n";
+	const std::string moved = cartoon::space::recentred(scene);
+	EXPECT_NE(moved.find("LookAt 0.000000 0.000000 0.000000  0.000000 0.000000 -20000.000000"), std::string::npos) << moved;
+	EXPECT_NE(moved.find("Translate 75000.0 -0.0 -0.0"), std::string::npos) << moved;
+	const std::size_t def = moved.find("ObjectBegin"), inst = moved.find("ObjectInstance");
+	EXPECT_LT(moved.rfind("AttributeEnd", def), def) << "the object's definition outside the Translate";
+	EXPECT_GT(moved.rfind("Translate", inst), def) << "its instance inside it";
+	EXPECT_EQ(cartoon::space::recentred("LookAt 10 0 0  0 0 0  0 1 0\nWorldBegin\n"), "LookAt 10 0 0  0 0 0  0 1 0\nWorldBegin\n") << "near the origin already";
+
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("planets", "scene s.pbrt\nlength 4\nspace\nplanet home ocean at 0 0 -20000 radius 6000\nplanet big gas at 30000 0 -40000 radius 9000 tilt 5\n"
+								 "shot 0 A\n key 0 0 0  0 0 -100  50\n",
+						film),
+			  "");
+	const std::string s = film.sceneAt(1.0);
+	EXPECT_EQ(count(s, "# a planet (film_planets.h)"), 2u);
+	EXPECT_NE(s.find("\"coateddiffuse\" \"texture reflectance\" \"home_colour\""), std::string::npos) << "an ocean world's seas glossy";
+	expectProblems({{"planet a moon at 0 0 0 radius 10", "rocky, desert, ice, ocean, gas or lava"},
+					{"planet a rocky at 0 0 0", "where it is and how big"},
+					{"planet a rocky at 0 0 0 radius 10\nplanet a ice at 5 0 0 radius 10", "already a planet called a"}});
+}

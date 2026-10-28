@@ -1074,6 +1074,24 @@ brighter and wider towards its centre (bearing 66, on the horizon), knotted with
 kilometres off at `sun BEARING ELEVATION` (degrees; 60 15 by default), its light the films' sunlight (3 units of irradiance) times `sunlight`, so a planet's night
 side is dark and shadows are as soft as the sun is big.
 
+**A floating origin.** The GPU renderers lose texture precision far from the origin (a textured planet 75 km out was drawn in blocks a few hundred metres across, on
+both GPU renderers; the cause is not yet found), so every frame of a film with `space` is moved - its camera and its whole world, by the same whole number of
+kilometres - to put the camera within a kilometre of the origin (film_space.h `recentred`). A film need not do anything about it.
+
+**Planets: `planet`.** (film_planets.h)
+
+```
+planet  home   ocean  at -75000 0 -20000  radius 6000                 # `tilt DEGREES` (15), `spin SECONDS` (600), `seed N`
+planet  giant  gas    at -45000 0 -20000  radius 6000  tilt 10
+```
+
+A world lit by the sun (`space`'s; a day side, a night side and the soft line between), a pbrt sphere with its surface painted once into a picture for its kind and seed,
+its poles up, tipped by `tilt`, turning once every `spin` seconds of nature's time. Kinds: `rocky` (grey highlands, dark plains, craters with soft bright rims and rays),
+`desert` (rust and ochre, dark rock, dunes in bands, white polar caps), `ice` (white and pale blue, crossed by long brown cracks), `ocean` (continents of forest, grass,
+desert and mountain by latitude under swirls of cloud, white caps; its seas are smooth, a coated surface whose roughness is a second picture, so they catch the sun in a
+glint), `gas` (a giant: bands of cloud torn into eddies at their edges, a great oval storm) and `lava` (dark crust broken by glowing rivers of lava that light its night
+side). Each needs `at X Y Z` and a `radius` (1 to 200 000 m), and its own name.
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

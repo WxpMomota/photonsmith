@@ -16,6 +16,7 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -150,6 +151,45 @@ inline std::string starfieldPicture(const std::string &film, const Space &s) {
 				}
 		}
 	});
+}
+
+// A space film's frame moved so its camera is near the origin (a floating origin): the GPU loses precision far from the origin - a textured planet 75 km out
+// came out in blocks a few hundred metres across (2026-10-27, both GPU renderers, cause not yet found) - so the camera (its `LookAt`) and everything in the world
+// are moved by the same whole number of kilometres. The world's lines are wrapped in a Translate, but not an object's definition (ObjectBegin .. ObjectEnd): its
+// instances are placed inside the Translate, and pbrt composes the two. Lights at infinity do not move. A scene with its camera within 5 km of the origin is left as
+// it is.
+inline std::string recentred(const std::string &scene) {
+	const std::size_t look = scene.find("LookAt "), world = scene.find("WorldBegin\n");
+	if (look == std::string::npos || world == std::string::npos || look > world) return scene;
+	const std::size_t end = scene.find('\n', look);
+	std::istringstream in(scene.substr(look + 7, end - look - 7));
+	double v[9];
+	for (double &x : v)
+		if (!(in >> x)) return scene;
+	const double ox = std::round(v[0] / 1000.0) * 1000.0, oy = std::round(v[1] / 1000.0) * 1000.0, oz = std::round(v[2] / 1000.0) * 1000.0;
+	if (std::max({std::abs(ox), std::abs(oy), std::abs(oz)}) < 5000.0) return scene;
+	char buf[320];
+	std::snprintf(buf, sizeof buf, "LookAt %.6f %.6f %.6f  %.6f %.6f %.6f  %.6f %.6f %.6f", v[0] - ox, v[1] - oy, v[2] - oz, v[3] - ox, v[4] - oy, v[5] - oz, v[6], v[7], v[8]);
+	char open[160];
+	std::snprintf(open, sizeof open, "AttributeBegin   # (a floating origin: film_space.h recentred)\n  Translate %.1f %.1f %.1f\n", -ox, -oy, -oz);
+	std::string out = scene.substr(0, look) + buf + scene.substr(end, world + 11 - end) + open;
+	// the world, with each object's definition kept outside the Translate
+	std::size_t at = world + 11;
+	while (at < scene.size()) {
+		const std::size_t ob = scene.find("ObjectBegin \"", at);
+		if (ob == std::string::npos || (ob > 0 && scene[ob - 1] != '\n')) {
+			out += scene.substr(at);
+			break;
+		}
+		const std::size_t oe = scene.find("ObjectEnd\n", ob);
+		if (oe == std::string::npos) {
+			out += scene.substr(at);
+			break;
+		}
+		out += scene.substr(at, ob - at) + "AttributeEnd\n" + scene.substr(ob, oe + 10 - ob) + open;
+		at = oe + 10;
+	}
+	return out + "AttributeEnd\n";
 }
 
 // The set in space as scene text: the starfield (the sky's picture as an infinite light) and the sun (a glowing ball a thousand kilometres off).
