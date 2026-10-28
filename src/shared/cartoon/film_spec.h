@@ -34,6 +34,7 @@
 #include "film_fire.h"
 #include "film_giants.h"
 #include "film_glow.h"
+#include "film_ice.h"
 #include "film_flowers.h"
 #include "film_geology.h"
 #include "film_soundscape.h"
@@ -384,6 +385,10 @@ struct Spec {
 	glow::Bioluminescence bio;
 	std::vector<glow::Fireflies> fireflies;
 	std::vector<glow::Fungi> fungi;
+	// ice (`glacier`, `iceberg`, `seaice`; `waterfall ... frozen`)
+	std::vector<ice::Glacier> glaciers;
+	std::vector<ice::Iceberg> icebergs;
+	ice::SeaIce seaIce;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;
 	bool muteBirds = false;   // (`mute birds`: no birdsong, no eagles' cries, no geese - whatever flies in the picture)

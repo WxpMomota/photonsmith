@@ -224,6 +224,50 @@ inline std::string glowLine(Spec &s, const std::string &verb, const std::string 
 	return std::string();
 }
 
+// A `glacier`, `iceberg` or `seaice` line (film_ice.h). "" or what is wrong with it.
+inline std::string iceLine(Spec &s, const std::string &verb, const std::string &line) {
+	using detail::number;
+	const auto fail = [](const std::string &what) { return what; };
+	const std::vector<std::string> t = detail::tokens(line);
+	double a = 0.0, b = 0.0;
+	if (verb == "seaice") {
+		if (s.seaIce.on) return fail("a film has one `seaice` line");
+		s.seaIce.on = true;
+		for (std::size_t i = 1; i < t.size(); i += 2) {
+			if (i + 1 >= t.size() || !number(t[i + 1], a)) return fail("\"" + t[i] + "\": `seaice [cover C] [floe F] [seed N]` (cover 0 to 1, floes 2 to 200 m across)");
+			if (t[i] == "cover" && a > 0.0 && a <= 1.0) s.seaIce.cover = a;
+			else if (t[i] == "floe" && a >= 2.0 && a <= 200.0) s.seaIce.floe = a;
+			else if (t[i] == "seed") s.seaIce.seed = static_cast<int>(a);
+			else return fail("\"" + t[i] + "\": `seaice [cover C] [floe F] [seed N]` (cover 0 to 1, floes 2 to 200 m across)");
+		}
+		return std::string();
+	}
+	const bool glacier = verb == "glacier";
+	const std::string usage = glacier ? "`glacier from X Z toward DEGREES [length L] [width W] [thick T] [calve T] ... [seed N]`" : "`iceberg at X Z [size S] [seed N]`";
+	if (t.size() < 4 || t[1] != (glacier ? "from" : "at") || !number(t[2], a) || !number(t[3], b)) return fail(usage);
+	ice::Glacier g;
+	ice::Iceberg berg;
+	(glacier ? g.x : berg.x) = a, (glacier ? g.z : berg.z) = b;
+	for (std::size_t i = 4; i < t.size(); i += 2) {
+		if (i + 1 >= t.size() || !number(t[i + 1], a)) return fail("\"" + t[i] + "\": " + usage);
+		if (glacier && t[i] == "toward") g.toward = a;
+		else if (glacier && t[i] == "length" && a >= 50.0 && a <= 20000.0) g.length = a;
+		else if (glacier && t[i] == "width" && a >= 10.0 && a <= 5000.0) g.width = a;
+		else if (glacier && t[i] == "thick" && a >= 2.0 && a <= 1000.0) g.thick = a;
+		else if (glacier && t[i] == "calve") g.calving.push_back(a);
+		else if (!glacier && t[i] == "size" && a >= 1.0 && a <= 2000.0) berg.size = a;
+		else if (t[i] == "seed") (glacier ? g.seed : berg.seed) = static_cast<int>(a);
+		else return fail("\"" + t[i] + "\": " + usage + (glacier ? " (length 50 to 20000 m, width 10 to 5000 m, thick 2 to 1000 m)" : " (size 1 to 2000 m)"));
+	}
+	if (glacier) {
+		std::sort(g.calving.begin(), g.calving.end());
+		s.glaciers.push_back(g);
+	} else {
+		s.icebergs.push_back(berg);
+	}
+	return std::string();
+}
+
 // One line of a film file, if it is a nature line: what it says goes into `s`. `handled` is false when `verb` is not a nature word (the line is parse()'s); the
 // result is "" or what is wrong with the line (parse() adds the file and the line).
 inline std::string natureLine(Spec &s, const std::string &verb, const std::string &line, const std::string &rest, bool &handled) {
@@ -317,14 +361,19 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		const std::vector<std::string> t = detail::tokens(line);
 		water::Fall fl;
 		if (t.size() < 5 || t[1] != "at" || !number(t[2], fl.lip.x) || !number(t[3], fl.lip.y) || !number(t[4], fl.lip.z))
-			return fail("`waterfall at X Y Z [width W] [drop H] [facing DEGREES]`: the middle of its lip");
+			return fail("`waterfall at X Y Z [width W] [drop H] [facing DEGREES] [frozen]`: the middle of its lip");
 		for (std::size_t i = 5; i < t.size(); i += 2) {
 			double v = 0.0;
+			if (t[i] == "frozen") {   // (hung in ice: film_ice.h)
+				fl.frozen = true;
+				--i;
+				continue;
+			}
 			if (i + 1 >= t.size() || !number(t[i + 1], v)) return fail("\"" + t[i] + "\": a waterfall takes width, drop and facing, each with a number");
 			if (t[i] == "width" && v > 0.0 && v <= 200.0) fl.width = v;
 			else if (t[i] == "drop" && v > 0.0 && v <= 1000.0) fl.drop = v;
 			else if (t[i] == "facing") fl.facing = v;
-			else return fail("\"" + t[i] + "\": a waterfall takes width (up to 200 m), drop (up to 1000 m) and facing");
+			else return fail("\"" + t[i] + "\": a waterfall takes width (up to 200 m), drop (up to 1000 m), facing and frozen");
 		}
 		s.falls.push_back(fl);
 	} else if (verb == "clouds") {
@@ -753,6 +802,8 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		return giantLine(s, verb, line);
 	} else if (verb == "bioluminescence" || verb == "fireflies" || verb == "fungi") {   // living light (film_glow.h)
 		return glowLine(s, verb, line);
+	} else if (verb == "glacier" || verb == "iceberg" || verb == "seaice") {   // ice (film_ice.h)
+		return iceLine(s, verb, line);
 	} else if (verb == "geyser" || verb == "rockfall" || verb == "avalanche") {   // the land in action (film_geology.h)
 		const std::vector<std::string> t = detail::tokens(line);
 		const std::string where = verb == "geyser" ? "at" : "from";

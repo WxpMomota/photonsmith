@@ -174,7 +174,38 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 		}
 		if (spec.swell.on && ground) out += surf::shallowsCausticText(spec.key.empty() ? std::string("film") : spec.key, nt, -eye.x, eye.z, *ground, spec.seas[0].level);
 		for (const water::River &r : spec.rivers) out += water::riverText(r, nt, ground.get());
-		for (const water::Fall &f : spec.falls) out += water::fallText(f, nt, ground.get());
+		for (const water::Fall &f : spec.falls) out += f.frozen ? (ground ? std::string() : water::cliffText(f)) + ice::frozenFallText(f) : water::fallText(f, nt, ground.get());
+	}
+	if (!spec.glaciers.empty() || !spec.icebergs.empty() || spec.seaIce.on) {   // ice (film_ice.h)
+		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
+		const auto groundAt = [&](double x, double z) { return ground && ground->inside(x, z) ? ground->heightAt(x, z) : (ground ? spec.terrain.y : 0.0); };
+		const double level = spec.seas.empty() ? -1e30 : spec.seas[0].level;
+		for (std::size_t i = 0; i < spec.glaciers.size(); ++i) {
+			const ice::Glacier &g = spec.glaciers[i];
+			double cut = 0.0;   // (each calving takes a slab off the front: the slab falls, the front stands back by its depth)
+			for (double c : g.calving) {
+				if (t < c) {
+					out += ice::slabText(g, cut, -1.0, groundAt, level, nt);   // (the next slab, still standing)
+					break;
+				}
+				if (t < c + 60.0) out += ice::slabText(g, cut, t - c, groundAt, level, nt);
+				if (t >= c + ice::kCalveFall && !spec.seas.empty()) {
+					const Vec3 at = ice::calveSplash(g, cut, groundAt, level);
+					const double since = t - c - ice::kCalveFall, H = g.thickness();
+					out += giants::sprayText(at, since, 3000, 0.55 * std::sqrt(9.81 * H), 0.004 * g.width, 1201 + static_cast<int>(i) * 31 + static_cast<int>(cut), false, spec.seas[0].glowing());
+					out += giants::foamText(spec.seas[0], at, since, 0.5 * g.width, nt, 1301 + static_cast<int>(cut));
+				}
+				cut += ice::slabDepth(g);
+			}
+			out += ice::glacierText(g, cut + (g.calving.empty() || t >= g.calving.back() ? 0.0 : ice::slabDepth(g)), groundAt, level);
+		}
+		for (const ice::Iceberg &b : spec.icebergs) out += ice::bergText(b, nt, level > -1e29 ? level : 0.0);
+		if (spec.seaIce.on && !spec.seas.empty()) {
+			Vec3 eye, target;
+			double fov = 40.0;
+			film_subjects::cameraOf(header, eye, target, fov);
+			out += ice::seaIceText(spec.seaIce, spec.seas[0], nt, {-eye.x, eye.y, eye.z});
+		}
 	}
 	if (!spec.fireflies.empty() || !spec.fungi.empty()) {   // living light (film_glow.h)
 		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
@@ -274,7 +305,7 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 inline void DataFilm::soundscape(audio::Mix &m) const {
 	const bool eagles = std::any_of(spec.flocks.begin(), spec.flocks.end(), [](const wildlife::Flock &f) { return f.kind == "eagles"; });
 	if (spec.falls.empty() && spec.fires.empty() && spec.lavas.empty() && spec.volcanoes.empty() && spec.wildfires.empty() && !spec.swell.on && spec.herds.empty() && !eagles &&
-		spec.forests.empty() && spec.geysers.empty() && spec.rockfalls.empty() && spec.avalanches.empty() && spec.quakes.empty() && spec.whales.empty() && spec.pods.empty())
+		spec.forests.empty() && spec.geysers.empty() && spec.rockfalls.empty() && spec.avalanches.empty() && spec.quakes.empty() && spec.whales.empty() && spec.pods.empty() && spec.glaciers.empty())
 		return;
 	namespace ss = soundscape;
 	const ss::Ears ears = ss::earsOf(m.seconds(), [this](double t, Vec3 &eye, Vec3 &target) {
@@ -285,6 +316,18 @@ inline void DataFilm::soundscape(audio::Mix &m) const {
 	const auto groundAt = [&](double x, double z) { return ground ? ground->heightAt(x, z) : 0.0; };
 	const double T = m.seconds();
 	const auto always = [](double) { return 1.0; };
+	for (std::size_t i = 0; i < spec.glaciers.size(); ++i) {   // a calving: the crack, then the roar of the slab hitting the water
+		const ice::Glacier &g = spec.glaciers[i];
+		double cut = 0.0;
+		for (std::size_t k = 0; k < g.calving.size(); ++k) {
+			const unsigned s = 1701u + static_cast<unsigned>(i * 31 + k * 7);
+			const Vec3 at = ice::calveSplash(g, cut, groundAt, spec.seas.empty() ? -1e30 : spec.seas[0].level);
+			ss::place(m, ears, g.calving[k], at, audio::noiseBurst(0.6, 0.002, 0.5, 3000.0, 800.0, s), 0.9, 200.0);   // (the crack)
+			ss::place(m, ears, g.calving[k] + ice::kCalveFall, at, ss::crash(s + 1u), 1.4, 200.0);
+			ss::place(m, ears, g.calving[k] + ice::kCalveFall, at, audio::noiseBurst(3.0, 0.03, 2.6, 50.0, 700.0, s + 2u), 1.8, 200.0);   // (its boom)
+			cut += ice::slabDepth(g);
+		}
+	}
 	if ((!spec.whales.empty() || !spec.pods.empty()) && !spec.seas.empty())   // the sea's giants (film_giants.h); nature's times back to the film's
 		giants::giantsSound(m, ears, spec.whales, spec.pods, spec.seas[0].level, spec.hasUnderwater, [this](double ft) { return natureAt(ft); }, [this, T](double ntv) {
 			double lo = 0.0, hi = T;
@@ -294,6 +337,7 @@ inline void DataFilm::soundscape(audio::Mix &m) const {
 	// waterfalls: a roar from the pool at the foot of each
 	for (std::size_t i = 0; i < spec.falls.size(); ++i) {
 		const water::Fall &f = spec.falls[i];
+		if (f.frozen) continue;   // (hung in ice: silent)
 		const Vec3 pool = f.lip + Vec3{0.0, -0.85 * f.drop, 0.0};
 		const double g = 0.3 * std::sqrt(std::max(1.0, f.width * f.drop) / 120.0);
 		ss::lay(m, ears, 0.0, T, 0.3, [pool](double) { return pool; }, [g](double) { return g; }, ss::roar(250.0, 1500.0, 0.8, 101u + static_cast<unsigned>(i)), 12.0);

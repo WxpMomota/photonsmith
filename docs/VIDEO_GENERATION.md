@@ -957,6 +957,24 @@ mushrooms in each, pale stems and glowing round caps 2 to 6 cm across, breathing
 above 1), so it looks as bright on the screen however far `exposure auto` opens the night camera up - `strength` and `brightness` are how it looks, not how much light it
 is. `bioluminescence` needs a `water` line.
 
+**Ice: `glacier`, `iceberg`, `seaice`, `waterfall ... frozen`.** (film_ice.h; nature round 9, 2026-10-27)
+
+```
+glacier   from 0 400  toward 180  length 500  width 140  thick 30  calve 12   # `seed N`; `calve T` as often as you like
+iceberg   at -120 -250  size 40                                               # `seed N`: its shape
+seaice    cover 0.5  floe 10                                                  # `seed N`
+waterfall at 0 30 -40  drop 25  width 8  frozen
+```
+
+Ice is pbrt's `subsurface` material (light goes in and comes out blue, the reds absorbed over a few metres); faces that look up carry snow, the steep ones show the ice.
+A glacier is a tongue of ice laid over the land from `from` along `toward` (a compass bearing): `thick` metres in its middle (0.18 of its width when not given),
+thinning to nothing at its edges, its surface following a smoothed bed and heaved, cut by fields of crevasses across its flow (bowed downstream, more towards its front
+and its edges). It ends in a fluted cliff that stands down into the sea where there is one (needs a `terrain`). At `calve T` a slab off the front (a twentieth of its
+width deep, a third of it wide) leans out, topples into the water in 3 s with a crack and a roar, bursts into spray and foam, then floats off; the front stands back by
+the slab's depth. An iceberg floats on the sea (`size` metres across at the water, 1 to 2000): flat-topped and steep-sided above, a broad keel below, bobbing and turning.
+`seaice` covers `cover` of the sea round the camera (out to 40 floes) with floes `floe` metres across riding the waves. `frozen` hangs a waterfall in ice: icicles from
+its lip, a quarter of them reaching the bottom as columns, a frozen pool, no spray and no roar. Icebergs and sea ice need a `water` line.
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

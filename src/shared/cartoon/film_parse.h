@@ -147,6 +147,8 @@
 //                                                               # tumbling down the slope; `avalanche from X Z [at T]`: a powder cloud racing down; `quake T0 T1`: shaking
 //     fire     at 0 0 -4  size 1.2                              # fire (film_fire.h): flames (glowing volumes, flickering, a light among them, sparks) with smoke above;
 //     lava     from 120 -300  width 6                           # lava creeping down the land from a vent; a volcano raised in the land (`volcano at X Z [height H]
+//     glacier  from 0 -400  toward 180  calve 20                # ice (film_ice.h): a glacier down the land, its front calving; `iceberg at X Z [size S]`,
+//                                                               # `seaice [cover C] [floe F]`, `waterfall ... frozen`
 //     fireflies 200  in -20 -20 20 20  together                # living light (film_glow.h): a swarm flashing (`together`: into step), `fungi COUNT in ...`
 //                                                               # glowing on the ground, `bioluminescence [strength S]`: the stirred sea glowing blue
 //     whale    at 0 -150  toward 90  breach 12                 # the sea's giants (film_giants.h): a humpback rolling, blowing, breaching; `dolphins 6 at X Z`
@@ -923,7 +925,7 @@ inline Parsed parse(const std::string &text, const std::string &where, const std
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, set, cast, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, mute, music, toon, voices, acting, lighting, terrain, water, river, waterfall, clouds, fogbank, forest, flock, herd, whale, dolphins, bioluminescence, fireflies, fungi, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, set, cast, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, mute, music, toon, voices, acting, lighting, terrain, water, river, waterfall, clouds, fogbank, forest, flock, herd, whale, dolphins, bioluminescence, fireflies, fungi, glacier, iceberg, seaice, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -1099,6 +1101,7 @@ inline Parsed parse(const std::string &text, const std::string &where, const std
 			s.emitters.push_back(e);
 		}
 	for (const water::Fall &f : s.falls) {   // a waterfall throws up spray where it lands, the whole film long
+		if (f.frozen) continue;
 		particles::Emitter e;
 		e.kind = "splash";
 		e.at = water::fallFoot(f);
@@ -1127,6 +1130,14 @@ inline Parsed parse(const std::string &text, const std::string &where, const std
 	if ((!s.whales.empty() || !s.pods.empty()) && (s.seas.empty() || s.seas[0].kind == "lake")) {
 		n = 0;
 		return fail("whales and dolphins swim in the sea: the film needs a `water sea` line");
+	}
+	if (!s.glaciers.empty() && !s.hasTerrain) {
+		n = 0;
+		return fail("a glacier lies on the land: the film needs a `terrain` line");
+	}
+	if ((!s.icebergs.empty() || s.seaIce.on) && s.seas.empty()) {
+		n = 0;
+		return fail(std::string(s.seaIce.on ? "sea ice" : "an iceberg") + " floats on the water: the film needs a `water` line");
 	}
 	if (s.bio.on) {   // (the sea's foam glows)
 		if (s.seas.empty()) {

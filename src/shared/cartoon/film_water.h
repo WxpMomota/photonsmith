@@ -51,6 +51,7 @@ struct River {
 struct Fall {
 	Vec3 lip;
 	double width = 6.0, drop = 20.0, facing = 0.0;
+	bool frozen = false;   // (film_ice.h) hung in ice
 };
 inline const std::vector<std::string> &seaKinds() {
 	static const std::vector<std::string> k = {"sea", "lake", "clear"};

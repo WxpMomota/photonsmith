@@ -396,3 +396,68 @@ TEST(FilmSpectacleGlow, FirefliesFlashAndFallIntoStepFungiGlowAndTheStirredSeaSh
 		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
 	}
 }
+
+// ---- 5. ice ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace ice = cartoon::ice;
+
+// A glacier is thick in its middle and thins to nothing at its edges, crevassed more towards its front; its front calves - a slab that stands, topples out and lies in
+// the water, with a burst of spray; an iceberg floats mostly under the water; sea ice covers as much of the sea as it is told; a frozen waterfall hangs in icicles, silent.
+TEST(FilmSpectacleIce, AGlacierThinsToItsEdgesCrevassesAndCalvesBergsFloatLowAndFallsFreeze) {
+	ice::Glacier g;
+	g.length = 600.0, g.width = 160.0, g.thick = 40.0;
+	const auto flat = [](double, double) { return 0.0; };
+	EXPECT_GT(ice::glacierTop(g, 300.0, 0.0, flat), 25.0) << "thick in its middle";
+	EXPECT_LT(ice::glacierTop(g, 300.0, 79.5, flat), 0.25 * ice::glacierTop(g, 300.0, 0.0, flat)) << "thin at its edges";
+	double head = 0.0, front = 0.0;
+	for (double b = -70.0; b <= 70.0; b += 1.0)
+		for (double a = 0.0; a < 100.0; a += 1.0) head += ice::crevasse(g, a, b), front += ice::crevasse(g, 500.0 + a, b);
+	EXPECT_GT(front, 3.0 * head + 1.0) << "crevassed towards its front";
+	const std::string text = ice::glacierText(g, 0.0, flat, -1e30);
+	EXPECT_NE(text.find("\"subsurface\""), std::string::npos) << "ice";
+	EXPECT_NE(text.find("0.86 0.88 0.9"), std::string::npos) << "snow on top";
+	// the calving slab: standing, then out from the front and down
+	const auto reach = [](const std::string &s, int axis) {   // (the furthest point along an axis: 0 = z, out from the front of a glacier flowing toward 0; 1 = y)
+		std::istringstream in(s.substr(s.find("\"point3 P\" [") + 12));
+		double best = -1e30, x = 0.0, y = 0.0, z = 0.0;
+		while (in >> x >> y >> z) best = std::max(best, axis == 0 ? z : y);
+		return best;
+	};
+	const std::string standing = ice::slabText(g, 0.0, -1.0, flat, 0.0, 0.0), toppling = ice::slabText(g, 0.0, 2.0, flat, 0.0, 2.0), lying = ice::slabText(g, 0.0, 8.0, flat, 0.0, 8.0);
+	EXPECT_GT(reach(toppling, 0), reach(standing, 0) + 10.0) << "toppling out over the water";
+	EXPECT_LT(reach(lying, 1), 0.5 * reach(standing, 1)) << "lying in the water";
+	// an iceberg: most of it under the water
+	const cartoon::Mesh &berg = ice::bergShape(3);
+	double lo = 0.0, hi = 0.0;
+	for (const cartoon::Vec3 &v : berg.verts) lo = std::min(lo, v.y), hi = std::max(hi, v.y);
+	EXPECT_GT(-lo, 2.0 * hi) << "a deep keel under a low berg";
+
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("ice", "scene s.pbrt\nlength 30\nterrain hills size 2000 height 30 seed 2\nwater sea level -5 waves 0.3\nglacier from 0 300 toward 180 length 400 width 120 calve 10\n"
+							  "iceberg at 50 -200 size 30\nseaice cover 0.5 floe 8\nwaterfall at -300 40 300 drop 20 frozen\nshot 0 A\n key 0 20 -150  0 10 0  50\n",
+						film),
+			  "");
+	const std::string before = film.sceneAt(9.0), after = film.sceneAt(10.0 + ice::kCalveFall + 0.4);
+	EXPECT_NE(before.find("# a calving slab"), std::string::npos) << "the slab stands in the front";
+	EXPECT_EQ(before.find("# spray"), std::string::npos);
+	EXPECT_NE(after.find("# spray"), std::string::npos) << "a burst of spray as it hits the water";
+	EXPECT_NE(after.find("# an iceberg"), std::string::npos);
+	EXPECT_NE(after.find("# sea ice"), std::string::npos);
+	EXPECT_NE(after.find("# a frozen waterfall"), std::string::npos);
+	EXPECT_EQ(after.find("# a waterfall (film_water.h)"), std::string::npos) << "no running water";
+	EXPECT_TRUE(film.spec.emitters.empty()) << "a frozen fall throws up no spray";
+	// more cover, more floes
+	ice::SeaIce few, many;
+	few.cover = 0.2, many.cover = 0.8;
+	cartoon::water::Sea sea;
+	const std::string a = ice::seaIceText(few, sea, 0.0, {0.0, 5.0, 0.0}), b = ice::seaIceText(many, sea, 0.0, {0.0, 5.0, 0.0});
+	EXPECT_GT(b.size(), 2.5 * a.size());
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"glacier from 0 0 toward 0", "needs a `terrain` line"},
+																						{"iceberg at 0 0", "needs a `water` line"},
+																						{"water sea level 0\nseaice cover 2", "cover 0 to 1"},
+																						{"terrain hills\nglacier from 0 0 width 1", "width 10 to 5000"},
+																						{"waterfall at 0 0 0 frozen drop 0", "\"drop\""}}) {
+		const std::string problem = problemOf(line);
+		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
+	}
+}
