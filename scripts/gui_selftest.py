@@ -119,6 +119,16 @@ def installphoto_env(fake_home):
             "RT_GUI_SELFTEST_SETUP_FAIL": fail_path, **extra}
 
 
+def fail(mode, why, log_path):
+    """Says a mode failed. On GitHub Actions it is also an error annotation with the end of the mode's log: annotations can be read without
+    signing in (the job's log and the uploaded logs cannot), so a red run says which mode failed and where it stopped."""
+    print("FAIL [%s]: %s" % (mode, why))
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        tail = open(log_path, errors="replace").read().splitlines()[-12:] if os.path.exists(log_path) else []
+        body = "\n".join([why] + tail).replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+        print("::error title=GUI self-test [%s]::%s" % (mode, body))
+
+
 def run_mode(exe, mode, wait_s, out, plugins, fake_home, gpu=False, retried=False):
     prefix = os.path.join(out, mode)
     for ext in (".txt", ".stdout"):
@@ -151,7 +161,7 @@ def run_mode(exe, mode, wait_s, out, plugins, fake_home, gpu=False, retried=Fals
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait()
-            print("FAIL [%s]: still running after %ds (hung)" % (mode, wait_s))
+            fail(mode, "still running after %ds (hung)" % wait_s, prefix + ".txt")
             return False
     if rc == -11 and mode == "quitwarm" and IS_MAC and not retried:
         # MallocScribble (set above) makes freed memory 0x55...: when macOS's own memory-pressure handler (libdispatch -> malloc_memory_event_handler -> malloc_zone_pressure_relief) walks
@@ -161,7 +171,7 @@ def run_mode(exe, mode, wait_s, out, plugins, fake_home, gpu=False, retried=Fals
         print("note [%s]: crashed once (SIGSEGV); running it again, a real quit crash would crash again" % mode)
         return run_mode(exe, mode, wait_s, out, plugins, fake_home, gpu, retried=True)
     if rc != 0:
-        print("FAIL [%s]: exit code %d" % (mode, rc))
+        fail(mode, "exit code %d" % rc, prefix + ".txt")
         if os.path.exists(prefix + ".txt"):
             print(open(prefix + ".txt", errors="replace").read())
         return False
@@ -217,7 +227,7 @@ def main():
             log = os.path.join(out, mode + ".txt")
             text = open(log, errors="replace").read() if os.path.exists(log) else ""
             if mode == "ui" and passed and args.live_preview and 'Live Preview (interactive)" enabled=1' not in text:
-                print("FAIL [ui]: no enabled Live Preview item")
+                fail("ui", "no enabled Live Preview item", log)
                 ok = False
             if mode in ("livepreview", "livepreview_objects", "livepreview_arrange"):
                 for line in text.splitlines():

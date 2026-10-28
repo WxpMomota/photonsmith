@@ -86,7 +86,7 @@ jobs:
         # this was never actually a Windows-specific issue.
         env:
           RT_REQUIRE_FIXTURES: "1"   # a test whose file of the repository is not found fails instead of skipping (tests/unit/fixture_skip.h)
-        run: .\tests\build\Release\unit_tests.exe --gtest_color=yes
+        run: .\tests\build\Release\unit_tests.exe --gtest_color=yes --gtest_output=xml:${{ runner.temp }}\unit_tests.xml
 
       - name: Build the launcher (ray_tracer)
         # The Scene Builder's render tests (tests/unit/scene_*_tests.cpp: the mix blend, the projector slide, the sky, volumes, the starter scene) render through the
@@ -107,11 +107,16 @@ jobs:
           RT_LAUNCHER: ${{ github.workspace }}\build_rt\Release\ray_tracer.exe
           RT_REQUIRE_LAUNCHER: "1"   # a render test that cannot find the launcher fails instead of skipping
           RT_REQUIRE_FIXTURES: "1"
-        run: .\tests\build\Release\cpu_integrator_tests.exe --gtest_color=yes
+        run: .\tests\build\Release\cpu_integrator_tests.exe --gtest_color=yes --gtest_output=xml:${{ runner.temp }}\cpu_integrator_tests.xml
+
+      - name: Failed tests as annotations
+        # Readable without signing in, unlike the log: which tests failed and why (scripts/gtest_annotations.py).
+        if: failure()
+        run: python scripts\gtest_annotations.py ${{ runner.temp }}\unit_tests.xml ${{ runner.temp }}\cpu_integrator_tests.xml
 
   unit-tests-macos:
-    # The same portable test target as the Windows job above, on Apple silicon: it builds and passes there (about 3,570 tests, ~20 s to run
-    # natively) and so catches a macOS-only break - a header that only compiles with MSVC, a path assumption, an Apple clang diagnostic - that the
+    # The same portable test target as the Windows job above, on Apple silicon: it builds and passes there (about 4,260 tests; ~20 s without the
+    # films, but the whole-film sweeps take ~390 s of a ~410 s run on Windows, and much longer here at -O0) and so catches a macOS-only break - a header that only compiles with MSVC, a path assumption, an Apple clang diagnostic - that the
     # Windows job cannot. Same two executables, same cwd rule (the repo root, so pbrt_scenes/ resolves). Pinned to macos-14 like metal-poc.
     runs-on: macos-14
     steps:
@@ -141,7 +146,7 @@ jobs:
         env:
           TEMP: ${{ runner.temp }}
           RT_REQUIRE_FIXTURES: "1"
-        run: build_tests/unit_tests --gtest_color=yes
+        run: build_tests/unit_tests --gtest_color=yes --gtest_output=xml:${{ runner.temp }}/unit_tests.xml
 
       - name: Build the launcher (ray_tracer)
         # See the Windows job: the Scene Builder's render tests need it, and must not skip.
@@ -157,7 +162,12 @@ jobs:
           RT_LAUNCHER: ${{ github.workspace }}/build_rt/ray_tracer
           RT_REQUIRE_LAUNCHER: "1"
           RT_REQUIRE_FIXTURES: "1"
-        run: build_tests/cpu_integrator_tests --gtest_color=yes
+        run: build_tests/cpu_integrator_tests --gtest_color=yes --gtest_output=xml:${{ runner.temp }}/cpu_integrator_tests.xml
+
+      - name: Failed tests as annotations
+        # See the Windows job's step of the same name.
+        if: failure()
+        run: python3 scripts/gtest_annotations.py ${{ runner.temp }}/unit_tests.xml ${{ runner.temp }}/cpu_integrator_tests.xml
 
   metal-poc:
     # Pinned to a specific image, not macos-latest - this job's own
