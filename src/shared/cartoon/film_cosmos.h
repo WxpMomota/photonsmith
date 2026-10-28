@@ -571,5 +571,63 @@ inline std::string cometText(const std::string &film, const Comet &c, double nt,
 	return out + buf;
 }
 
+// ---- asteroid belts ----
+// Rocks by the thousand: a belt (`ring`: a band `width` wide round a centre at `radius`, a tenth as thick, its rocks going round at Kepler's pace - those inside faster -
+// tipped by `tilt` about x and turned by `turn` about y) or a field (`field`: a ball of rocks `radius` round, drifting and tumbling) - `count` rocks, most of them small, the
+// biggest `size` across, each a placement of one of eight rock shapes (pbrt objects), grey to brown.
+struct Belt {
+	std::string name, kind = "ring";
+	Vec3 at{0.0, 0.0, -30000.0};
+	double radius = 20000.0, width = 4000.0, size = 400.0, tilt = 0.0, turn = 0.0, spin = 1.0;
+	int count = 3000, seed = 1;
+};
+inline const std::vector<std::string> &beltKinds() {
+	static const std::vector<std::string> k = {"ring", "field"};
+	return k;
+}
+constexpr int kBeltShapes = 8;
+// Rock k of a belt at nature's time `nt`: where its centre is (pbrt's), how big, which shape, and its turn (an axis and degrees).
+struct BeltRock {
+	Vec3 at, axis;
+	double size = 0.0, degrees = 0.0;
+	int shape = 0;
+};
+inline BeltRock beltRock(const Belt &b, int k, double nt) {
+	const int sd = b.seed * 307 + k * 13;
+	BeltRock r;
+	r.size = b.size * (0.12 + 0.88 * std::pow(hash01(sd, 1), 4.0));   // (many small, a few big)
+	r.shape = static_cast<int>(hash01(sd, 2) * kBeltShapes) % kBeltShapes;
+	r.axis = normalize(Vec3{hash01(sd, 3) - 0.5, hash01(sd, 4) - 0.5, hash01(sd, 5) - 0.5} + Vec3{1e-6, 0.0, 0.0});
+	r.degrees = std::fmod(360.0 * hash01(sd, 6) + nt * (2.0 + 10.0 * hash01(sd, 7)) * b.spin, 360.0);
+	if (b.kind == "field") {   // in a ball, drifting slowly
+		const double z = 2.0 * hash01(sd, 8) - 1.0, a = 2.0 * kPi * hash01(sd, 9), rr = b.radius * std::cbrt(hash01(sd, 10));
+		const Vec3 drift = Vec3{hash01(sd, 11) - 0.5, hash01(sd, 12) - 0.5, hash01(sd, 13) - 0.5} * (0.004 * b.radius * b.spin);
+		r.at = b.at + Vec3{std::sqrt(1.0 - z * z) * std::cos(a), z, std::sqrt(1.0 - z * z) * std::sin(a)} * rr + drift * nt;
+		return r;
+	}
+	const double rr = b.radius + b.width * (hash01(sd, 8) + hash01(sd, 9) - 1.0) * 0.5 * 1.4;   // (thicker in the middle of the band)
+	const double omega = 2.0 * kPi / 600.0 * b.spin * std::pow(b.radius / std::max(1.0, rr), 1.5);   // (a turn in ten minutes at the band's middle)
+	const double a = 2.0 * kPi * hash01(sd, 10) + omega * nt, h = b.width * 0.1 * (hash01(sd, 11) + hash01(sd, 12) - 1.0);
+	const double ti = b.tilt * kPi / 180.0, tu = b.turn * kPi / 180.0;
+	const Vec3 flat{rr * std::cos(a), h, rr * std::sin(a)};
+	const Vec3 tipped{flat.x, flat.y * std::cos(ti) - flat.z * std::sin(ti), flat.y * std::sin(ti) + flat.z * std::cos(ti)};
+	r.at = b.at + Vec3{tipped.x * std::cos(tu) + tipped.z * std::sin(tu), tipped.y, -tipped.x * std::sin(tu) + tipped.z * std::cos(tu)};
+	return r;
+}
+// A belt at nature's time `nt` as scene text: its eight rock shapes as objects (a unit across), then a placement of one for each rock.
+inline std::string beltText(const Belt &b, double nt) {
+	std::string out = "# an asteroid belt (film_cosmos.h): " + b.name + "\n";
+	for (int s = 0; s < kBeltShapes; ++s) {
+		const double tone = hash01(b.seed * 17 + s, 1);
+		const Vec3 colour = lerp(Vec3{0.2, 0.19, 0.18}, Vec3{0.32, 0.25, 0.18}, tone) * (0.8 + 0.4 * hash01(b.seed * 17 + s, 2));
+		out += nature::objectBegin("belt_" + b.name + "_" + std::to_string(s)) + attr(diffuseMaterial(colour), emitMesh(spaceRock(b.seed * 31 + s, 1.0, 24, 14), identity())) + nature::objectEnd();
+	}
+	for (int k = 0; k < b.count; ++k) {
+		const BeltRock r = beltRock(b, k, nt);
+		out += nature::placeObject("belt_" + b.name + "_" + std::to_string(r.shape), mul(translate(-r.at.x, r.at.y, r.at.z), rotate(r.axis, r.degrees), scale(r.size, r.size, r.size)));
+	}
+	return out;
+}
+
 }  // namespace cosmos
 }  // namespace cartoon

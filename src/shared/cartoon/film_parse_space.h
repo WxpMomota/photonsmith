@@ -9,7 +9,7 @@ namespace film_file {
 
 // Whether `verb` is a space line's.
 inline bool isSpaceVerb(const std::string &verb) {
-	static const std::vector<std::string> k = {"space", "planet", "moon", "nebula", "galaxy", "star", "blackhole", "comet"};
+	static const std::vector<std::string> k = {"space", "planet", "moon", "nebula", "galaxy", "star", "blackhole", "comet", "asteroids"};
 	return std::find(k.begin(), k.end(), verb) != k.end();
 }
 
@@ -258,6 +258,27 @@ inline std::string cometLine(Spec &s, const std::vector<std::string> &t) {
 	return std::string();
 }
 
+// An `asteroids` line (film_cosmos.h). "" or what is wrong with it.
+inline std::string beltLine(Spec &s, const std::vector<std::string> &t) {
+	cosmos::Belt b;
+	const std::string e = bodyLine(t, "`asteroids NAME at X Y Z [kind ring|field] [radius R] [width W] [count N] [size S] [tilt DEGREES] [turn DEGREES] [spin S] [seed N]` "
+									  "(radius 100 to 1000000 m, count 1 to 20000, size 1 to 20000 m)",
+								   cosmos::beltKinds(), b.name, b.kind, b.at, [&](const std::string &w, double a) {
+									   if (w == "radius" && a >= 100.0 && a <= 1000000.0) return b.radius = a, true;
+									   if (w == "width" && a > 0.0 && a <= 1000000.0) return b.width = a, true;
+									   if (w == "count" && a >= 1.0 && a <= 20000.0) return b.count = static_cast<int>(a), true;
+									   if (w == "size" && a >= 1.0 && a <= 20000.0) return b.size = a, true;
+									   if (w == "tilt" && a >= -90.0 && a <= 90.0) return b.tilt = a, true;
+									   if (w == "turn") return b.turn = a, true;
+									   if (w == "spin" && a >= -10.0 && a <= 10.0) return b.spin = a, true;
+									   if (w == "seed") return b.seed = static_cast<int>(a), true;
+									   return false;
+								   });
+	if (!e.empty()) return e;
+	s.belts.push_back(b);
+	return std::string();
+}
+
 // One space line: what it says goes into `s`. "" or what is wrong with it.
 inline std::string spaceLine(Spec &s, const std::string &verb, const std::string &line) {
 	const std::vector<std::string> t = detail::tokens(line);
@@ -269,6 +290,7 @@ inline std::string spaceLine(Spec &s, const std::string &verb, const std::string
 	if (verb == "star") return starLine(s, t);
 	if (verb == "blackhole") return blackHoleLine(s, t);
 	if (verb == "comet") return cometLine(s, t);
+	if (verb == "asteroids") return beltLine(s, t);
 	return "unknown space line \"" + verb + "\"";
 }
 

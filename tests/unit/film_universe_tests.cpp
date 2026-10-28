@@ -516,3 +516,35 @@ TEST(FilmUniverseComet, TailsPointFromTheSunTheDustTailCurvesBackAndTheCometMove
 	EXPECT_NE(at0, at2) << "it moves";
 	expectProblems({{"comet a at 0 0 0 size 5", "\"size\""}, {"comet a at 0 0 0 move 1 2", "\"move\""}, {"comet a at 0 0 0 tail 50", "\"tail\""}});
 }
+
+// ---- 13. asteroid belts ---------------------------------------------------------------------------------------------------------------------------------------------------
+
+TEST(FilmUniverseBelt, RocksFillTheBandOrTheBallMostAreSmallAndTheyGoRound) {
+	cs::Belt b;
+	b.name = "belt", b.at = {0.0, 0.0, 0.0}, b.radius = 20000.0, b.width = 4000.0, b.size = 400.0, b.count = 2000;
+	int small = 0;
+	for (int k = 0; k < b.count; ++k) {
+		const cs::BeltRock r = cs::beltRock(b, k, 0.0);
+		const double rr = std::hypot(r.at.x, r.at.z);
+		EXPECT_GT(rr, b.radius - b.width) << k;
+		EXPECT_LT(rr, b.radius + b.width) << k;
+		EXPECT_LT(std::abs(r.at.y), 0.2 * b.width) << "a thin band";
+		EXPECT_LE(r.size, b.size);
+		small += r.size < 0.3 * b.size ? 1 : 0;
+		EXPECT_GE(r.shape, 0);
+		EXPECT_LT(r.shape, cs::kBeltShapes);
+	}
+	EXPECT_GT(small, b.count / 2) << "most are small";
+	const cs::BeltRock now = cs::beltRock(b, 5, 0.0), later = cs::beltRock(b, 5, 60.0);
+	EXPECT_NEAR(std::hypot(now.at.x, now.at.z), std::hypot(later.at.x, later.at.z), 1e-6) << "going round at its own radius";
+	EXPECT_GT(length(now.at - later.at), 100.0);
+	b.kind = "field", b.radius = 5000.0;
+	for (int k = 0; k < 200; ++k) EXPECT_LT(length(cs::beltRock(b, k, 0.0).at), 5000.0 * 1.0001);
+
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("belt", "scene s.pbrt\nlength 4\nspace\nasteroids ring at 0 0 -30000 radius 20000 count 300\nshot 0 A\n key 0 0 0  0 0 -100  50\n", film), "");
+	const std::string s = film.sceneAt(1.0);
+	EXPECT_EQ(count(s, "ObjectBegin \"belt_ring_"), static_cast<std::size_t>(cs::kBeltShapes));
+	EXPECT_EQ(count(s, "ObjectInstance \"belt_ring_"), 300u);
+	expectProblems({{"asteroids a at 0 0 0 count 0", "\"count\""}, {"asteroids a at 0 0 0 kind cloud", "\"kind\""}, {"asteroids a at 0 0 0 radius 5", "\"radius\""}});
+}

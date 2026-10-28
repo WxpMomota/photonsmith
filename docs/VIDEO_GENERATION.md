@@ -1217,6 +1217,18 @@ green-white glow; and its two tails `tail` long, pointing away from the sun whic
 broader, warm white and curving back along the way it came. The glow is one grid in the film's cache (in the comet's own frame, made once and carried along with it); it is
 dense enough to be smooth on the GPU, so it dims the stars behind it a little.
 
+**Asteroid belts and fields: `asteroids`.** (film_cosmos.h)
+
+```
+asteroids  belt   at 0 0 -30000  radius 20000  width 4000  count 4000  size 400  tilt 10     # a ring going round its centre
+asteroids  chase  at 0 0 -3000   kind field  radius 2500  count 1500  size 120              # a ball of drifting rocks to fly through
+```
+
+Rocks by the thousand, most of them small and a few `size` across, grey to brown, each tumbling: a `ring` (the default) is a band `width` wide round its centre at `radius`, a
+tenth as thick and thickest in its middle, its rocks going round at Kepler's pace (a turn in ten minutes at the band's middle, the inner ones faster; `spin` scales it and
+negative turns it the other way), tipped by `tilt` and turned by `turn`; a `field` is a ball `radius` round whose rocks drift slowly. Every rock is a placement of one of
+eight rock shapes (lumpy, cratered), so 20000 of them (the most) cost little. Real belts are almost empty; these are as crowded as a film wants them.
+
 **Forests: `forest`.** (film_forest.h)
 
 ```
