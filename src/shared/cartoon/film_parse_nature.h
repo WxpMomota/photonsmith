@@ -121,6 +121,55 @@ inline std::string fireLine(Spec &s, const std::string &verb, const std::string 
 	return std::string();
 }
 
+// A `whale` or `dolphins` line (film_giants.h). "" or what is wrong with it.
+inline std::string giantLine(Spec &s, const std::string &verb, const std::string &line) {
+	using detail::number;
+	const auto fail = [](const std::string &what) { return what; };
+	const std::vector<std::string> t = detail::tokens(line);
+	const bool whale = verb == "whale";
+	const std::string usage = whale ? "`whale at X Z [toward DEGREES] [length L] [speed S] [during T0 T1] [breach T] ... [seed N]`"
+									: "`dolphins COUNT at X Z [toward DEGREES] [speed S] [during T0 T1] [seed N]`";
+	giants::Whale w;
+	giants::Dolphins d;
+	std::size_t i = 1;
+	double a = 0.0, b = 0.0;
+	if (!whale) {
+		if (t.size() < 2 || !number(t[1], a) || a < 1.0 || a > 40.0 || a != std::floor(a)) return fail(usage + ": 1 to 40 dolphins");
+		d.count = static_cast<int>(a);
+		i = 2;
+	}
+	bool placed = false;
+	for (; i < t.size();) {
+		if ((t[i] == "at" || t[i] == "during") && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b)) {
+			if (t[i] == "at") (whale ? w.x : d.x) = a, (whale ? w.z : d.z) = b, placed = true;
+			else if (b > a) (whale ? w.t0 : d.t0) = a, (whale ? w.t1 : d.t1) = b;
+			else return fail("`during T0 T1`: T1 after T0");
+			i += 3;
+		} else if (i + 1 < t.size() && number(t[i + 1], a)) {
+			if (t[i] == "toward") (whale ? w.toward : d.toward) = a;
+			else if (t[i] == "seed") (whale ? w.seed : d.seed) = static_cast<int>(a);
+			else if (whale && t[i] == "length" && a >= 4.0 && a <= 30.0) w.length = a;
+			else if (whale && t[i] == "speed" && a >= 0.0 && a <= 8.0) w.speed = a;
+			else if (whale && t[i] == "breach") w.breaches.push_back(a);
+			else if (!whale && t[i] == "speed" && a >= 0.5 && a <= 15.0) d.speed = a;
+			else return fail("\"" + t[i] + "\": " + usage + (whale ? " (length 4 to 30 m, speed up to 8 m/s)" : " (speed 0.5 to 15 m/s)"));
+			i += 2;
+		} else {
+			return fail("\"" + t[i] + "\": " + usage);
+		}
+	}
+	if (!placed) return fail(usage + ": where it is");
+	if (whale) {
+		for (double x : w.breaches)
+			if (x < w.t0 || x > w.t1) return fail("a whale breaches while it is there: `breach T` with T in its `during T0 T1`");
+		std::sort(w.breaches.begin(), w.breaches.end());
+		s.whales.push_back(w);
+	} else {
+		s.pods.push_back(d);
+	}
+	return std::string();
+}
+
 // One line of a film file, if it is a nature line: what it says goes into `s`. `handled` is false when `verb` is not a nature word (the line is parse()'s); the
 // result is "" or what is wrong with the line (parse() adds the file and the line).
 inline std::string natureLine(Spec &s, const std::string &verb, const std::string &line, const std::string &rest, bool &handled) {
@@ -646,6 +695,8 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		else s.corals.push_back(co);
 	} else if (verb == "fire" || verb == "lava" || verb == "volcano" || verb == "wildfire") {
 		return fireLine(s, verb, line);
+	} else if (verb == "whale" || verb == "dolphins") {   // the sea's giants (film_giants.h)
+		return giantLine(s, verb, line);
 	} else if (verb == "geyser" || verb == "rockfall" || verb == "avalanche") {   // the land in action (film_geology.h)
 		const std::vector<std::string> t = detail::tokens(line);
 		const std::string where = verb == "geyser" ? "at" : "from";

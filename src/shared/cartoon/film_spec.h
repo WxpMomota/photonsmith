@@ -32,6 +32,7 @@
 #include "film_subjects.h"
 #include "film_clouds.h"
 #include "film_fire.h"
+#include "film_giants.h"
 #include "film_flowers.h"
 #include "film_geology.h"
 #include "film_soundscape.h"
@@ -375,6 +376,9 @@ struct Spec {
 	std::vector<fire::Lava> lavas;
 	std::vector<fire::Volcano> volcanoes;
 	std::vector<fire::Wildfire> wildfires;
+	// the sea's giants (`whale`, `dolphins`)
+	std::vector<giants::Whale> whales;
+	std::vector<giants::Dolphins> pods;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;
 	bool muteBirds = false;   // (`mute birds`: no birdsong, no eagles' cries, no geese - whatever flies in the picture)

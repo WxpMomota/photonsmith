@@ -923,6 +923,24 @@ it races off at a tenth of the volcano's radius a second and slows as it spreads
 has gone, its head billowing highest, lofting and thinning away behind over half a minute, its roar heard from its front. Its grid stays below the column's, so the two
 never overlap. The camera may be inside any of them.
 
+**The sea's giants: `whale`, `dolphins`.** (film_giants.h; nature round 9, 2026-10-27)
+
+```
+water    sea  level 0  waves 0.6
+whale    at -40 -120  toward 90  length 14  speed 2  breach 14  breach 40   # `during T0 T1`, `seed N`
+dolphins 6  at 30 -40  toward 270  speed 6                                   # `during T0 T1`, `seed N`
+```
+
+A whale is a humpback (`length` 4 to 30 m, 14 by default; a body sculpted as a signed distance function and meshed once: long white pectorals, a pale throat, broad
+flukes) swimming along its heading (`toward`, a compass bearing) at `speed` (2 m/s). Every 16 s or so its back rolls up out of the water and down again - gently up,
+steeply down, its flukes lifting last - and it blows as it comes over: a bushy spout of spray that hangs and drifts. Its body follows its way as a train its track (each part
+where the part ahead was), so it arches over the roll and its flukes beat. At `breach T` (as many as you like, inside its `during`) it bursts out nearly upright 2.7 s
+before landing (for 14 m: launched at 15 m/s, flung right clear), twists onto its back as it falls and crashes down: spray as it comes out, a great crash of spray as it lands
+(a couple of thousand drops), a patch of foam spreading on the waves and breaking up over half a minute, bubbles if the camera is under water; round a breach it swims deep.
+Dolphins (1 to 40, 2.6 m long, grey with pale bellies) porpoise along their heading at `speed` (6 m/s): each leaps clear in a low arc every 2.6 to 3.8 s (a metre above the
+water, a second in the air), a splash where it leaves and where it goes back in. Heard: the whale's blows, the breach's wash and the boom of its crash, its song under water;
+the dolphins' splashes and their whistles. Both need a `water sea`. They move in nature's time, so `slowmo` slows a breach.
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

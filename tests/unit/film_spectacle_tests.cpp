@@ -241,3 +241,89 @@ TEST(FilmSpectacleVolcano, AnAshColumnClimbsIntoAnUmbrellaWithLightningAshAndPyr
 	ff::DataFilm ash;
 	EXPECT_EQ(loadFilm("ash", "scene s.pbrt\nlength 4\nweather ash 2\n", ash), "") << "ash is a weather of its own too";
 }
+
+// ---- 3. the sea's giants ---------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace giants = cartoon::giants;
+
+// A humpback's body has its long pectorals and broad flukes; it rolls up through the surface (its back out, then down) and blows as it comes over; in a breach it is flung
+// clear of the sea nearly upright and crashes back, a burst of spray at each end and foam after. Dolphins leap clear of the water in arcs, a splash where each goes out
+// and back in.
+TEST(FilmSpectacleSea, AWhaleRollsBlowsAndBreachesAndDolphinsPorpoise) {
+	const auto extent = [](const giants::Body &b, int axis, bool hi) {
+		double v = hi ? -1e30 : 1e30;
+		for (const cartoon::Mesh *m : {&b.dark, &b.light})
+			for (const auto &tr : m->tris)
+				for (int k : tr) {
+					const cartoon::Vec3 p = m->verts[static_cast<std::size_t>(k)];
+					const double c = axis == 0 ? p.x : axis == 1 ? p.y : p.z;
+					v = hi ? std::max(v, c) : std::min(v, c);
+				}
+		return v;
+	};
+	const giants::Body &whale = giants::whaleBody();
+	ASSERT_FALSE(whale.dark.tris.empty());
+	ASSERT_FALSE(whale.light.tris.empty()) << "white pectorals and throat";
+	EXPECT_GT(extent(whale, 0, true), 0.45) << "its head";
+	EXPECT_LT(extent(whale, 0, false), -0.5) << "its flukes";
+	EXPECT_GT(extent(whale, 2, true), 0.33) << "pectorals a third of its length";
+	EXPECT_LT(extent(whale, 2, false), -0.33);
+	const giants::Body &dolphin = giants::dolphinBody();
+	EXPECT_GT(extent(dolphin, 1, true), 0.15) << "a dorsal fin";
+
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("giants", "scene s.pbrt\nlength 40\nwater sea level 0 waves 0.5\n"
+								 "whale at 0 -150 toward 90 length 14 speed 2 breach 20\ndolphins 5 at 20 -60 toward 270 speed 6\nshot 0 A\n key 0 8 60  0 2 -150  50\n",
+						film),
+			  "");
+	ASSERT_EQ(film.spec.whales.size(), 1u);
+	ASSERT_EQ(film.spec.pods.size(), 1u);
+	const giants::Whale &w = film.spec.whales[0];
+	const std::vector<double> none, breach = {20.0};
+	// rolling: over a dive cycle its back comes out of the water and goes back under; most of the time it is under
+	int out = 0, n = 0;
+	for (double t = 0.0; t < 16.0; t += 0.25, ++n) {
+		const giants::Frame back = giants::whaleFrames(w, t, 0.0, none, 0.0)(0.0);
+		out += back.at.y + 0.11 * w.length > 0.0;
+	}
+	EXPECT_GT(out, 0) << "its back rolls out";
+	EXPECT_LT(out, n / 2) << "and it is under most of the time";
+	const std::vector<double> blows = giants::blowTimes(w, 0.0, 40.0, breach);
+	EXPECT_GE(blows.size(), 1u);
+	for (double b : blows) {
+		EXPECT_GT(giants::blowhole(w, b, 0.0, breach, 0.0).y, 0.0) << "it blows with its blowhole out of the water";
+		EXPECT_TRUE(b < 20.0 - 6.0 || b > 20.0 + giants::breachCrash(14.0) + 8.0) << "not round the breach";
+	}
+	// the breach: clear of the sea nearly upright at its top, back under after the crash
+	const double air = giants::breachCrash(14.0);
+	EXPECT_GT(air, 2.0);
+	EXPECT_LT(air, 5.0);
+	const auto f = giants::whaleFrames(w, 20.0 + 0.45 * air, 0.0, breach, 0.0);
+	EXPECT_GT(f(-0.4 * w.length).at.y, -1.0) << "most of it out of the water";
+	EXPECT_GT(f(0.0).forward.y, 0.8) << "nearly upright";
+	EXPECT_LT(giants::whaleFrames(w, 20.0 + air + 1.5, 0.0, breach, 0.0)(0.0).at.y, 0.0) << "back under";
+	const std::string up = film.sceneAt(20.2), crash = film.sceneAt(20.0 + air + 0.3), calm = film.sceneAt(19.0);
+	EXPECT_GT(count(up, "Shape \"sphere\""), count(calm, "Shape \"sphere\"") + 100) << "spray as it bursts out";
+	EXPECT_GT(count(crash, "Shape \"sphere\""), count(calm, "Shape \"sphere\"") + 300) << "a crash of spray";
+	EXPECT_EQ(count(calm, "# bubbles"), 0u) << "bubbles only under water";
+	// dolphins: each leaps clear every few seconds
+	const giants::Dolphins &d = film.spec.pods[0];
+	for (int i = 0; i < d.count; ++i) {
+		double top = -1e30;
+		for (double t = 0.0; t < 6.0; t += 0.05) top = std::max(top, giants::dolphinFrames(d, i, t, 0.0, giants::kDolphinLength)(0.0).at.y);
+		EXPECT_GT(top, 0.6) << "dolphin " << i << " leaps clear";
+		std::vector<double> o, in;
+		giants::leapTimes(d, i, 10.0, o, in);
+		EXPECT_GE(o.size(), 2u);
+		EXPECT_GE(in.size(), 2u);
+	}
+	EXPECT_NE(film.sceneAt(5.0), film.sceneAt(5.5));
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"water sea level 0\nwhale toward 90", "where it is"},
+																						{"water sea level 0\nwhale at 0 0 length 90", "length 4 to 30"},
+																						{"water sea level 0\nwhale at 0 0 during 2 8 breach 12", "while it is there"},
+																						{"water sea level 0\ndolphins 0 at 0 0", "1 to 40 dolphins"},
+																						{"whale at 0 0", "needs a `water sea` line"}}) {
+		const std::string problem = problemOf(line);
+		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
+	}
+}

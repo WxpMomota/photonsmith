@@ -173,6 +173,8 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 		for (const water::River &r : spec.rivers) out += water::riverText(r, nt, ground.get());
 		for (const water::Fall &f : spec.falls) out += water::fallText(f, nt, ground.get());
 	}
+	if ((!spec.whales.empty() || !spec.pods.empty()) && !spec.seas.empty())   // the sea's giants (film_giants.h)
+		out += giants::giantsText(spec.whales, spec.pods, spec.seas[0], spec.hasUnderwater, t, nt, [this](double ft) { return natureAt(ft); });
 	if (!spec.auroras.empty() || !spec.lightnings.empty() || !spec.meteors.empty()) {   // the sky's spectacles (film_skyfx.h)
 		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
 		const Vec3 centre = ground ? Vec3{spec.terrain.x, spec.terrain.y, spec.terrain.z} : Vec3{0.0, 0.0, 0.0};
@@ -259,7 +261,7 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 inline void DataFilm::soundscape(audio::Mix &m) const {
 	const bool eagles = std::any_of(spec.flocks.begin(), spec.flocks.end(), [](const wildlife::Flock &f) { return f.kind == "eagles"; });
 	if (spec.falls.empty() && spec.fires.empty() && spec.lavas.empty() && spec.volcanoes.empty() && spec.wildfires.empty() && !spec.swell.on && spec.herds.empty() && !eagles &&
-		spec.forests.empty() && spec.geysers.empty() && spec.rockfalls.empty() && spec.avalanches.empty() && spec.quakes.empty())
+		spec.forests.empty() && spec.geysers.empty() && spec.rockfalls.empty() && spec.avalanches.empty() && spec.quakes.empty() && spec.whales.empty() && spec.pods.empty())
 		return;
 	namespace ss = soundscape;
 	const ss::Ears ears = ss::earsOf(m.seconds(), [this](double t, Vec3 &eye, Vec3 &target) {
@@ -270,6 +272,12 @@ inline void DataFilm::soundscape(audio::Mix &m) const {
 	const auto groundAt = [&](double x, double z) { return ground ? ground->heightAt(x, z) : 0.0; };
 	const double T = m.seconds();
 	const auto always = [](double) { return 1.0; };
+	if ((!spec.whales.empty() || !spec.pods.empty()) && !spec.seas.empty())   // the sea's giants (film_giants.h); nature's times back to the film's
+		giants::giantsSound(m, ears, spec.whales, spec.pods, spec.seas[0].level, spec.hasUnderwater, [this](double ft) { return natureAt(ft); }, [this, T](double ntv) {
+			double lo = 0.0, hi = T;
+			for (int k = 0; k < 40; ++k) (natureAt(0.5 * (lo + hi)) < ntv ? lo : hi) = 0.5 * (lo + hi);
+			return hi;
+		});
 	// waterfalls: a roar from the pool at the foot of each
 	for (std::size_t i = 0; i < spec.falls.size(); ++i) {
 		const water::Fall &f = spec.falls[i];
