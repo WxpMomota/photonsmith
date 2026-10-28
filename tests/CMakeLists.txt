@@ -1,4 +1,4 @@
-﻿cmake_minimum_required(VERSION 3.14)
+﻿cmake_minimum_required(VERSION 3.18)   # (3.18: gtest_discover_tests DISCOVERY_MODE)
 project(ray_tracer_tests CXX C)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -306,7 +306,10 @@ add_executable(unit_tests
 )
 target_include_directories(unit_tests PRIVATE ${COMMON_INCLUDES})
 target_link_libraries(unit_tests PRIVATE GTest::gtest_main ${CMAKE_DL_LIBS})   # ${CMAKE_DL_LIBS}: oidn_runtime.h loads Open Image Denoise with dlopen
-gtest_discover_tests(unit_tests)
+# PRE_TEST: the tests are listed when ctest runs, not by running the program at the end of every build. Listed at build time (the default), a freshly linked
+# 35 MB program had 5 s to start and print its 5,000 tests while the rest of the build still compiled on every core (and an antivirus scanned the new file):
+# "Process terminated due to timeout" failed the build itself, on CI since 2026-10-23 and locally. CI runs the programs directly, so it does not list them at all.
+gtest_discover_tests(unit_tests DISCOVERY_MODE PRE_TEST DISCOVERY_TIMEOUT 120)
 
 # Precompiled header for the ~150 test translation units: gtest and the standard headers every one of them parses.
 # C++ only - the project also enables C
@@ -394,4 +397,4 @@ if(MSVC)
     target_compile_options(cpu_integrator_tests PRIVATE /bigobj)
 endif()
 target_link_libraries(cpu_integrator_tests PRIVATE GTest::gtest_main)
-gtest_discover_tests(cpu_integrator_tests)
+gtest_discover_tests(cpu_integrator_tests DISCOVERY_MODE PRE_TEST DISCOVERY_TIMEOUT 120)   # (listed when ctest runs: see unit_tests above)
