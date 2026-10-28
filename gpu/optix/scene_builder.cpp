@@ -217,12 +217,16 @@ namespace {
 	// review pass found this was silently unsupported on GPU (unlike this
 	// same round's other CPU-only gaps, which all warn) even though CPU
 	// wires it for exactly this camera type.
+	// out_lower_left_offset (optional): lower_left_corner - lookfrom made from
+	// the basis alone, for GpuCameraParams::lower_left_offset (far from the
+	// origin the two points' own difference has lost its precision).
 	void build_pinhole_camera_params(
 		const float3& lookfrom, const float3& lookat, const float3& vup,
 		float vfov_degrees, float aspect, float focus_dist,
 		float* camera_params,
 		float3* out_u = nullptr, float3* out_v = nullptr, float3* out_w = nullptr,
-		const float* screen_window = nullptr, bool mirror_x = false
+		const float* screen_window = nullptr, bool mirror_x = false,
+		float3* out_lower_left_offset = nullptr
 	) {
 		float viewport_width, viewport_height;
 		float center_shift_u = 0.0f, center_shift_v = 0.0f;
@@ -256,6 +260,12 @@ namespace {
 		if (out_u) *out_u = u;
 		if (out_v) *out_v = v;
 		if (out_w) *out_w = w;
+		if (out_lower_left_offset) {
+			*out_lower_left_offset = make_float3(
+				-horizontal.x / 2.0f - vertical.x / 2.0f - focus_dist * w.x + center_shift_u * u.x + center_shift_v * v.x,
+				-horizontal.y / 2.0f - vertical.y / 2.0f - focus_dist * w.y + center_shift_u * u.y + center_shift_v * v.y,
+				-horizontal.z / 2.0f - vertical.z / 2.0f - focus_dist * w.z + center_shift_u * u.z + center_shift_v * v.z);
+		}
 	}
 
 	// Populates GpuCameraParams for real per-ray camera motion blur (GPU
@@ -294,7 +304,8 @@ namespace {
 
 		float3 u0, v0, w0;
 		build_pinhole_camera_params(lookfrom0, lookat0, vup, vfov_degrees, aspect,
-			fd_for_viewport, camera_params, &u0, &v0, &w0, nullptr, mirror_x);
+			fd_for_viewport, camera_params, &u0, &v0, &w0, nullptr, mirror_x,
+			out_camera_extra ? &out_camera_extra->lower_left_offset : nullptr);
 		// The keyframe matrices below must stay rotations (a mirror cannot be interpolated): the mirror is the local horizontal axis instead.
 		if (mirror_x) u0 = make_float3(-u0.x, -u0.y, -u0.z);
 
@@ -1095,7 +1106,8 @@ static void setup_loaded_perspective_camera(const float3& lookfrom, const float3
 		float3 dof_u, dof_v;
 		build_pinhole_camera_params(
 			lookfrom, lookat, vup, vfovUsed, aspect,
-			focus_dist_world, camera_params, &dof_u, &dof_v, nullptr, screenWindowPtr, leftHanded);
+			focus_dist_world, camera_params, &dof_u, &dof_v, nullptr, screenWindowPtr, leftHanded,
+			out_camera_extra ? &out_camera_extra->lower_left_offset : nullptr);
 		if (out_camera_extra) {
 			// A nonzero defocus disk opts this scene out of
 			// optix_interface.cpp's generic camera_params->cameraExtra
@@ -1117,7 +1129,8 @@ static void setup_loaded_perspective_camera(const float3& lookfrom, const float3
 	} else {
 		build_pinhole_camera_params(
 			lookfrom, lookat, vup, vfovUsed, aspect,
-			1.0f, camera_params, nullptr, nullptr, nullptr, screenWindowPtr, leftHanded);
+			1.0f, camera_params, nullptr, nullptr, nullptr, screenWindowPtr, leftHanded,
+			out_camera_extra ? &out_camera_extra->lower_left_offset : nullptr);
 	}
 }
 

@@ -890,15 +890,17 @@ extern "C" __global__ void __raygen__sppm_camera_pass() {
 		org = cam.origin;
 		dir = normalize(sin_t * cosf(phi) * cam.su + cosf(theta) * cam.sv + sin_t * sinf(phi) * cam.sw);
 	} else {
-		const float3 pixel_sample = cam.lower_left_corner + s * cam.horizontal + t * cam.vertical;
+		// (the film point relative to the eye, never two far-off world points subtracted: see GpuCameraParams::lower_left_offset)
+		const float3 to_pixel = gpu_camera_lower_left_offset(cam) + s * cam.horizontal + t * cam.vertical;
 		const bool hasDOF = (cam.defocus_disk_u.x != 0.0f || cam.defocus_disk_u.y != 0.0f || cam.defocus_disk_u.z != 0.0f ||
 		                     cam.defocus_disk_v.x != 0.0f || cam.defocus_disk_v.y != 0.0f || cam.defocus_disk_v.z != 0.0f);
-		org = cam.origin;
+		float3 lens = make_float3(0.0f, 0.0f, 0.0f);
 		if (hasDOF) {
 			const float r = sqrtf(sppm_rand(seed)), a = 2.0f * 3.14159265358979323846f * sppm_rand(seed);
-			org = cam.origin + (r * cosf(a)) * cam.defocus_disk_u + (r * sinf(a)) * cam.defocus_disk_v;
+			lens = (r * cosf(a)) * cam.defocus_disk_u + (r * sinf(a)) * cam.defocus_disk_v;
 		}
-		dir = normalize(pixel_sample - org);
+		org = cam.origin + lens;
+		dir = normalize(to_pixel - lens);
 	}
 
 	float3 beta = make_float3(1.0f, 1.0f, 1.0f);

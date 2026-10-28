@@ -215,6 +215,10 @@ struct GpuCameraParams {
 	float3 horizontal;
 	float3 vertical;
 	float3 w;               // Orthographic: constant unit ray direction
+	// Perspective: lower_left_corner - origin, worked out on the host from the camera's own basis rather than from those two points. Far from the world's origin
+	// the points are rounded to its float grid (0.008 at 75000) while a pinhole viewport is only about one unit across, so their difference snapped every ray to
+	// a grid of directions and the picture came out in blocks of eight pixels. Zero (a camera made without it): the difference of the two points.
+	float3 lower_left_offset;
 	float3 defocus_disk_u;  // Perspective DOF: disk basis vector (zero = disabled)
 	float3 defocus_disk_v;
 	float3 su, sv, sw;      // Spherical: world-space camera basis (right, up, forward);
@@ -492,3 +496,10 @@ struct GpuCameraParams {
 	float        adaptiveExposure;
 	unsigned int adaptiveMinSamples;
 };
+
+// A perspective camera's lower_left_corner - origin (see lower_left_offset): the ray through film point (u, v) is this + u * horizontal + v * vertical.
+inline __host__ __device__ float3 gpu_camera_lower_left_offset(const GpuCameraParams& c) {
+	const float3 o = c.lower_left_offset;
+	if (o.x != 0.0f || o.y != 0.0f || o.z != 0.0f) return o;
+	return make_float3(c.lower_left_corner.x - c.origin.x, c.lower_left_corner.y - c.origin.y, c.lower_left_corner.z - c.origin.z);
+}

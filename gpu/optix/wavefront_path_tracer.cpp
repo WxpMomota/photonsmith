@@ -1309,6 +1309,7 @@ void WavefrontPathTracer::renderFinish(RenderCall &rc) {
 								   numPixels * sizeof(float4), cudaMemcpyDeviceToDevice, stream_));
 		prevRestirCamera_.origin = camera.origin;
 		prevRestirCamera_.lowerLeftCorner = camera.lower_left_corner;
+		prevRestirCamera_.lowerLeftOffset = gpu_camera_lower_left_offset(camera);
 		prevRestirCamera_.horizontal = camera.horizontal;
 		prevRestirCamera_.vertical = camera.vertical;
 		restirHistoryWidth_ = width;

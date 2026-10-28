@@ -62,6 +62,7 @@ struct GpuReprojectBasis {
 	float3 lowerLeftCorner;
 	float3 horizontal;
 	float3 vertical;
+	float3 lowerLeftOffset;   // lowerLeftCorner - origin made without them (GpuCameraParams::lower_left_offset); zero: their difference
 };
 
 // Bundles everything wf_finish_material_scatter's ReSTIR temporal-reuse step

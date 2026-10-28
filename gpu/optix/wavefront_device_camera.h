@@ -205,17 +205,18 @@ __device__ __forceinline__ void wf_generate_primary_ray(
 			break;
 		}
 		default: { // Perspective, optionally thin-lens DOF
-			float3 pixel_sample = cam.lower_left_corner + u * cam.horizontal + v * cam.vertical;
+			// (the film point relative to the eye, never two far-off world points subtracted: see GpuCameraParams::lower_left_offset)
+			const float3 to_pixel = gpu_camera_lower_left_offset(cam) + u * cam.horizontal + v * cam.vertical;
 			bool hasDOF = (cam.defocus_disk_u.x != 0.0f || cam.defocus_disk_u.y != 0.0f || cam.defocus_disk_u.z != 0.0f ||
 						   cam.defocus_disk_v.x != 0.0f || cam.defocus_disk_v.y != 0.0f || cam.defocus_disk_v.z != 0.0f);
+			float3 lens = make_float3(0.0f, 0.0f, 0.0f);
 			if (hasDOF) {
 				float rx = 2.0f * wf_rand(seed) - 1.0f, ry = 2.0f * wf_rand(seed) - 1.0f;
 				while (rx*rx + ry*ry >= 1.0f) { rx = 2.0f * wf_rand(seed) - 1.0f; ry = 2.0f * wf_rand(seed) - 1.0f; }
-				origin = cam.origin + rx * cam.defocus_disk_u + ry * cam.defocus_disk_v;
-			} else {
-				origin = cam.origin;
+				lens = rx * cam.defocus_disk_u + ry * cam.defocus_disk_v;
 			}
-			direction = normalize(pixel_sample - origin);
+			origin = cam.origin + lens;
+			direction = normalize(to_pixel - lens);
 			break;
 		}
 	}

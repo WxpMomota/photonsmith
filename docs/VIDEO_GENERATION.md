@@ -1075,9 +1075,10 @@ picture at `sun BEARING ELEVATION` (degrees; 60 15 by default), `sunsize` across
 units of irradiance) times `sunlight`: the sky light's importance sampling finds it, a planet's night side is dark and shadows are as soft as the sun is big. (Not a
 glowing ball far off, as the Nomai film's sun: the wavefront renderer, which draws every frame with a volume in it, lights almost nothing with so small and far a sphere.)
 
-**A floating origin.** The GPU renderers lose texture precision far from the origin (a textured planet 75 km out was drawn in blocks a few hundred metres across, on
-both GPU renderers; the cause is not yet found), so every frame of a film with `space` is moved - its camera and its whole world, by the same whole number of
-kilometres - to put the camera within a kilometre of the origin (film_space.h `recentred`). A film need not do anything about it.
+**A floating origin.** The GPU renderers work in float, whose positions grow coarse far from the origin (0.06 m at 1000 km), so every frame of a film with `space`
+is moved - its camera and its whole world, by the same whole number of kilometres - to put the camera within a kilometre of the origin (film_space.h `recentred`). A
+film need not do anything about it. (Before 2026-10-28 the GPU's camera rays themselves snapped to a grid of directions far out, and a planet 75 km away was drawn
+in blocks; that is fixed in the renderers.)
 
 **Planets: `planet`.** (film_planets.h)
 

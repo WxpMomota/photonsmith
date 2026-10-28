@@ -471,8 +471,9 @@ struct WfScreenProjection {
 __device__ __forceinline__ WfScreenProjection wf_project_to_screen(const float3& worldPoint,
 																	 const GpuReprojectBasis& basis) {
 	const float3 toPoint = worldPoint - basis.origin;
-	const float3 wScaled = basis.origin - basis.lowerLeftCorner
-						  - basis.horizontal * 0.5f - basis.vertical * 0.5f;
+	const bool offsetSet = basis.lowerLeftOffset.x != 0.0f || basis.lowerLeftOffset.y != 0.0f || basis.lowerLeftOffset.z != 0.0f;
+	const float3 toLowerLeft = offsetSet ? basis.lowerLeftOffset : basis.lowerLeftCorner - basis.origin;
+	const float3 wScaled = -toLowerLeft - basis.horizontal * 0.5f - basis.vertical * 0.5f;
 	const float3 vCrossW = cross(basis.vertical, wScaled);
 	const float denom = dot(basis.horizontal, vCrossW);
 	if (fabsf(denom) < 1e-18f) return WfScreenProjection{0.0f, 0.0f, false};

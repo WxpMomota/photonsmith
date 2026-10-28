@@ -133,3 +133,42 @@ TEST(PbrtCameraOverrideTest, CpuRendersWhereItIsToldAndWithTheFieldOfViewItIsGiv
 	std::error_code ec;
 	std::filesystem::remove_all(dir, ec);
 }
+
+// Far from the world's origin (a camera 75 km out, as the space films' were) the GPU's rays must still fan out smoothly across the picture. The film point used to be
+// made as (lower_left_corner + u * horizontal) - origin from two far-off float points, each rounded to the float grid there (0.008 at 75000), while a pinhole's
+// viewport is about one unit across: neighbouring columns got the same direction and pictures came out in blocks of eight pixels. GpuCameraParams::lower_left_offset
+// is made from the camera's basis instead; the device's ray generators (optix_device_mix_camera.h, wavefront_device_camera.h, sppm_programs.cu) all read it through
+// gpu_camera_lower_left_offset.
+TEST(PbrtCameraOverrideTest, OptixRayDirectionsStayFineFarFromTheOrigin) {
+	const SceneDescriptor* s = findScene();
+	if (!s) GTEST_SKIP() << "checkered-spheres.pbrt was not discovered - is pbrt_scenes/ present?";
+	const auto camera = [&](double x, float* params, GpuCameraParams& extra) {
+		SceneData scene;
+		extra = GpuCameraParams{};
+		return build_scene(s->id.c_str(), 640, 360, scene, params, x, 0.0, 0.0, &extra, /*force_camera_override=*/true, /*has_custom_lookat=*/true, x, 0.0, -20000.0,
+		                   /*has_dof_override=*/false, 0.0, 0.0, 40.0);
+	};
+	float farParams[12], nearParams[12];
+	GpuCameraParams farCam{}, nearCam{};
+	ASSERT_TRUE(camera(-75000.0, farParams, farCam));
+	ASSERT_TRUE(camera(0.0, nearParams, nearCam));
+	// the offset is the camera's own, wherever the camera is
+	const float3 offFar = gpu_camera_lower_left_offset(farCam), offNear = gpu_camera_lower_left_offset(nearCam);
+	ASSERT_FALSE(offFar.x == 0.0f && offFar.y == 0.0f && offFar.z == 0.0f) << "the pbrt camera sets lower_left_offset";
+	EXPECT_NEAR(offFar.x, offNear.x, 1e-6);
+	EXPECT_NEAR(offFar.y, offNear.y, 1e-6);
+	EXPECT_NEAR(offFar.z, offNear.z, 1e-6);
+	// across a row of 640 columns: the x of each column's (unnormalised) direction, the old way and the new
+	const float3 h = make_float3(farParams[6], farParams[7], farParams[8]);
+	const float3 origin = make_float3(farParams[0], farParams[1], farParams[2]), lowerLeft = make_float3(farParams[3], farParams[4], farParams[5]);
+	int oldDistinct = 0, newDistinct = 0;
+	float oldPrev = 0.0f, newPrev = 0.0f;
+	for (int i = 0; i < 640; ++i) {
+		const float u = (i + 0.5f) / 640.0f;
+		const float oldX = (lowerLeft.x + u * h.x) - origin.x, newX = offFar.x + u * h.x;
+		oldDistinct += (i == 0 || oldX != oldPrev), newDistinct += (i == 0 || newX != newPrev);
+		oldPrev = oldX, newPrev = newX;
+	}
+	EXPECT_LT(oldDistinct, 200) << "(the way that came out in blocks: if this fails the old way is fine here, and the test no longer shows the problem)";
+	EXPECT_EQ(newDistinct, 640) << "every column its own direction";
+}

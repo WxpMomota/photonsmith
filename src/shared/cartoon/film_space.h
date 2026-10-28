@@ -183,9 +183,10 @@ inline std::string starfieldPicture(const std::string &film, const Space &s) {
 	});
 }
 
-// A space film's frame moved so its camera is near the origin (a floating origin): the GPU loses precision far from the origin - a textured planet 75 km out
-// came out in blocks a few hundred metres across (2026-10-27, both GPU renderers, cause not yet found) - so the camera (its `LookAt`) and everything in the world
-// are moved by the same whole number of kilometres. The world's lines are wrapped in a Translate, but not an object's definition (ObjectBegin .. ObjectEnd): its
+// A space film's frame moved so its camera is near the origin (a floating origin): the GPU works in float, whose grid far from the origin is coarse (0.06 at a
+// million, more than the 0.01 a shadow ray starts off a surface), so the camera (its `LookAt`) and everything in the world are moved by the same whole number of
+// kilometres. (It was first made for a worse loss, fixed since: the GPU's camera rays snapped to a grid of directions far out, so a planet 75 km away came out in
+// blocks - GpuCameraParams::lower_left_offset.) The world's lines are wrapped in a Translate, but not an object's definition (ObjectBegin .. ObjectEnd): its
 // instances are placed inside the Translate, and pbrt composes the two. Lights at infinity do not move. A scene with its camera within 5 km of the origin is left as
 // it is.
 inline std::string recentred(const std::string &scene) {

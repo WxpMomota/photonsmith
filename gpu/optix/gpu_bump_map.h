@@ -153,7 +153,7 @@ inline __host__ __device__ void gpu_triangle_dpdu_dpdv(const float3& p0, const f
 struct GpuBumpFootprint {
 	float3 origin;       // the camera's position: pbrt gives a hit its footprint as if a camera ray at this origin saw the point (CameraBase::Approximate_dp_dxy)
 	int    enabled;
-	float3 lowerLeft;
+	float3 lowerLeft;    // the viewport's lower left corner relative to `origin` (GpuCameraParams::lower_left_offset)
 	float3 horizontal;   // the whole viewport's extent, so one pixel is horizontal / width
 	float3 vertical;
 	camera_footprint::Camera approx;   // the camera's minimum differentials, made once on the host (gpu_make_bump_footprint)
@@ -165,7 +165,7 @@ inline __host__ __device__ GpuBumpFootprint gpu_make_bump_footprint(const GpuCam
 	GpuBumpFootprint f;
 	f.origin     = cam.origin;
 	f.enabled    = (cam.kind == CameraKind::Perspective && !cam.animated && width > 0 && height > 0) ? 1 : 0;
-	f.lowerLeft  = cam.lower_left_corner;
+	f.lowerLeft  = gpu_camera_lower_left_offset(cam);
 	f.horizontal = cam.horizontal;
 	f.vertical   = cam.vertical;
 	f.width      = width;
@@ -177,7 +177,7 @@ inline __host__ __device__ GpuBumpFootprint gpu_make_bump_footprint(const GpuCam
 	if (f.enabled) {
 		const auto v = [](const float3& a) { return camera_footprint::make(a.x, a.y, a.z); };
 		const camera_footprint::V3 du = v(cam.horizontal) * (1.0 / width), dv = v(cam.vertical) * (-1.0 / height);
-		const camera_footprint::V3 pixel00 = v(cam.lower_left_corner) + v(cam.horizontal) * (0.5 / width) + v(cam.vertical) * (1.0 - 0.5 / height);
+		const camera_footprint::V3 pixel00 = v(cam.origin) + v(f.lowerLeft) + v(cam.horizontal) * (0.5 / width) + v(cam.vertical) * (1.0 - 0.5 / height);
 		f.approx = camera_footprint::makeCamera(v(cam.origin), pixel00, du, dv, width, height, samplesPerPixel);
 	}
 #endif
@@ -223,7 +223,7 @@ inline __host__ __device__ GpuBumpDiff gpu_bump_footprint(const GpuBumpFootprint
 	const float den = dot(pn, d);
 	if (fabsf(den) < 1e-8f) return none;
 	// Length of the UNnormalized primary direction (pixel sample - ray origin): it lands on the viewport plane.
-	const float L = dot(pn, f.lowerLeft - O) / den;
+	const float L = dot(pn, f.lowerLeft - (O - f.origin)) / den;
 	const float3 D  = d * L;
 	const float3 Dx = D + f.horizontal * (f.diffScale / (float)f.width);
 	const float3 Dy = D + f.vertical   * (f.diffScale / (float)f.height);
