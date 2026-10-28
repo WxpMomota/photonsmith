@@ -137,12 +137,7 @@ const SceneDescriptor* build_scene_for_bdpt(const char* scene_id, int width, int
 	// --bdpt/--mlt rather than silently mishandling it.
 	if (scene_desc->build_sky)
 		out_cam.sky = scene_desc->build_sky();
-	if (scene_desc->build_portal && !quiet_light_warnings) {   // (the AOV passes involve no lighting at all)
-		std::cerr << "Warning: scene '" << scene_id << "' has a portal (windowed) infinite "
-		             "light, which is not supported under --bdpt/--mlt - it will not contribute "
-		             "any light (rendering black through the window); use the default path "
-		             "tracer instead if the portal light matters for this render.\n";
-	}
+	if (!quiet_light_warnings) std::cerr << portal_light_integrator_warning(*scene_desc, scene_id, "--bdpt/--mlt");   // (the AOV passes involve no lighting at all)
 	if (scene_desc->build_punct)
 		out_cam.punct_lights = scene_desc->build_punct();
 	// Not read by these integrators; it tells each *_render_core() whether the scene has a medium whose extinction differs between colour

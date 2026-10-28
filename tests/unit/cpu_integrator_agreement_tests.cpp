@@ -46,6 +46,20 @@ TEST(ChromaticMediaIntegratorWarningTest, SppmNamesEverySceneWithAMedium) {
 		EXPECT_EQ(warn(stem), "") << stem << " has no medium";
 }
 
+// --sppm, --bdpt and --mlt do not sample a portal (windowed) infinite light, and say so - for a scene that has one. Every pbrt-backed scene has a portal
+// builder (it hands back nullptr without a portal), and the warning used to test only that the builder existed, so every scene got it.
+TEST(ChromaticMediaIntegratorWarningTest, PortalWarningOnlyWhenThereIsAPortal) {
+	const auto warn = [](const char* stem) {
+		const SceneDescriptor* s = find_example_scene(stem);
+		return s ? portal_light_integrator_warning(*s, stem, "--sppm") : std::string("<scene missing>");
+	};
+	const std::string w = warn("portal-light-constant");
+	EXPECT_NE(w.find("portal (windowed) infinite light"), std::string::npos) << w;
+	EXPECT_NE(w.find("--sppm"), std::string::npos) << w;
+	for (const char* stem : {"flush-ceiling-light", "bdpt-box-room", "checkered-spheres"})
+		EXPECT_EQ(warn(stem), "") << stem << " has no portal light";
+}
+
 // Per-channel means of a linear EXR; false if unreadable.
 static bool loadChannelMeans(const std::string& path, double mean[3]) {
 	int w = 0, h = 0;

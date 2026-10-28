@@ -241,6 +241,15 @@ inline std::string sppm_media_warning(const SceneDescriptor& d, const std::strin
            "renders too dark; use --bdpt, --mlt or the default path tracer for fog.\n";
 }
 
+// The warning --sppm, --bdpt and --mlt print for a scene with a portal (windowed) infinite light, which none of them sample, or "" when it has none. Asks
+// the builder, not whether there is one: every pbrt-backed scene has a build_portal, which hands back nullptr when its file has no portal (so every such
+// scene used to be warned). `flags` names the integrator, e.g. "--bdpt/--mlt".
+inline std::string portal_light_integrator_warning(const SceneDescriptor& d, const std::string& scene_id, const std::string& flags) {
+    if (!(d.build_portal && d.build_portal())) return "";
+    return "Warning: scene '" + scene_id + "' has a portal (windowed) infinite light, which is not supported under " + flags + " - it will not contribute "
+           "any light (rendering black through the window); use the default path tracer instead if the portal light matters for this render.\n";
+}
+
 // paths() is defined at the bottom of this file; forward-declared here so a
 // curated builtin entry can register its own .pbrt path the same way
 // pbrt_scene_registry::append() does for dynamically-discovered ones.

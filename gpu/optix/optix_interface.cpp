@@ -1228,7 +1228,7 @@ static std::string sppm_gpu_unsupported_reason(const SceneData& scene, const Gpu
 		       "shape (spheres and quads only)";
 	}
 	if (!scene.punctualLights.empty()) {
-		return "uses punctual (point/spot) lights -- GPU SPPM's camera/photon-pass "
+		return "uses punctual (point, spot, distant, goniometric or projection) lights -- GPU SPPM's camera/photon-pass "
 		       "raygens only sample the scene's area-light alias table";
 	}
 	if (scene.skyWidth > 0 || scene.skyHeight > 0) {

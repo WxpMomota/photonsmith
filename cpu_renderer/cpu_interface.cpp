@@ -764,12 +764,7 @@ extern "C" int cpu_render_main_sppm(int width, int height, int iterations, int p
 		// than silently doing something wrong.
 		if (scene_desc->build_sky)
 			cam.sky = scene_desc->build_sky();
-		if (scene_desc->build_portal) {
-			std::cerr << "Warning: scene '" << scene_id << "' has a portal (windowed) infinite "
-						 "light, which is not supported under --sppm - it will not contribute "
-						 "any light (rendering black through the window); use the default path "
-						 "tracer instead if the portal light matters for this render.\n";
-		}
+		std::cerr << portal_light_integrator_warning(*scene_desc, scene_id, "--sppm");
 		if (scene_desc->build_punct)
 			cam.punct_lights = scene_desc->build_punct();
 		// camera::camera_medium is ray_color() (default path tracer) only -
