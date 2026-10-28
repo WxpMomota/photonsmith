@@ -39,6 +39,7 @@
 #include "film_ground.h"
 #include "film_space.h"
 #include "film_planets.h"
+#include "film_cosmos.h"
 #include "film_flowers.h"
 #include "film_geology.h"
 #include "film_soundscape.h"
@@ -404,6 +405,7 @@ struct Spec {
 	// the universe (round 10: film_parse_space.h)
 	space::Space space;
 	std::vector<planets::Planet> planets;
+	std::vector<cosmos::Nebula> nebulae;
 	std::vector<ground::Track> tracks;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;

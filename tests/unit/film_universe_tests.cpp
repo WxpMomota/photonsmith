@@ -307,3 +307,46 @@ TEST(FilmUniverseMoons, MoonsGoRoundAndEclipsesShowTheCoronaAndTheDiamondRing) {
 	expectProblems({{"planet a rocky at 0 0 0 radius 10\nmoon b rocky of c radius 2 orbit 30", "no planet or moon called c"},
 					{"planet a rocky at 0 0 0 radius 10\nmoon b rocky of a radius 2", "its orbit"}});
 }
+
+// ---- 7. nebulae -----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace cs = cartoon::cosmos;
+
+// A nebula's gas glows red outside and teal near its middle, its dust absorbs and gives no light, nothing beyond its edge; its pillars are columns of dust; a film's
+// nebula is a glowing grid in a sphere, with its young stars.
+TEST(FilmUniverseNebula, GasGlowsDustDarkensAndPillarsStand) {
+	cs::Nebula n;
+	n.name = "veil", n.size = 20000.0;
+	double gasLight = 0.0, outside = 0.0, dustLight = 0.0;
+	int dusty = 0;
+	for (int k = 0; k < 24; ++k)
+		for (int j = 0; j < 24; ++j)
+			for (int i = 0; i < 24; ++i) {
+				const double x = (i + 0.5) / 24, y = (j + 0.5) / 24, z = (k + 0.5) / 24;
+				const cs::Voxel v = cs::nebulaVoxel(n, x, y, z);
+				const double r = 2.0 * std::sqrt((x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5) + (z - 0.5) * (z - 0.5));
+				if (r > 1.45) outside += v.sa.x + v.le.x;
+				gasLight += v.le.x + v.le.y + v.le.z;
+				if (v.sa.x > 20.0 / n.size) ++dusty, dustLight += v.le.x;
+			}
+	EXPECT_GT(gasLight, 10.0) << "glowing gas";
+	EXPECT_EQ(outside, 0.0) << "nothing past its edge";
+	EXPECT_GT(dusty, 0) << "dust lanes";
+	EXPECT_LT(dustLight, 0.3 * dusty) << "dust gives little light";
+	const cs::Voxel middle = cs::nebulaVoxel(n, 0.5, 0.5, 0.5);
+	if (middle.le.y + middle.le.x > 0.0) EXPECT_GT(middle.le.y / (middle.le.x + 1e-9), 0.3) << "teal towards the middle";
+	cs::Nebula towers = n;
+	towers.kind = "pillars";
+	int column = 0;
+	const int ts = towers.seed * 113;
+	const double px = 0.3 + 0.06 * (cartoon::hash01(ts, 5) - 0.5), pz = 0.5 + 0.12 * (cartoon::hash01(ts, 6) - 0.5);   // (the first pillar's axis, as nebulaVoxel places it)
+	for (double y = 0.3; y < 0.5; y += 0.02) column += cs::nebulaVoxel(towers, px + 0.05 * std::sin(y * 7.0), y, pz).sa.x > 20.0 / n.size;
+	EXPECT_GT(column, 5) << "a pillar of dust";
+
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("nebula", "scene s.pbrt\nlength 4\nspace\nnebula veil at 0 0 -30000 size 20000 kind dark\nshot 0 A\n key 0 0 0  0 0 -100  50\n", film), "");
+	const std::string s = film.sceneAt(1.0);
+	EXPECT_NE(s.find("MediumInterface \"nebula_veil\" \"\""), std::string::npos);
+	EXPECT_EQ(count(s, "AreaLightSource"), 4u) << "its young stars";
+	expectProblems({{"nebula a at 0 0 0", "how big it is"}, {"nebula a at 0 0 0 size 10", "size 100 to 200000"}, {"nebula a at 0 0 0 size 500 kind glowing", "\"kind\""}});
+}

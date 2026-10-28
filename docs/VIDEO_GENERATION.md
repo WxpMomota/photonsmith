@@ -1143,6 +1143,19 @@ totality the corona: pearly streamers round the black disc (an emitting card far
 sun gives a total eclipse; a smaller one, an annular one or a transit. For a narrow shot (12 degrees or less) with the sun in it, the sun is drawn as a glowing ball
 instead of the sky picture's disc, so it stays round however close the lens (the picture leaves it out then).
 
+**Nebulae: `nebula`.** (film_cosmos.h)
+
+```
+nebula  veil    at 0 0 -30000       size 20000  kind emission      # `brightness B` (1, up to 20), `seed N`
+nebula  towers  at 120000 0 -30000  size 20000  kind pillars
+```
+
+A cloud of glowing gas `size` metres across: `emission` - its gas glowing the deep red of hydrogen outside and the teal of oxygen towards its hot middle, knotted and
+wispy, its outline ragged, crossed by dark lanes of dust that hide and redden what is behind them; `dark` - a cloud of dust in front (towards a camera looking down -z)
+silhouetted against glowing gas behind it; `pillars` - three columns of dust rising from a dense base in glowing gas, their edges lit. Four young blue-white stars burn
+near its middle. It is one "rgbgrid" medium (72 cubed; it absorbs, scatters and gives out light per voxel) written once into the film's cache, in a sphere round it - the
+camera can fly into it. Its glow is calibrated by eye to about the brightness of a sunlit planet at `brightness 1`.
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

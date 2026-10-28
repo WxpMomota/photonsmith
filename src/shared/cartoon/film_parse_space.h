@@ -9,7 +9,7 @@ namespace film_file {
 
 // Whether `verb` is a space line's.
 inline bool isSpaceVerb(const std::string &verb) {
-	static const std::vector<std::string> k = {"space", "planet", "moon"};
+	static const std::vector<std::string> k = {"space", "planet", "moon", "nebula"};
 	return std::find(k.begin(), k.end(), verb) != k.end();
 }
 
@@ -122,12 +122,57 @@ inline std::string moonLine(Spec &s, const std::vector<std::string> &t) {
 	return std::string();
 }
 
+// The common start of a body's line - `VERB NAME [KIND] at X Y Z` - and its numbered options, each with its range; "" or what is wrong. `kinds` empty: no kind.
+// `option(word, value)` takes an option (false: not one of this line's).
+inline std::string bodyLine(const std::vector<std::string> &t, const std::string &usage, const std::vector<std::string> &kinds, std::string &name, std::string &kind, Vec3 &at,
+							const std::function<bool(const std::string &, double)> &option, const std::function<bool(const std::string &, const std::string &)> &word = nullptr) {
+	using detail::number;
+	if (t.size() < 2) return usage;
+	name = t[1];
+	bool placed = false;
+	for (std::size_t i = 2; i < t.size();) {
+		double a = 0.0, b = 0.0, c = 0.0;
+		if (t[i] == "at" && i + 3 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && number(t[i + 3], c)) {
+			at = {a, b, c}, placed = true;
+			i += 4;
+		} else if (t[i] == "kind" && i + 1 < t.size() && std::find(kinds.begin(), kinds.end(), t[i + 1]) != kinds.end()) {
+			kind = t[i + 1];
+			i += 2;
+		} else if (i + 1 < t.size() && word && word(t[i], t[i + 1])) {
+			i += 2;
+		} else if (i + 1 < t.size() && number(t[i + 1], a) && option(t[i], a)) {
+			i += 2;
+		} else {
+			return "\"" + t[i] + "\": " + usage;
+		}
+	}
+	if (!placed) return usage + ": where it is";
+	return std::string();
+}
+// A `nebula` line (film_cosmos.h). "" or what is wrong with it.
+inline std::string nebulaLine(Spec &s, const std::vector<std::string> &t) {
+	cosmos::Nebula n;
+	bool sized = false;
+	const std::string e = bodyLine(t, "`nebula NAME at X Y Z size S [kind emission|dark|pillars] [brightness B] [seed N]` (size 100 to 200000 m, brightness up to 20)", cosmos::nebulaKinds(),
+								   n.name, n.kind, n.at, [&](const std::string &w, double a) {
+									   if (w == "size" && a >= 100.0 && a <= 200000.0) return n.size = a, sized = true;
+									   if (w == "brightness" && a > 0.0 && a <= 20.0) return n.brightness = a, true;
+									   if (w == "seed") return n.seed = static_cast<int>(a), true;
+									   return false;
+								   });
+	if (!e.empty()) return e;
+	if (!sized) return "`nebula NAME at X Y Z size S ...`: how big it is";
+	s.nebulae.push_back(n);
+	return std::string();
+}
+
 // One space line: what it says goes into `s`. "" or what is wrong with it.
 inline std::string spaceLine(Spec &s, const std::string &verb, const std::string &line) {
 	const std::vector<std::string> t = detail::tokens(line);
 	if (verb == "space") return spaceSetLine(s, t);
 	if (verb == "planet") return planetLine(s, t);
 	if (verb == "moon") return moonLine(s, t);
+	if (verb == "nebula") return nebulaLine(s, t);
 	return "unknown space line \"" + verb + "\"";
 }
 
