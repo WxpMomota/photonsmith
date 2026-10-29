@@ -67,7 +67,9 @@ bool WavefrontPathTracer::allocateQueues(int numPixels, int numPunctualLights) {
 		size_t freeBytes = 0, totalBytes = 0;
 		const long long perItem = static_cast<long long>(sizeof(ShadowRayWorkItem) + sizeof(float));
 		long long most = std::numeric_limits<int>::max();
-		if (cudaMemGetInfo(&freeBytes, &totalBytes) == cudaSuccess && freeBytes > 0) most = std::min(most, static_cast<long long>(freeBytes / 2) / perItem);
+		// (a quarter of the card, so how many lights a hit samples - and so the picture's noise - is the same in every run on that card; it was half of what was free at
+		// that moment, which changed with the GUI or a second worker on the card and between a video's frames. Half of what is free still caps it: a busy card picks fewer.)
+		if (cudaMemGetInfo(&freeBytes, &totalBytes) == cudaSuccess && freeBytes > 0) most = std::min(most, static_cast<long long>(std::min(totalBytes / 4, freeBytes / 2)) / perItem);
 		most = std::max<long long>(most, numPixels);   // (one shadow ray a pixel at least, as every other queue)
 		if (wantedShadow > most) {
 			static bool said = false;
@@ -75,7 +77,7 @@ bool WavefrontPathTracer::allocateQueues(int numPixels, int numPunctualLights) {
 			if (!said) {
 				said = true;
 				std::cout << "[WavefrontPathTracer] A shadow ray to each of the " << numPunctualLights << " point/spot lights from every hit would need " << wantedShadow
-						  << " queue entries at this size, more than half the graphics card's free memory holds (" << most << "): each hit samples " << punctualPerHit_
+						  << " queue entries at this size, more than a quarter of the graphics card (or half its free memory) holds (" << most << "): each hit samples " << punctualPerHit_
 						  << " of them, picked at random (the same picture on average, a little noisier)." << std::endl;
 			}
 			wantedShadow = static_cast<long long>(numPixels) * (2 + punctualPerHit_);
