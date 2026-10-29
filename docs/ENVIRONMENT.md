@@ -9,6 +9,7 @@ Rule for new ones: prefer a command-line option or a setting in the GUI; add an 
 | Variable | Read by | What it does |
 |----------|---------|--------------|
 | `RAY_TRACER_THREADS` | `src/TheRestOfYourLife/thread_count.h`, `launcher/main.cpp` | Number of CPU render threads, instead of the machine's hardware thread count |
+| `RAY_TRACER_FILM_CACHE` | `src/shared/cartoon/film_cache.h` | The folder of the film cache (the films' skies, grids and meshes), instead of `photonsmith_film_cache` in the temporary folder. `scripts/run_tests_parallel.ps1` points every shard at the machine's, so a long film's meshes are not built again in each |
 | `RAY_TRACER_MODE` | `gpu/optix/renderer_config.h` | OptiX path tracer: `recursive` (default), `wavefront` or `auto` |
 | `RAY_TRACER_FALLBACK` | `gpu/optix/renderer_config.h` | What the OptiX renderer falls back to when the mode asked for cannot be used: `none`, `recursive` or `fastest` |
 | `RAY_TRACER_VERBOSE` | `gpu/optix/renderer_config.h` | More console output from the GPU renderer |
