@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 #include "fixture_skip.h"
+#include "test_parts.h"
 
 #include <algorithm>
 #include <cmath>
@@ -215,7 +216,9 @@ TEST(CartoonCandle, TheCandleBurnsDownAndTheFlameDiesWithSmokeAfterwards) {
 	EXPECT_FALSE(cd::buildSmoke(cd::kOut + 3.0).empty());
 }
 
-TEST(CartoonFilms, EveryFilmFlattensAtSeveralTimesWithoutWarnings) {
+// Every film at seven times, in test_parts.h's parts (each film and time is one of 119 instants: one test of all of them took 150 s of one process).
+class EveryFilmFlattens : public ::testing::TestWithParam<int> {};
+TEST_P(EveryFilmFlattens, AtSeveralTimesWithoutWarnings) {
 	// (a film may keep its heavy meshes in PLY files of its cache, film_cache.h: read them as the scene loader does)
 	const MeshResolver plyFiles = [](const std::string &path, std::vector<float> &positions, std::vector<int> &indices, std::vector<float> &uvs, std::vector<float> &normals) {
 		ply_mesh::LoadResult m = ply_mesh::loadFile(path);
@@ -226,8 +229,10 @@ TEST(CartoonFilms, EveryFilmFlattensAtSeveralTimesWithoutWarnings) {
 		normals = std::move(m.mesh.normals);
 		return true;
 	};
+	std::size_t instant = 0;
 	for (const cartoon::Film &film : cartoon::kFilms) {
 		for (double f : {0.0, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99}) {   // (0.99: the last second may be a cut to black)
+			if (!test_parts::inPart(instant++, GetParam())) continue;
 			const double t = f * film.duration;
 			const FlatScene s = flattenSource(film.sceneAt(t), plyFiles);
 			// (a black card -- a title over black: no light at all, a black sky -- is a picture too; and a frame lit by its sky alone, an ink painting on paper, needs no lamp)
@@ -242,6 +247,7 @@ TEST(CartoonFilms, EveryFilmFlattensAtSeveralTimesWithoutWarnings) {
 		}
 	}
 }
+INSTANTIATE_TEST_SUITE_P(Parts, EveryFilmFlattens, test_parts::all());
 
 TEST(CartoonLittleRobot, TheRobotKneelsAtTheSeedlingAndItBloomsAfterTheWatering) {
 	namespace lr = cartoon::little_robot;
@@ -322,8 +328,11 @@ TEST(CartoonForestDawn, TheSoundtrackIsTheSameEveryTimeInRangeAndNeverSilent) {
 
 // Every film has a soundtrack: the same every time it is made, heard over its whole length (no stretch of 6 s in silence before its last second), and never driven into the
 // limiter (its loudest moment is below full scale). RT_SOUNDTRACK_DIR=<folder> keeps each film's mix as <key>.wav to listen to.
-TEST(CartoonSound, EveryFilmHasASoundtrackHeardFromStartToEnd) {
-	for (const cartoon::Film &film : cartoon::kFilms) {
+class EveryFilmSound : public ::testing::TestWithParam<int> {};   // (each film in one of test_parts.h's parts)
+TEST_P(EveryFilmSound, IsASoundtrackHeardFromStartToEnd) {
+	for (std::size_t i = 0; i < cartoon::kFilms.size(); ++i) {
+		if (!test_parts::inPart(i, GetParam())) continue;
+		const cartoon::Film &film = cartoon::kFilms[i];
 		ASSERT_TRUE(static_cast<bool>(film.soundtrack)) << film.key << " has no soundtrack";
 		if (film.duration > 120.0) continue;   // (the long films' mixes take most of a minute: they are made in their own tests and in a draft)
 		cartoon::audio::Mix a(film.duration), b(film.duration);
@@ -345,6 +354,7 @@ TEST(CartoonSound, EveryFilmHasASoundtrackHeardFromStartToEnd) {
 		EXPECT_GT(peak, 3000) << film.key << ": too quiet";
 	}
 }
+INSTANTIATE_TEST_SUITE_P(Parts, EveryFilmSound, test_parts::all());
 
 // The Great Turtle Escape: a wide 1920 x 1080 film whose camera stays in the room, whose turtle never jumps between frames, whose night is exposed brighter than its day, and whose
 // soundtrack is deterministic and never silent until the cut to black.

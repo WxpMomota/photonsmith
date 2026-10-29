@@ -157,18 +157,25 @@ TEST(FilmWater, TheSeasWavesRollAndAreDrawnWhereTheCameraLooks) {
 	sea.level = 2.0;
 	sea.waves = 1.0;
 	double lo = 1e9, hi = -1e9, moved = 0.0;
-	for (double x = -40.0; x <= 40.0; x += 1.7)
-		for (double z = -40.0; z <= 40.0; z += 1.9) {
-			cartoon::Vec3 p, n, q, m;
-			double fold = 0.0;
-			water::seaAt(sea, x, z, 3.0, 1.0, p, n, fold);
-			lo = std::min(lo, p.y), hi = std::max(hi, p.y);
-			EXPECT_GT(n.y, 0.0);
-			water::seaAt(sea, x, z, 3.0, 1.0, q, m, fold);
-			EXPECT_DOUBLE_EQ(p.y, q.y) << "the same at the same time";
-			water::seaAt(sea, x, z, 4.0, 1.0, q, m, fold);
-			moved = std::max(moved, std::abs(p.y - q.y));
-		}
+	// (one pass a time: the sea keeps the spectrum tiles of one time, film_water.h oceanTile, so a test that went 3, 3, 4 at each point made them anew twice a point - 36 s)
+	std::vector<double> first, again, later;
+	for (double t : {3.0, 3.0, 4.0}) {
+		std::vector<double> &heights = first.empty() ? first : again.empty() ? again : later;
+		for (double x = -40.0; x <= 40.0; x += 1.7)
+			for (double z = -40.0; z <= 40.0; z += 1.9) {
+				cartoon::Vec3 p, n;
+				double fold = 0.0;
+				water::seaAt(sea, x, z, t, 1.0, p, n, fold);
+				heights.push_back(p.y);
+				if (&heights == &first) EXPECT_GT(n.y, 0.0);
+			}
+	}
+	ASSERT_EQ(first.size(), later.size());
+	for (std::size_t i = 0; i < first.size(); ++i) {
+		lo = std::min(lo, first[i]), hi = std::max(hi, first[i]);
+		EXPECT_DOUBLE_EQ(first[i], again[i]) << "the same at the same time";
+		moved = std::max(moved, std::abs(first[i] - later[i]));
+	}
 	EXPECT_GT(hi - lo, 0.5 * sea.waves) << "waves as high as asked";
 	EXPECT_LT(hi - lo, 2.5 * sea.waves);
 	EXPECT_NEAR(0.5 * (hi + lo), sea.level, 0.4 * sea.waves);

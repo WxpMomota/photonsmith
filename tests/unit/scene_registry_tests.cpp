@@ -13,6 +13,7 @@
 
 #include <gtest/gtest.h>
 #include "fixture_skip.h"
+#include "test_parts.h"
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -793,8 +794,13 @@ TEST(CpuSceneApiTest, UnknownIdRecommendedExposureReturnsNeutral) {
 // Builder callback smoke tests
 // ===========================================================================
 
-TEST(SceneBuilderTest, AllScenesProduceNonEmptyWorld) {
-	for (const auto& s : get_scene_registry()) {
+// Every scene of the registry, in test_parts.h's parts (one test of all of them took 75 s of one process).
+class EveryScene : public ::testing::TestWithParam<int> {};
+TEST_P(EveryScene, ProducesANonEmptyWorld) {
+	const auto& registry = get_scene_registry();
+	for (std::size_t i = 0; i < registry.size(); ++i) {
+		if (!test_parts::inPart(i, GetParam())) continue;
+		const auto& s = registry[i];
 		// Skip scenes requiring external files (earthmap.jpg may not be present in CI)
 		if (s.requires_files) continue;
 		hittable_list world;
@@ -804,6 +810,7 @@ TEST(SceneBuilderTest, AllScenesProduceNonEmptyWorld) {
 			<< "Empty world for id " << s.id;
 	}
 }
+INSTANTIATE_TEST_SUITE_P(Parts, EveryScene, test_parts::all());
 
 TEST(SceneBuilderTest, CornellFamilyLightsAreNonEmpty) {
 	// Scenes that use Cornell box lights: A1, A8, B2 (old flat ids 0, 7, 10)

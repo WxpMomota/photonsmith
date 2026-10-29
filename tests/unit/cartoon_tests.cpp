@@ -39,6 +39,7 @@
 #include "../../launcher/run_log.h"
 #include "../../src/shared/cartoon/film_subjects.h"
 #include "fixture_skip.h"
+#include "test_parts.h"
 #include "../../src/shared/cartoon/cartoon_films.h"   // (the films themselves, which these tests reach into)
 #include "../../src/shared/cartoon/cartoon_stills.h"
 #include "../../src/shared/cartoon/film_checks.h"
@@ -405,16 +406,30 @@ TEST(CartoonScenes, TheRegistryListsEveryFilmAndLoadsAStillThroughIt) {
 	EXPECT_TRUE(std::filesystem::exists(path)) << path;
 }
 
-TEST(CartoonStills, EveryStillNamesItsFilmByKeyAndTheNamesAgree) {
-	for (const cartoon::Film &film : cartoon::kFilms) {
+// Every film's still is written (cartoon_stills::ensure is pruneUnknown and this for each film) and names its film - in test_parts.h's parts: writing every still is
+// building every film's frame, which took one test 90 s of one process.
+class EveryStill : public ::testing::TestWithParam<int> {};
+TEST_P(EveryStill, IsWrittenAndNamesItsFilmByKeyAndTheNamesAgree) {
+	const std::filesystem::path dir = scratchDir(("stills_part_" + std::to_string(GetParam())).c_str());
+	std::filesystem::create_directories(dir);
+	for (std::size_t i = 0; i < cartoon::kFilms.size(); ++i) {
+		if (!test_parts::inPart(i, GetParam())) continue;
+		const cartoon::Film &film = cartoon::kFilms[i];
 		EXPECT_EQ(cartoon::cameraPathOf(film), std::string("cartoon:") + film.key);
 		EXPECT_EQ(cartoon::stillSlugOf(film), std::string("cartoon-") + film.key);
 		EXPECT_EQ(cartoon_stills::fileName(film), cartoon::stillSlugOf(film) + ".pbrt");
 		ASSERT_NE(cartoon::forCameraPath(cartoon::cameraPathOf(film).c_str()), nullptr);
 		EXPECT_STREQ(cartoon::forCameraPath(cartoon::cameraPathOf(film).c_str())->key, film.key) << "a camera path finds its film again";
-		EXPECT_NE(cartoon_stills::text(film).find(std::string("# @rt-cartoon ") + film.key + "\n"), std::string::npos) << "the tag that links a listed still to its film";
+		cartoon_stills::ensureOne(dir.string(), film);
+		std::ifstream in(dir / cartoon_stills::fileName(film), std::ios::binary);
+		ASSERT_TRUE(in.good()) << film.key << ": its still was not written";
+		std::stringstream all;
+		all << in.rdbuf();
+		EXPECT_NE(all.str().find(std::string("# @rt-cartoon ") + film.key + "\n"), std::string::npos) << "the tag that links a listed still to its film";
 	}
+	std::filesystem::remove_all(dir);
 }
+INSTANTIATE_TEST_SUITE_P(Parts, EveryStill, test_parts::all());
 
 TEST(CartoonStills, AStillIsTheFilmsFrameAtItsStillTime) {
 	const cartoon::Film &film = cartoon::kFilms[0];
@@ -427,8 +442,9 @@ TEST(CartoonStills, AStillIsTheFilmsFrameAtItsStillTime) {
 
 TEST(CartoonStills, AFileIsWrittenAgainOnlyWhenItsTextWouldChange) {
 	const std::filesystem::path dir = scratchDir("stills_fresh");
-	cartoon_stills::ensure(dir.string());
-	const cartoon::Film &film = cartoon::kFilms[0];
+	std::filesystem::create_directories(dir);
+	const cartoon::Film &film = cartoon::kFilms[0];   // (one film's file: ensureOne, which ensure() runs for every film - each run of that built every film's frame)
+	cartoon_stills::ensureOne(dir.string(), film);
 	const std::filesystem::path file = dir / cartoon_stills::fileName(film);
 	ASSERT_TRUE(std::filesystem::exists(file));
 	const std::string hash = cartoon_stills::hashOf(cartoon_stills::body(film));
@@ -438,7 +454,7 @@ TEST(CartoonStills, AFileIsWrittenAgainOnlyWhenItsTextWouldChange) {
 	EXPECT_NE(cartoon_stills::hashOf("a"), cartoon_stills::hashOf("b"));
 	// current: left alone (a marker appended to the end survives)
 	{ std::ofstream(file, std::ios::binary | std::ios::app) << "# marker\n"; }
-	cartoon_stills::ensure(dir.string());
+	cartoon_stills::ensureOne(dir.string(), film);
 	std::ifstream in(file, std::ios::binary);
 	std::stringstream all;
 	all << in.rdbuf();
@@ -449,7 +465,7 @@ TEST(CartoonStills, AFileIsWrittenAgainOnlyWhenItsTextWouldChange) {
 		std::ofstream out(file, std::ios::binary | std::ios::trunc);
 		out << "# @rt-cartoon-hash something else\nWorldBegin\n";
 	}
-	cartoon_stills::ensure(dir.string());
+	cartoon_stills::ensureOne(dir.string(), film);
 	EXPECT_TRUE(cartoon_stills::upToDate(file, hash));
 	std::filesystem::remove_all(dir);
 }
@@ -459,10 +475,9 @@ TEST(CartoonStills, TheStillOfAFilmThatIsGoneIsRemovedAndOtherFilesAreKept) {
 	std::filesystem::create_directories(dir);
 	{ std::ofstream(dir / "cartoon-gone-film.pbrt") << "WorldBegin\n"; }
 	{ std::ofstream(dir / "my-scene.pbrt") << "WorldBegin\n"; }
-	cartoon_stills::ensure(dir.string());
+	cartoon_stills::pruneUnknown(dir.string());   // (what ensure() does before writing every film's still: EveryStill writes them)
 	EXPECT_FALSE(std::filesystem::exists(dir / "cartoon-gone-film.pbrt"));
 	EXPECT_TRUE(std::filesystem::exists(dir / "my-scene.pbrt")) << "only the generated names are touched";
-	for (const cartoon::Film &film : cartoon::kFilms) EXPECT_TRUE(std::filesystem::exists(dir / cartoon_stills::fileName(film))) << film.key;
 	std::filesystem::remove_all(dir);
 }
 
