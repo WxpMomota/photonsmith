@@ -1,0 +1,3 @@
+# Commits that only reformat, skipped by git blame (GitHub reads this file; locally: git config blame.ignoreRevsFile .git-blame-ignore-revs).
+# Line endings: camera.h, camera_render.h, pbrt_cpu_builder.h to LF
+0d0235098b7100e2e9da0ea5b091400b39b842e8
