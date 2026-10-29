@@ -1357,6 +1357,20 @@ void MainWindow::runFramesStripSelfTest(const std::function<void(const QString &
 	check(strip.refresh() == 2 && strip.item(strip.count() - 2)->data(Qt::UserRole).toInt() == 6 && strip.item(strip.count() - 1)->data(Qt::UserRole).toInt() == 9, "frames that arrive out of order are put in their place");
 	check(strip.count() == 5 && strip.item(0)->data(Qt::UserRole).toInt() == 1, "only the latest five are kept (the strip's limit): the oldest went");
 	check(strip.pictures() == 6, "the whole count is still the folder's: 6");
+	// a video that starts afresh over an older one's frames (other settings): they leave the strip when the renderer empties the folder, and its own frames are loaded although they
+	// have the old ones' names - also one written again in place between two looks
+	for (const QString &file : QDir(dir.path()).entryList(QStringList() << "enc_*.png", QDir::Files)) QFile::remove(dir.filePath(file));
+	check(strip.refresh() == 0 && strip.count() == 0 && strip.pictures() == 0, "frames whose files are gone leave the strip");
+	picture("enc_0000.png", 30);
+	check(strip.refresh() == 1 && strip.count() == 1 && strip.item(0)->text() == "1", "the new video's frame 1 is shown, under the old name");
+	picture("enc_0000.png", 220);
+	{
+		QFile again(dir.filePath("enc_0000.png"));
+		check(again.open(QIODevice::ReadWrite) && again.setFileTime(QDateTime::currentDateTime().addSecs(60), QFileDevice::FileModificationTime), "(the picture is written again)");
+	}
+	check(strip.refresh() == 1 && strip.count() == 1, "a picture written again in place is loaded again, not shown twice");
+	for (int i = 1; i < 6; ++i) picture(QString("enc_%1.png").arg(i, 4, 10, QChar('0')), 20 * i);
+	strip.refresh();
 	// many at once (a resumed video): at most `maxNew` per look, and only the newest ones shown
 	QTemporaryDir many;
 	for (int i = 0; i < 40; ++i) {

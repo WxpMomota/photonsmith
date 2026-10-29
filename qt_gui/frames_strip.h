@@ -6,8 +6,10 @@
 // freeze the window), puts each in its place by frame number, keeps only the latest `limit` (a film has thousands) and scrolls to the newest while you are looking at the end of the
 // strip. Double-clicking a picture is for the window to act on (it opens the file).
 
+#include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
+#include <QHash>
 #include <QImage>
 #include <QListWidget>
 #include <QPixmap>
@@ -56,16 +58,30 @@ class FramesStrip : public QListWidget {
 	int refresh(int maxNew = 12) {
 		if (dir_.isEmpty()) return 0;
 		static const QRegularExpression name("^enc_(\\d+)\\.png$");
-		QStringList fresh;   // file names not seen yet, in order
-		int count = 0;
-		for (const QString &file : QDir(dir_).entryList(QStringList() << "enc_*.png", QDir::Files, QDir::Name)) {
-			if (!name.match(file).hasMatch()) continue;   // (a picture being written has another name: enc_0007.png.tmp.png)
-			++count;
-			if (!seen_.contains(file)) fresh << file;
+		QStringList files;               // the finished frames in the folder, in order
+		QHash<QString, qint64> written;  // and when each was written
+		for (const QFileInfo &info : QDir(dir_).entryInfoList(QStringList() << "enc_*.png", QDir::Files, QDir::Name)) {
+			if (!name.match(info.fileName()).hasMatch()) continue;   // (a picture being written has another name: enc_0007.png.tmp.png)
+			files << info.fileName();
+			written.insert(info.fileName(), info.lastModified().toMSecsSinceEpoch());
 		}
-		pictures_ = count;
+		// A picture that is gone, or was written again since it was loaded, leaves the strip: a video that starts afresh over an older one's frames (other settings) has its folder
+		// emptied by the renderer only after the strip has started looking, and its frame 1 is a new enc_0000.png under the old name. (The old frames stayed in the strip for the
+		// whole render, 2026-10-28.)
+		for (int row = count_() - 1; row >= 0; --row) {
+			const QString file = QFileInfo(pathOf(item(row))).fileName();
+			if (written.value(file, -1) != seen_.value(file, -2)) delete takeItem(row);
+		}
+		for (auto it = seen_.begin(); it != seen_.end();) it = written.value(it.key(), -1) == it.value() ? std::next(it) : seen_.erase(it);
+		QStringList fresh;   // file names not seen yet, in order
+		for (const QString &file : files)
+			if (!seen_.contains(file)) fresh << file;
+		pictures_ = files.size();
 		// a resumed video can have hundreds of finished frames at once: only the newest `limit_` are shown
-		while (fresh.size() > limit_) seen_.insert(fresh.takeFirst());
+		while (fresh.size() > limit_) {
+			const QString skipped = fresh.takeFirst();
+			seen_.insert(skipped, written.value(skipped));
+		}
 		QScrollBar *bar = horizontalScrollBar();
 		const bool atEnd = bar->value() >= bar->maximum() - 2;
 		int loaded = 0;
@@ -74,7 +90,7 @@ class FramesStrip : public QListWidget {
 			const QString path = QDir(dir_).filePath(file);
 			QImage image(path);
 			if (image.isNull()) continue;   // (not readable yet: tried again next time)
-			seen_.insert(file);
+			seen_.insert(file, written.value(file));
 			const int index = name.match(file).captured(1).toInt();
 			auto *item = new QListWidgetItem(QIcon(QPixmap::fromImage(image.scaled(kThumbWidth, kThumbHeight, Qt::KeepAspectRatio, Qt::SmoothTransformation))), QString::number(index + 1));
 			item->setData(Qt::UserRole, index);
@@ -101,7 +117,7 @@ class FramesStrip : public QListWidget {
 	int count_() const { return QListWidget::count(); }
 
 	QString dir_;
-	QSet<QString> seen_;
+	QHash<QString, qint64> seen_;   // the pictures loaded (or passed over for the limit), with when each was written
 	int limit_ = 300;
 	int pictures_ = 0;
 };
