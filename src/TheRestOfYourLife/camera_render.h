@@ -988,4 +988,4 @@ inline ray camera::get_ray(int i, int j, int /*s_i*/, int /*s_j*/, const vec3& o
                          ray_origin, ry_sample - ray_origin);
 
     return r;
-}
+}

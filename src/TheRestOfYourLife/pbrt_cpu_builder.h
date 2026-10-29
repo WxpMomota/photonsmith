@@ -844,4 +844,4 @@ inline BuildResult build(const pbrt_flatten::FlatScene &scene) {
 	return scene_builder_impl::CpuSceneBuilder(scene).run();
 }
 
-} // namespace pbrt_cpu
+} // namespace pbrt_cpu
