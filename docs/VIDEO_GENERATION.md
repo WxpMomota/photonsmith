@@ -1782,6 +1782,14 @@ whole: AgX fades it towards white keeping its hue, PBR Neutral leaves everything
 (30 s, the haze behind the heart): ACES turns the haze's bright side yellow; AgX keeps it rose but is paler and flatter; AgX Punchy keeps the hue with about ACES's contrast;
 PBR Neutral is the most saturated. The GUI's Tone mapping box (Render Options) offers them too.
 
+**Star glints, and any look word for a film or a shot: `look`.** A cameras file's `look WORDS` adds words to the frame's `# @rt-look` line (`[*]` for the whole film, a
+shot's own after it, so they win), and `--look "WORDS"` does the same for one render. Among them the star glint of Blender's Glare node ("Streaks", "Simple Star"):
+`star S` (0-1: how much of the light above the threshold goes into each ray), `star-points N` (4: a cross; 6, 8 ...), `star-angle D` (degrees from the right; 45 with 4
+points: an x), `star-length L` (each ray's reach, a share of the picture's width; 0.08) and `star-threshold T` (linear luminance a light must pass; 1). Every light above
+the threshold gets the rays - the sparks round a crystal, a gem, a lamp, a magic spark - and nothing below it. Made as Blender makes its streaks (Kawase's method: passes
+of four taps, 1, 4, 16, 64 pixels apart), at half the picture's size, on the linear picture before the bloom: `look star 0.35 star-length 0.12 star-threshold 2` puts a
+thin cross on each of Crystal Heart's floating sparks.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

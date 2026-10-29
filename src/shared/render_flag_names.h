@@ -46,6 +46,7 @@ namespace render_flags {
 	constexpr const char* kVignette      = "--vignette";
 	constexpr const char* kWarmth        = "--warmth";
 	constexpr const char* kSaturation    = "--saturation";
+	constexpr const char* kLook          = "--look";         // "WORDS": any of the look line's words (star 0.3, flare 0.2, tonemap agx ...), over the scene's
 	constexpr const char* kSampler       = "--sampler";
 	constexpr const char* kAdaptive      = "--adaptive";
 	constexpr const char* kNoAdaptive    = "--no-adaptive";   // (a film video samples adaptively unless told not to: cartoon_render.h, frameFlags)

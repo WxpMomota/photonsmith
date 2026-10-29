@@ -210,6 +210,16 @@ TEST(ShotCameras, AFilmOrAShotChoosesItsColourCurveOnTheLookLine) {
 	const std::size_t at = second.find("# @rt-look") + 10;
 	EXPECT_TRUE(lens_look::parse(second.substr(at, second.find('\n', at) - at), look).empty());
 	EXPECT_EQ(look.tonemap, "neutral");
+
+	// `look`: any of the look line's words, the film's and then the shot's (which win); a word the look does not know is said
+	const sc::File g = sc::parse("[*]\nlook star 0.2 star-points 6\n[2]\nlook star 0.4\n[3]\nlook glimmer 1\n");
+	EXPECT_EQ(g.problems.size(), 1u);
+	const std::string shot = sc::apply(scene, sc::changeFor(g, 1, ""));
+	const std::size_t from = shot.find("# @rt-look") + 10;
+	lens_look::Look both;
+	EXPECT_TRUE(lens_look::parse(shot.substr(from, shot.find('\n', from) - from), both).empty());
+	EXPECT_EQ(both.starPoints, 6) << "the film's";
+	EXPECT_EQ(both.star, 0.4) << "the shot's wins";
 }
 
 // Every film the program lists reads its cameras file when a frame is made: an edit is seen by the next frame, without a rebuild, and only in the shot it names.

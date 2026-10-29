@@ -118,3 +118,45 @@ TEST(LensLook, ALookLineCanChooseTheColourCurve) {
 	only.tonemap = "agx";
 	EXPECT_FALSE(only.active()) << "the curve alone changes nothing in apply(): it is the writers'";
 }
+
+// A star glint: rays from a light brighter than the threshold, along the points' directions only, and nothing from what is below it.
+TEST(LensLook, AStarSendsRaysFromABrightLightAlongItsPointsOnly) {
+	const int w = 200, h = 200;
+	std::vector<float> img = flat(w, h, 0.1f, 0.1f, 0.1f);
+	for (int y = 98; y < 102; ++y)
+		for (int x = 98; x < 102; ++x)
+			for (int k = 0; k < 3; ++k) img[(static_cast<std::size_t>(y) * w + x) * 3 + k] = 50.0f;   // a light, 4 x 4 pixels
+	const std::vector<float> before = img;
+	lens_look::Look look;
+	ASSERT_TRUE(lens_look::parse("star 0.5 star-points 4 star-length 0.3", look).empty());
+	EXPECT_TRUE(look.active());
+	lens_look::apply(img.data(), w, h, look);
+	const auto at = [&](const std::vector<float> &p, int x, int y) { return p[(static_cast<std::size_t>(y) * w + x) * 3 + 1]; };
+	for (const auto &d : {std::pair<int, int>{130, 100}, {70, 100}, {100, 70}, {100, 130}})
+		EXPECT_GT(at(img, d.first, d.second), at(before, d.first, d.second) + 0.05f) << "a ray reaches " << d.first << "," << d.second;
+	EXPECT_NEAR(at(img, 125, 125), at(before, 125, 125), 0.01f) << "not on the diagonal: a cross, not an x";
+	EXPECT_NEAR(at(img, 10, 10), 0.1f, 1e-4f) << "the dark picture far away is untouched";
+	EXPECT_GT(at(img, 120, 100), at(img, 140, 100)) << "a ray fades with distance";
+
+	lens_look::Look turned = look;
+	turned.starAngle = 45.0;
+	std::vector<float> x = before;
+	lens_look::apply(x.data(), w, h, turned);
+	EXPECT_GT(at(x, 120, 80), at(before, 120, 80) + 0.02f) << "45 degrees: an x (up and to the right; rows go down)";
+	EXPECT_NEAR(at(x, 130, 100), at(before, 130, 100), 0.01f);
+
+	std::vector<float> dim = flat(w, h, 0.8f, 0.8f, 0.8f);
+	const std::vector<float> dimBefore = dim;
+	lens_look::apply(dim.data(), w, h, look);
+	EXPECT_EQ(dim, dimBefore) << "nothing above the threshold (1): no star";
+}
+
+TEST(LensLook, StarWordsAreReadAndKeptInRange) {
+	lens_look::Look look;
+	EXPECT_TRUE(lens_look::parse("star 2 star-points 40 star-angle 30 star-length 0.2 star-threshold 3", look).empty());
+	EXPECT_EQ(look.star, 1.0);
+	EXPECT_EQ(look.starPoints, 16);
+	EXPECT_EQ(look.starAngle, 30.0);
+	EXPECT_EQ(look.starLength, 0.2);
+	EXPECT_EQ(look.starThreshold, 3.0);
+}

@@ -43,7 +43,7 @@ inline constexpr FlagScopeEntry kFlagScopes[] = {
 	{"--gpu", FlagScope::Render}, {"-gpu", FlagScope::Render}, {"--gpu-device", FlagScope::Render}, {"--cpu", FlagScope::Render}, {"-cpu", FlagScope::Render}, {"--wavefront", FlagScope::Render}, {"--optix-validate", FlagScope::Render},
 	{"--isolate-pbrt-lighting", FlagScope::Render}, {"--denoise", FlagScope::Render}, {"--denoise-guides", FlagScope::Render}, {"--denoise-blend", FlagScope::Render},
 	{"--stats", FlagScope::Render}, {"--exposure", FlagScope::Render},
-	{"--bloom", FlagScope::Render}, {"--vignette", FlagScope::Render}, {"--warmth", FlagScope::Render}, {"--saturation", FlagScope::Render}, {"--sampler", FlagScope::Render}, {"--aovs", FlagScope::Render}, {"--toon", FlagScope::Render}, {"--adaptive", FlagScope::Render}, {"--no-adaptive", FlagScope::Render},
+	{"--bloom", FlagScope::Render}, {"--vignette", FlagScope::Render}, {"--warmth", FlagScope::Render}, {"--saturation", FlagScope::Render}, {"--look", FlagScope::Render}, {"--sampler", FlagScope::Render}, {"--aovs", FlagScope::Render}, {"--toon", FlagScope::Render}, {"--adaptive", FlagScope::Render}, {"--no-adaptive", FlagScope::Render},
 	{"--adaptive-threshold", FlagScope::Render}, {"--lightsampler", FlagScope::Render}, {"--accelerator", FlagScope::Render}, {"--splitmethod", FlagScope::Render},
 	{"--regularize", FlagScope::Render}, {"--maxcomponentvalue", FlagScope::Render}, {"--crop", FlagScope::Render}, {"--seed", FlagScope::Render}, {"--aperture", FlagScope::Render},
 	{"--focus-distance", FlagScope::Render}, {"--spectral", FlagScope::Render}, {"--tonemap", FlagScope::Render},

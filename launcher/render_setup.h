@@ -58,6 +58,7 @@ inline lens_look::Look look_for_scene(const LaunchArgs& args, const std::string&
     std::string problem;
     if (path && *path && lens_look::fromSceneFile(path, look, problem) && !problem.empty())
         std::cerr << "Warning: the scene's @rt-look line: " << problem << "\n";
+    if (!args.look_words.empty()) lens_look::parse(args.look_words, look);   // (--look: checked when it was read)
     // (a --tonemap given on the command line wins over the scene's `tonemap`)
     if (std::find(args.consumed_tokens.begin(), args.consumed_tokens.end(), std::string(render_flags::kTonemap)) != args.consumed_tokens.end()) look.tonemap.clear();
     return lens_look::merged(look, args.look);

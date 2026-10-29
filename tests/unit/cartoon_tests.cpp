@@ -1006,7 +1006,7 @@ TEST(FlagScopes, EveryRenderFlagTheFramesRepeatIsAFlagTheParserKnows) {
 		{"--splitmethod", {"sah"}}, {"--maxcomponentvalue", {"10"}}, {"--crop", {"0", "0", "1", "1"}}, {"--seed", {"3"}}, {"--aperture", {"0.1"}}, {"--focus-distance", {"5"}},
 		{"--tonemap", {"aces"}}, {"--gpu-device", {"0"}}, {"--sppm-iterations", {"3"}}, {"--sppm-photons", {"1000"}}, {"--bdpt-max-depth", {"4"}}, {"--mlt-bootstrap", {"100"}}, {"--mlt-mutations", {"100"}},
 		{"--mlt-max-depth", {"4"}}, {"--ao-max-dist", {"2"}}, {"--ao-illum-scale", {"1"}}, {"--ao-illum-rgb", {"1", "1", "1"}}, {"--bloom", {"0.2"}}, {"--vignette", {"0.3"}},
-		{"--warmth", {"0.1"}}, {"--saturation", {"1.2"}}};
+		{"--warmth", {"0.1"}}, {"--saturation", {"1.2"}}, {"--look", {"star 0.3 star-points 6"}}};
 	for (const FlagScopeEntry &e : kFlagScopes) {
 		if (e.scope != FlagScope::Render) continue;
 		std::vector<std::string> words = {e.name};

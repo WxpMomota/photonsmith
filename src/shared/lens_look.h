@@ -31,6 +31,14 @@ struct Look {
 	double vignette = 0.0;      // 0..1: how much darker the corners are than the centre
 	double warmth = 0.0;        // -1..1: towards blue (cool, night) or amber (warm, dawn); the picture's brightness stays the same
 	double saturation = 1.0;    // 0 = grey, 1 = as rendered, above 1 = more colourful
+	// A star glint (Blender's Glare node, "Streaks"/"Simple Star"): rays from every light brighter than `starThreshold` (linear luminance), `starPoints` of them evenly
+	// round (4: a cross, 6, 8 ...), the first at `starAngle` degrees from the right (45 with 4 points: an x), each reaching `starLength` of the picture's width;
+	// `star` is how much of the light above the threshold goes into each ray (0: none). The sparkle on a crystal, a gem, an eye, a magic spark.
+	double star = 0.0;
+	int starPoints = 4;
+	double starAngle = 0.0;
+	double starLength = 0.08;
+	double starThreshold = 1.0;
 	// the grade: c' = (max(0, c * gain * tint + lift))^(1 / gamma), per channel
 	double lift[3] = {0.0, 0.0, 0.0};
 	double gamma[3] = {1.0, 1.0, 1.0};
@@ -44,7 +52,7 @@ struct Look {
 			if (lift[k] != 0.0 || gamma[k] != 1.0 || gain[k] != 1.0 || tint[k] != 1.0) return true;
 		return false;
 	}
-	bool active() const { return bloom > 0.0 || flare > 0.0 || vignette > 0.0 || warmth != 0.0 || saturation != 1.0 || graded(); }
+	bool active() const { return bloom > 0.0 || flare > 0.0 || star > 0.0 || vignette > 0.0 || warmth != 0.0 || saturation != 1.0 || graded(); }
 };
 
 // Values that were set (a flag, a scene line) override `base`; a negative bloom/vignette or a saturation below 0 means "not given" in `given`.
@@ -98,10 +106,16 @@ inline std::string parse(const std::string &text, Look &out) {
 		if (word == "bloom") out.bloom = std::clamp(v, 0.0, 1.0);
 		else if (word == "bloom-radius") out.bloomRadius = std::clamp(v, 0.001, 0.5);
 		else if (word == "flare") out.flare = std::clamp(v, 0.0, 1.0);
+		else if (word == "star") out.star = std::clamp(v, 0.0, 1.0);
+		else if (word == "star-points") out.starPoints = std::clamp(static_cast<int>(std::lround(v)), 2, 16);
+		else if (word == "star-angle") out.starAngle = v;
+		else if (word == "star-length") out.starLength = std::clamp(v, 0.005, 0.5);
+		else if (word == "star-threshold") out.starThreshold = std::clamp(v, 0.0, 1000.0);
 		else if (word == "vignette") out.vignette = std::clamp(v, 0.0, 1.0);
 		else if (word == "warmth") out.warmth = std::clamp(v, -1.0, 1.0);
 		else if (word == "saturation") out.saturation = std::clamp(v, 0.0, 3.0);
-		else return "unknown word \"" + word + "\" (bloom, bloom-radius, flare, vignette, warmth, saturation, lift, gamma, gain, tint, tonemap)";
+		else return "unknown word \"" + word + "\" (bloom, bloom-radius, flare, star, star-points, star-angle, star-length, star-threshold, vignette, warmth, saturation, lift, "
+					"gamma, gain, tint, tonemap)";
 	}
 	return "";
 }
@@ -155,6 +169,51 @@ inline void gaussian(std::vector<float> &img, int w, int h, double sigma) {
 		boxPass(img, w, h, r, true);
 		boxPass(img, w, h, r, false);
 	}
+}
+
+// The picture (w x h x 3) at (x, y) in pixels, bilinear between pixel centres; black outside.
+inline void sample(const std::vector<float> &img, int w, int h, double x, double y, double out[3]) {
+	out[0] = out[1] = out[2] = 0.0;
+	const double fx = x - 0.5, fy = y - 0.5;
+	const int x0 = static_cast<int>(std::floor(fx)), y0 = static_cast<int>(std::floor(fy));
+	const double tx = fx - x0, ty = fy - y0;
+	for (int j = 0; j < 2; ++j)
+		for (int i = 0; i < 2; ++i) {
+			const int px = x0 + i, py = y0 + j;
+			if (px < 0 || py < 0 || px >= w || py >= h) continue;
+			const double wgt = (i ? tx : 1.0 - tx) * (j ? ty : 1.0 - ty);
+			const float *p = &img[(static_cast<std::size_t>(py) * static_cast<std::size_t>(w) + static_cast<std::size_t>(px)) * 3];
+			for (int k = 0; k < 3; ++k) out[k] += wgt * p[k];
+		}
+}
+
+// One ray of a star glint: `src`'s light smeared along (dx, dy) (a unit step in pixels), fading to 1% over `lengthPx`, its total kept (the ray's light is the source's).
+// Built as Blender's Glare node builds its streaks (after Kawase's "Frame buffer postprocessing effects in DOUBLE-S.T.E.A.L", GDC 2003): passes of four taps each,
+// the taps of pass p 4^p pixels apart and weighted by the fade over that distance, so a ray hundreds of pixels long costs sixteen or twenty taps a pixel.
+// `atSource` gets the share of the light that stays where it was (the product of the passes' first weights), for taking it out again: a ray is what leaves the light.
+inline std::vector<float> ray(const std::vector<float> &src, int w, int h, double dx, double dy, double lengthPx, double &atSource) {
+	const double fade = std::pow(0.01, 1.0 / (std::max)(1.0, lengthPx));   // per pixel
+	std::vector<float> cur = src, next(src.size());
+	atSource = 1.0;
+	for (int step = 1; step < lengthPx; step *= 4) {
+		double weights[4], total = 0.0;
+		for (int j = 0; j < 4; ++j) total += weights[j] = std::pow(fade, static_cast<double>(j * step));
+		for (double &wj : weights) wj /= total;
+		atSource *= weights[0];
+		ppm_text::parallel_ranges(static_cast<std::size_t>(h), [&](std::size_t begin, std::size_t end) {
+			for (std::size_t y = begin; y < end; ++y)
+				for (int x = 0; x < w; ++x) {
+					double acc[3] = {0.0, 0.0, 0.0}, c[3];
+					for (int j = 0; j < 4; ++j) {   // the light arriving from behind along the ray
+						sample(cur, w, h, x + 0.5 - dx * j * step, y + 0.5 - dy * j * step, c);
+						for (int k = 0; k < 3; ++k) acc[k] += weights[j] * c[k];
+					}
+					for (int k = 0; k < 3; ++k) next[(y * static_cast<std::size_t>(w) + static_cast<std::size_t>(x)) * 3 + k] = static_cast<float>(acc[k]);
+				}
+		});
+		cur.swap(next);
+	}
+	return cur;
 }
 
 }  // namespace detail
@@ -212,6 +271,42 @@ inline void apply(float *rgb, int w, int h, const Look &look) {
 					rgb[i * 3 + k] += static_cast<float>(f * add);
 				}
 			}
+		});
+	}
+
+	if (look.star > 0.0) {
+		// A star glint, at half the picture's size: the light above the threshold (a pixel's luminance over it, in that pixel's colour) sent out along each ray and added
+		// on top, without what stays at the light itself (detail::ray). Before the bloom, so the rays glow a little too, as in a lens.
+		const int sw = (std::max)(1, w / 2), sh = (std::max)(1, h / 2);
+		std::vector<float> bright(static_cast<std::size_t>(sw) * static_cast<std::size_t>(sh) * 3, 0.0f);
+		for (int y = 0; y < sh; ++y)
+			for (int x = 0; x < sw; ++x) {
+				double c[3] = {0.0, 0.0, 0.0};
+				for (int dy = 0; dy < 2; ++dy)
+					for (int dx = 0; dx < 2; ++dx) {
+						const std::size_t at = (static_cast<std::size_t>((std::min)(h - 1, y * 2 + dy)) * static_cast<std::size_t>(w) + static_cast<std::size_t>((std::min)(w - 1, x * 2 + dx))) * 3;
+						for (int k = 0; k < 3; ++k) c[k] += rgb[at + k] / 4.0;
+					}
+				const double lum = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2], over = lum > look.starThreshold ? (lum - look.starThreshold) / lum : 0.0;
+				for (int k = 0; k < 3; ++k) bright[(static_cast<std::size_t>(y) * static_cast<std::size_t>(sw) + static_cast<std::size_t>(x)) * 3 + k] = static_cast<float>(c[k] * over);
+			}
+		std::vector<double> rays(bright.size(), 0.0);
+		const double lengthPx = look.starLength * sw;
+		for (int p = 0; p < look.starPoints; ++p) {
+			const double a = (look.starAngle + 360.0 * p / look.starPoints) * 3.14159265358979 / 180.0;
+			double atSource = 0.0;
+			const std::vector<float> one = detail::ray(bright, sw, sh, std::cos(a), -std::sin(a), lengthPx, atSource);   // (degrees anticlockwise from the right; rows go down)
+			for (std::size_t i = 0; i < rays.size(); ++i) rays[i] += one[i] - atSource * bright[i];
+		}
+		const std::vector<float> half(rays.begin(), rays.end());
+		const double s = look.star;
+		ppm_text::parallel_ranges(static_cast<std::size_t>(h), [&](std::size_t begin, std::size_t end) {
+			for (std::size_t y = begin; y < end; ++y)
+				for (int x = 0; x < w; ++x) {
+					double c[3];
+					detail::sample(half, sw, sh, (x + 0.5) * sw / w, (y + 0.5) * sh / h, c);
+					for (int k = 0; k < 3; ++k) rgb[(y * static_cast<std::size_t>(w) + static_cast<std::size_t>(x)) * 3 + k] += static_cast<float>(s * (std::max)(0.0, c[k]));
+				}
 		});
 	}
 

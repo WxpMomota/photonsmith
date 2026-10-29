@@ -189,6 +189,8 @@ struct LaunchArgs {
 	double exposure         = 1.0;
 	// --bloom/--vignette/--warmth/--saturation: the camera's look (src/shared/lens_look.h), over the scene file's own `# @rt-look` line; unset values keep the file's.
 	lens_look::Given look;
+	// --look "WORDS": any of the look line's words (lens_look::parse: star 0.3 star-points 6, flare 0.2, tonemap agx ...), after the scene file's own and the four flags above
+	std::string look_words;
 	// Which ported pbrt-v4 sampler (src/shared/sobol_sampler.h,
 	// stratified_sampler.h, pmj02_sampler.h, halton_sampler.h,
 	// independent_sampler.h) drives camera.h's random decisions this
@@ -540,6 +542,15 @@ inline FlagResult handle_quality_flag(const std::string& arg, int argc, char** a
 							[lo, hi](double v) { return (std::min)(hi, (std::max)(lo, v)); });
 			return FlagResult::Handled;
 		}
+	}
+	if (arg == render_flags::kLook && i + 1 < argc) {
+		lens_look::Look check;
+		if (const std::string e = lens_look::parse(argv[i + 1], check); !e.empty()) std::cerr << "Invalid --look: " << e << ", ignored\n";
+		else out.look_words = argv[i + 1];
+		consumed_args.insert(i);
+		consumed_args.insert(i + 1);
+		++i;
+		return FlagResult::Handled;
 	}
 	if (arg == render_flags::kExposure && i + 1 < argc) {
 		// exposure <= 0 is a valid double but not a valid exposure -
@@ -1137,6 +1148,8 @@ inline void print_launch_help(const char* program) {
 				  << "               glow bright lights spread), vignette 0-1 (darker corners), warmth -1 to 1 (blue to amber),\n"
 				  << "               saturation 0-3 (1 = as rendered). A scene file's `# @rt-look bloom 0.2 ...` line sets them\n"
 				  << "               too; a flag wins. CPU and GPU default path tracer.\n"
+				  << "  " << render_flags::kLook << " \"WORDS\": any of that line's words, after the scene's: star 0.3 (a star glint on lights\n"
+				  << "               above star-threshold, 1), star-points 4, star-angle 0, star-length 0.08, flare, tonemap agx ...\n"
 				  << "  " << render_flags::kSampler << " NAME: Which ported pbrt-v4 sampler drives random decisions\n"
 				  << "               (default sobol, this project's pre-existing behavior).\n"
 				  << "               One of sobol, zsobol, paddedsobol, stratified, pmj02bn, halton,\n"
