@@ -147,6 +147,10 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 		bool nature = false;
 		if (const std::string e = natureLine(s, verb, line, rest, nature); !e.empty()) return fail(e);
 		if (nature) continue;
+		// the cartoon lines (`mark`, `cloth`): film_parse_cartoon.h
+		bool cartoonish = false;
+		if (const std::string e = cartoonLine(s, verb, line, n, cartoonish); !e.empty()) return fail(e);
+		if (cartoonish) continue;
 		if (verb == "key") {
 			if (s.shots.empty()) return fail("a `key` line belongs to a shot: start one with `shot 0 NAME` first");
 			shotText += line + "\n";
@@ -773,7 +777,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, set, cast, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, spacecam, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, mute, music, toon, voices, acting, lighting, terrain, water, river, waterfall, clouds, fogbank, forest, flock, herd, whale, dolphins, bioluminescence, fireflies, fungi, glacier, iceberg, seaice, wind, tornado, optics, caustics, closeup, tracks, space, planet, moon, nebula, galaxy, star, blackhole, comet, asteroids, remnant, ship, astronaut, descent, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, set, cast, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, spacecam, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, mute, music, toon, voices, acting, lighting, terrain, water, river, waterfall, clouds, fogbank, forest, flock, herd, whale, dolphins, bioluminescence, fireflies, fungi, glacier, iceberg, seaice, wind, tornado, optics, caustics, closeup, tracks, space, planet, moon, nebula, galaxy, star, blackhole, comet, asteroids, remnant, ship, astronaut, descent, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst, mark, cloth)");
 		}
 	}
 	n = shotLine;

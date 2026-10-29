@@ -276,6 +276,10 @@ extern "C" __global__ void __anyhit__wf_shadow_sphere() {
 
 	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
 		optixGetPayload_0(), optixGetPayload_1());
+	if (sp->notShadowing != 0ull && !light_link::covers(~sp->notShadowing, mat.linkGroup)) {   // shadow linking (light_link.h): not a group that casts this light's shadows
+		optixIgnoreIntersection();
+		return;
+	}
 
 	// An emissive sphere is an occluder like every other pbrt-v4 surface: the shadow ray a light sample fires stops
 	// just short of its target (NEE call sites subtract 0.002) and sphere lights are cone-sampled, so the target is
@@ -325,6 +329,10 @@ extern "C" __global__ void __anyhit__wf_shadow_quad() {
 
 	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
 		optixGetPayload_0(), optixGetPayload_1());
+	if (sp->notShadowing != 0ull && !light_link::covers(~sp->notShadowing, mat.linkGroup)) {   // shadow linking (light_link.h): not a group that casts this light's shadows
+		optixIgnoreIntersection();
+		return;
+	}
 
 	if (mat.type == MaterialType::Interface) {
 		optixIgnoreIntersection();
@@ -345,6 +353,10 @@ extern "C" __global__ void __anyhit__wf_shadow_bilinear_patch() {
 
 	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
 		optixGetPayload_0(), optixGetPayload_1());
+	if (sp->notShadowing != 0ull && !light_link::covers(~sp->notShadowing, mat.linkGroup)) {   // shadow linking (light_link.h): not a group that casts this light's shadows
+		optixIgnoreIntersection();
+		return;
+	}
 
 	if (mat.type == MaterialType::Interface) {
 		optixIgnoreIntersection();
@@ -393,6 +405,10 @@ extern "C" __global__ void __anyhit__wf_shadow_triangle() {
 
 	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
 		optixGetPayload_0(), optixGetPayload_1());
+	if (sp->notShadowing != 0ull && !light_link::covers(~sp->notShadowing, mat.linkGroup)) {   // shadow linking (light_link.h): not a group that casts this light's shadows
+		optixIgnoreIntersection();
+		return;
+	}
 
 	if (mat.type == MaterialType::Interface) {
 		optixIgnoreIntersection();
@@ -419,6 +435,10 @@ extern "C" __global__ void __anyhit__wf_shadow_disk() {
 
 	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
 		optixGetPayload_0(), optixGetPayload_1());
+	if (sp->notShadowing != 0ull && !light_link::covers(~sp->notShadowing, mat.linkGroup)) {   // shadow linking (light_link.h): not a group that casts this light's shadows
+		optixIgnoreIntersection();
+		return;
+	}
 
 	if (mat.type == MaterialType::Interface) {
 		optixIgnoreIntersection();
@@ -441,6 +461,10 @@ extern "C" __global__ void __anyhit__wf_shadow_cylinder() {
 
 	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
 		optixGetPayload_0(), optixGetPayload_1());
+	if (sp->notShadowing != 0ull && !light_link::covers(~sp->notShadowing, mat.linkGroup)) {   // shadow linking (light_link.h): not a group that casts this light's shadows
+		optixIgnoreIntersection();
+		return;
+	}
 
 	if (mat.type == MaterialType::Interface) {
 		optixIgnoreIntersection();

@@ -97,6 +97,10 @@ extern "C" __global__ void __closesthit__disk() {
 	// see MaterialType::Mix's own comment (optix_types.h).
 	int matIdx = disk.materialIdx;
 	const MaterialData mat = resolve_mix_material(params.materials[matIdx], matIdx, hit_point, matIdx);
+	// Light linking (light_link.h): whether this hit's light reaches the surface the ray left, read before this hit reports its own group (payload p28),
+	// which the light sampling below reads as the receiver's.
+	const bool linkLit = link_lit_from_previous(mat);
+	link_report_group(mat);
 
 	// A disk is flat: its object-space normal is the constant +Z everywhere
 	// on its surface, unlike Cylinder's (see __closesthit__cylinder), which
@@ -198,6 +202,7 @@ extern "C" __global__ void __closesthit__disk() {
 		}
 	}
 
+	if (!linkLit) emission = make_float3(0.0f, 0.0f, 0.0f);   // light linking (light_link.h)
 	optixSetPayload_3(__float_as_uint(emission.x));
 	optixSetPayload_4(__float_as_uint(emission.y));
 	optixSetPayload_5(__float_as_uint(emission.z));
@@ -228,7 +233,7 @@ extern "C" __global__ void __closesthit__disk() {
 		// A lamp that also reflects: its own light, weighted against the light sampling (p13-p15, which only a subsurface exit otherwise uses; raygen
 		// adds it for flag 1). The input p12 (the arriving BSDF pdf) is read here, before this program overwrites it.
 		float3 lamp_le = make_float3(0.0f, 0.0f, 0.0f);
-		if (lamp_scatters(mat))
+		if (lamp_scatters(mat) && linkLit)
 			lamp_le = lamp_own_emission(material_emission(mat, front_face, uv_u, uv_v, hit_point), __uint_as_float(optixGetPayload_12()), disk_light_pdf());
 		float t_hit = optixGetRayTmax();
 		float brdf_pdf_out = is_specular ? 0.0f
@@ -427,6 +432,10 @@ extern "C" __global__ void __closesthit__cylinder() {
 	// see MaterialType::Mix's own comment (optix_types.h).
 	int matIdx = cyl.materialIdx;
 	const MaterialData mat = resolve_mix_material(params.materials[matIdx], matIdx, hit_point, matIdx);
+	// Light linking (light_link.h): whether this hit's light reaches the surface the ray left, read before this hit reports its own group (payload p28),
+	// which the light sampling below reads as the receiver's.
+	const bool linkLit = link_lit_from_previous(mat);
+	link_report_group(mat);
 
 	// Cylinder's normal varies with hit position (radial, from the axis) -
 	// unlike disk's constant one - so the object-space hit point has to be
@@ -769,6 +778,7 @@ extern "C" __global__ void __closesthit__cylinder() {
 		}
 	}
 
+	if (!linkLit) emission = make_float3(0.0f, 0.0f, 0.0f);   // light linking (light_link.h)
 	optixSetPayload_3(__float_as_uint(emission.x));
 	optixSetPayload_4(__float_as_uint(emission.y));
 	optixSetPayload_5(__float_as_uint(emission.z));
@@ -799,7 +809,7 @@ extern "C" __global__ void __closesthit__cylinder() {
 		// A lamp that also reflects: its own light, weighted against the light sampling (p13-p15, which only a subsurface exit otherwise uses; raygen
 		// adds it for flag 1). The input p12 (the arriving BSDF pdf) is read here, before this program overwrites it.
 		float3 lamp_le = make_float3(0.0f, 0.0f, 0.0f);
-		if (lamp_scatters(mat))
+		if (lamp_scatters(mat) && linkLit)
 			lamp_le = lamp_own_emission(material_emission(mat, front_face, uv_u, uv_v, hit_point), __uint_as_float(optixGetPayload_12()), cyl_light_pdf());
 		// Medium: the scatter/exit point is not the cylinder's entry root
 		// (optixGetRayTmax()) - use the distance computed in the Medium case

@@ -106,6 +106,14 @@ extern "C" __global__ void accumulate_miss(
 	// again, the same way evaluate_materials's own flush sites do.
 	SS L = throughput * wf_lift_rgb_to_spectrum(weightedBackground, swl, /*isIlluminant=*/true) + SS(m.radiance);
 	if (!(bool)L) return;
+	// Light groups (wavefront_light_groups.h): the sky's own part (not m.radiance, which lamps hit earlier have credited already) goes to the sky's group.
+	if (d_wf_light_group_fb && d_wf_sky_light_group >= 0) {
+		const SS sky = throughput * wf_lift_rgb_to_spectrum(weightedBackground, swl, /*isIlluminant=*/true);
+		auto sxyz = SampledSpectrumToXYZ(sky, swl, d_cie_x, d_cie_y, d_cie_z, kDevCIEMin, kDevCIENSamples);
+		float sr, sg, sb;
+		wf_xyz_to_linear_rgb(sxyz.x, sxyz.y, sxyz.z, sr, sg, sb);
+		wf_credit_light_group(d_wf_sky_light_group, m.pixelIndex, sr, sg, sb, maxComponentValue);
+	}
 
 	auto xyz = SampledSpectrumToXYZ(L, swl, d_cie_x, d_cie_y, d_cie_z, kDevCIEMin, kDevCIENSamples);
 	float r, g, b;
@@ -243,6 +251,7 @@ extern "C" __global__ void accumulate_shadow(
 
 		// (dropped if not finite, then the per-contribution "float maxcomponentvalue" clamp: GpuCameraParams::maxComponentValue, optix_types.h)
 		wf_add_to_pixel(framebuffer, s.pixelIndex, r, g, b, maxComponentValue);
+		wf_credit_light_group(s.lightGroup, s.pixelIndex, r, g, b, maxComponentValue);   // (and its light's group: wavefront_light_groups.h)
 	}
 }
 

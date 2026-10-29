@@ -39,6 +39,9 @@ struct PunctualLiSample {
 	vec3   wi;        // unit world-space direction from shading point toward light
 	double pdf;       // 1.0 for delta lights (caller divides by this)
 	double t_max;     // maximum shadow-ray t (distance to light, infinity for distant)
+	// light linking (src/shared/light_link.h): the groups the light lights, and the groups whose shapes cast its shadows (bit g: group g)
+	std::uint64_t illuminates = ~0ull, shadowsFrom = ~0ull;
+	int lightGroup = -1;   // its light group (src/shared/light_groups.h); -1: none
 };
 
 // ---------------------------------------------------------------------------
@@ -254,16 +257,22 @@ class projection_light_obj {
 // ---------------------------------------------------------------------------
 class punctual_light_list {
   public:
+	// Light linking (src/shared/light_link.h): the masks of the next light added (then back to "everything").
+	void link_next(std::uint64_t illuminates, std::uint64_t shadows_from, int light_group = -1) { pending_ = Link{illuminates, shadows_from, light_group}; }
+
 	void add_point(const point3& pos, const color& intensity, double scale = 1.0) {
 		points.emplace_back(pos, intensity, scale);
+		take_link(pointLinks);
 	}
 	void add_spot(const point3& pos, const vec3& dir, const color& intensity,
 				  double total_width_deg, double falloff_start_deg, double scale = 1.0) {
 		spots.emplace_back(pos, dir, intensity, total_width_deg, falloff_start_deg, scale);
+		take_link(spotLinks);
 	}
 	void add_distant(const vec3& dir, const color& radiance,
 					 double scene_radius = 1000.0, double scale = 1.0) {
 		distants.emplace_back(dir, radiance, scene_radius, scale);
+		take_link(distantLinks);
 	}
 
 	// Add a goniometric (IES-profile) point light.
@@ -274,6 +283,7 @@ class punctual_light_list {
 				   const double id[9],
 				   const std::vector<double>& image, int nu, int nv) {
 		gonios.emplace_back(pos, intensity, scale, id, image, nu, nv);
+		take_link(gonioLinks);
 	}
 
 	// Add a projection light (slide-projector frustum).
@@ -285,6 +295,7 @@ class punctual_light_list {
 						double fov_deg,
 						const std::vector<double>& image_rgb, int nx, int ny) {
 		projections.emplace_back(pos, scale, wtl, fov_deg, image_rgb, nx, ny);
+		take_link(projectionLinks);
 	}
 
 	bool empty() const {
@@ -296,11 +307,11 @@ class punctual_light_list {
 	// Callback: void fn(const PunctualLiSample&)
 	template<typename Fn>
 	void for_each_sample(const point3& shading_p, Fn&& fn) const {
-		for (const auto& l : points)      fn(l.sample_direct(shading_p));
-		for (const auto& l : spots)       fn(l.sample_direct(shading_p));
-		for (const auto& l : distants)    fn(l.sample_direct(shading_p));
-		for (const auto& l : gonios)      fn(l.sample_direct(shading_p));
-		for (const auto& l : projections) fn(l.sample_direct(shading_p));
+		each(points, pointLinks, shading_p, fn);
+		each(spots, spotLinks, shading_p, fn);
+		each(distants, distantLinks, shading_p, fn);
+		each(gonios, gonioLinks, shading_p, fn);
+		each(projections, projectionLinks, shading_p, fn);
 	}
 
 	std::vector<point_light_obj>   points;
@@ -308,4 +319,24 @@ class punctual_light_list {
 	std::vector<distant_light_obj> distants;
 	std::vector<goniometric_light_obj> gonios;
 	std::vector<projection_light_obj>  projections;
+
+  private:
+	struct Link {
+		std::uint64_t illuminates = ~0ull, shadowsFrom = ~0ull;
+		int lightGroup = -1;   // (light groups: src/shared/light_groups.h)
+	};
+	void take_link(std::vector<Link>& links) {
+		links.push_back(pending_);
+		pending_ = Link{};
+	}
+	template<typename Lights, typename Fn>
+	static void each(const Lights& lights, const std::vector<Link>& links, const point3& shading_p, Fn& fn) {
+		for (std::size_t i = 0; i < lights.size(); ++i) {
+			PunctualLiSample s = lights[i].sample_direct(shading_p);
+			if (i < links.size()) s.illuminates = links[i].illuminates, s.shadowsFrom = links[i].shadowsFrom, s.lightGroup = links[i].lightGroup;
+			fn(s);
+		}
+	}
+	Link pending_;
+	std::vector<Link> pointLinks, spotLinks, distantLinks, gonioLinks, projectionLinks;
 };

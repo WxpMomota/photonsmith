@@ -55,9 +55,11 @@
 // real NEE call sites need it, and should multiply their light
 // contribution by it regardless of whether this returns true or false,
 // since a light can be dimmed by fog without being fully occluded by it.
+// `shadow_groups`: shadow linking (src/shared/light_link.h) - the link groups whose shapes cast this light's shadows; a shape of another group is passed as if it
+// were not there (all of them by default).
 inline bool shadow_ray_hit(
     const hittable& world, const ray& r, hit_record& out_hit,
-    double t_max = infinity, color* out_transmittance = nullptr
+    double t_max = infinity, color* out_transmittance = nullptr, std::uint64_t shadow_groups = ~0ull
 ) {
     // Bounds a stack of transmissive objects in a row (several glass panes,
     // say) rather than looping until t_max is exhausted one epsilon-sized
@@ -75,6 +77,14 @@ inline bool shadow_ray_hit(
         hit_record rec;
         if (!world.hit(current, interval(t_min, remaining), rec))
             return false;  // nothing (opaque or otherwise) left before t_max
+
+        // shadow linking: a shape whose group does not cast this light's shadows is not there for it
+        if (shadow_groups != ~0ull && !light_link::covers(shadow_groups, rec.mat ? rec.mat->link_group : 0)) {
+            remaining -= rec.t;
+            if (remaining <= t_min) return false;
+            current = ray(rec.p, r.direction(), r.time());
+            continue;
+        }
 
         if (!rec.mat->is_shadow_transmissive(rec)) {
             // Thin glass lets the path tracer's shadow rays through, scaled by what it transmits at this angle (material::thin_pass_through): the path side

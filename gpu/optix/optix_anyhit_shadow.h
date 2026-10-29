@@ -183,6 +183,12 @@ __device__ __forceinline__ void shadow_medium_sphere_chord(const SphereData& sph
 // Thin glass lets a shadow ray through, scaled by the share it transmits at this angle (ThinDielectricTransmittance, src/shared/bxdfs_simple.h): the path
 // side's straight-through scatter off it is a free crossing (optix_device_shade.h), so the two estimators add up. `cosTheta` is the ray's cosine with the
 // surface, in whichever space the caller has both in (1 where an any-hit has no cheap normal: disks, cylinders, bilinear patches).
+// Shadow linking (src/shared/light_link.h): whether this shadow ray passes a shape of `m`'s link group (the light's shadow is cast by other groups only).
+__device__ __forceinline__ bool shadow_link_skips(const MaterialData& m) {
+	const unsigned long long notShadowing = shadow_state_from_payload()->notShadowing;
+	return notShadowing != 0ull && !light_link::covers(~notShadowing, m.linkGroup);
+}
+
 __device__ __forceinline__ void shadow_pass_thin_glass(const MaterialData& mat, float cosTheta) {
 	ShadowRayState* st = shadow_state_from_payload();
 	st->transmittance *= ThinDielectricTransmittance(cosTheta, mat.ior);   // memory write: survives optixIgnoreIntersection
@@ -212,6 +218,10 @@ extern "C" __global__ void __anyhit__shadow_sphere() {
 	const float3 shadow_hit_point = optixGetWorldRayOrigin() + shadow_t * optixGetWorldRayDirection();
 	int matIdx = sphere.materialIdx;
 	const MaterialData mat = resolve_mix_material(params.materials[matIdx], matIdx, shadow_hit_point, matIdx);
+	if (shadow_link_skips(mat)) {   // shadow linking (light_link.h): a shape of a group that does not cast this light's shadows
+		optixIgnoreIntersection();
+		return;
+	}
 
 	// An emissive sphere is an occluder like every other pbrt-v4 surface: the shadow ray a light sample fires stops
 	// just short of its target (NEE call sites subtract 0.002) and sphere lights are cone-sampled, so the target is
@@ -339,6 +349,10 @@ extern "C" __global__ void __anyhit__shadow_quad() {
 	const float3 shadow_hit_point = optixGetWorldRayOrigin() + shadow_t * optixGetWorldRayDirection();
 	int matIdx = quad.materialIdx;
 	const MaterialData mat = resolve_mix_material(params.materials[matIdx], matIdx, shadow_hit_point, matIdx);
+	if (shadow_link_skips(mat)) {   // shadow linking (light_link.h): a shape of a group that does not cast this light's shadows
+		optixIgnoreIntersection();
+		return;
+	}
 
 	// Transmissive materials let light through -- ignore them in shadow rays
 	if (mat.type == MaterialType::Interface) {
@@ -364,6 +378,10 @@ extern "C" __global__ void __anyhit__shadow_bilinear_patch() {
 	const float3 shadow_hit_point = optixGetWorldRayOrigin() + shadow_t * optixGetWorldRayDirection();
 	int matIdx = patch.materialIdx;
 	const MaterialData mat = resolve_mix_material(params.materials[matIdx], matIdx, shadow_hit_point, matIdx);
+	if (shadow_link_skips(mat)) {   // shadow linking (light_link.h): a shape of a group that does not cast this light's shadows
+		optixIgnoreIntersection();
+		return;
+	}
 
 	if (mat.type == MaterialType::Interface) {
 		optixIgnoreIntersection();
@@ -391,6 +409,10 @@ extern "C" __global__ void __anyhit__shadow_disk() {
 	const float3 shadow_hit_point = optixGetWorldRayOrigin() + shadow_t * optixGetWorldRayDirection();
 	int matIdx = disk.materialIdx;
 	const MaterialData mat = resolve_mix_material(params.materials[matIdx], matIdx, shadow_hit_point, matIdx);
+	if (shadow_link_skips(mat)) {   // shadow linking (light_link.h): a shape of a group that does not cast this light's shadows
+		optixIgnoreIntersection();
+		return;
+	}
 
 	if (mat.type == MaterialType::Interface) {
 		optixIgnoreIntersection();
@@ -414,6 +436,10 @@ extern "C" __global__ void __anyhit__shadow_cylinder() {
 	const float3 shadow_hit_point = optixGetWorldRayOrigin() + shadow_t * optixGetWorldRayDirection();
 	int matIdx = cyl.materialIdx;
 	const MaterialData mat = resolve_mix_material(params.materials[matIdx], matIdx, shadow_hit_point, matIdx);
+	if (shadow_link_skips(mat)) {   // shadow linking (light_link.h): a shape of a group that does not cast this light's shadows
+		optixIgnoreIntersection();
+		return;
+	}
 
 	// Homogeneous Medium/DielectricMedium: real Beer-Lambert attenuation of
 	// the running shadow-ray transmittance (payload 1), same fix and same
@@ -523,6 +549,10 @@ extern "C" __global__ void __anyhit__shadow_triangle() {
 	int matIdx = tri.materialIdx;
 	const float2 mixUv = triangle_hit_uv(tri, optixGetTriangleBarycentrics());
 	const MaterialData mat = resolve_mix_material(params.materials[matIdx], matIdx, shadow_hit_point, mixUv.x, mixUv.y, matIdx);
+	if (shadow_link_skips(mat)) {   // shadow linking (light_link.h): a shape of a group that does not cast this light's shadows
+		optixIgnoreIntersection();
+		return;
+	}
 
 	// Alpha-cutout: a transparent pixel of a leaf/foliage material casts no
 	// shadow there, same as any other "not actually here" any-hit case

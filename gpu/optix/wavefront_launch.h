@@ -606,6 +606,10 @@ extern "C" void wf_upload_cie_tables(
 // wavefront_path_tracer.cpp for how the resulting table is consumed).
 extern "C" void wf_upload_d65_table(const float* h_d65, int n_samples);
 
+// Light groups (wavefront_light_groups.h): the device buffer of `count` pictures of numPixels float3 the kernels add each group's light to, and the sky's group
+// (-1: none). d_pictures null: no light groups.
+extern "C" void wf_set_light_groups(float3* d_pictures, int count, int numPixels, int skyGroup);
+
 extern "C" void wf_upload_srgb_table(
 	const float* h_zNodes,    // [64]
 	const float* h_coeffs,    // [3*64*64*64*3]

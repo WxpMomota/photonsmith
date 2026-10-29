@@ -11,6 +11,7 @@
 #include "../../src/shared/tone_map.h"
 #include "../../src/shared/render_events.h"
 #include "../../src/shared/exr_writer.h"
+#include "../../src/shared/light_group_passes.h"
 #include "../../src/shared/ppm_text.h"
 #include "../../src/shared/output_format.h"
 #include <iostream>
@@ -37,6 +38,27 @@ static std::unique_ptr<OptiXRenderer, LeakedAtExit> g_renderer;
 using optix_renderer::RendererKind;
 using optix_renderer::UploadedScene;
 static UploadedScene g_uploaded;
+
+// The light groups (src/shared/light_groups.h) of the scene prepareSceneAndCamera() last built: optix_render_main draws and writes their passes.
+static std::vector<std::string> g_sceneLightGroups;
+static int g_sceneSkyLightGroup = -1;
+
+// optix_render_main's render draws the light groups' pictures too (the wavefront renderer), for that render only: Live Preview and the next call draw none.
+struct LightGroupsForThisRender {
+	LightGroupsForThisRender() { g_renderer->setLightGroups(static_cast<int>(g_sceneLightGroups.size()), g_sceneSkyLightGroup); }
+	~LightGroupsForThisRender() { g_renderer->setLightGroups(0, -1); }
+	LightGroupsForThisRender(const LightGroupsForThisRender &) = delete;
+	LightGroupsForThisRender &operator=(const LightGroupsForThisRender &) = delete;
+	// The passes, after the picture is written (rgb: its linear pixels when it is an EXR, rewritten with them), at its exposure.
+	static void write(const std::string &picture, bool exr, int w, int h, const float *rgb, double exposure) {
+		const std::vector<float> *pixels = g_renderer->lightGroupPixels();
+		if (!pixels || pixels->size() != g_sceneLightGroups.size() * static_cast<std::size_t>(w) * h * 3) return;
+		std::string error;
+		const std::string path = light_groups::writePasses(picture, exr, w, h, rgb, g_sceneLightGroups, pixels->data(), static_cast<float>(exposure), error);
+		if (path.empty()) std::cerr << "[OptiX] Failed to write the light groups' passes: " << error << "\n";
+		else std::cout << "[OptiX] Light groups (" << g_sceneLightGroups.size() << "): " << path << "\n";
+	}
+};
 
 // What "the scene already on the GPU" is compared by: the scene id AND, for a scene read from a pbrt file, that file and when it was last written. An id alone is not
 // enough: a file saved over (the Scene Builder does) keeps its id, and would otherwise be drawn from the old upload.
@@ -240,6 +262,9 @@ static bool prepareSceneAndCamera(
 		errorCode = reportBuildFailure(scene_id, scene.failure, verbose);
 		return false;
 	}
+
+	g_sceneLightGroups = scene.lightGroupNames;
+	g_sceneSkyLightGroup = scene.skyLightGroup;
 
 	// A scene only the wavefront renderer draws right (SceneData::needsWavefront) is prepared for it instead of the default renderer.
 	if (!wavefrontMode && scene.needsWavefront) {
@@ -548,6 +573,7 @@ extern "C" int optix_render_main(
 		// Render
 		std::cout << "[OptiX] Rendering...\n";
 
+		const LightGroupsForThisRender lightGroups;
 		if (!g_renderer->render(
 			image_width,
 			image_height,
@@ -593,6 +619,7 @@ extern "C" int optix_render_main(
 				return ERR_FILE_WRITE_FAILED;
 			}
 			std::cout << "[OptiX] Wrote EXR: " << output_path << "\n";
+			LightGroupsForThisRender::write(output_path, /*exr=*/true, image_width, image_height, framebuffer.data(), options.exposure);
 
 			// Albedo/normal AOV export - only possible when denoise was
 			// requested, since that is what allocates/fills d_albedoAov_/
@@ -716,6 +743,7 @@ extern "C" int optix_render_main(
 			outFile.close();
 		}
 
+		LightGroupsForThisRender::write(output_path, /*exr=*/false, image_width, image_height, nullptr, options.exposure);
 		std::cout << "[OptiX] Render complete! Output: " << output_path << "\n";
 		return 0;  // Success
 

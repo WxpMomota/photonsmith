@@ -23,6 +23,8 @@
 #include "../toon_look.h"
 #include "film_dressing.h"
 #include "film_faces.h"
+#include "film_marks.h"
+#include "film_cloth.h"
 #include "film_particles.h"
 #include "film_paths.h"
 #include "film_acting.h"
@@ -463,6 +465,10 @@ struct Spec {
 	// weather and particles (`weather`, `particles`, `burst`)
 	std::vector<particles::Weather> weather;
 	std::vector<particles::Emitter> emitters;
+	// cartoon marks drawn over the frames (`mark`: film_marks.h)
+	std::vector<film_marks::Mark> marks;
+	// cloth: flags, capes, sheets and curtains (`cloth`: film_cloth.h)
+	std::vector<cloth::Cloth> cloths;
 };
 
 struct Parsed {

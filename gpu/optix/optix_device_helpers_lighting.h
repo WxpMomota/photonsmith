@@ -440,6 +440,20 @@ __device__ __forceinline__ void nee_gate_one_sided(
 // different spellings of the two-way version, and adding a third kind to each
 // by hand is exactly how a backend ends up sampling a light one way and
 // weighting it another.
+// The material index of area light `light_idx` (params.lightIndices/lightKinds), -1 when it is of a kind not listed.
+__device__ __forceinline__ int area_light_material_index(int light_idx) {
+	const int prim_idx = params.lightIndices[light_idx];
+	switch (params.lightKinds[light_idx]) {
+	case GpuLightKind::Sphere: return params.spheres[prim_idx].materialIdx;
+	case GpuLightKind::Triangle: return params.triangles[prim_idx].materialIdx;
+	case GpuLightKind::BilinearPatch: return params.bilinearPatches[prim_idx].materialIdx;
+	case GpuLightKind::Disk: return params.disks[prim_idx].materialIdx;
+	case GpuLightKind::Cylinder: return params.cylinders[prim_idx].materialIdx;
+	case GpuLightKind::Quad: return params.quads[prim_idx].materialIdx;
+	default: return -1;
+	}
+}
+
 __device__ __forceinline__ float3 sample_area_light_by_kind(
 	int light_idx,
 	const float3& origin,
@@ -780,7 +794,8 @@ __device__ __forceinline__ bool sample_nee_light(
 	float3& sampled_light_emission,
 	float& max_dist,
 	float& light_pdf,
-	float ray_time
+	float ray_time,
+	int receiver_group = -1   // light linking (light_link.h): the shaded surface's link group; -1 lights from every light
 ) {
 	if (params.numLights <= 0) return false;
 
@@ -818,6 +833,12 @@ __device__ __forceinline__ bool sample_nee_light(
 		light_idx, origin, seed, geom_pdf, max_dist, sampled_light_emission, ray_time);
 
 	light_pdf = selection_pdf * geom_pdf;
+	// Light linking: a lamp that does not light the receiver's group gives it nothing (the draw stays a draw: its pdf is the same, its light none - as the bounce that
+	// finds the lamp adds none either, optix_device_basics.h link_lit_from_previous()).
+	if (receiver_group >= 0) {
+		const int mi = area_light_material_index(light_idx);
+		if (mi >= 0 && !light_link::covers(~params.materials[mi].notLit, receiver_group)) return false;
+	}
 	return light_pdf > 1e-6f;
 }
 
@@ -855,6 +876,7 @@ struct ShadowRayState {
 	float3       rgb;           // running per-channel transmittance through CHROMATIC media (medium_is_chromatic); (1,1,1) otherwise
 	float        maxDistance;   // the shadow ray's ORIGINAL tmax - see __anyhit__shadow_sphere
 	unsigned int seed;          // RNG state for the heterogeneous-medium ratio tracking in the any-hit
+	unsigned long long notShadowing;   // shadow linking (light_link.h): the link groups whose shapes this light's shadow passes (bit g: group g); 0: none
 };
 
 __device__ __forceinline__ void shadow_pack_state_ptr(ShadowRayState* p, unsigned int& p0, unsigned int& p1) {
@@ -890,7 +912,8 @@ __device__ __forceinline__ bool trace_shadow_ray(
 	const float3& direction,
 	float max_distance,
 	float* out_transmittance = nullptr,
-	float3* out_rgb = nullptr
+	float3* out_rgb = nullptr,
+	unsigned long long not_shadowing = 0ull   // shadow linking (light_link.h): a point, spot or distant light's PunctualLightGPU::notShadowing
 ) {
 	// Pack shadow payload (bool: occluded, plus a running medium
 	// transmittance - see this function's own header comment above).
@@ -898,6 +921,7 @@ __device__ __forceinline__ bool trace_shadow_ray(
 	shadow_state.occluded = 1;           // Default to occluded (set to 0 by the miss program)
 	shadow_state.transmittance = 1.0f;
 	shadow_state.rgb = make_float3(1.0f, 1.0f, 1.0f);
+	shadow_state.notShadowing = not_shadowing;
 	shadow_state.maxDistance = max_distance;
 	// Stateless per-ray seed (the shadow any-hit has no access to the caller's
 	// RNG): hash of the ray's own origin/direction bits, which differ for every
@@ -1003,10 +1027,11 @@ __device__ __forceinline__ bool trace_shadow_ray_stochastic(
 	const float3& origin,
 	const float3& direction,
 	float max_distance,
-	unsigned int& seed
+	unsigned int& seed,
+	unsigned long long not_shadowing = 0ull
 ) {
 	float transmittance = 1.0f;
-	if (!trace_shadow_ray(origin, direction, max_distance, &transmittance)) return false;
+	if (!trace_shadow_ray(origin, direction, max_distance, &transmittance, nullptr, not_shadowing)) return false;
 	return transmittance >= 1.0f || random_float(seed) < transmittance;
 }
 
@@ -1017,11 +1042,12 @@ __device__ __forceinline__ bool trace_shadow_ray_stochastic(
 	const float3& direction,
 	float max_distance,
 	unsigned int& seed,
-	float3& rgb
+	float3& rgb,
+	unsigned long long not_shadowing = 0ull
 ) {
 	float transmittance = 1.0f;
 	rgb = make_float3(1.0f, 1.0f, 1.0f);
-	if (!trace_shadow_ray(origin, direction, max_distance, &transmittance, &rgb)) return false;
+	if (!trace_shadow_ray(origin, direction, max_distance, &transmittance, &rgb, not_shadowing)) return false;
 	return transmittance >= 1.0f || random_float(seed) < transmittance;
 }
 
@@ -1201,7 +1227,7 @@ __device__ __forceinline__ float3 medium_phase_nee_mis(
 		if (!eval_punctual_light(params.punctualLights[pi], medium_point, wi_p, Li_p, t_max_p)) continue;
 		float shadow_tr = 0.0f;
 		float3 shadow_rgb = make_float3(1.0f, 1.0f, 1.0f);
-		if (trace_shadow_ray(medium_point, wi_p, t_max_p, &shadow_tr, &shadow_rgb)) {
+		if (trace_shadow_ray(medium_point, wi_p, t_max_p, &shadow_tr, &shadow_rgb, params.punctualLights[pi].notShadowing)) {
 			medium_emission = medium_emission +
 				hg_phase_value(dot(wo, wi_p), g) * attenuation * Li_p
 				* shadow_tr * shadow_rgb * camera_medium_shadow_trans(t_max_p);
@@ -1543,9 +1569,10 @@ __device__ __forceinline__ void add_punctual_lights_lambertian(
 	for (unsigned int i = 0; i < params.numPunctualLights; ++i) {
 		float3 wi, Li; float t_max;
 		if (!eval_punctual_light(params.punctualLights[i], hit_point, wi, Li, t_max)) continue;
+		if (!light_link::covers(~params.punctualLights[i].notLit, current_link_group())) continue;   // light linking (light_link.h)
 		float cos_theta = dot(wi, normal);
 		if (cos_theta <= 0.0f) continue;
-		if (trace_shadow_ray(hit_point, wi, t_max)) {
+		if (trace_shadow_ray(hit_point, wi, t_max, nullptr, nullptr, params.punctualLights[i].notShadowing)) {
 			float3 brdf = albedo / 3.14159265358979323846f;
 			emission = emission + brdf * Li * cos_theta * camera_medium_shadow_trans(t_max);
 		}

@@ -361,6 +361,55 @@ inline void flattenMedia(const pbrt_scene::Scene &scene, FlatScene &out) {
 }
 
 // LightSource directives: the infinite light and the punctual lights.
+// A light's `"string illuminates"` or `"string shadowsfrom"` (light_link.h) as a mask of link groups: bit g for group g ("rest": 0, the shapes in no group). All of them when
+// the light does not say; a name no shape has is said, and counts for nothing.
+inline std::uint64_t linkMask(const pbrt_scene::Scene &scene, FlatScene &out, const pbrt_scene::ParamList &params, const char *name) {
+	const pbrt_scene::Param *p = params.find(name);
+	if (!p) return ~0ull;
+	std::uint64_t mask = 0;
+	for (const std::string &group : p->strings) {
+		if (group == "rest") {
+			mask |= 1ull;
+			continue;
+		}
+		// a name is a group, and also every group under it: "cast" is "cast/pip", "cast/ann" ... (a film's characters)
+		bool any = false;
+		for (std::size_t g = 0; g < scene.linkGroups.size(); ++g) {
+			const std::string &have = scene.linkGroups[g];
+			if (have == group || (have.size() > group.size() && have.compare(0, group.size(), group) == 0 && have[group.size()] == '/')) {
+				mask |= 1ull << (g + 1);
+				any = true;
+			}
+		}
+		if (!any) out.warnings.push_back({0, std::string(), std::string("a light's \"") + name + "\" names \"" + group + "\", the linkgroup of no shape"});
+	}
+	return mask;
+}
+
+// A light's `"string lightgroup"` (light_groups.h): its group's index in out.lightGroups, -1 for none.
+inline int lightGroupOf(FlatScene &out, const pbrt_scene::ParamList &params) {
+	std::string warning;
+	const int g = light_groups::indexOf(out.lightGroups, params.getString("lightgroup", ""), &warning);
+	if (!warning.empty()) out.warnings.push_back({0, std::string(), warning});
+	return g;
+}
+
+// Light linking and light groups for one light declaration: whatever punctual lights flattenLights makes of it get its masks and group when this goes out of scope
+// (however that declaration's branch ends).
+struct PunctualLightLinks {
+	FlatScene &out;
+	std::size_t from;
+	std::uint64_t illuminates, shadowsFrom;
+	int lightGroup;
+	PunctualLightLinks(const pbrt_scene::Scene &scene, FlatScene &o, const pbrt_scene::ParamList &params)
+		: out(o), from(o.punctualLights.size()), illuminates(linkMask(scene, o, params, "illuminates")), shadowsFrom(linkMask(scene, o, params, "shadowsfrom")),
+		  lightGroup(lightGroupOf(o, params)) {}
+	~PunctualLightLinks() {
+		for (std::size_t i = from; i < out.punctualLights.size(); ++i)
+			out.punctualLights[i].illuminates = illuminates, out.punctualLights[i].shadowsFrom = shadowsFrom, out.punctualLights[i].lightGroup = lightGroup;
+	}
+};
+
 inline void flattenLights(const pbrt_scene::Scene &scene, FlatScene &out) {
 	const auto warn = [&out](const std::string &msg) {
 		out.warnings.push_back({0, std::string(), msg});
@@ -385,6 +434,8 @@ inline void flattenLights(const pbrt_scene::Scene &scene, FlatScene &out) {
 	// Punctual lights have no such limit: every one is kept.
 	std::vector<InfiniteLight> infiniteCandidates;
 	for (const pbrt_scene::LightDecl &ld : scene.lights) {
+		const PunctualLightLinks linkMasks(scene, out, ld.params);   // (light linking and light groups, for the branch below however it ends)
+		if (ld.type == "infinite" && linkMasks.lightGroup >= 0) out.skyLightGroup = linkMasks.lightGroup;   // (the sky: one slot, one group)
 		if (ld.type == "infinite") {
 			InfiniteLight cand;
 			cand.present = true;
@@ -675,6 +726,8 @@ inline void flattenAreaLights(const pbrt_scene::Scene &scene, FlatScene &out) {
 				e.power = p->numbers[0];
 			}
 		}
+		e.illuminates = linkMask(scene, out, ld.params, "illuminates");
+		e.lightGroup = lightGroupOf(out, ld.params);
 		out.areaLights.push_back(e);
 	}
 }

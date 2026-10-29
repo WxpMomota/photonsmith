@@ -10,12 +10,24 @@
 // and the background keep their own.
 // Lines: where the depth jumps (its inverse is nearly flat across a plane, so a floor seen edge-on draws none), where the normal turns by more than about 55 degrees, and
 // where a surface meets the background; drawn on the nearer side, `lines` pixels wide in a picture 1080 high (as wide in proportion in any other), in `ink`.
+// And, as Blender's Line Art draws them from the geometry (modifiers/intern/lineart: its "material border" and "intersection" edges), where one material meets another
+// (`materials on`) and where one object meets another with no depth jump between them - a character's foot on the floor, two parts that pass through each other
+// (`objects on`): from the ID passes (aov_pass.h renderIds; an object is a link group, a film's characters each their own). The silhouette (against the background or
+// a depth jump) keeps the full width and the lines inside a shape - creases, materials, objects - are `inner` times as wide, the cartoon convention of a bolder outline.
 //
+// Cel shading per material, as Blender's NPR materials do it (a Shader to RGB into a Color Ramp in each material): `shadow-tint COLOUR` colours the shadow bands
+// (a cartoon's shadows are tinted - purple, blue - not only darker), `highlight H` puts a flat glossy spot where the light is above H of the brightest, in
+// `highlight-colour`; and `material NAME ...` or `object NAME ...` starts a ramp of a material's or an object's own (its bands, shadow, tint and highlight: the words
+// after it, up to the next), found through the ID passes (aov_pass.h renderIds: a material by its scene name, an object by its link group - a film's character is
+// `cast/<name>`). A material's own ramp wins over its object's, and either over the picture's.
 // Set by a scene file's `# @rt-toon [bands N] [lines W] [ink COLOUR] [saturation S] [shadow S]` line (a film writes one into every frame: film_file.h `toon`), or by
 // --toon (the scene's style, or the default one). Off by default: a picture without it is the rendered one.
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
+
+#include "cryptomatte.h"   // a material's or object's ramp found by its name's ID (the ID passes)
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -32,6 +44,32 @@ struct Style {
 	double ink[3] = {0.012, 0.010, 0.018};      // the lines' colour (linear)
 	double saturation = 1.2;                    // 1: as rendered
 	double shadow = 0.35;                       // the darkest band's light, as a share of the brightest
+	double inner = 1.0;                         // the lines inside a shape (creases, materials, objects) as a share of the silhouette's width
+	bool materials = false;                     // lines where materials meet (the ID passes)
+	bool objects = false;                       // lines where objects meet with no depth jump (the ID passes)
+	// the shading's ramp: the picture's, and the materials' and objects' own
+	struct Ramp {
+		std::string name;                            // the material's or object's name (empty: the picture's own)
+		bool object = false;                         // an object's (its link group), else a material's
+		int bands = 3;
+		double shadow = 0.35;
+		double shadowTint[3] = {1.0, 1.0, 1.0};      // the darkest band's colour cast (linear; 1: none)
+		double highlight = 0.0;                      // 0: none; else the share of the brightest light above which the surface is highlight-colour
+		double highlightColour[3] = {1.0, 1.0, 1.0}; // (linear)
+		bool tinted() const { return shadowTint[0] != 1.0 || shadowTint[1] != 1.0 || shadowTint[2] != 1.0; }
+	};
+	double shadowTint[3] = {1.0, 1.0, 1.0};
+	double highlight = 0.0;
+	double highlightColour[3] = {1.0, 1.0, 1.0};
+	std::vector<Ramp> ramps;                     // `material NAME ...` / `object NAME ...`
+	bool needsIds() const { return materials || objects || !ramps.empty(); }
+	// The picture's own ramp.
+	Ramp base() const {
+		Ramp r;
+		r.bands = bands, r.shadow = shadow, r.highlight = highlight;
+		for (int k = 0; k < 3; ++k) r.shadowTint[k] = shadowTint[k], r.highlightColour[k] = highlightColour[k];
+		return r;
+	}
 };
 
 inline double srgbToLinear(double c) { return c <= 0.04045 ? c / 12.92 : std::pow((c + 0.055) / 1.055, 2.4); }
@@ -40,19 +78,53 @@ inline double linearToSrgb(double c) {
 	return c <= 0.0031308 ? c * 12.92 : 1.055 * std::pow(c, 1.0 / 2.4) - 0.055;
 }
 
+// A colour as the toon words write it: #rrggbb or r,g,b from 0 to 1 (sRGB, as a picture's colours are), into linear `out`. False when it is not one.
+inline bool colourOf(const std::string &v, double out[3]) {
+	double c[3] = {0, 0, 0};
+	unsigned r = 0, g = 0, b = 0;
+	char extra = 0;
+	if (v.size() == 7 && v[0] == '#' && std::sscanf(v.c_str() + 1, "%2x%2x%2x%c", &r, &g, &b, &extra) == 3) {
+		c[0] = r / 255.0, c[1] = g / 255.0, c[2] = b / 255.0;
+	} else if (std::sscanf(v.c_str(), "%lf,%lf,%lf%c", &c[0], &c[1], &c[2], &extra) != 3 || std::min({c[0], c[1], c[2]}) < 0 || std::max({c[0], c[1], c[2]}) > 1) {
+		return false;
+	}
+	for (int k = 0; k < 3; ++k) out[k] = srgbToLinear(c[k]);
+	return true;
+}
+
 // The words after `# @rt-toon` (or a film file's `toon`): "" or what is wrong. It turns the look on.
 inline std::string parse(const std::string &words, Style &s) {
 	std::istringstream in(words);
 	s.on = true;
+	Style::Ramp *ramp = nullptr;   // after `material NAME` / `object NAME`: the words are that ramp's
 	for (std::string w; in >> w;) {
 		std::string v;
-		if (!(in >> v)) return "\"" + w + "\" needs a value (bands N, lines W, ink COLOUR, saturation S, shadow S)";
+		if (!(in >> v)) return "\"" + w + "\" needs a value (bands N, lines W, ink COLOUR, saturation S, shadow S, inner I, materials on|off, objects on|off, shadow-tint COLOUR, "
+							  "highlight H, highlight-colour COLOUR, material NAME, object NAME)";
 		char *end = nullptr;
 		const double x = std::strtod(v.c_str(), &end);
 		const bool isNumber = end && *end == '\0';
-		if (w == "bands") {
+		if (w == "material" || w == "object") {
+			Style::Ramp r = s.base();
+			r.name = v;
+			r.object = w == "object";
+			s.ramps.push_back(r);
+			ramp = &s.ramps.back();
+			continue;
+		}
+		if (ramp && w != "bands" && w != "shadow" && w != "shadow-tint" && w != "highlight" && w != "highlight-colour")
+			return "\"" + w + "\" is the picture's, not a material's: put it before the first `material` or `object` (a ramp takes bands, shadow, shadow-tint, highlight, highlight-colour)";
+		if (w == "shadow-tint" || w == "highlight-colour") {
+			double c[3];
+			if (!colourOf(v, c)) return w + " is a colour: #rrggbb or r,g,b from 0 to 1";
+			double *dst = w == "shadow-tint" ? (ramp ? ramp->shadowTint : s.shadowTint) : (ramp ? ramp->highlightColour : s.highlightColour);
+			for (int k = 0; k < 3; ++k) dst[k] = c[k];
+		} else if (w == "highlight") {
+			if (!isNumber || x < 0 || x > 1) return "highlight is the share of the brightest light above which a surface is highlight-colour, from 0 (none) to 1";
+			(ramp ? ramp->highlight : s.highlight) = x;
+		} else if (w == "bands") {
 			if (!isNumber || x < 2 || x > 6 || x != std::floor(x)) return "bands is a whole number from 2 to 6";
-			s.bands = static_cast<int>(x);
+			(ramp ? ramp->bands : s.bands) = static_cast<int>(x);
 		} else if (w == "lines") {
 			if (!isNumber || x < 0 || x > 12) return "lines is a width in pixels from 0 (none) to 12";
 			s.lines = x;
@@ -61,19 +133,17 @@ inline std::string parse(const std::string &words, Style &s) {
 			s.saturation = x;
 		} else if (w == "shadow") {
 			if (!isNumber || x < 0 || x > 1) return "shadow is the darkest band's light, from 0 to 1";
-			s.shadow = x;
+			(ramp ? ramp->shadow : s.shadow) = x;
+		} else if (w == "inner") {
+			if (!isNumber || x < 0 || x > 1) return "inner is the lines inside a shape as a share of the outline's width, from 0 (none) to 1";
+			s.inner = x;
+		} else if (w == "materials" || w == "objects") {
+			if (v != "on" && v != "off") return w + " is on or off";
+			(w == "materials" ? s.materials : s.objects) = v == "on";
 		} else if (w == "ink") {   // #rrggbb or r,g,b (0..1), as a picture's colours are
-			double c[3] = {0, 0, 0};
-			unsigned r = 0, g = 0, b = 0;
-			char extra = 0;
-			if (v.size() == 7 && v[0] == '#' && std::sscanf(v.c_str() + 1, "%2x%2x%2x%c", &r, &g, &b, &extra) == 3) {
-				c[0] = r / 255.0, c[1] = g / 255.0, c[2] = b / 255.0;
-			} else if (std::sscanf(v.c_str(), "%lf,%lf,%lf%c", &c[0], &c[1], &c[2], &extra) != 3 || std::min({c[0], c[1], c[2]}) < 0 || std::max({c[0], c[1], c[2]}) > 1) {
-				return "ink is a colour: #rrggbb or r,g,b from 0 to 1";
-			}
-			for (int k = 0; k < 3; ++k) s.ink[k] = srgbToLinear(c[k]);
+			if (!colourOf(v, s.ink)) return "ink is a colour: #rrggbb or r,g,b from 0 to 1";
 		} else {
-			return "\"" + w + "\": the toon look takes bands, lines, ink, saturation and shadow";
+			return "\"" + w + "\": the toon look takes bands, lines, ink, saturation, shadow, inner, materials, objects, shadow-tint, highlight, highlight-colour, material and object";
 		}
 	}
 	return std::string();
@@ -81,10 +151,41 @@ inline std::string parse(const std::string &words, Style &s) {
 
 // The scene-file line that gives a picture this look.
 inline std::string tagOf(const Style &s) {
-	char buf[200];
-	std::snprintf(buf, sizeof buf, "# @rt-toon bands %d lines %g ink %.4f,%.4f,%.4f saturation %g shadow %g\n", s.bands, s.lines, linearToSrgb(s.ink[0]), linearToSrgb(s.ink[1]),
+	char buf[260];
+	std::snprintf(buf, sizeof buf, "# @rt-toon bands %d lines %g ink %.4f,%.4f,%.4f saturation %g shadow %g", s.bands, s.lines, linearToSrgb(s.ink[0]), linearToSrgb(s.ink[1]),
 				  linearToSrgb(s.ink[2]), s.saturation, s.shadow);
-	return buf;
+	std::string tag = buf;   // (the line words only when they are not the default: a film without them keeps its frames' text)
+	if (s.inner != 1.0) {
+		std::snprintf(buf, sizeof buf, " inner %g", s.inner);
+		tag += buf;
+	}
+	if (s.materials) tag += " materials on";
+	if (s.objects) tag += " objects on";
+	const auto colourWords = [&](const char *word, const double c[3]) {
+		std::snprintf(buf, sizeof buf, " %s %.4f,%.4f,%.4f", word, linearToSrgb(c[0]), linearToSrgb(c[1]), linearToSrgb(c[2]));
+		return std::string(buf);
+	};
+	const auto rampWords = [&](const Style::Ramp &r, const Style::Ramp &over) {   // (the words that differ from `over`)
+		std::string t;
+		if (r.bands != over.bands) t += " bands " + std::to_string(r.bands);
+		if (r.shadow != over.shadow) {
+			std::snprintf(buf, sizeof buf, " shadow %g", r.shadow);
+			t += buf;
+		}
+		if (r.tinted() || over.tinted()) t += colourWords("shadow-tint", r.shadowTint);
+		if (r.highlight != over.highlight) {
+			std::snprintf(buf, sizeof buf, " highlight %g", r.highlight);
+			t += buf;
+		}
+		if (r.highlight > 0.0) t += colourWords("highlight-colour", r.highlightColour);
+		return t;
+	};
+	Style::Ramp plain = s.base();   // (the picture's bands and shadow are written above: only its tint and highlight here)
+	plain.highlight = 0.0;
+	for (int k = 0; k < 3; ++k) plain.shadowTint[k] = 1.0;
+	tag += rampWords(s.base(), plain);
+	for (const Style::Ramp &r : s.ramps) tag += std::string(r.object ? " object " : " material ") + r.name + rampWords(r, s.base());
+	return tag + "\n";
 }
 
 // A scene file's `# @rt-toon` line (before its WorldBegin): true when it has one (and `problem` says what is wrong with it, if anything).
@@ -109,7 +210,8 @@ inline double smoothstep(double a, double b, double x) {
 inline double luminance(double r, double g, double b) { return 0.2126 * r + 0.7152 * g + 0.0722 * b; }
 }  // namespace detail
 
-// The look on a picture. `rgb`: w*h*3, linear. `planes`: aov_pass.h's ten, w*h each (albedo R G B, normal X Y Z, depth, u, v, coverage).
+// The look on a picture. `rgb`: w*h*3, linear. `planes`: aov_pass.h's ten, w*h each (albedo R G B, normal X Y Z, depth, u, v, coverage), and for the lines between
+// materials and objects two more: id.object and id.material (aov_pass.h renderIds).
 inline void apply(std::vector<float> &rgb, int w, int h, const std::vector<std::vector<float>> &planes, const Style &st) {
 	using detail::smoothstep;
 	const std::size_t n = static_cast<std::size_t>(w) * static_cast<std::size_t>(h);
@@ -197,16 +299,38 @@ inline void apply(std::vector<float> &rgb, int w, int h, const std::vector<std::
 			if (shaded[i]) lit.push_back(static_cast<float>(detail::luminance(light[3 * i], light[3 * i + 1], light[3 * i + 2])));
 		const double ref = std::max(1e-6, percentile(0.95));
 		const double soft = 0.04;
+		// each pixel's ramp: its material's own, else its object's, else the picture's (the ID planes: a ramp's name hashed as they are, cryptomatte.h)
+		const Style::Ramp pictureRamp = st.base();
+		std::vector<std::pair<float, const Style::Ramp *>> materialRamps, objectRamps;
+		for (const Style::Ramp &r : st.ramps) (r.object ? objectRamps : materialRamps).emplace_back(cryptomatte::idToFloat(cryptomatte::murmur3_32(r.name)), &r);
+		const bool haveIds = planes.size() >= 12 && planes[10].size() >= n && planes[11].size() >= n;
+		const auto rampAt = [&](std::size_t i) -> const Style::Ramp & {
+			if (haveIds) {
+				for (const auto &[id, r] : materialRamps)
+					if (planes[11][i] == id) return *r;
+				for (const auto &[id, r] : objectRamps)
+					if (planes[10][i] == id) return *r;
+			}
+			return pictureRamp;
+		};
 		for (std::size_t i = 0; i < n; ++i) {
 			if (!shaded[i]) continue;
+			const Style::Ramp &rp = rampAt(i);
 			const double L = detail::luminance(light[3 * i], light[3 * i + 1], light[3 * i + 2]);
 			const double x = L / ref;
 			double steps = 0.0;
-			for (int k = 1; k < st.bands; ++k) steps += smoothstep(static_cast<double>(k) / st.bands - soft, static_cast<double>(k) / st.bands + soft, x);
-			const double band = (st.shadow + (1.0 - st.shadow) * steps / (st.bands - 1)) * ref;
+			for (int k = 1; k < rp.bands; ++k) steps += smoothstep(static_cast<double>(k) / rp.bands - soft, static_cast<double>(k) / rp.bands + soft, x);
+			const double level = rp.shadow + (1.0 - rp.shadow) * steps / (rp.bands - 1);   // (from rp.shadow, the darkest band, to 1)
+			const double band = level * ref;
+			// the shadow's tint: all of it in the darkest band, none in the brightest
+			const double inShadow = rp.shadow < 1.0 ? std::clamp((1.0 - level) / (1.0 - rp.shadow), 0.0, 1.0) : 0.0;
+			// the highlight: a flat spot where the light is above its share of the brightest
+			const double spot = rp.highlight > 0.0 ? smoothstep(rp.highlight - soft, rp.highlight + soft, x) : 0.0;
 			for (int c = 0; c < 3; ++c) {   // the surface's colour in light of the band's brightness and the light's own colour (white where there is none to tell)
 				const double tint = L > 1e-6 * ref ? std::min(4.0, light[3 * i + c] / L) : 1.0;
-				rgb[3 * i + c] = static_cast<float>(albedo[3 * i + c] * tint * band);
+				const double shade = 1.0 + (rp.shadowTint[c] - 1.0) * inShadow;
+				const double v = albedo[3 * i + c] * tint * band * shade;
+				rgb[3 * i + c] = static_cast<float>(v + (rp.highlightColour[c] * ref - v) * spot);
 			}
 		}
 	}
@@ -218,7 +342,9 @@ inline void apply(std::vector<float> &rgb, int w, int h, const std::vector<std::
 		}
 	// ---- the lines ----
 	if (st.lines <= 0.0) return;
-	std::vector<float> edge(n, 0.0f);
+	std::vector<float> edge(n, 0.0f), innerEdge(n, 0.0f);   // the silhouette's, and the lines inside a shape (the same map when they are as wide)
+	const bool apart = st.inner != 1.0;
+	const bool ids = planes.size() >= 12 && planes[10].size() >= n && planes[11].size() >= n;
 	const auto inv = [&](int x, int y) {
 		const std::size_t i = static_cast<std::size_t>(y) * w + x;
 		return covered(i) ? 1.0 / depth[i] : 0.0;
@@ -242,25 +368,41 @@ inline void apply(std::vector<float> &rgb, int w, int h, const std::vector<std::
 				const double dot = planes[3][i] * planes[3][j] + planes[4][i] * planes[4][j] + planes[5][i] * planes[5][j];
 				turn = std::max(turn, 1.0 - dot);
 			}
-			e = std::max(e, smoothstep(0.35, 0.55, turn));
-			edge[i] = static_cast<float>(e);
-		}
-	const double radius = std::max(0.75, 0.5 * st.lines * h / 1080.0);   // (at least about a pixel and a half wide: a thinner line is lost)
-	const int reach = static_cast<int>(std::ceil(radius + 0.5));
-	std::vector<float> ink(n, 0.0f);
-	for (int y = 0; y < h; ++y)
-		for (int x = 0; x < w; ++x) {
-			double m = 0.0;
-			for (int dy = -reach; dy <= reach; ++dy)
-				for (int dx = -reach; dx <= reach; ++dx) {
-					const int xx = x + dx, yy = y + dy;
-					if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
-					const float e = edge[static_cast<std::size_t>(yy) * w + xx];
-					if (e <= 0.0f) continue;
-					m = std::max(m, e * std::clamp(radius + 0.5 - std::sqrt(static_cast<double>(dx * dx + dy * dy)), 0.0, 1.0));
+			double in = smoothstep(0.35, 0.55, turn);
+			// where one material, or one object, meets another (the ID passes): drawn on the nearer side, as the depth's lines are
+			if (ids && (st.materials || st.objects))
+				for (std::size_t j : nb) {
+					if (!covered(j) || depth[j] < depth[i]) continue;
+					if ((st.materials && planes[11][j] != planes[11][i]) || (st.objects && planes[10][j] != planes[10][i])) in = 1.0;
 				}
-			ink[static_cast<std::size_t>(y) * w + x] = static_cast<float>(m);
+			if (apart) {
+				edge[i] = static_cast<float>(e);
+				innerEdge[i] = static_cast<float>(in);
+			} else {
+				edge[i] = static_cast<float>(std::max(e, in));
+			}
 		}
+	std::vector<float> ink(n, 0.0f);
+	// the edge map drawn as round strokes `width` pixels wide (in a picture 1080 high), into `ink`
+	const auto stroke = [&](const std::vector<float> &edges, double width) {
+		const double radius = std::max(0.75, 0.5 * width * h / 1080.0);   // (at least about a pixel and a half wide: a thinner line is lost)
+		const int reach = static_cast<int>(std::ceil(radius + 0.5));
+		for (int y = 0; y < h; ++y)
+			for (int x = 0; x < w; ++x) {
+				double m = ink[static_cast<std::size_t>(y) * w + x];
+				for (int dy = -reach; dy <= reach; ++dy)
+					for (int dx = -reach; dx <= reach; ++dx) {
+						const int xx = x + dx, yy = y + dy;
+						if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+						const float e = edges[static_cast<std::size_t>(yy) * w + xx];
+						if (e <= 0.0f) continue;
+						m = std::max(m, e * std::clamp(radius + 0.5 - std::sqrt(static_cast<double>(dx * dx + dy * dy)), 0.0, 1.0));
+					}
+				ink[static_cast<std::size_t>(y) * w + x] = static_cast<float>(m);
+			}
+	};
+	stroke(edge, st.lines);
+	if (apart && st.inner > 0.0) stroke(innerEdge, st.lines * st.inner);
 	for (std::size_t i = 0; i < n; ++i)
 		for (int c = 0; c < 3; ++c) rgb[3 * i + c] = static_cast<float>(rgb[3 * i + c] + (st.ink[c] - rgb[3 * i + c]) * ink[i]);
 }

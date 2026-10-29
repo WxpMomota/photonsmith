@@ -421,6 +421,8 @@ inline void setupMaterialLookup(BuildCtx &c) {
 		// caching the wrong index for it. Every other material kind has no
 		// such side effect, so this reordering is a no-op for them.
 		MaterialData built = makeMaterial(m, em, out, bssrdfTableCache, measuredTableCache, imageTextureCache, alphaMaskTextureCache, scene.materials, materialIndexDepth, depth);
+		built.linkGroup = m.linkGroup;   // light linking (light_link.h)
+		if (em) built.notLit = ~em->illuminates, built.lightGroupPlus1 = em->lightGroup + 1;   // (and light groups: light_groups.h)
 		const int idx = static_cast<int>(out.materials.size());
 		out.materials.push_back(built);
 		cache.emplace(key, idx);
@@ -1853,6 +1855,9 @@ inline void addPunctualLights(BuildCtx &c) {
 			break;
 		}
 		}
+		light.notLit = ~pl.illuminates;   // light linking (light_link.h)
+		light.lightGroupPlus1 = pl.lightGroup + 1;   // light groups (light_groups.h)
+		light.notShadowing = ~pl.shadowsFrom;
 		out.punctualLights.push_back(light);
 	}
 }

@@ -303,6 +303,12 @@ public:
     /// --denoise previously had no effect under --wavefront at all.
     void setDenoiseEnabled(bool enabled) { denoiseEnabled_ = enabled; }
 
+    /// Light groups (src/shared/light_groups.h): how many the scene has (0: none) and the sky's (-1: none), set per render() by OptiXRenderer::render(). With
+    /// groups, render() also leaves each group's picture in lightGroupPixels() (group g's numPixels*3 floats at g*numPixels*3, normalised like the picture);
+    /// without, that is empty.
+    void setLightGroups(int count, int skyGroup) { lightGroupCount_ = count; skyLightGroup_ = skyGroup; }
+    const std::vector<float>& lightGroupPixels() const { return lightGroupPixels_; }
+
     /// Mirrors OptiXRenderer::setDenoiseBlend() - see that method's own
     /// comment. Same setter-not-render()-parameter pattern, same reasoning.
     void setDenoiseBlend(float blend) { denoiseBlend_ = blend; }
@@ -1029,6 +1035,13 @@ private:
     CUdeviceptr  d_fb_ = 0;
     CUdeviceptr  d_weight_ = 0;
     int          fbCapacity_ = 0;
+
+    // Light groups - see setLightGroups(). d_lightGroupFb_ holds lightGroupFbCapacity_ float3 (count * numPixels), reallocated when that grows.
+    int          lightGroupCount_ = 0;
+    int          skyLightGroup_ = -1;
+    CUdeviceptr  d_lightGroupFb_ = 0;
+    size_t       lightGroupFbCapacity_ = 0;
+    std::vector<float> lightGroupPixels_;
 
     // Live Preview's adaptive sampling - see setActivePixelMask()'s own
     // comment. activePixelMaskHost_ is NOT owned by this class (points into

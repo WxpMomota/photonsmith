@@ -885,6 +885,7 @@ inline FlatScene flatten(const pbrt_scene::Scene &scene,
 	FlatScene out;
 	out.warnings = scene.warnings;   // carry the parser's own warnings through
 
+	out.linkGroups = scene.linkGroups;
 	flattenMaterials(scene, out);
 	flattenMedia(scene, out);
 	flattenLights(scene, out);

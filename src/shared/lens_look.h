@@ -10,6 +10,10 @@
 //
 // A grade too (a shot's own colour, from a film's cameras file: shot_cameras.h): `lift R G B` (added light, lifting the shadows), `gamma G` (c^(1/G): above 1 brightens the
 // middle), `gain R G B` (multiplied) and `tint R G B` (a colour cast, scaled to keep the brightness) - each one number or three (red, green, blue).
+//
+// And a painting: `paint SIZE` turns the picture into strokes of paint that follow its edges (kuwahara.h: the anisotropic Kuwahara filter, as Blender's compositor
+// Kuwahara node has it), SIZE the strokes' radius in pixels at a picture 1080 high; `paint-sharpness` (0..1), `paint-stretch` (0..2: how far a stroke runs along an
+// edge) and `paint-smoothness` (pixels at 1080: how even the strokes' directions are). First of all the steps, so the lens's glow and the grade go over the paint.
 
 #include <algorithm>
 #include <cmath>
@@ -20,6 +24,7 @@
 #include <string>
 #include <vector>
 
+#include "kuwahara.h"
 #include "ppm_text.h"
 
 namespace lens_look {
@@ -39,6 +44,11 @@ struct Look {
 	double starAngle = 0.0;
 	double starLength = 0.08;
 	double starThreshold = 1.0;
+	// a painting (kuwahara.h): the strokes' radius in pixels at a picture 1080 high (0: none), and the filter's sharpness, stretch and smoothness (kuwahara::Params)
+	double paint = 0.0;
+	double paintSharpness = 0.5;
+	double paintStretch = 1.0;
+	double paintSmoothness = 4.0;
 	// the grade: c' = (max(0, c * gain * tint + lift))^(1 / gamma), per channel
 	double lift[3] = {0.0, 0.0, 0.0};
 	double gamma[3] = {1.0, 1.0, 1.0};
@@ -52,7 +62,7 @@ struct Look {
 			if (lift[k] != 0.0 || gamma[k] != 1.0 || gain[k] != 1.0 || tint[k] != 1.0) return true;
 		return false;
 	}
-	bool active() const { return bloom > 0.0 || flare > 0.0 || star > 0.0 || vignette > 0.0 || warmth != 0.0 || saturation != 1.0 || graded(); }
+	bool active() const { return paint > 0.0 || bloom > 0.0 || flare > 0.0 || star > 0.0 || vignette > 0.0 || warmth != 0.0 || saturation != 1.0 || graded(); }
 };
 
 // Values that were set (a flag, a scene line) override `base`; a negative bloom/vignette or a saturation below 0 means "not given" in `given`.
@@ -114,8 +124,12 @@ inline std::string parse(const std::string &text, Look &out) {
 		else if (word == "vignette") out.vignette = std::clamp(v, 0.0, 1.0);
 		else if (word == "warmth") out.warmth = std::clamp(v, -1.0, 1.0);
 		else if (word == "saturation") out.saturation = std::clamp(v, 0.0, 3.0);
+		else if (word == "paint") out.paint = std::clamp(v, 0.0, 40.0);
+		else if (word == "paint-sharpness") out.paintSharpness = std::clamp(v, 0.0, 1.0);
+		else if (word == "paint-stretch") out.paintStretch = std::clamp(v, 0.0, 2.0);
+		else if (word == "paint-smoothness") out.paintSmoothness = std::clamp(v, 0.0, 40.0);
 		else return "unknown word \"" + word + "\" (bloom, bloom-radius, flare, star, star-points, star-angle, star-length, star-threshold, vignette, warmth, saturation, lift, "
-					"gamma, gain, tint, tonemap)";
+					"gamma, gain, tint, tonemap, paint, paint-sharpness, paint-stretch, paint-smoothness)";
 	}
 	return "";
 }
@@ -224,6 +238,11 @@ inline void apply(float *rgb, int w, int h, const Look &look) {
 	const std::size_t n = static_cast<std::size_t>(w) * static_cast<std::size_t>(h);
 	for (std::size_t i = 0; i < n * 3; ++i)
 		if (!std::isfinite(rgb[i])) rgb[i] = 0.0f;
+
+	if (look.paint > 0.0) {   // the painting first: the lens and the grade go over it (sizes are given at a picture 1080 high)
+		const double scale = h / 1080.0;
+		kuwahara::apply(rgb, w, h, kuwahara::Params{look.paint * scale, look.paintSharpness, look.paintStretch, look.paintSmoothness * scale});
+	}
 
 	if (look.flare > 0.0) {
 		// A lens flare: the brightest lights (what is above four times white - the sun, a flash; not a lit planet) at a quarter of the size, drawn out into a streak

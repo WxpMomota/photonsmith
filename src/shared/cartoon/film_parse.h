@@ -242,6 +242,7 @@
 //     toon     bands 3  lines 2.5  ink #1a1420  saturation 1.25  shadow 0.35    # (any of them, or none for the default style; `toon off`)
 
 #include "film_parse_nature.h"   // (and film_spec.h)
+#include "film_parse_cartoon.h"   // (the cartoon lines: mark, cloth)
 
 namespace cartoon {
 namespace film_file {

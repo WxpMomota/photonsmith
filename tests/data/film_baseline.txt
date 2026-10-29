@@ -1,9 +1,9 @@
 # Every film, shot by shot: film|shot|fingerprint of the scene at the shot's middle (at preview coarseness)|name. Written by
 # `python scripts/anim/film.py baseline --write` (ray_tracer --film-baseline); a difference is a film that changed - on purpose or not.
-a-walk-at-dusk|1|199cdea0941eec04|Setting out
-a-walk-at-dusk|2|80e448361d8c20f9|Along the path
-a-walk-at-dusk|3|d66773e6874420e9|The lantern
-a-walk-at-dusk|4|16218e237a956456|The first star
+a-walk-at-dusk|1|e859e3b8594f62d8|Setting out
+a-walk-at-dusk|2|61af484746e830db|Along the path
+a-walk-at-dusk|3|583028adcb9d90c1|The lantern
+a-walk-at-dusk|4|1a3aa1889f1b8e9a|The first star
 ball-parade|1|be82b9a4eec4a8ce|The row of balls
 candle|1|8782ad171cbdf69c|Portrait of the flame
 candle|2|ff22690a18254670|Macro on the wax and drips
@@ -99,10 +99,10 @@ pip-and-the-moon|10|578f15558fff4e6b|Alone at the water
 pip-and-the-moon|11|5caeceecfc68504f|The firefly
 pip-and-the-moon|12|e8298ef6e53ff15e|Under the real moon
 pip-and-the-moon|13|0503e1c3de0b1302|Pull back over the pond
-pip-goes-out|1|ea0351b984926c53|Down the path
-pip-goes-out|2|05e3ce496e23b642|The lantern lights
-pip-goes-out|3|b5310ec062371b73|Into the sun
-pip-goes-out|4|75a1c4f53b7e133a|Cheering
+pip-goes-out|1|805c82fd278421d6|Down the path
+pip-goes-out|2|2176887f580d9f79|The lantern lights
+pip-goes-out|3|f2203261bc25a810|Into the sun
+pip-goes-out|4|32ec586d624f5a93|Cheering
 pip-goes-out|5|3c333a32d94cf28f|Credits
 seasons-wood|1|d68706e3644f43b8|The meadow wakes
 seasons-wood|2|f407c4181788cb1b|Following the sun

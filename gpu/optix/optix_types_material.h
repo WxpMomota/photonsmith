@@ -421,6 +421,12 @@ struct MaterialData {
 	// DiffuseLight only: the lamp's surface is smooth glass (pbrt: an AreaLightSource on a "dielectric" shape) of index `ior`, tinted by `transmission_filter` - it adds its
 	// light and then refracts like a Dielectric, so at index 1 it is a glow the scene behind shows through (lamp_glass()).
 	bool lampGlass = false;
+	// Light linking (src/shared/light_link.h): the link group of the shapes this material is on, and for an emitter the groups it does NOT light (bit g: group g) -
+	// kept inverted so that a zeroed MaterialData lights every group.
+	int linkGroup = 0;
+	unsigned long long notLit = 0ull;
+	// Light groups (src/shared/light_groups.h): an emitter's group + 1, 0 for none (so a zeroed MaterialData is in none). The wavefront renderer credits its light to it.
+	int lightGroupPlus1 = 0;
 };
 
 // A lamp that also reflects (pbrt-v4: an AreaLightSource keeps the shape's Material, default diffuse 0.5). The builder (pbrt_gpu_builder_materials.h makeMaterial) stores a flat

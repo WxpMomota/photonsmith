@@ -392,6 +392,9 @@ class BDPTSceneAdapter {
 		// PDFLight()/PDFLightOrigin() (bdpt.h) query it. -1 if this hit
 		// isn't a genuine area-light material.
 		hit.light_id = emitter_index_for_material(rec.mat.get());
+		hit.material_index = rec.mat->material_index;   // (the ID passes: aov_pass.h)
+		hit.material_name = rec.mat->material_name.c_str();
+		hit.group_name = rec.mat->link_group_name.c_str();
 		return true;
 	}
 

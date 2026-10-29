@@ -20,6 +20,7 @@
 // ============================================================================
 
 #include "cpu_interface.h"
+#include <tuple>
 #include <unordered_set>
 #include <map>
 #include <mutex>
@@ -556,6 +557,8 @@ extern "C" int cpu_render_main(int width, int height, int spp, int max_depth, co
 		// next-event code treats each as a light of its own.
 		if (scene_desc->build_punct)
 			cam.punct_lights = scene_desc->build_punct();
+		if (scene_desc->light_groups)   // (light groups: src/shared/light_groups.h - their passes beside the picture)
+			std::tie(cam.light_group_names, cam.sky_light_group) = scene_desc->light_groups();
 		// camera::camera_medium is ray_color() (default path tracer) only -
 		// ray_color_spectral() (the function --spectral actually dispatches
 		// to) never reads it - same "warn rather than silently drop"

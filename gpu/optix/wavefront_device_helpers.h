@@ -26,6 +26,7 @@
 #include "wavefront_nrc_encoding.h"
 #include "wavefront_nrc_mlp.h"
 #include "spectral_device.h"
+#include "wavefront_light_groups.h"   // wf_credit_light_group: light groups' pictures
 #include "sampled_spectrum.h"
 #include "spectrum_types.h"
 #include "color_utils.h"

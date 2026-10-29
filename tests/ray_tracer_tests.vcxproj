@@ -245,6 +245,7 @@
     <ClCompile Include="unit\scene_builder_more_tests.cpp" />
     <ClCompile Include="unit\scene_sky_tests.cpp" />
     <ClCompile Include="unit\scene_lighting_tests.cpp" />
+    <ClCompile Include="unit\light_link_tests.cpp" />
     <ClCompile Include="unit\scene_projector_tests.cpp" />
     <ClCompile Include="unit\scene_mix_tests.cpp" />
     <ClCompile Include="unit\pbrt_handedness_tests.cpp" />

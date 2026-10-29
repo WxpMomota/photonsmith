@@ -25,6 +25,8 @@
 #include "../shared/portal_image_infinite_light.h"   // PortalImageInfiniteLightData<double>
 #include "../shared/portal_light_set.h"             // PortalLightSet<double>: one or several portal lights
 #include "punctual_light_objects.h"
+#include "light_group_tally.h"   // light groups: camera::light_group_names
+#include "../shared/light_group_passes.h"   // (and their passes, written by render())
 #include "shadow_ray.h"
 #include "constant_medium.h"   // ambient_medium - see camera::camera_medium's own comment
 #include "../shared/animated_transform.h"
@@ -275,6 +277,11 @@ class camera {
     // sky as two lights, each with its own next-event estimate and MIS weight.
     shared_ptr<PortalLightSet<double>> portal;   // one portal light, or the several of a file (pbrt sums them)
     shared_ptr<punctual_light_list> punct_lights; // pbrt-v4 PointLight/SpotLight/DistantLight (delta); nullptr = none
+    // Light groups (src/shared/light_groups.h): their names (none: no passes), the sky's group, and after render() each group's picture (light_group_pixels: group g's
+    // w*h*3 floats at g*w*h*3, linear, the picture's own filtering and exposure) - camera_render.h writes them as passes.
+    std::vector<std::string> light_group_names;
+    int sky_light_group = -1;
+    std::vector<float> light_group_pixels;
     // pbrt-v4's own "camera medium" (FlatScene::cameraMediumIndex's own
     // comment, pbrt_flatten.h) - an unbounded homogeneous medium the camera
     // itself starts inside, no bounding shape needed. nullptr = none (the

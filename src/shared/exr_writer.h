@@ -21,6 +21,7 @@
 #include <cstring>
 #include <numeric>
 #include <string>
+#include <utility>
 #include <vector>
 
 // Case-insensitive ".exr" extension check, shared by every render entry
@@ -53,9 +54,11 @@ inline bool write_exr_image(const std::string &path, const float *rgb,
 
 // ---- Multi-channel (AOV / multilayer) EXR -------------------------------------------------------------------------------------------------------------------
 // One float plane per named channel ("R", "G", "B", "A", "normal.X", "depth.Z", ...), full precision. The channels are written sorted by name, as the EXR format
-// requires. `planes[i]` holds width*height floats for `names[i]`.
+// requires. `planes[i]` holds width*height floats for `names[i]`. `attributes`: string attributes for the header (name, value) - the Cryptomatte layers' metadata
+// (cryptomatte.h).
 inline bool write_exr_channels(const std::string &path, int width, int height, const std::vector<std::string> &names,
-							   const std::vector<std::vector<float>> &planes, std::string &error) {
+							   const std::vector<std::vector<float>> &planes, std::string &error,
+							   const std::vector<std::pair<std::string, std::string>> &attributes = {}) {
 	const int n = static_cast<int>(names.size());
 	if (n == 0 || planes.size() != names.size()) { error = "no channels"; return false; }
 	for (const auto &p : planes)
@@ -88,8 +91,20 @@ inline bool write_exr_channels(const std::string &path, int width, int height, c
 		header.pixel_types[i] = TINYEXR_PIXELTYPE_FLOAT;
 		header.requested_pixel_types[i] = TINYEXR_PIXELTYPE_FLOAT;
 	}
+	std::vector<EXRAttribute> custom(attributes.size());
+	for (size_t i = 0; i < attributes.size(); ++i) {
+		std::memset(&custom[i], 0, sizeof(EXRAttribute));
+		std::memcpy(custom[i].name, attributes[i].first.c_str(), (std::min)(attributes[i].first.size(), sizeof(custom[i].name) - 1));
+		std::memcpy(custom[i].type, "string", 6);
+		custom[i].value = reinterpret_cast<unsigned char *>(const_cast<char *>(attributes[i].second.data()));   // (only read while the file is written)
+		custom[i].size = static_cast<int>(attributes[i].second.size());
+	}
+	header.num_custom_attributes = static_cast<int>(custom.size());
+	header.custom_attributes = custom.empty() ? nullptr : custom.data();
 	const char *err = nullptr;
 	const int ret = SaveEXRImageToFile(&image, &header, path.c_str(), &err);
+	header.num_custom_attributes = 0;
+	header.custom_attributes = nullptr;
 	std::free(header.channels);
 	std::free(header.pixel_types);
 	std::free(header.requested_pixel_types);
@@ -101,9 +116,10 @@ inline bool write_exr_channels(const std::string &path, int width, int height, c
 	return true;
 }
 
-// Reads every channel of a scanline EXR as a float plane (half and uint channels are converted).
+// Reads every channel of a scanline EXR as a float plane (half and uint channels are converted). `attributes` (when given) gets the header's string attributes.
 inline bool read_exr_channels(const std::string &path, int &width, int &height, std::vector<std::string> &names,
-							  std::vector<std::vector<float>> &planes, std::string &error) {
+							  std::vector<std::vector<float>> &planes, std::string &error,
+							  std::vector<std::pair<std::string, std::string>> *attributes = nullptr) {
 	EXRVersion version;
 	if (ParseEXRVersionFromFile(&version, path.c_str()) != TINYEXR_SUCCESS || version.multipart || version.tiled) {
 		error = "not a single-part scanline EXR file: " + path;
@@ -128,6 +144,13 @@ inline bool read_exr_channels(const std::string &path, int &width, int &height, 
 	}
 	width = image.width;
 	height = image.height;
+	if (attributes) {
+		attributes->clear();
+		for (int a = 0; a < header.num_custom_attributes; ++a)
+			if (std::string(header.custom_attributes[a].type) == "string" && header.custom_attributes[a].value)
+				attributes->emplace_back(header.custom_attributes[a].name,
+										 std::string(reinterpret_cast<const char *>(header.custom_attributes[a].value), static_cast<size_t>(header.custom_attributes[a].size)));
+	}
 	names.clear();
 	planes.clear();
 	for (int c = 0; c < header.num_channels; ++c) {

@@ -302,6 +302,7 @@ __device__ __forceinline__ bool near_zero(const float3& v) {
 
 // reflect/refract from shared CPU/GPU header (pbrt-v4 pattern)
 #include "../../src/shared/math_utils.h"
+#include "../../src/shared/light_link.h"
 __device__ __forceinline__ float3 reflect(const float3& v, const float3& n) { return cpu_gpu_reflect(v, n); }
 __device__ __forceinline__ float3 refract(const float3& uv, const float3& n, float e) { return cpu_gpu_refract<float3,float>(uv, n, e); }
 
@@ -392,6 +393,20 @@ __device__ __forceinline__ unsigned int pack_scatter_flag(bool bssrdf_exit, bool
 __device__ __forceinline__ float3 mis_origin_from_payload() {
 	return make_float3(__uint_as_float(optixGetPayload_25()), __uint_as_float(optixGetPayload_26()),
 					   __uint_as_float(optixGetPayload_27()));
+}
+
+// Light linking (src/shared/light_link.h): whether a light on this hit's material lights the surface the ray left - payload p28 is that surface's link group, ~0u for
+// the camera, which sees every light (optix_raygen.h keeps it from bounce to bounce). Read it before link_report_group() overwrites it.
+__device__ __forceinline__ bool link_lit_from_previous(const MaterialData& m) {
+	return light_link::covers(~m.notLit, static_cast<int>(optixGetPayload_28()));
+}
+// This hit's link group, for the bounce that leaves it.
+__device__ __forceinline__ void link_report_group(const MaterialData& m) {
+	optixSetPayload_28(static_cast<unsigned int>(m.linkGroup));
+}
+// The link group of the surface being shaded, for its light sampling (closest-hit programs only: after link_report_group()).
+__device__ __forceinline__ int current_link_group() {
+	return static_cast<int>(optixGetPayload_28());
 }
 
 // Integrator "bool regularize" gate for THIS bounce, read fresh by each

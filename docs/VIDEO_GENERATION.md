@@ -625,7 +625,9 @@ it too). Three spot lights are added to the frame's world, placed round the subj
 side of the camera and 35 up, a cool fill 50 degrees to the other side and a little up, and a rim behind and high. They light but are not seen, and their cones are wide
 and soft. Each strength is the light it gives the subject (its irradiance, in the units of a sun's `L`: the stage's sun is 2.2), whatever the camera's distance: a light
 stands as far from the subject as the camera does and is that much stronger. The subject is what the camera looks at, or the character `on` names (its chest); an `auto`
-shot lights each speaker in turn. `lighting` alone is key 1.2, fill 0.4, rim 0.8.
+shot lights each speaker in turn. `lighting` alone is key 1.2, fill 0.4, rim 0.8. `only cast` makes the three light the characters alone and not the set (light
+linking, as in Blender: `docs/PBRT_SUPPORT.md`, Lights): a film file puts every character's shapes in the link group `cast`, so `lighting rim 1.5 only cast` lifts a
+character off a background that keeps its own light and shadows. `only GROUP` names any other group a scene's shapes are in (`"string linkgroup"`).
 
 **The toon look: cel shading and ink lines.** `toon [bands N] [lines W] [ink COLOUR] [saturation S] [shadow S]` in a film file draws every frame as a cartoon
 (`src/shared/toon_look.h`): the light on each surface in a few flat bands, ink lines round what stands in front of something, along sharp creases and against the sky, and
@@ -636,6 +638,17 @@ picture there is the surface's colour - textures stay - in that light, with the 
 normal turns by more than about 55 degrees, `lines` pixels wide at 1080 lines. The film writes a `# @rt-toon ...` line into every frame's scene, and any scene file with that
 line gets the look; `--toon` gives any picture or video it (the scene's style, or the default). Default: 3 bands, lines 2, near-black ink, saturation 1.2, shadow 0.35. A
 frame worker reads the frame's scene file again for the passes (`cpu_reload_scene_file`), so each frame's lines are its own. `pip-goes-out.film` uses it.
+
+**Toon lines from the geometry, and a ramp per material** (Blender's Line Art and NPR materials). With the ID passes (`docs/RENDER_PASSES.md`) the toon look also knows
+which material and which object is at each pixel. `materials on` draws a line where one material meets another (a character's sleeve and hand), `objects on` where one
+object meets another with no depth jump between them - Line Art's intersection lines, a foot on the floor, a cup on a table - and `inner I` draws the lines inside a
+shape (creases, materials, objects) at I times the outline's width (`inner 0.5`: the bold outline and fine inner lines of a cartoon). `shadow-tint COLOUR` colours the
+darkest band (a cartoon's shadows are blue or purple, not only darker), and `highlight H` with `highlight-colour COLOUR` puts a flat glossy spot where the light is above H
+of the brightest. `material NAME ...` or `object NAME ...` starts a ramp of that material's or object's own: the words after it (`bands`, `shadow`, `shadow-tint`,
+`highlight`, `highlight-colour`) up to the next one are its, and the rest of the picture keeps the picture's. A material is named by its scene name (a pbrt
+`MakeNamedMaterial`); an object is a link group, and a film file's characters are `cast/<name>`: `toon bands 3 inner 0.5 materials on objects on shadow-tint #6a5acd
+object cast/pip bands 2 shadow 0.5 highlight 0.92` gives Pip two bands, purple shadows and a glint, the set three bands. All of it is off unless written, so a film's
+frames keep their look; when it is on, the frame's ID passes are made with its other passes (`cpu_render_aov_planes` with ids: twelve planes).
 
 **The kinds of character.** Each walks with its own gait with its feet held where they come down (a turtle's four), blinks on its own, opens its mouth when it speaks (a
 `sample ... by NAME` cue) and has its own poses for gestures; a gesture naming a pose its kind does not have is an error when the film is loaded, and the message lists the
@@ -784,6 +797,41 @@ folder) and a sun whose colour and strength come from the air its light crosses,
 the year (`day`, 172 by default, the longest), with `south` saying which way south is on the set (as a character's `facing`; west is a quarter turn on from it); below the
 horizon the sun goes out and the sky dims into twilight. A film with a `sky` leaves out its scene's own infinite and distant lights. The ambiences are made like the films'
 own (crickets, birds and wind as in Forest Dawn and the Nomai film; a brook of rushing noise and bubbles; night is crickets with an owl far off).
+
+**Cartoon marks: `mark`.** (film_marks.h, src/shared/screen_marks.h) The signs a cartoon draws by a character, drawn over the finished frame as a 2D layer, the way
+Blender's Grease Pencil draws over a render:
+
+```
+mark pip !  4.2                  # a "!" pops up over Pip at 4.2 s and goes 1.8 s later
+mark ann ?  6 8.5                # a question mark from 6 s to 8.5 s
+mark pip speed 10 12             # speed lines behind Pip while it moves
+mark kim heart 3 colour red size 1.3
+mark at 0.5 0.4 -2 impact 7.3    # the jagged star of an impact at a place (pbrt's coordinates)
+```
+
+The kinds are exclaim (`!`), question (`?`), sweat, anger, heart, zzz, sparkle, impact and speed. Each is a flat shape of colour inside a dark ink outline. It pops in past
+its size and settles, moves in its own way and shrinks away at its end: a `!` jolts, a `?` rocks, a heart floats up and beats, sweat runs down, the anger mark throbs, the
+z's rise one after another, sparkles twinkle, and speed lines are drawn afresh twelve times a second, as hand-drawn ones would be. A sign goes over the top of its character
+(sweat and anger beside its head) and is as big as the character is on the screen, so it follows the character and the camera. Speed lines trail the character's chest the
+way it moves on the screen, and only while it moves. The film writes each frame's marks, worked out through that moment's camera, as `# @rt-mark` lines in the frame's
+header. The launcher draws them last, after the render, the look and the toon look, so nothing shades, grades or blurs them, and they are never lit and cast no shadow.
+An EXR is left as rendered.
+
+**Cloth: `cloth`.** (film_cloth.h) Flags, capes, sheets and curtains, simulated as Blender's cloth modifier simulates them. The cloth is points joined by links that keep
+its weave's lengths and resist folding; gravity pulls it, the wind blows each little triangle by how squarely it meets the air, and it is kept out of the ground, the body it
+hangs on and the boxes it falls over. It is solved as position-based dynamics in small steps (300 a second):
+
+```
+cloth flag at 2 3 -4 size 1.2 0.8 colour red                    # a flag on a pole standing from the ground to 2 3 -4 (`pole H`: a shorter pole)
+cloth cape on pip length 0.8 colour purple                       # from a character's shoulders, swinging as it walks
+cloth sheet at 0 1.6 0 size 2 2 drop 3 over 0 0.4 0 1.2 0.8 0.8  # held flat, let go at 3 s, falls over a box (centre, size)
+cloth curtain at 0 2.5 -3 size 2 2.2 facing 0 colour cream        # hangs from a rail and stirs in the air
+```
+
+Every cloth also takes `stiff S` (0 silk to 1 canvas; 0.5), `wind S` (how much the wind blows it; 1) and `ground Y`. The wind is the film's `wind`; with none, a
+flag flies in a 4 m/s breeze and a curtain stirs. A frame is a function of its time. The cloth is simulated from a second before the film (so it has settled) in fixed
+steps up to the frame. A process rendering frames in order keeps where it got to, so the next frame takes only the steps between, and a frame comes out the same in any
+order. A cloth renders as a smooth triangle mesh (with uv, ready for a texture), and a flag gets its pole.
 
 **Weather and particles: `weather`, `particles`, `burst`.** (film_particles.h)
 
@@ -1789,6 +1837,8 @@ points: an x), `star-length L` (each ray's reach, a share of the picture's width
 the threshold gets the rays - the sparks round a crystal, a gem, a lamp, a magic spark - and nothing below it. Made as Blender makes its streaks (Kawase's method: passes
 of four taps, 1, 4, 16, 64 pixels apart), at half the picture's size, on the linear picture before the bloom: `look star 0.35 star-length 0.12 star-threshold 2` puts a
 thin cross on each of Crystal Heart's floating sparks.
+
+**A painting: `paint`.** `look paint 8` turns the picture into strokes of paint that follow its edges - an oil or gouache look with every edge kept sharp - by the anisotropic Kuwahara filter (Kyprianidis et al. 2009/2010; Blender's compositor Kuwahara node, "Anisotropic"): at each pixel an ellipse along the local edge is cut into eight sectors and the pixel takes the colour of the evenest ones, so a flat area becomes one stroke and the colour never smears across an edge. `paint SIZE` is the strokes' radius in pixels at a picture 1080 high (4 fine, 8 brushy, 16 bold); `paint-sharpness` (0-1, 0.5: how strongly the evenest sector wins), `paint-stretch` (0-2, 1: how far a stroke runs along an edge; 0 gives round dabs) and `paint-smoothness` (pixels at 1080, 4: how even the strokes' directions are). It runs first, on the linear picture, so the bloom, glints and grade go over the paint; it also wipes away a render's grain, so a painted film can use fewer samples. `src/shared/kuwahara.h`; it costs about a second a 1080p frame at size 8.
 
 ## Examples
 

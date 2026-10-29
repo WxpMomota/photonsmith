@@ -5,6 +5,7 @@
 #include "wavefront_types.h"
 #define SPECTRAL_DEVICE_IMPL   // owns the __constant__ symbol definitions
 #include "spectral_device.h"
+#include "wavefront_light_groups.h"   // (its __constant__ symbols are defined here too)
 #include "optix_types.h"
 #include "probe_grid_types.h"
 #include "wavefront_nrc_types.h"  // NrcTrainingRecord
@@ -958,6 +959,15 @@ extern "C" void wf_upload_cie_tables(
 extern "C" void wf_upload_d65_table(const float* h_d65, int n_samples)
 {
 	cudaMemcpyToSymbol(d_d65, h_d65, n_samples * sizeof(float));
+}
+
+extern "C" void wf_set_light_groups(float3* d_pictures, int count, int numPixels, int skyGroup)
+{
+	if (!d_pictures) count = 0, numPixels = 0;
+	cudaMemcpyToSymbol(d_wf_light_group_fb, &d_pictures, sizeof(d_pictures));
+	cudaMemcpyToSymbol(d_wf_light_group_count, &count, sizeof(int));
+	cudaMemcpyToSymbol(d_wf_light_group_pixels, &numPixels, sizeof(int));
+	cudaMemcpyToSymbol(d_wf_sky_light_group, &skyGroup, sizeof(int));
 }
 
 extern "C" void wf_upload_srgb_table(

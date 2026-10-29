@@ -119,6 +119,10 @@ extern "C" __global__ void __closesthit__bilinear_patch() {
 	// see MaterialType::Mix's own comment (optix_types.h).
 	int matIdx = patch.materialIdx;
 	const MaterialData mat = resolve_mix_material(params.materials[matIdx], matIdx, hit_point, matIdx);
+	// Light linking (light_link.h): whether this hit's light reaches the surface the ray left, read before this hit reports its own group (payload p28),
+	// which the light sampling below reads as the receiver's.
+	const bool linkLit = link_lit_from_previous(mat);
+	link_report_group(mat);
 
 	// dpdu/dpdv at (u,v) - see bilinear_patch.h's blp_point
 	const float3 pu0 = lerp(patch.p00, patch.p01, v);
@@ -202,6 +206,7 @@ extern "C" __global__ void __closesthit__bilinear_patch() {
 
 	// Pack updated payload back into registers (see optix_intersection_quad.h
 	// for the p0-p15 layout - identical here)
+	if (!linkLit) emission = make_float3(0.0f, 0.0f, 0.0f);   // light linking (light_link.h)
 	optixSetPayload_3(__float_as_uint(emission.x));
 	optixSetPayload_4(__float_as_uint(emission.y));
 	optixSetPayload_5(__float_as_uint(emission.z));
@@ -244,7 +249,7 @@ extern "C" __global__ void __closesthit__bilinear_patch() {
 		// A lamp that also reflects: its own light, weighted against the light sampling (p13-p15, which only a subsurface exit otherwise uses; raygen
 		// adds it for flag 1). The input p12 (the arriving BSDF pdf) is read here, before this program overwrites it.
 		float3 lamp_le = make_float3(0.0f, 0.0f, 0.0f);
-		if (lamp_scatters(mat))
+		if (lamp_scatters(mat) && linkLit)
 			lamp_le = lamp_own_emission(material_emission(mat, front_face, u, v, hit_point), __uint_as_float(optixGetPayload_12()), blp_light_pdf());
 		float t_hit = optixGetRayTmax();
 		float brdf_pdf_out = is_specular ? 0.0f

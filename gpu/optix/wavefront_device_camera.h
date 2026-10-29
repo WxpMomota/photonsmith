@@ -312,6 +312,22 @@ CPU_GPU GlossyCtx wf_setup_glossy_context(
 // function: haveSample/to_light/max_dist/light_pdf/nee_norm/
 // light_emission_spec, initialized the same "no sample yet" way either path
 // left them in before either filled them in (or didn't, on a failed draw).
+// The material index of area light `li` (lightIndices/lightKinds), -1 for a kind not listed - for light linking (light_link.h).
+__device__ __forceinline__ int wf_area_light_material_index(int li, const int* lightIndices, const GpuLightKind* lightKinds,
+	const SphereData* spheres, const QuadData* quads, const TriangleData* triangles, const BilinearPatchData* bilinearPatches,
+	const DiskData* disks, const CylinderData* cylinders) {
+	const int prim = lightIndices[li];
+	switch (lightKinds[li]) {
+	case GpuLightKind::Sphere: return spheres[prim].materialIdx;
+	case GpuLightKind::Triangle: return triangles[prim].materialIdx;
+	case GpuLightKind::BilinearPatch: return bilinearPatches[prim].materialIdx;
+	case GpuLightKind::Disk: return disks[prim].materialIdx;
+	case GpuLightKind::Cylinder: return cylinders[prim].materialIdx;
+	case GpuLightKind::Quad: return quads[prim].materialIdx;
+	default: return -1;
+	}
+}
+
 struct NeeLightSample {
 	bool haveSample = false;
 	float3 to_light = make_float3(0.0f, 0.0f, 0.0f);
@@ -319,6 +335,7 @@ struct NeeLightSample {
 	float light_pdf = 0.0f;
 	float nee_norm = 0.0f;
 	SampledSpectrum<kWFNWavelengths> light_emission_spec = SampledSpectrum<kWFNWavelengths>(0.f);
+	int lightIdx = -1;   // the area light picked (index into lightIndices/lightKinds), for light linking
 };
 
 // Extracted out of wf_finish_material_scatter() (item 4 sub-step 3 of this
@@ -396,7 +413,7 @@ __device__ __forceinline__ NeeLightSample wf_nee_pick_light(
 	// of that reciprocal - see restir_reservoir_add's own comment) - so the
 	// Ld formula the caller computes multiplies by nee_norm instead of
 	// dividing by light_pdf.
-	bool   haveSample = false;
+	bool   haveSample = false;   int pickedLight = -1;   // (pickedLight: the area light drawn, for light linking)
 	float3 to_light = make_float3(0.0f, 0.0f, 0.0f);
 	float  max_dist = 0.0f;
 	float  light_pdf = 0.0f;
@@ -640,6 +657,7 @@ __device__ __forceinline__ NeeLightSample wf_nee_pick_light(
 				light_emission_spec = liftEmission(raw);
 				nee_norm = res.W;
 				haveSample = true;
+				pickedLight = res.sample.lightIdx;
 			}
 		}
 	} else
@@ -662,6 +680,7 @@ __device__ __forceinline__ NeeLightSample wf_nee_pick_light(
 			light_emission_spec = liftEmission(raw);
 			nee_norm = (light_pdf > 1e-6f) ? (1.0f / light_pdf) : 0.0f;
 			haveSample = true;
+			pickedLight = cand.lightIdx;
 		}
 	}
 
@@ -672,6 +691,7 @@ __device__ __forceinline__ NeeLightSample wf_nee_pick_light(
 	result.light_pdf = light_pdf;
 	result.nee_norm = nee_norm;
 	result.light_emission_spec = light_emission_spec;
+	result.lightIdx = pickedLight;
 	return result;
 }
 
@@ -769,7 +789,9 @@ __device__ __forceinline__ void wf_push_nee_shadow_ray(
 	float raw_cos, const float3& lightDir, float tMax,
 	const SampledSpectrum<kWFNWavelengths>& Ld, float filterWeight,
 	const SampledWavelengths<kWFNWavelengths>& swl,
-	int pixelIndex, float time, bool isGiCandidate, unsigned int shadowSeed)
+	int pixelIndex, float time, bool isGiCandidate, unsigned int shadowSeed,
+	unsigned long long notShadowing = 0ull,   // shadow linking (light_link.h): a point, spot or distant light's PunctualLightGPU::notShadowing
+	int lightGroup = -1)                      // light groups (light_groups.h): the light's group, credited when the ray gets through
 {
 	// See the area-light NEE block's own "0.01, not the original 0.001"
 	// comment (wf_finish_material_scatter, below) for the full story on why
@@ -780,6 +802,8 @@ __device__ __forceinline__ void wf_push_nee_shadow_ray(
 	// to the far side of the surface instead of back into the same
 	// hemisphere the ray isn't going toward).
 	ShadowRayWorkItem shadow;
+	shadow.notShadowing = notShadowing;
+	shadow.lightGroup = lightGroup;
 	// The origin is offset along `offsetNormal` - the GEOMETRIC normal where the caller has one - toward the side the light is on, as pbrt's SpawnRayTo offsets along the
 	// geometric normal: along a bump- or normal-mapped surface's perturbed shading normal it dipped below the surface where that normal tilts away from it, the shadow ray
 	// then started under the floor and hit it, and a strongly bumped floor at a grazing light read 7% dark (bump-fine-floor, wavefront). For a surface with no such normal the

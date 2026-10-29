@@ -14,9 +14,29 @@ A render pass shows one property of the scene instead of the finished lit pictur
 
 Where a pixel is part surface and part background, the surface channels are averaged over the surface samples only, so an object's edge keeps its own value instead of fading towards 0 (use `A` to blend).
 
+**ID passes: a matte of any object or material (Cryptomatte).** The same file also holds the ID passes, in the Cryptomatte layout (Psyop's open specification, which Blender's Cycles writes and Blender's, Nuke's and Fusion's Cryptomatte nodes read): pick an object or a material in the compositor and get its matte, soft edges and all, to grade a character apart from the set or to recolour one material.
+
+| Channel | What it holds |
+|---|---|
+| `CryptoObject00.R/G/B/A` | the two objects that cover the pixel most (their IDs in R and B) and how much of the pixel each covers (G and A) |
+| `CryptoMaterial00.R/G/B/A` | the same for materials |
+| `id.object`, `id.material` | the one ID that covers the pixel most: a flat ID for simple masks and for edges between objects or materials |
+
+An **object** is a shape's link group (`"string linkgroup"`, `docs/PBRT_SUPPORT.md` Lights): each character of a film file is its own object (`cast/<name>`), and every shape in no group is the object `rest`. A **material** is its name in the scene (a named material's name, `material N` for an unnamed one). An ID is the name's MurmurHash3 stored as a float, and the file's header names every ID (`cryptomatte/<key>/name`, `hash`, `conversion`, `manifest`), so the compositor lists the names. `src/shared/cryptomatte.h` is the layout; `aov_pass::renderIds()` makes the passes; the header survives the merge into an `.exr` image.
+
 **Where they go.** If the image is an `.exr` (`ray_tracer ... --output shot.exr --aovs`), the passes are merged into it: one multilayer EXR with `R G B` (the render) and the passes above. For any other image type they are written to `<name>.aovs.exr` beside it. Single images only (not video).
 
 **How they are made.** The beauty image comes from whichever renderer you chose (CPU, OptiX or Metal). The passes come from a separate first-hit pass over the camera's rays on the CPU scene, with up to 16 samples per pixel for anti-aliasing, so they cost very little, work the same for every renderer, and never change the picture. `src/TheRestOfYourLife/aov_pass.h` is the pass; `cpu_render_main_aovs()` writes it; `cpu_merge_exr_passes()` merges it into an image's EXR; `src/shared/exr_writer.h` has the multi-channel EXR reader and writer (channels are written sorted by name, as the format requires).
+
+## Light groups: the picture split by lights
+
+Give lights a group and the render also writes each group's light as its own pass, so a key, a fill and a rim (or the sun and the lamps) can be turned up, down or recoloured in the compositor without rendering again - Blender Cycles' light groups. In a scene, any `LightSource` or `AreaLightSource` takes `"string lightgroup" "key"`; up to 8 groups.
+
+| Channel | What it holds |
+|---|---|
+| `lightgroup.<name>.R/G/B` | the light that reached the camera from that group's lights: their direct light, the light of their lamps seen or found by a bounce, and for the sky's group the sky |
+
+The passes add up to the picture, except for light from lights in no group and the glow of emissive fog. They are linear, at the picture's exposure, before any look or tone map. In an `.exr` picture they sit beside `R G B`; beside a PNG or PPM they go to `<name>.lightgroups.exr`. They are made by the CPU path tracer and by the OptiX wavefront renderer: a GPU render of a scene with light groups uses the wavefront renderer even when the default one was asked for. Not BDPT, MLT, SPPM, `--spectral` or Metal (the picture is drawn, without passes). `src/shared/light_groups.h` is the format, `src/shared/light_group_passes.h` writes the file, `light_group_tally.h` (CPU) and `gpu/optix/wavefront_light_groups.h` (GPU) split the light; tests: `LightGroups*` in `tests/unit/light_link_tests.cpp`.
 
 ## Why is this pixel this colour? (the pixel probe)
 

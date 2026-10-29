@@ -93,6 +93,7 @@ extern char** environ;
 #include "launcher/background_mode.h"   // --background
 #include "launcher/cartoon_worker.h"
 #include "launcher/toon_frame.h"
+#include "launcher/marks_frame.h"   // a scene's cartoon marks, drawn over the finished picture
 #include "launcher/video_render.h"   // --video, --assemble-video
 #ifdef RT_HAVE_AVFOUNDATION_ENCODER
 #include "launcher/video_encoder_mac.h"   // Video -> MP4 via AVFoundation, no ffmpeg needed
@@ -814,6 +815,10 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
             if (!toon_frame::apply(out_path, image_width, image_height, toon, scene_id, cam_x, cam_y, cam_z, problem))
                 std::cerr << "WARNING: the toon look could not be made (" << problem << "); the picture stays as rendered." << std::endl;
         }
+        // and last, the scene's cartoon marks (`# @rt-mark` lines: a film's `mark`, src/shared/screen_marks.h), drawn over the finished picture
+        const std::vector<screen_marks::Mark> marks = scene_file ? screen_marks::fromSceneFile(scene_file) : std::vector<screen_marks::Mark>();
+        if (!marks.empty() && !is_exr_output_path(out_path) && !marks_frame::apply(out_path, marks, problem))
+            std::cerr << "WARNING: the cartoon marks could not be drawn (" << problem << ")." << std::endl;
     }
     if (render_result == 0 && !args.aovs) cutToScenePicture(args, scene_id, out_path);
     if (render_result == 0 && !announceRenderedFile(out_path, use_gpu, args.ppm_only)) render_result = ERR_FILE_WRITE_FAILED;

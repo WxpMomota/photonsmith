@@ -269,6 +269,10 @@ extern "C" __global__ void __closesthit__sphere() {
 	// exactly as supported here as if it had been assigned directly.
 	int matIdx = sphere.materialIdx;
 	const MaterialData mat = resolve_mix_material(params.materials[matIdx], matIdx, hit_point, matIdx);
+	// Light linking (light_link.h): whether this hit's light reaches the surface the ray left, read before this hit reports its own group (payload p28),
+	// which the light sampling below reads as the receiver's.
+	const bool linkLit = link_lit_from_previous(mat);
+	link_report_group(mat);
 
 	// Compute the normal in the sphere's own space, where it is exactly radial
 	// and unit length however the placement scales it, then carry it to world
@@ -1052,6 +1056,7 @@ extern "C" __global__ void __closesthit__sphere() {
 	// p12: brdf_pdf of scattered dir (flag==1) OR light NEE pdf of incoming dir (flag==2) for MIS
 
 	// Always set emission (for all material types - non-lights have emission=0)
+	if (!linkLit) emission = make_float3(0.0f, 0.0f, 0.0f);   // light linking (light_link.h)
 	optixSetPayload_3(__float_as_uint(emission.x));
 	optixSetPayload_4(__float_as_uint(emission.y));
 	optixSetPayload_5(__float_as_uint(emission.z));
@@ -1113,7 +1118,7 @@ extern "C" __global__ void __closesthit__sphere() {
 		// A lamp that also reflects: its own light, weighted against the light sampling (p13-p15, which only a subsurface exit otherwise uses; raygen
 		// adds it for flag 1). The input p12 (the arriving BSDF pdf) is read here, before this program overwrites it.
 		float3 lamp_le = make_float3(0.0f, 0.0f, 0.0f);
-		if (lamp_scatters(mat))
+		if (lamp_scatters(mat) && linkLit)
 			lamp_le = lamp_own_emission(material_emission(mat, front_face, sphere_uv_u, sphere_uv_v, hit_point), __uint_as_float(optixGetPayload_12()), sphere_light_pdf());
 		// Return surface attenuation ONLY (raygen will multiply with throughput)
 		// Medium: the scatter/exit point is not the sphere's entry surface

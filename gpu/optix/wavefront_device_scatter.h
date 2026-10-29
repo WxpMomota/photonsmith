@@ -29,6 +29,9 @@ __device__ __forceinline__ SampledSpectrum<kWFNWavelengths> wf_lift_rgb_to_spect
 
 __device__ __forceinline__ void wf_finish_material_scatter(
 	MaterialType matType, float nfEta, int matIdx,
+	// Light linking (light_link.h): the shaded surface's link group (HitWorkItem::linkGroup: its own material's, before a Mix was resolved) - the
+	// lights that do not light it are left out of its light sampling, and the next ray carries it as prevLinkGroup.
+	int linkGroup,
 	// True once any PRIOR bounce along this path was non-specular (see
 	// RayWorkItem::any_nonspecular's own comment, wavefront_types.h) - folded
 	// (OR'd with !is_specular) into the pushed next-bounce RayWorkItem's own
@@ -686,6 +689,14 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 		restirVolumeReservoirs, restirVolumeCtx,
 		volumeMatIdxOut, volumePhaseWoGOut, volumeEntryPointOut);
 	bool   haveSample = neeSample.haveSample;
+	// Light linking: a lamp that does not light this surface's group gives it nothing (the draw stays a draw: its pdf is the same, its light none -
+	// as the bounce that finds the lamp adds none, evaluate_materials' emitter hit).
+	int neeLightGroup = -1;   // (and the lamp's light group: light_groups.h)
+	if (haveSample && neeSample.lightIdx >= 0) {
+		const int lm = wf_area_light_material_index(neeSample.lightIdx, lightIndices, lightKinds, spheres, quads, triangles, bilinearPatches, disks, cylinders);
+		if (lm >= 0 && !light_link::covers(~materials[lm].notLit, linkGroup)) haveSample = false;
+		if (lm >= 0) neeLightGroup = materials[lm].lightGroupPlus1 - 1;
+	}
 	float3 to_light = neeSample.to_light;
 	float  max_dist = neeSample.max_dist;
 	float  light_pdf = neeSample.light_pdf;
@@ -792,7 +803,7 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 			// call (depth==0's own NEE, or GI disabled/ineligible this frame).
 			wf_push_nee_shadow_ray(shadowQueue, hit_point, (dot(geomNormalIn, geomNormalIn) > 0.5f ? geomNormalIn : normal), isPhase, shadow_eps,
 				raw_cos, to_light, max_dist - 0.002f, Ld, filterWeight, swl,
-				pixelIndex, time, giCandidateEligible, wf_pcg(seed));
+				pixelIndex, time, giCandidateEligible, wf_pcg(seed), 0ull, neeLightGroup);
 		}
 	}
 	// -------------------------------------------------------------------------
@@ -870,7 +881,7 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 			// (unlike the area/punctual sites' max_dist/t_max - 0.002f).
 			wf_push_nee_shadow_ray(shadowQueue, hit_point, (dot(geomNormalIn, geomNormalIn) > 0.5f ? geomNormalIn : normal), isPhase, shadow_eps,
 				raw_cos, sky_dir, 1e30f, Ld, filterWeight, swl,
-				pixelIndex, time, giCandidateEligible, wf_pcg(seed));
+				pixelIndex, time, giCandidateEligible, wf_pcg(seed), 0ull, d_wf_sky_light_group);
 		}
 	}
 
@@ -893,6 +904,7 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 		const unsigned int pli = (plStart + plj) % numPunctualLights;
 		float3 wi, Li; float t_max;
 		if (!wf_eval_punctual_light(punctualLights[pli], hit_point, wi, Li, t_max)) continue;
+		if (!light_link::covers(~punctualLights[pli].notLit, linkGroup)) continue;   // light linking (light_link.h)
 		// See the area-light block above for the RoughDielectric two-sided
 		// rationale (matches optix_device_helpers.h's punctual-light NEE,
 		// which only excludes exact grazing (plz==0), not either sign).
@@ -951,7 +963,7 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 		// identical ratio-tracking noise if they both cross the same medium.
 		wf_push_nee_shadow_ray(shadowQueue, hit_point, (dot(geomNormalIn, geomNormalIn) > 0.5f ? geomNormalIn : normal), isPhase, shadow_eps,
 			raw_cos, wi, t_max - 0.002f, Ld, filterWeight, swl,
-			pixelIndex, time, giCandidateEligible, wf_pcg(seed ^ (pli * 0x9E3779B9u)));
+			pixelIndex, time, giCandidateEligible, wf_pcg(seed ^ (pli * 0x9E3779B9u)), punctualLights[pli].notShadowing, punctualLights[pli].lightGroupPlus1 - 1);
 	}
 
 	// Flush accumulated prior-bounce radiance (once, regardless of whether
@@ -1148,6 +1160,7 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 	// else brdf_pdf_override if the material set one, else the cosine-
 	// weighted hemisphere pdf every non-specular case here samples from).
 	next.scatterOrigin = hit_point;   // see RayWorkItem::scatterOrigin
+	next.prevLinkGroup = linkGroup;
 	next.brdf_pdf = is_specular ? 0.0f
 		: (brdf_pdf_override > 0.0f ? brdf_pdf_override
 			: fmaxf(dot(next.direction, normal), 0.0f) / 3.14159265f);

@@ -19,6 +19,7 @@
 #include "../shared/bxdfs.h"
 #include "../shared/shading_frame.h"
 #include "../shared/material_context.h"
+#include "../shared/light_link.h"
 
 
 // Defined in material_pbrt.h. Forward-declared here so `material::
@@ -143,6 +144,16 @@ class dispersive_material {
 class material {
   public:
     virtual ~material() = default;
+
+    // Light linking (Cycles' light linking, src/shared/light_link.h): the group of the shapes this material is on (0: in none; a shape's pbrt `"string linkgroup"`
+    // gives it a copy of its material with its group), and for an emitter the groups it lights (bit g: group g). Set by the scene builder.
+    int link_group = 0;
+    std::uint64_t lights_groups = ~0ull;
+    // The ID passes (aov_pass.h, src/shared/cryptomatte.h): this material's index in the scene and its name, and its link group's name ("rest" for none).
+    int material_index = -1;
+    std::string material_name, link_group_name = "rest";
+    // An emitter's light group (src/shared/light_groups.h): the pass its light is credited to; -1 for none.
+    int light_group = -1;
 
     virtual color emitted(
         const ray& r_in, const hit_record& rec, double u, double v, const point3& p

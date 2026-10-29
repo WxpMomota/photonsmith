@@ -205,6 +205,13 @@ private:
 						  std::make_shared<normal_map_material>(disp_tex, base));
 			}
 		}
+		if (base) {   // light linking (light_link.h): the shapes' group, and for an emitter the groups it lights (made per material and area light: cachedMaterial)
+			base->link_group = m.linkGroup;
+			if (em) base->lights_groups = em->illuminates, base->light_group = em->lightGroup;
+			base->material_index = materialIndex;   // (the ID passes: aov_pass.h)
+			base->material_name = !m.name.empty() ? m.name : "material " + std::to_string(materialIndex);
+			if (m.linkGroup > 0 && static_cast<std::size_t>(m.linkGroup) <= scene.linkGroups.size()) base->link_group_name = scene.linkGroups[static_cast<std::size_t>(m.linkGroup) - 1];
+		}
 		return base;
 	}
 

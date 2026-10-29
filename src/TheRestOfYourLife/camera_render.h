@@ -98,6 +98,11 @@ inline color camera::render_pixel(int i, int j, RenderSamplers& smp, const hitta
     auto& halton_smp = smp.halton_smp;
     color  weighted_color(0,0,0);
     double weight_sum = 0.0;
+    // Light groups (src/shared/light_groups.h; the RGB path only): each sample's light per group, added up with the picture's weights.
+    const int groups = spectral ? 0 : static_cast<int>(std::min<std::size_t>(light_group_names.size(), light_groups::kMax));
+    light_group_tally::Tally tally;
+    color group_sum[light_groups::kMax];
+    light_group_tally::current = groups > 0 ? &tally : nullptr;
     // --adaptive: tracks this pixel's running luminance
     // estimate across samples so far - see camera::
     // adaptive_sampling's own comment and
@@ -163,6 +168,7 @@ inline color camera::render_pixel(int i, int j, RenderSamplers& smp, const hitta
                     // and duck-typed on `Sampler&`, so each branch instantiates
                     // its own copy; kept to a two-line construct+call per case.
                     color sample;
+                    if (groups > 0) tally.reset();
                     // spectral mirrors the switch below verbatim, calling
                     // ray_color_spectral() instead of ray_color() - see that
                     // field's own comment (camera::spectral). Kept as a
@@ -295,8 +301,18 @@ inline color camera::render_pixel(int i, int j, RenderSamplers& smp, const hitta
                 double w = fs.weight;
                 weighted_color += w * sample;
                 weight_sum    += w;
+                for (int g = 0; g < groups; ++g) {
+                    const color gs = tally.c[g] * camera_weight;
+                    if (std::isfinite(gs.x()) && std::isfinite(gs.y()) && std::isfinite(gs.z())) group_sum[g] += w * gs;
+                }
             }
         }
+    light_group_tally::current = nullptr;
+    if (groups > 0 && weight_sum > 0.0 && light_group_pixels.size() >= static_cast<std::size_t>(groups) * image_width * image_height * 3) {
+        const std::size_t plane = static_cast<std::size_t>(image_width) * image_height * 3, at = (static_cast<std::size_t>(j) * image_width + i) * 3;
+        for (int g = 0; g < groups; ++g)
+            for (int c = 0; c < 3; ++c) light_group_pixels[g * plane + at + c] = static_cast<float>(group_sum[g][c] / weight_sum);
+    }
     // Normalize by filter weight sum -- mirrors pbrt-v4 film:
     //   pixel.rgbSum / pixel.weightSum
     color pixel_color = (weight_sum > 0.0)
@@ -412,6 +428,9 @@ inline bool camera::render(const hittable& world, const hittable& lights,
     const bool keep_linear = exr_output || denoise || look.active();
     std::vector<float> exr_pixels(
         keep_linear ? static_cast<size_t>(image_width) * image_height * 3 : 0);
+    // light groups (src/shared/light_groups.h): each group's picture, filled by render_pixel (not under --spectral)
+    const std::size_t light_group_count = spectral ? 0 : std::min<std::size_t>(light_group_names.size(), light_groups::kMax);
+    light_group_pixels.assign(light_group_count * static_cast<size_t>(image_width) * image_height * 3, 0.0f);
     std::atomic<int> next_j(image_height - 1);
     std::atomic<int> completed_lines(0);
     std::mutex log_mutex;
@@ -615,6 +634,19 @@ inline bool camera::render(const hittable& world, const hittable& lights,
             out << scanlines[j];
         }
         out.close();
+    }
+
+    // The light groups' passes: in the picture's EXR beside its R, G, B, or in <picture>.lightgroups.exr beside a PNG or PPM - at the picture's exposure, before any look
+    // or tone map (a compositor adds them up and grades them).
+    if (wrote_ok && light_group_count > 0) {
+        const std::vector<std::string> names(light_group_names.begin(), light_group_names.begin() + static_cast<std::ptrdiff_t>(light_group_count));
+        std::string exr_error;
+        const std::string passes = light_groups::writePasses(out_path, exr_output, image_width, image_height, exr_pixels.data(), names, light_group_pixels.data(),
+                                                             static_cast<float>(exposure), exr_error);
+        if (!passes.empty())
+            std::clog << "\rLight groups (" << light_group_count << "): " << passes << "\n";
+        else
+            std::cerr << "Failed to write the light groups' passes: " << exr_error << std::endl;
     }
 
     std::clog << "\rDone.                 \n";

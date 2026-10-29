@@ -703,8 +703,14 @@ extern "C" int cpu_render_main_aovs(int width, int height, int spp, const char* 
 		BDPTSceneAdapter adapter(world, cam);
 		std::vector<std::vector<float>> planes;
 		aov_pass::render(adapter, cam.image_width, cam.image_height, spp, planes);
+		// and the ID passes: the objects' and materials' mattes in the Cryptomatte layout, their names in the header (aov_pass.h renderIds, cryptomatte.h)
+		aov_pass::IdPasses ids;
+		aov_pass::renderIds(adapter, cam.image_width, cam.image_height, spp, ids);
+		std::vector<std::string> names = aov_pass::channelNames();
+		names.insert(names.end(), aov_pass::idChannelNames().begin(), aov_pass::idChannelNames().end());
+		planes.insert(planes.end(), ids.planes.begin(), ids.planes.end());
 		std::string exr_error;
-		if (!write_exr_channels(output_path, cam.image_width, cam.image_height, aov_pass::channelNames(), planes, exr_error)) {
+		if (!write_exr_channels(output_path, cam.image_width, cam.image_height, names, planes, exr_error, ids.metadata())) {
 			std::cerr << "[cpu_interface_bdpt] Failed to write the AOV EXR '" << output_path << "': " << exr_error << std::endl;
 			return ERR_FILE_WRITE_FAILED;
 		}
@@ -723,7 +729,8 @@ extern "C" int cpu_render_main_aovs(int width, int height, int spp, const char* 
 }
 
 // The passes into memory (10 planes of width*height floats), for a look made from them in the run that rendered the picture (toon_look.h).
-extern "C" int cpu_render_aov_planes(int width, int height, int spp, const char* scene_id, double cam_x, double cam_y, double cam_z, int force_camera_override, float* out) {
+extern "C" int cpu_render_aov_planes(int width, int height, int spp, const char* scene_id, double cam_x, double cam_y, double cam_z, int force_camera_override, float* out,
+                                     int with_ids) {
 	try {
 		if (width <= 0 || height <= 0) { std::cerr << ErrorInfo(ERR_INVALID_DIMENSIONS).to_string() << std::endl; return ERR_INVALID_DIMENSIONS; }
 		if (spp <= 0) { std::cerr << ErrorInfo(ERR_INVALID_SAMPLE_COUNT).to_string() << std::endl; return ERR_INVALID_SAMPLE_COUNT; }
@@ -738,6 +745,12 @@ extern "C" int cpu_render_aov_planes(int width, int height, int spp, const char*
 		BDPTSceneAdapter adapter(world, cam);
 		std::vector<std::vector<float>> planes;
 		aov_pass::render(adapter, width, height, spp, planes);
+		if (with_ids) {   // (the toon look's lines between materials and objects: id.object, id.material)
+			aov_pass::IdPasses ids;
+			aov_pass::renderIds(adapter, width, height, spp, ids);
+			planes.push_back(ids.planes[0]);
+			planes.push_back(ids.planes[1]);
+		}
 		const size_t count = static_cast<size_t>(width) * static_cast<size_t>(height);
 		for (size_t p = 0; p < planes.size(); ++p) std::copy(planes[p].begin(), planes[p].end(), out + p * count);
 		return SUCCESS;
@@ -768,15 +781,18 @@ extern "C" int cpu_merge_exr_passes(const char* image_path, const char* passes_p
 		int bw = 0, bh = 0, pw = 0, ph = 0;
 		std::vector<std::string> names, passNames;
 		std::vector<std::vector<float>> planes, passPlanes;
-		if (!read_exr_channels(image_path, bw, bh, names, planes, error)) return fail(error);
-		if (!read_exr_channels(passes_path, pw, ph, passNames, passPlanes, error)) return fail(error);
+		std::vector<std::pair<std::string, std::string>> attributes, passAttributes;   // (the Cryptomatte layers' metadata goes with their channels)
+		if (!read_exr_channels(image_path, bw, bh, names, planes, error, &attributes)) return fail(error);
+		if (!read_exr_channels(passes_path, pw, ph, passNames, passPlanes, error, &passAttributes)) return fail(error);
+		for (const auto &a : passAttributes)
+			if (std::none_of(attributes.begin(), attributes.end(), [&](const auto &b) { return b.first == a.first; })) attributes.push_back(a);
 		if (bw != pw || bh != ph) return fail("the image and the passes differ in size");
 		for (size_t i = 0; i < passNames.size(); ++i) {
 			if (std::find(names.begin(), names.end(), passNames[i]) != names.end()) continue;
 			names.push_back(passNames[i]);
 			planes.push_back(std::move(passPlanes[i]));
 		}
-		if (!write_exr_channels(image_path, bw, bh, names, planes, error)) return fail(error);
+		if (!write_exr_channels(image_path, bw, bh, names, planes, error, attributes)) return fail(error);
 		return SUCCESS;
 	} catch (const std::exception& e) {
 		return fail(e.what());

@@ -143,6 +143,8 @@ __device__ __forceinline__ float wf_mix_branch_hash01(const float3& p) {
 __device__ __forceinline__ MaterialData wf_resolve_mix_material(MaterialData mat, int matIdx,
 																 const float3& hit_point, int& outMatIdx) {
 	constexpr int kMaxMixDepth = 8;
+	const int linkGroup = mat.linkGroup;   // (light linking: the shape's group and light are the hit material's, whichever material the mix picks)
+	const unsigned long long notLit = mat.notLit;
 	for (int depth = 0; mat.type == MaterialType::Mix && depth < kMaxMixDepth; ++depth) {
 		const float w = mat.mix_extra.mixWeight;
 		const float h = wf_mix_branch_hash01(hit_point);
@@ -152,6 +154,8 @@ __device__ __forceinline__ MaterialData wf_resolve_mix_material(MaterialData mat
 		mat = wf_params.materials[subIdx];
 	}
 	outMatIdx = matIdx;
+	mat.linkGroup = linkGroup;
+	mat.notLit = notLit;
 	return mat;
 }
 
@@ -376,6 +380,8 @@ struct WfShadowPayload {
 	float lambda[kWFNWavelengths];
 	float tr[kWFNWavelengths];
 	int   chromatic;
+	// Shadow linking (light_link.h): the link groups whose shapes this shadow ray passes (ShadowRayWorkItem::notShadowing).
+	unsigned long long notShadowing;
 };
 
 // BSSRDF probe walk (MaterialType::Subsurface, wavefront backend Phase 2) -
@@ -388,6 +394,8 @@ struct WfShadowPayload {
 // any shape) and the triangle shadow/alpha any-hit programs use it; the other shapes' shadow any-hit programs resolve with the image's mean (mix_extra.mixWeight), above.
 __device__ __forceinline__ MaterialData wf_resolve_mix_material(MaterialData mat, int matIdx, const float3& hit_point, float uv_u, float uv_v, int& outMatIdx) {
 	constexpr int kMaxMixDepth = 8;
+	const int linkGroup = mat.linkGroup;   // (light linking: the shape's group and light are the hit material's, whichever material the mix picks)
+	const unsigned long long notLit = mat.notLit;
 	for (int depth = 0; mat.type == MaterialType::Mix && depth < kMaxMixDepth; ++depth) {
 		float w = mat.mix_extra.mixWeight;
 		if (mat.mixAmountTexIdx >= 0)
@@ -399,5 +407,7 @@ __device__ __forceinline__ MaterialData wf_resolve_mix_material(MaterialData mat
 		mat = wf_params.materials[subIdx];
 	}
 	outMatIdx = matIdx;
+	mat.linkGroup = linkGroup;
+	mat.notLit = notLit;
 	return mat;
 }

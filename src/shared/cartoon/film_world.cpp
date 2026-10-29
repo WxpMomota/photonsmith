@@ -417,6 +417,7 @@ std::string DataFilm::worldAt(const std::string &header, double t) const {
 		if (!visible(b.name, t)) continue;
 		out += b.head + transformsFor(b.name, t) + lightsScaled(b.name, b.body, t);
 	}
+	out += clothAt(t);   // cloth (film_cloth.h): simulated up to now
 	for (const Character &c : spec.characters) {   // the characters, as their kinds draw them
 		const CharacterKind &kind = characterKinds().at(c.kind);
 		if (!kind.text) continue;
@@ -426,9 +427,10 @@ std::string DataFilm::worldAt(const std::string &header, double t) const {
 		m.voice = music_cues::voiceAt(spec.key, c.name, t, shotStarts(), shotNameList(), &m.mouth);   // (a recording's loudness and mouth shapes)
 		speakingAt(c, t, m);
 		m.face = faces::faceAt(c.feelings, t);
-		out += "# " + c.name + " (" + c.kind + ")\n" + kind.text(m);
+		out += "# " + c.name + " (" + c.kind + ")\n" + shot_lighting::inLinkGroup(kind.text(m), "cast/" + c.name);   // (light linking: a shot's `lighting ... only cast` - "cast" names every cast/ group; the ID passes)
 	}
 	out = shot_lighting::withLights(out, shotLightsAt(header, t));
+	out = marksAt(header, t) + out;   // the cartoon marks over the frame (film_marks.h): its `# @rt-mark` lines, before everything (the launcher draws them after the render)
 	return spec.space.on ? cosmos::withSpaceLook(space::recentred(out), spec.space.flare, spec.space.bloom) : out;   // (a floating origin for a film in space: film_space.h)
 }
 
@@ -660,6 +662,55 @@ void DataFilm::thunder(audio::Mix &m) const {
 			if (!film_subjects::cameraOf(headerAt(t), eye, target, fov)) return std::hypot(x, z);
 			return std::hypot(x + eye.x, z - eye.z);   // (eye is story space: pbrt's x is -eye.x)
 		});
+}
+
+std::string DataFilm::clothAt(double t) const {
+	std::string out;
+	for (const cloth::Cloth &cl : spec.cloths) {   // (film_cloth.h)
+		cloth::World w;
+		// the film's wind (a flag with none flies in a breeze, a curtain stirs; a sheet and a cape feel only the air they move through)
+		w.wind = spec.wind.on ? spec.wind.dir() * spec.wind.speed : cl.kind == "flag" ? Vec3{4.0, 0.0, 0.0} : cl.kind == "curtain" ? Vec3{0.0, 0.0, 0.6} : Vec3{};
+		if (cl.kind == "cape") {
+			const Character *who = nullptr;
+			for (const Character &c : spec.characters)
+				if (c.name == cl.who) who = &c;
+			if (!who) continue;
+			const CharacterKind &kind = characterKinds().at(who->kind);
+			w.holdAt = [this, who, &kind, &cl](double when, int count, std::vector<Vec3> &held, std::vector<cloth::Sphere> &body) {
+				const CharacterMoment m = actingMoment(*who, std::max(0.0, when));
+				const double s = m.scale, shoulders = kind.chest.y + 0.45 * (kind.head.y - kind.chest.y), back = -0.85 * kind.radius;
+				const auto pbrt = [](Vec3 p) { return Vec3{-p.x, p.y, p.z}; };   // (story space to pbrt's)
+				held.clear(), body.clear();
+				for (int i = 0; i < count; ++i) {
+					const double across = 0.5 * cl.width * (1.0 - 2.0 * i / std::max(1, count - 1)) / std::max(1e-6, s);   // (its left (+x, body space) to its right)
+					held.push_back(pbrt(transformPoint(m.frame, Vec3{across, shoulders, back} * s)));
+				}
+				body.push_back({pbrt(transformPoint(m.frame, Vec3{0.0, kind.chest.y, 0.0} * s)), 0.95 * kind.radius * s});
+				body.push_back({pbrt(transformPoint(m.frame, Vec3{0.0, 0.55 * kind.chest.y, 0.0} * s)), 0.9 * kind.radius * s});
+				return true;
+			};
+		}
+		out += cloth::text(spec.key.empty() ? std::string("film") : spec.key, cl, w, t);
+	}
+	return out;
+}
+
+std::string DataFilm::marksAt(const std::string &header, double t) const {
+	if (spec.marks.empty()) return std::string();
+	film_marks::Camera cam;
+	film_subjects::cameraOf(header, cam.eye, cam.target, cam.fov);
+	const film_marks::PoseAt poseAt = [&](const std::string &who, double when, Vec3 &head, Vec3 &top, Vec3 &feet, Vec3 &chest) {
+		for (const Character &c : spec.characters) {
+			if (c.name != who) continue;
+			const CharacterKind &kind = characterKinds().at(c.kind);
+			const CharacterMoment m = actingMoment(c, when);
+			head = transformPoint(m.frame, kind.head * m.scale), top = transformPoint(m.frame, Vec3{0.0, kind.height, 0.0} * m.scale);
+			feet = transformPoint(m.frame, {0.0, 0.0, 0.0}), chest = transformPoint(m.frame, kind.chest * m.scale);
+			return true;
+		}
+		return false;
+	};
+	return film_marks::headerLines(spec.marks, t, cam, poseAt);
 }
 
 std::string DataFilm::airMedium() const {

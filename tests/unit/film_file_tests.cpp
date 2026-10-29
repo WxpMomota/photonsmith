@@ -12,6 +12,7 @@
 #include <map>
 #include <regex>
 #include <set>
+#include <sstream>
 #include <string>
 
 #include "../../src/shared/cartoon/cartoon_films.h"   // (the films themselves, which these tests reach into)
@@ -21,6 +22,7 @@
 #include "../../src/shared/cartoon/film_edit.h"
 #include "../../src/shared/gltf_skin.h"
 #include "../../src/shared/pbrt_discover.h"
+#include "../../src/shared/screen_marks.h"
 #include "../../launcher/process.h"   // (a speech engine for the real voices)
 
 namespace ff = cartoon::film_file;
@@ -639,7 +641,15 @@ TEST(ShotLighting, AKeyAFillAndARimLightTheSubjectFromTheCamera) {
 	EXPECT_DOUBLE_EQ(l.key, 2.0);
 	EXPECT_DOUBLE_EQ(l.side, 1.0);
 	EXPECT_NE(sl::parse("key lots", l).find("strength"), std::string::npos);
-	EXPECT_NE(sl::parse("glow 1", l).find("takes key, fill, rim and side"), std::string::npos);
+	EXPECT_NE(sl::parse("glow 1", l).find("takes key, fill, rim, side and only"), std::string::npos);
+	// light linking (src/shared/light_link.h): `only cast` makes the three light the film's characters alone, whose shapes are in the group "cast"
+	sl::Lighting onCast;
+	ASSERT_EQ(sl::parse("rim 1 only cast", onCast), "");
+	EXPECT_EQ(onCast.only, "cast");
+	const std::string castLights = sl::lightsText({0.0, 1.0, 4.0}, {0.0, 1.0, 0.0}, onCast);
+	EXPECT_NE(castLights.find("\"string illuminates\" [ \"cast\" ]"), std::string::npos) << castLights;
+	EXPECT_EQ(sl::inLinkGroup("Shape \"sphere\" \"float radius\" [ 1 ]\nShape \"trianglemesh\" \"point3 P\" [ 0 0 0 ]\n", "cast"),
+			  "Shape \"sphere\" \"string linkgroup\" \"cast\" \"float radius\" [ 1 ]\nShape \"trianglemesh\" \"string linkgroup\" \"cast\" \"point3 P\" [ 0 0 0 ]\n");
 	// the lights round a subject at the origin, the camera 4 in front (story space +z), the key on the picture's left (story space -x)
 	sl::Lighting usual;
 	ASSERT_EQ(sl::parse("", usual), "");
@@ -681,6 +691,10 @@ TEST(ShotLighting, AKeyAFillAndARimLightTheSubjectFromTheCamera) {
 	const std::size_t to = lit.find("\"point3 to\" [ ");
 	ASSERT_NE(to, std::string::npos);
 	EXPECT_NEAR(std::atof(lit.c_str() + to + 14), 2.0, 0.3) << "aimed at ann (pbrt's x 2), not at what the camera looks at";
+	EXPECT_NE(lit.find("\"string linkgroup\" \"cast/ann\""), std::string::npos) << "ann's shapes are in her own group under \"cast\" (what `only cast` lights)";
+	ff::DataFilm castOnly;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 8\ncharacter ann person at 2 0 0\nshot 0 A\n key 0 1 5  0 1 0\n lighting rim 1 only cast on ann\n", castOnly), "");
+	EXPECT_NE(castOnly.sceneAt(2.0).find("\"string illuminates\" [ \"cast\" ]"), std::string::npos) << "the shot's lights light the characters alone";
 	ff::DataFilm bad;
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 8\nlighting\n", bad).find("belongs to a shot"), std::string::npos);
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 8\nshot 0 A\n key 0 1 5  0 1 0\n lighting on nobody\n", bad).find("nobody"), std::string::npos);
@@ -1219,4 +1233,143 @@ TEST(FilmFile, PipAPersonAndTheTurtleWalkTurnACornerWithFeetThatStayPutAndActWit
 	ff::DataFilm bad;
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 12\ncharacter c person scale 2\n", bad).find("a person cannot be scaled"), std::string::npos);
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 12\ncharacter c pip scale 0\n", bad).find("above 0"), std::string::npos);
+}
+
+// ---- cartoon marks (`mark`: film_marks.h, drawn by screen_marks.h) ----
+
+namespace {
+std::vector<screen_marks::Mark> marksOf(const std::string &frame) {   // the frame's `# @rt-mark` lines (they come before WorldBegin)
+	std::vector<screen_marks::Mark> out;
+	std::istringstream in(frame);
+	std::string line;
+	while (std::getline(in, line) && line.rfind("WorldBegin", 0) != 0) {
+		screen_marks::Mark m;
+		if (line.rfind("# @rt-mark ", 0) == 0 && screen_marks::parse(line.substr(11), m)) out.push_back(m);
+	}
+	return out;
+}
+}  // namespace
+
+TEST(FilmFile, MarksFollowTheirCharacterAndComeAndGoAtTheirTimes) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 10\ncharacter pip pip at 0 0 0\nwalk pip 5 1.2  -3 0\nmark pip ! 1\nmark pip speed 1 8\nmark at 1 0.5 0 impact 2 colour red\n"
+					   "mark pip heart 3 4 size 2\nshot 0 A\n key 0 1 5  0 1 0\n", film), "");
+	const std::vector<screen_marks::Mark> at1 = marksOf(film.sceneAt(1.5));
+	ASSERT_EQ(at1.size(), 1u) << "the exclamation mark; no speed lines while Pip stands still";
+	EXPECT_EQ(at1[0].kind, "exclaim");
+	EXPECT_NEAR(at1[0].age, 0.5, 1e-3);
+	EXPECT_GT(at1[0].y, -0.2) << "over Pip's head (the camera looks down at it from 5 m)";
+	EXPECT_TRUE(marksOf(film.sceneAt(3.5)).size() == 1u && marksOf(film.sceneAt(3.5))[0].kind == "heart") << "the ! has gone (1.8 s), the heart is up";
+	const std::vector<screen_marks::Mark> at2 = marksOf(film.sceneAt(2.1));
+	const auto impact = std::find_if(at2.begin(), at2.end(), [](const screen_marks::Mark &m) { return m.kind == "impact"; });
+	ASSERT_NE(impact, at2.end());
+	EXPECT_NEAR(impact->colour[0], 0.78, 1e-3) << "its colour from the film's palette";
+	EXPECT_LT(impact->x, 0.0) << "pbrt's +x is the picture's left from this camera (story space mirrors it)";
+	const std::vector<screen_marks::Mark> walking = marksOf(film.sceneAt(6.0));
+	const auto speed = std::find_if(walking.begin(), walking.end(), [](const screen_marks::Mark &m) { return m.kind == "speed"; });
+	ASSERT_NE(speed, walking.end()) << "Pip walks from 5 s: the lines are there";
+	EXPECT_LT(std::cos(speed->angle), -0.9) << "walking to pbrt's -x (the picture's right), its lines trail to the left";
+	EXPECT_TRUE(film.sceneAt(1.5).find("# @rt-mark") < film.sceneAt(1.5).find("WorldBegin"));
+
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nmark nobody ! 1\n", bad).find("`mark` needs the name of a character"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\ncharacter pip pip\nmark pip wave 1\n", bad).find("kinds:"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nmark at 0 0 0 speed 1 2\n", bad).find("speed lines go behind a character"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\ncharacter pip pip\nmark pip ! 3 2\n", bad).find("end comes after its start"), std::string::npos);
+}
+
+TEST(FilmFile, AMarkIsDrawnAsColourInsideInkOverThePictureAndNowhereElse) {
+	const int w = 200, h = 120;
+	std::vector<float> img(static_cast<std::size_t>(w) * h * 3, 0.5f);
+	screen_marks::Mark m;
+	m.kind = "exclaim", m.x = 0.0, m.y = 0.0, m.size = 0.5, m.age = 0.6, m.life = 1.8;
+	screen_marks::defaultColour(m.kind, m.colour);
+	screen_marks::draw(img.data(), w, h, {m});
+	const auto px = [&](int x, int y) { return &img[(static_cast<std::size_t>(y) * w + x) * 3]; };
+	EXPECT_GT(px(100, 50)[0], 0.9f) << "the bar's middle: yellow";
+	EXPECT_LT(px(100, 50)[2], 0.4f);
+	int inked = 0, untouched = 0;
+	for (int x = 80; x < 100; ++x) inked += px(x, 52)[0] < 0.15f ? 1 : 0;   // (left of the bar: its outline)
+	EXPECT_GT(inked, 0) << "a dark ink outline round it";
+	for (int y = 0; y < h; ++y)
+		for (int x = 0; x < w; ++x) untouched += (x < 60 || x > 140) && px(x, y)[0] == 0.5f ? 1 : 0;
+	EXPECT_EQ(untouched, (60 + 59) * h) << "nothing away from it changes";
+
+	screen_marks::Mark heart = m;
+	heart.kind = "heart", heart.age = 0.3;
+	screen_marks::Mark later = heart;
+	later.age = 1.2;
+	const auto top = [](const screen_marks::Drawing &d) {
+		double y = -1e9;
+		for (const auto &f : d.fills)
+			for (const auto &p : f) y = std::max(y, p.y);
+		return y;
+	};
+	EXPECT_GT(top(screen_marks::shapeOf(later)), top(screen_marks::shapeOf(heart)) + 0.15) << "a heart floats up";
+	screen_marks::Mark gone = m;
+	gone.age = gone.life;
+	EXPECT_TRUE(screen_marks::shapeOf(gone).fills.empty()) << "and a mark has shrunk away at the end of its life";
+}
+
+// ---- cloth (`cloth`: film_cloth.h) ----
+
+TEST(FilmCloth, AFlagFliesOutInTheWindAndHangsWithoutIt) {
+	namespace cl = cartoon::cloth;
+	cl::Cloth flag;
+	flag.kind = "flag", flag.at = {0.0, 3.0, 0.0}, flag.width = 1.0, flag.height = 0.6, flag.line = 1;
+	cl::World windy;
+	windy.wind = {5.0, 0.0, 0.0};
+	const cl::State flying = cl::simulate("test-flag-windy", flag, windy, 2.0);
+	double farX = 0.0;
+	for (int i = 0; i < flying.nx; ++i) farX += flying.x[static_cast<std::size_t>((flying.ny - 1) * flying.nx + i)].x / flying.nx;
+	EXPECT_GT(farX, 0.7) << "its free edge is blown out along the wind";
+	for (int i = 0; i < flying.nx; ++i) EXPECT_EQ(flying.x[static_cast<std::size_t>(i)].x, 0.0) << "the edge on the pole stays on it";
+	const cl::State still = cl::simulate("test-flag-still", flag, cl::World{}, 2.0);
+	double stillX = 0.0, lowest = 1e9;
+	for (int i = 0; i < still.nx; ++i) stillX = std::max(stillX, still.x[static_cast<std::size_t>((still.ny - 1) * still.nx + i)].x);
+	for (const cartoon::Vec3 &p : still.x) lowest = std::min(lowest, p.y);
+	EXPECT_LT(stillX, 0.35) << "with no wind it hangs down the pole";
+	EXPECT_LT(lowest, 3.0 - 0.6 - 0.4);
+	// the weave keeps its length: no link stretched by more than a tenth
+	const double cell = 0.6 / (flying.nx - 1);
+	for (int j = 0; j < flying.ny; ++j)
+		for (int i = 0; i + 1 < flying.nx; ++i)
+			EXPECT_LT(cartoon::length(flying.x[static_cast<std::size_t>(j * flying.nx + i + 1)] - flying.x[static_cast<std::size_t>(j * flying.nx + i)]), 1.1 * cell);
+}
+
+TEST(FilmCloth, ASheetLetGoFallsOverTheBoxAndOntoTheGroundTheSameWhateverTheOrderOfTheFrames) {
+	namespace cl = cartoon::cloth;
+	cl::Cloth sheet;
+	sheet.kind = "sheet", sheet.at = {0.0, 1.5, 0.0}, sheet.width = 2.0, sheet.height = 2.0, sheet.drop = 0.5, sheet.line = 2;
+	sheet.over.push_back({{0.0, 0.4, 0.0}, {0.8, 0.8, 0.8}});
+	const cl::State held = cl::simulate("test-sheet-a", sheet, cl::World{}, 0.4);
+	for (const cartoon::Vec3 &p : held.x) EXPECT_NEAR(p.y, 1.5, 1e-9) << "held flat until it is let go";
+	const cl::State fallen = cl::simulate("test-sheet-a", sheet, cl::World{}, 4.0);   // (on from 0.4 s)
+	const cartoon::Vec3 middle = fallen.x[static_cast<std::size_t>((fallen.ny / 2) * fallen.nx + fallen.nx / 2)];
+	EXPECT_NEAR(middle.y, 0.8, 0.05) << "its middle lies on the box's top";
+	for (const cartoon::Vec3 &p : fallen.x) {
+		EXPECT_GE(p.y, -1e-6) << "nothing through the ground";
+		EXPECT_FALSE(std::fabs(p.x) < 0.39 && std::fabs(p.z) < 0.39 && p.y > 0.01 && p.y < 0.79) << "nothing inside the box";
+	}
+	EXPECT_LT(fallen.x.front().y, 0.4) << "its corners have fallen past the box's edge";
+	const cl::State fresh = cl::simulate("test-sheet-b", sheet, cl::World{}, 4.0);   // (from the start in one go)
+	ASSERT_EQ(fresh.x.size(), fallen.x.size());
+	for (std::size_t k = 0; k < fresh.x.size(); ++k) EXPECT_EQ(fresh.x[k].y, fallen.x[k].y) << "a frame is a function of its time";
+}
+
+TEST(FilmCloth, ClothLinesAreReadAndACapeHangsFromItsCharactersShoulders) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 6\ncharacter ann person at 0 0 0\nwalk ann 1 1.2  0 3\ncloth cape on ann colour red length 0.9\n"
+					   "cloth flag at 3 2.5 0 size 1 0.6 pole 2.5\ncloth sheet at 0 1.5 -3 drop 1 over 0 0.4 -3 1 0.8 1\nshot 0 A\n key 0 1 5  0 1 0\n", film), "");
+	const std::string frame = film.sceneAt(3.0);
+	EXPECT_NE(frame.find("# cloth: a cape"), std::string::npos);
+	EXPECT_NE(frame.find("# cloth: a flag"), std::string::npos);
+	EXPECT_NE(frame.find("# cloth: a sheet"), std::string::npos);
+	EXPECT_NE(frame.find("Shape \"cylinder\""), std::string::npos) << "the flag's pole";
+	EXPECT_EQ(frame.find("nan"), std::string::npos);
+	EXPECT_EQ(frame.find("inf "), std::string::npos);
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 6\ncloth cape on nobody\n", bad).find("a cape goes `on` a character"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 6\ncloth banner at 0 1 0\n", bad).find("cloth flag|curtain|sheet"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 6\ncloth flag at 0 1 0 drop 3\n", bad).find("\"drop\""), std::string::npos) << "a flag is not dropped";
 }

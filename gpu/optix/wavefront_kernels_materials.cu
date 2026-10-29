@@ -280,6 +280,7 @@ extern "C" __global__ void evaluate_materials(
 		if (!h.specular_bounce && h.depth > 0)
 			emitMis = wf_emitter_hit_mis_weight(h, spheres, quads, triangles, bilinearPatches, disks, cylinders,
 												lightIndices, lightKinds, aliasTable, numLights, lightBvh);
+		if (!light_link::covers(~h.notLit, h.prevLinkGroup)) emitMis = 0.0f;   // light linking (light_link.h): it does not light the surface the ray left
 		if (emitMis > 0.0f) {
 			// mat.twoSided (pbrt AreaLightSource "diffuse" "bool twosided") lets
 			// a light emit from both faces instead of gating on frontFace - see
@@ -316,8 +317,17 @@ extern "C" __global__ void evaluate_materials(
 				// NOT provably `SS(0.f)` if `throughput` were ever NaN/Inf (IEEE-754
 				// 0*NaN=NaN), so skip the multiply entirely rather than rely on
 				// multiplying by zero to cancel it out.
-				if (le.x > 0.0f || le.y > 0.0f || le.z > 0.0f)
-					radiance = radiance + (throughput * emitMis) * wf_lift_rgb_to_spectrum(le, swl, /*isIlluminant=*/true);
+				if (le.x > 0.0f || le.y > 0.0f || le.z > 0.0f) {
+					const SS lit = (throughput * emitMis) * wf_lift_rgb_to_spectrum(le, swl, /*isIlluminant=*/true);
+					radiance = radiance + lit;
+					// Light groups (wavefront_light_groups.h): the lamp's light goes to its group's picture now, filter-weighted as the flush below weights it
+					if (d_wf_light_group_fb && materials[h.materialIdx].lightGroupPlus1 > 0) {
+						auto gxyz = SampledSpectrumToXYZ(lit * h.filterWeight, swl, d_cie_x, d_cie_y, d_cie_z, kDevCIEMin, kDevCIENSamples);
+						float gr, gg, gb;
+						wf_xyz_to_linear_rgb(gxyz.x, gxyz.y, gxyz.z, gr, gg, gb);
+						wf_credit_light_group(materials[h.materialIdx].lightGroupPlus1 - 1, h.pixelIndex, gr, gg, gb, maxComponentValue);
+					}
+				}
 			}
 		}
 		// A lamp that also reflects (pbrt-v4: an AreaLightSource keeps the shape's Material, default diffuse 0.5; the builder stores the reflectance in
@@ -1668,7 +1678,7 @@ extern "C" __global__ void evaluate_materials(
 	// entry/exit surfaces) - see this function's own eventEta local comment.
 	// The radiance-mode eta^2 of a crossing goes into the throughput, not etaScale (see wavefront_kernels_materials_dielectric.cu).
 	attenuation = attenuation * (eventEta * eventEta);
-	wf_finish_material_scatter(effectiveMatType, matEta, h.materialIdx, (bool)h.any_nonspecular, glossyAlphaForNEE, glossyAlphaVForNEE, h.etaScale, h.filterWeight, maxComponentValue, normal, h.geomNormal, hit_point, h.objDpdu, seed,
+	wf_finish_material_scatter(effectiveMatType, matEta, h.materialIdx, h.linkGroup, (bool)h.any_nonspecular, glossyAlphaForNEE, glossyAlphaVForNEE, h.etaScale, h.filterWeight, maxComponentValue, normal, h.geomNormal, hit_point, h.objDpdu, seed,
 		throughput, radiance, swl, attenuation, scattered_dir, is_specular, brdf_pdf_override,
 		phaseWo, phaseG,
 		h.pixelIndex, h.depth,

@@ -76,6 +76,10 @@ extern "C" __global__ void __closesthit__quad() {
 	// see MaterialType::Mix's own comment (optix_types.h).
 	int matIdx = quad.materialIdx;
 	const MaterialData mat = resolve_mix_material(params.materials[matIdx], matIdx, hit_point, matIdx);
+	// Light linking (light_link.h): whether this hit's light reaches the surface the ray left, read before this hit reports its own group (payload p28),
+	// which the light sampling below reads as the receiver's.
+	const bool linkLit = link_lit_from_previous(mat);
+	link_report_group(mat);
 
 	// Determine front face
 	const bool front_face = dot(ray_dir, normal) < 0.0f;
@@ -168,6 +172,7 @@ extern "C" __global__ void __closesthit__quad() {
 	// p13-p15: explicit next-ray origin (flag==3 only - MaterialType::Subsurface's probe exit point)
 
 	// Always set emission (for all material types - non-lights have emission=0)
+	if (!linkLit) emission = make_float3(0.0f, 0.0f, 0.0f);   // light linking (light_link.h)
 	optixSetPayload_3(__float_as_uint(emission.x));
 	optixSetPayload_4(__float_as_uint(emission.y));
 	optixSetPayload_5(__float_as_uint(emission.z));
@@ -211,7 +216,7 @@ extern "C" __global__ void __closesthit__quad() {
 		// A lamp that also reflects: its own light, weighted against the light sampling (p13-p15, which only a subsurface exit otherwise uses; raygen adds it
 		// for flag 1). The input p12 (the arriving BSDF pdf) is read here, before this program overwrites it.
 		float3 lamp_le = make_float3(0.0f, 0.0f, 0.0f);
-		if (lamp_scatters(mat))
+		if (lamp_scatters(mat) && linkLit)
 			lamp_le = lamp_own_emission(material_emission(mat, front_face, uv_u, uv_v, hit_point), __uint_as_float(optixGetPayload_12()), quad_light_pdf());
 		// p12: BRDF PDF for MIS on the next bounce.
 		// Specular (Metal/Dielectric): 0 = no MIS (pbrt-v4 specularBounce pattern).

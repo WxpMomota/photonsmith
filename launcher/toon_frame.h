@@ -51,13 +51,14 @@ inline bool apply(const std::string &imagePath, int width, int height, const too
 	// its passes, from the scene as its file is now (a film's worker rewrites one scene file for each frame: the CPU would otherwise keep the first frame's)
 	cpu_reload_scene_file(sceneId.c_str());
 	const std::size_t count = static_cast<std::size_t>(w) * h;
-	std::vector<float> flat(count * 10);
-	if (const int err = cpu_render_aov_planes(w, h, 16, sceneId.c_str(), camX, camY, camZ, 0, flat.data()); err != 0) {
+	const std::size_t planeCount = style.needsIds() ? 12 : 10;   // (lines between materials or objects: the two ID planes too)
+	std::vector<float> flat(count * planeCount);
+	if (const int err = cpu_render_aov_planes(w, h, 16, sceneId.c_str(), camX, camY, camZ, 0, flat.data(), style.needsIds() ? 1 : 0); err != 0) {
 		why = "the passes could not be made (error " + std::to_string(err) + ")";
 		return false;
 	}
-	std::vector<std::vector<float>> planes(10);
-	for (std::size_t p = 0; p < 10; ++p) planes[p].assign(flat.begin() + static_cast<std::ptrdiff_t>(p * count), flat.begin() + static_cast<std::ptrdiff_t>((p + 1) * count));
+	std::vector<std::vector<float>> planes(planeCount);
+	for (std::size_t p = 0; p < planeCount; ++p) planes[p].assign(flat.begin() + static_cast<std::ptrdiff_t>(p * count), flat.begin() + static_cast<std::ptrdiff_t>((p + 1) * count));
 	// the look, on the linear picture
 	std::vector<float> rgb(count * 3);
 	for (std::size_t i = 0; i < rgb.size(); ++i) rgb[i] = static_cast<float>(toon_look::srgbToLinear(static_cast<double>(samples[i]) / maxValue));

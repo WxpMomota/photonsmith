@@ -137,6 +137,8 @@ struct SceneDescriptor {
     std::function<std::string()>                         missing_meshes_error;
     std::function<std::shared_ptr<sky_light>()>          build_sky;      // nullptr = flat bg
     std::function<std::shared_ptr<punctual_light_list>()> build_punct;   // nullptr = none
+    // Light groups (src/shared/light_groups.h): their names and the sky's group (-1: none); nullptr = no light groups
+    std::function<std::pair<std::vector<std::string>, int>()> light_groups;
     std::function<void(camera_t&)>                       setup_camera;   // nullptr = default perspective
 
     // Everything from here down through recommended_light_sampler is the
@@ -439,6 +441,10 @@ namespace pbrt_scene_registry {
         s.build_punct = [ensure]() -> std::shared_ptr<punctual_light_list> {
             pbrt_cpu::BuildResult& b = ensure();
             return b.punctLights;
+        };
+        s.light_groups = [ensure]() -> std::pair<std::vector<std::string>, int> {
+            pbrt_cpu::BuildResult& b = ensure();
+            return {b.lightGroupNames, b.skyLightGroup};
         };
         // nullptr unless the file declared a MediumInterface before its
         // Camera directive - see pbrt_cpu_builder.h's build() for how

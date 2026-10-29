@@ -57,6 +57,8 @@ __device__ __forceinline__ float mix_branch_hash01(const float3& p) {
 __device__ __forceinline__ MaterialData resolve_mix_material(MaterialData mat, int matIdx,
 															  const float3& hit_point, int& outMatIdx) {
 	constexpr int kMaxMixDepth = 8;
+	const int linkGroup = mat.linkGroup;   // (light linking: the shape's group and light are the hit material's, whichever material the mix picks)
+	const unsigned long long notLit = mat.notLit;
 	for (int depth = 0; mat.type == MaterialType::Mix && depth < kMaxMixDepth; ++depth) {
 		const float w = mat.mix_extra.mixWeight;
 		const float h = mix_branch_hash01(hit_point);
@@ -66,6 +68,8 @@ __device__ __forceinline__ MaterialData resolve_mix_material(MaterialData mat, i
 		mat = params.materials[subIdx];
 	}
 	outMatIdx = matIdx;
+	mat.linkGroup = linkGroup;
+	mat.notLit = notLit;
 	return mat;
 }
 
@@ -73,6 +77,8 @@ __device__ __forceinline__ MaterialData resolve_mix_material(MaterialData mat, i
 // material is); the other shapes resolve with the image's mean (mix_extra.mixWeight), above.
 __device__ __forceinline__ MaterialData resolve_mix_material(MaterialData mat, int matIdx, const float3& hit_point, float uv_u, float uv_v, int& outMatIdx) {
 	constexpr int kMaxMixDepth = 8;
+	const int linkGroup = mat.linkGroup;   // (light linking: the shape's group and light are the hit material's, whichever material the mix picks)
+	const unsigned long long notLit = mat.notLit;
 	for (int depth = 0; mat.type == MaterialType::Mix && depth < kMaxMixDepth; ++depth) {
 		float w = mat.mix_extra.mixWeight;
 		if (mat.mixAmountTexIdx >= 0) w = fminf(1.0f, fmaxf(0.0f, mat.mixAmountTexScale * sample_texture(mat.mixAmountTexIdx, uv_u, uv_v, hit_point).x));
@@ -83,6 +89,8 @@ __device__ __forceinline__ MaterialData resolve_mix_material(MaterialData mat, i
 		mat = params.materials[subIdx];
 	}
 	outMatIdx = matIdx;
+	mat.linkGroup = linkGroup;
+	mat.notLit = notLit;
 	return mat;
 }
 

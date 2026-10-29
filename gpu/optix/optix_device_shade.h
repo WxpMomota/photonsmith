@@ -57,7 +57,7 @@ __device__ __forceinline__ void shade_lambertian(ShadeState& s) {
 	// Add direct lighting via explicit light sampling (Next Event Estimation)
 	{
 		float3 to_light, sampled_light_emission; float max_dist, light_pdf;
-		if (sample_nee_light(hit_point, seed, to_light, sampled_light_emission, max_dist, light_pdf, optixGetRayTime())) {
+		if (sample_nee_light(hit_point, seed, to_light, sampled_light_emission, max_dist, light_pdf, optixGetRayTime(), current_link_group())) {
 			// Check if light is visible (shadow ray)
 			bool visible = trace_shadow_ray_stochastic(hit_point, to_light, max_dist, seed, nee_shadow_rgb);
 
@@ -205,7 +205,7 @@ __device__ __forceinline__ void shade_measured(ShadeState& s) {
 
 	{
 		float3 to_light, sampled_light_emission; float max_dist, light_pdf;
-		if (sample_nee_light(hit_point, seed, to_light, sampled_light_emission, max_dist, light_pdf, optixGetRayTime())) {
+		if (sample_nee_light(hit_point, seed, to_light, sampled_light_emission, max_dist, light_pdf, optixGetRayTime(), current_link_group())) {
 			float llx, lly, llz;
 			m_frame.to_local(to_light.x, to_light.y, to_light.z, llx, lly, llz);
 			float fr, fg, fb, brdf_pdf;
@@ -223,6 +223,7 @@ __device__ __forceinline__ void shade_measured(ShadeState& s) {
 	for (unsigned int pi = 0; pi < params.numPunctualLights; ++pi) {
 		float3 wi_p, Li_p; float t_max_p;
 		if (!eval_punctual_light(params.punctualLights[pi], hit_point, wi_p, Li_p, t_max_p)) continue;
+		if (!light_link::covers(~params.punctualLights[pi].notLit, current_link_group())) continue;   // light linking (light_link.h)
 		float plx, ply, plz;
 		m_frame.to_local(wi_p.x, wi_p.y, wi_p.z, plx, ply, plz);
 		if (plz <= 0.0f) continue;
@@ -230,7 +231,7 @@ __device__ __forceinline__ void shade_measured(ShadeState& s) {
 		if (!gpu_measured_f_pdf(m_tab, m_tab.isotropic != 0,
 				params.measuredParamValues, params.measuredData, params.measuredMcdf, params.measuredCcdf,
 				m_wox, m_woy, m_woz, plx, ply, plz, fr, fg, fb, brdf_pdf)) continue;
-		if (trace_shadow_ray_stochastic(hit_point, wi_p, t_max_p, seed, nee_shadow_rgb)) {
+		if (trace_shadow_ray_stochastic(hit_point, wi_p, t_max_p, seed, nee_shadow_rgb, params.punctualLights[pi].notShadowing)) {
 			emission = emission + make_float3(fr, fg, fb) * Li_p * plz * (camera_medium_shadow_trans(t_max_p) * nee_shadow_rgb);
 		}
 	}
@@ -521,7 +522,7 @@ __device__ __forceinline__ void shade_conductor(ShadeState& s) {
 
 		{
 			float3 to_light, sampled_light_emission; float max_dist, light_pdf;
-			if (sample_nee_light(hit_point, seed, to_light, sampled_light_emission, max_dist, light_pdf, optixGetRayTime())) {
+			if (sample_nee_light(hit_point, seed, to_light, sampled_light_emission, max_dist, light_pdf, optixGetRayTime(), current_link_group())) {
 				float llx = dot(to_light, ctan), lly = dot(to_light, cbitan), llz = dot(to_light, cn);
 				if (llz > 0.0f && trace_shadow_ray_stochastic(hit_point, to_light, max_dist, seed, nee_shadow_rgb)) {
 					float fr, fg, fb;
@@ -537,9 +538,10 @@ __device__ __forceinline__ void shade_conductor(ShadeState& s) {
 		for (unsigned int pi = 0; pi < params.numPunctualLights; ++pi) {
 			float3 wi_p, Li_p; float t_max_p;
 			if (!eval_punctual_light(params.punctualLights[pi], hit_point, wi_p, Li_p, t_max_p)) continue;
+			if (!light_link::covers(~params.punctualLights[pi].notLit, current_link_group())) continue;   // light linking (light_link.h)
 			float plx = dot(wi_p, ctan), ply = dot(wi_p, cbitan), plz = dot(wi_p, cn);
 			if (plz <= 0.0f) continue;
-			if (trace_shadow_ray_stochastic(hit_point, wi_p, t_max_p, seed, nee_shadow_rgb)) {
+			if (trace_shadow_ray_stochastic(hit_point, wi_p, t_max_p, seed, nee_shadow_rgb, params.punctualLights[pi].notShadowing)) {
 				float fr, fg, fb;
 				c_bxdf.f(cwi_x, cwi_y, cwi_z, plx, ply, plz, fr, fg, fb);
 				emission = emission + make_float3(fr, fg, fb) * Li_p * plz * (camera_medium_shadow_trans(t_max_p) * nee_shadow_rgb);
@@ -628,7 +630,7 @@ __device__ __forceinline__ void shade_rough_metal(ShadeState& s) {
 
 		{
 			float3 to_light, sampled_light_emission; float max_dist, light_pdf;
-			if (sample_nee_light(hit_point, seed, to_light, sampled_light_emission, max_dist, light_pdf, optixGetRayTime())) {
+			if (sample_nee_light(hit_point, seed, to_light, sampled_light_emission, max_dist, light_pdf, optixGetRayTime(), current_link_group())) {
 				float llx = dot(to_light, rmtan), lly = dot(to_light, rmbitan), llz = dot(to_light, rmn);
 				if (llz > 0.0f && trace_shadow_ray_stochastic(hit_point, to_light, max_dist, seed, nee_shadow_rgb)) {
 					float fr, fg, fb;
@@ -644,9 +646,10 @@ __device__ __forceinline__ void shade_rough_metal(ShadeState& s) {
 		for (unsigned int pi = 0; pi < params.numPunctualLights; ++pi) {
 			float3 wi_p, Li_p; float t_max_p;
 			if (!eval_punctual_light(params.punctualLights[pi], hit_point, wi_p, Li_p, t_max_p)) continue;
+			if (!light_link::covers(~params.punctualLights[pi].notLit, current_link_group())) continue;   // light linking (light_link.h)
 			float plx = dot(wi_p, rmtan), ply = dot(wi_p, rmbitan), plz = dot(wi_p, rmn);
 			if (plz <= 0.0f) continue;
-			if (trace_shadow_ray_stochastic(hit_point, wi_p, t_max_p, seed, nee_shadow_rgb)) {
+			if (trace_shadow_ray_stochastic(hit_point, wi_p, t_max_p, seed, nee_shadow_rgb, params.punctualLights[pi].notShadowing)) {
 				float fr, fg, fb;
 				rm_bxdf.f(rmwi_x, rmwi_y, rmwi_z, plx, ply, plz, fr, fg, fb);
 				emission = emission + make_float3(fr, fg, fb) * Li_p * plz * (camera_medium_shadow_trans(t_max_p) * nee_shadow_rgb);
@@ -746,7 +749,7 @@ __device__ __forceinline__ void shade_diffuse_transmission(ShadeState& s) {
 
 		{
 			float3 to_light, sampled_light_emission; float max_dist, light_pdf;
-			if (sample_nee_light(hit_point, seed, to_light, sampled_light_emission, max_dist, light_pdf, optixGetRayTime())) {
+			if (sample_nee_light(hit_point, seed, to_light, sampled_light_emission, max_dist, light_pdf, optixGetRayTime(), current_link_group())) {
 				const float llz = dot(to_light, normal);
 				if (llz != 0.0f && trace_shadow_ray_stochastic(hit_point, to_light, max_dist, seed, nee_shadow_rgb_dt)) {
 					const float3 f_l = ((llz > 0.0f) ? R : T_col) * kInvPi;
@@ -761,9 +764,10 @@ __device__ __forceinline__ void shade_diffuse_transmission(ShadeState& s) {
 		for (unsigned int pi = 0; pi < params.numPunctualLights; ++pi) {
 			float3 wi_p, Li_p; float t_max_p;
 			if (!eval_punctual_light(params.punctualLights[pi], hit_point, wi_p, Li_p, t_max_p)) continue;
+			if (!light_link::covers(~params.punctualLights[pi].notLit, current_link_group())) continue;   // light linking (light_link.h)
 			const float plz = dot(wi_p, normal);
 			if (plz == 0.0f) continue;
-			if (trace_shadow_ray_stochastic(hit_point, wi_p, t_max_p, seed, nee_shadow_rgb_dt)) {
+			if (trace_shadow_ray_stochastic(hit_point, wi_p, t_max_p, seed, nee_shadow_rgb_dt, params.punctualLights[pi].notShadowing)) {
 				const float3 f_p = ((plz > 0.0f) ? R : T_col) * kInvPi;
 				emission = emission + f_p * Li_p * fabsf(plz) * (camera_medium_shadow_trans(t_max_p) * nee_shadow_rgb_dt);
 			}

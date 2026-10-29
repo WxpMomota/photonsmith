@@ -370,6 +370,11 @@ public:
 	///        enableProbeCache() above.
 	void setActivePixelMask(const unsigned char* mask) { activePixelMaskHost_ = mask; }
 
+	/// @brief Light groups (src/shared/light_groups.h): how many the scene has (0: none) and the sky's group (-1: none) - the wavefront renderer then also draws
+	///        each group's picture, which lightGroupPixels() gives after render() (null on the default renderer, or with none). Forwarded inside render().
+	void setLightGroups(int count, int skyGroup) { lightGroupCount_ = count; skyLightGroup_ = skyGroup; }
+	const std::vector<float>* lightGroupPixels() const;
+
 	/// @brief Sets SVGF's advanced tuning constants (gpu/optix/
 	///        svgf_tuning_params.h) - formerly hardcoded kSvgf* literals in
 	///        wavefront_kernels_svgf.cu. Forwarded to wavefrontTracer_ inside
@@ -813,6 +818,7 @@ private:
 	unsigned int temporalJitterBaseIndex_ = 0;
 	bool neuralUpscaleEnabled_ = false;             ///< See enableNeuralUpscale()
 	const unsigned char* activePixelMaskHost_ = nullptr;  ///< See setActivePixelMask()
+	int lightGroupCount_ = 0, skyLightGroup_ = -1;        ///< See setLightGroups()
 
 	// Punctual (delta) lights: point/spot/distant. Separate from the area
 	// lights above - evaluated deterministically, not via the alias table.

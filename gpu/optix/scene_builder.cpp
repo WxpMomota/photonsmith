@@ -945,6 +945,12 @@ static void apply_loaded_scene_settings(const char* path,
 	// (wavefront_medium_shapes.h); the default renderer only where a ray meets its boundary, so a ray that entered went through the ground and the
 	// objects inside, and a ray starting inside one (the camera's, or a bounce off something in it) saw no fog before the first surface. A volume with
 	// nothing inside it stays with the default renderer, which draws it right (and per colour channel where the wavefront renderer is spectral).
+	scene.lightGroupNames = loaded.scene.lightGroups;
+	scene.skyLightGroup = loaded.scene.skyLightGroup;
+	if (!scene.needsWavefront && !scene.lightGroupNames.empty()) {
+		scene.needsWavefront = true;
+		scene.needsWavefrontReason = "the scene has light groups (a pass per group of lights)";
+	}
 	if (!scene.needsWavefront && something_inside_a_volume(builtScene, loaded.scene.camera.lookfrom)) {
 		scene.needsWavefront = true;
 		scene.needsWavefrontReason = "the camera or a surface is inside a fog, smoke or cloud volume";

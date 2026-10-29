@@ -194,6 +194,7 @@ extern "C" __global__ void nrc_generate_training_rays(
 	item.filterWeight = 1.0f;
 	item.brdf_pdf = 0.0f;
 	item.scatterOrigin = item.origin;
+	item.prevLinkGroup = -1;   // (the camera sees every light: light_link.h)
 	item.tMin = 0.001f;
 	item.tMax = 1e30f;
 	item.mediaTMin = 0.0f;
@@ -286,6 +287,7 @@ extern "C" __global__ void nrc_training_shade_simple(
 	next.filterWeight = 1.0f;
 	next.brdf_pdf = 0.0f;
 	next.scatterOrigin = h.hitPoint;
+	next.prevLinkGroup = h.linkGroup;   // (light linking: light_link.h)
 	next.tMin = 0.001f;
 	next.tMax = 1e30f;
 	next.mediaTMin = 0.0f;
@@ -410,6 +412,7 @@ extern "C" __global__ void nrc_training_shade_full(
 	next.filterWeight = 1.0f;
 	next.brdf_pdf = sample.pdf;
 	next.scatterOrigin = h.hitPoint;
+	next.prevLinkGroup = h.linkGroup;   // (light linking: light_link.h)
 	next.tMin = 0.001f;
 	next.tMax = 1e30f;
 	next.mediaTMin = 0.0f;

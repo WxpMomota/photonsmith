@@ -147,3 +147,109 @@ TEST(ToonLook, ItsStyleIsReadFromAScenesLineAndAFilmWritesOneIntoEveryFrame) {
 	std::ofstream(d / "bad.film") << "scene s.pbrt\nlength 4\ntoon bands 1\n";
 	EXPECT_NE(bad.load((d / "bad.film").string()).find("bad.film:3:"), std::string::npos);
 }
+
+// Lines from the geometry, as Blender's Line Art draws them: where one material meets another and where one object meets another with no depth jump (the ID passes), and
+// the lines inside a shape thinner than its outline. Off unless asked, so a film's toon frames keep their look.
+TEST(ToonLook, LinesWhereMaterialsOrObjectsMeetAndThinnerInnerLines) {
+	const int w = 64, h = 64;
+	auto passes = flatPasses(w, h, 0.6f, 5.0f);   // one flat surface facing the camera: no depth jump, no crease
+	passes.push_back(std::vector<float>(static_cast<std::size_t>(w) * h, 1.0f));   // id.object
+	passes.push_back(std::vector<float>(static_cast<std::size_t>(w) * h, 7.0f));   // id.material
+	for (int y = 0; y < h; ++y)
+		for (int x = w / 2; x < w; ++x) passes[11][static_cast<std::size_t>(y) * w + x] = 8.0f;   // another material on the right half
+	for (int y = h / 2; y < h; ++y)
+		for (int x = 0; x < w; ++x) passes[10][static_cast<std::size_t>(y) * w + x] = 2.0f;   // another object in the bottom half
+	toon_look::Style st;
+	st.on = true;
+	st.lines = 2.0 * 1080.0 / h;
+	st.saturation = 1.0;
+	const auto run = [&](const toon_look::Style &s) {
+		std::vector<float> rgb(static_cast<std::size_t>(w) * h * 3, 0.3f);
+		toon_look::apply(rgb, w, h, passes, s);
+		return rgb;
+	};
+	const auto at = [&](const std::vector<float> &rgb, int x, int y) { return rgb[(static_cast<std::size_t>(y) * w + x) * 3]; };
+	const std::vector<float> plain = run(st);
+	EXPECT_GT(at(plain, w / 2, 10), 0.2) << "by default no line where the materials meet";
+	EXPECT_GT(at(plain, 10, h / 2), 0.2);
+	EXPECT_FALSE(st.needsIds());
+
+	toon_look::Style mats = st;
+	ASSERT_EQ(toon_look::parse("materials on", mats), "");
+	EXPECT_TRUE(mats.needsIds());
+	const std::vector<float> m = run(mats);
+	EXPECT_LT(std::min(at(m, w / 2 - 1, 10), at(m, w / 2, 10)), 0.05) << "a line where the materials meet";
+	EXPECT_GT(at(m, 10, h / 2), 0.2) << "not where only the object changes";
+	EXPECT_GT(at(m, 10, 10), 0.2) << "nor on a surface of one material";
+
+	toon_look::Style objs = st;
+	ASSERT_EQ(toon_look::parse("objects on", objs), "");
+	const std::vector<float> o = run(objs);
+	EXPECT_LT(std::min(at(o, 10, h / 2 - 1), at(o, 10, h / 2)), 0.05) << "a line where the objects meet with no depth jump (an intersection)";
+	EXPECT_GT(at(o, w / 2, 10), 0.2);
+
+	// inner lines half as wide as the outline: the material line is narrower than it is with inner 1 (lines 8 pixels wide here, above the thinnest a stroke is drawn)
+	toon_look::Style wideMats = mats;
+	wideMats.lines = 8.0 * 1080.0 / h;
+	toon_look::Style thin = wideMats;
+	ASSERT_EQ(toon_look::parse("inner 0.5", thin), "");
+	const std::vector<float> full = run(wideMats), t = run(thin);
+	int wide = 0, narrow = 0;
+	for (int x = 0; x < w; ++x) {
+		wide += at(full, x, 10) < 0.15f;
+		narrow += at(t, x, 10) < 0.15f;
+	}
+	EXPECT_LT(narrow, wide) << "inner 0.5 draws the inside lines thinner";
+	EXPECT_GT(narrow, 0);
+
+	// the scene line carries the new words only when they are set
+	EXPECT_EQ(toon_look::tagOf(st).find("materials"), std::string::npos);
+	toon_look::Style tagged = mats;   // (lines 2: a width a scene's line may have)
+	tagged.inner = 0.5;
+	tagged.lines = 2.0;
+	EXPECT_NE(toon_look::tagOf(tagged).find("inner 0.5 materials on"), std::string::npos);
+	toon_look::Style back;
+	ASSERT_EQ(toon_look::parse(toon_look::tagOf(tagged).substr(10), back), "");
+	EXPECT_TRUE(back.materials);
+	EXPECT_EQ(back.inner, 0.5);
+}
+
+// Cel shading per material, as Blender's NPR materials ramp it: a material's (or object's) own bands, its shadows tinted, a flat highlight - the rest of the picture keeps
+// the picture's ramp.
+TEST(ToonLook, AMaterialHasItsOwnRampTintedShadowsAndAHighlight) {
+	const int w = 200, h = 8;
+	auto passes = flatPasses(w, h, 0.5f, 3.0f);
+	const float skin = cryptomatte::idToFloat(cryptomatte::murmur3_32("skin")), cloth = cryptomatte::idToFloat(cryptomatte::murmur3_32("cloth"));
+	passes.push_back(std::vector<float>(static_cast<std::size_t>(w) * h, 0.0f));   // id.object
+	passes.push_back(std::vector<float>(static_cast<std::size_t>(w) * h, cloth));  // id.material: cloth, and skin in the bottom half
+	for (int y = h / 2; y < h; ++y)
+		for (int x = 0; x < w; ++x) passes[11][static_cast<std::size_t>(y) * w + x] = skin;
+	std::vector<float> ramp(static_cast<std::size_t>(w) * h * 3);
+	for (int y = 0; y < h; ++y)
+		for (int x = 0; x < w; ++x)
+			for (int c = 0; c < 3; ++c) ramp[(static_cast<std::size_t>(y) * w + x) * 3 + c] = 0.5f * (x + 0.5f) / w;   // the same ramp of light on both
+	toon_look::Style st;
+	ASSERT_EQ(toon_look::parse("bands 3 lines 0 saturation 1 material skin bands 2 shadow 0.5 shadow-tint #4060ff highlight 0.9 highlight-colour #ffffff", st), "");
+	ASSERT_EQ(st.ramps.size(), 1u);
+	EXPECT_TRUE(st.needsIds());
+	std::vector<float> rgb = ramp;
+	toon_look::apply(rgb, w, h, passes, st);
+	const auto px = [&](int x, int y, int c) { return rgb[(static_cast<std::size_t>(y) * w + x) * 3 + c]; };
+	const int sixty = static_cast<int>(0.6 * w);   // at 60% of the light: the skin (two bands) already in its bright band, the cloth (three) in its middle one
+	EXPECT_GT(px(sixty, h - 2, 0), 1.3f * px(sixty, 1, 0)) << "the skin has its own two bands, the cloth the picture's three";
+	EXPECT_GT(px(5, h - 2, 2), 1.5f * px(5, h - 2, 0)) << "the skin's shadow is tinted blue";
+	EXPECT_NEAR(px(5, 1, 2), px(5, 1, 0), 0.02f) << "the cloth's shadow is not";
+	EXPECT_NEAR(px(w - 2, h - 2, 0), px(w - 2, h - 2, 2), 0.02f) << "the skin's brightest end is the white highlight";
+	EXPECT_GT(px(w - 2, h - 2, 1), px(w - 2, 1, 1)) << "brighter than the cloth's top band";
+
+	// the scene line keeps the ramp
+	toon_look::Style back;
+	ASSERT_EQ(toon_look::parse(toon_look::tagOf(st).substr(10), back), "");
+	ASSERT_EQ(back.ramps.size(), 1u);
+	EXPECT_EQ(back.ramps[0].name, "skin");
+	EXPECT_EQ(back.ramps[0].bands, 2);
+	EXPECT_NEAR(back.ramps[0].shadowTint[2], st.ramps[0].shadowTint[2], 1e-3);
+	EXPECT_EQ(back.ramps[0].highlight, 0.9);
+	EXPECT_EQ(toon_look::tagOf(toon_look::Style()).find("highlight"), std::string::npos) << "a style without them writes none of the new words";
+	EXPECT_NE(toon_look::parse("material skin lines 3", back).find("not a material's"), std::string::npos) << "a picture's word after a ramp is said";
+}

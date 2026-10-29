@@ -212,6 +212,9 @@ extern "C" __global__ void __raygen__wf_intersect() {
 		h.filterWeight    = ray.filterWeight;
 		h.brdf_pdf        = ray.brdf_pdf;
 		h.scatterOrigin   = ray.scatterOrigin;
+		h.prevLinkGroup   = ray.prevLinkGroup;
+		h.linkGroup       = wf_params.materials[h.materialIdx].linkGroup;   // (light linking: the hit's own material, before the Mix below)
+		h.notLit          = wf_params.materials[h.materialIdx].notLit;
 		h.time            = ray.time;
 		// Resolve Mix HERE, once, before routing - not in each consumer
 		// kernel. h.materialIdx is overwritten with the RESOLVED index, so
@@ -310,6 +313,7 @@ extern "C" __global__ void __raygen__wf_shadow() {
 	sp.seed = s.seed;
 	sp.tMax = s.tMax;
 	sp.chromatic = 0;
+	sp.notShadowing = s.notShadowing;   // (shadow linking: light_link.h)
 	for (int i = 0; i < kWFNWavelengths; ++i) {
 		sp.lambda[i] = s.wavelengths[i];
 		sp.tr[i] = 1.0f;

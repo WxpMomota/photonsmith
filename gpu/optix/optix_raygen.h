@@ -211,6 +211,9 @@ extern "C" __global__ void __raygen__rg() {
 		// crossing moves ray_origin but not this, so the emitter MIS pdf (hit programs, payload p25-p27) is evaluated
 		// from the vertex the light was actually sampled against - CPU's prev_surface_p, wavefront's scatterOrigin.
 		float3 mis_origin = ray_origin;
+		// Light linking (src/shared/light_link.h): that vertex's link group (payload p28: the hit programs read it to tell whether an emitter they are
+		// lights it, and write their own); ~0u is the camera, which sees every light.
+		unsigned int link_group = ~0u;
 
 		// maxDepth scattering vertices, then one more iteration (depth == maxDepth) that only collects what the last continuation ray sees: the
 		// MIS-weighted emission of a light it hits or of the sky it escapes to. That is pbrt-v4's PathIntegrator order (add Le, then test
@@ -301,6 +304,7 @@ extern "C" __global__ void __raygen__rg() {
 			unsigned int p24 = rgbChannel;
 			// p25-p27: mis_origin (INPUT only, read by the emitter hit programs - see its declaration above).
 			unsigned int p25 = __float_as_uint(mis_origin.x), p26 = __float_as_uint(mis_origin.y), p27 = __float_as_uint(mis_origin.z);
+			unsigned int p28 = link_group;   // IN: the last real vertex's link group; OUT: this hit's
 
 			optixTrace(
 				params.traversable,     // Acceleration structure
@@ -315,7 +319,7 @@ extern "C" __global__ void __raygen__rg() {
 				RAY_TYPE_COUNT,         // SBT stride
 				RAY_TYPE_RADIANCE,      // missSBTIndex
 				p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15,
-				p16, p17, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27
+				p16, p17, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27, p28
 			);
 
 			// Unpack payload (25 registers, p0-p24 - see the trace call above)
@@ -450,6 +454,7 @@ extern "C" __global__ void __raygen__rg() {
 					// hg_phase_material::scatter() leaving srec.eta at 1.0).
 					ray_origin = medium_point;
 					mis_origin = medium_point;
+					link_group = 0u;   // (a scatter in the camera's fog: in no group)
 					ray_direction = medium_dir;  // already normalized (sample_henyey_greenstein)
 					seed = medium_seed;
 					continue;
@@ -619,6 +624,7 @@ extern "C" __global__ void __raygen__rg() {
 
 				ray_origin = scatter_origin;
 				mis_origin = scatter_origin;
+				link_group = p28;
 				ray_direction = normalize(payload.scatterDir);  // MUST normalize!
 			} else {
 				// Absorbed — add any surface emission (e.g. background hit) then stop

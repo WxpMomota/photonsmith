@@ -251,6 +251,10 @@ struct MaterialDecl {
 	// materials are resolved after the whole file is read). MakeNamedMaterial fills it in; one still set at the end of the file is an error.
 	bool forwardRef = false;
 	int forwardLine = 0;
+	// Light linking (light_link.h): a copy of material `linkedFrom` (-2: pbrt's default material; -1: not a copy) made for the shapes of link group `linkGroup`
+	// (Scene::linkGroups[linkGroup - 1]), so that a renderer reads a hit's group from its material.
+	int linkGroup = 0;
+	int linkedFrom = -1;
 };
 
 struct TextureDecl {
@@ -530,6 +534,8 @@ struct Scene {
 	KdTreeAccelParams acceleratorKdParams;
 
 	std::vector<MaterialDecl> materials;
+	// The link groups' names (light_link.h), in the order the scene first names them: group g is linkGroups[g - 1] (group 0, "rest", is the shapes in none).
+	std::vector<std::string> linkGroups;
 	std::vector<TextureDecl> textures;
 	std::vector<LightDecl> lights;       // LightSource
 	std::vector<LightDecl> areaLights;   // AreaLightSource
@@ -890,6 +896,40 @@ private:
 
 	void warn(int line, const std::string &msg) {
 		s_.warnings.push_back({line, fileOf(pos_ ? pos_ - 1 : 0), msg});
+	}
+
+	// A shape's `"string linkgroup"` (light_link.h): the index of a copy of material `material` (-1: pbrt's default) for that group, made once per material and group.
+	int linkedMaterial(int material, const std::string &group) {
+		int g = 0;
+		for (std::size_t i = 0; i < s_.linkGroups.size() && g == 0; ++i)
+			if (s_.linkGroups[i] == group) g = static_cast<int>(i) + 1;
+		if (g == 0) {
+			if (group == "rest") return material;   // (the shapes in no group)
+			if (s_.linkGroups.size() >= 63) {
+				warn(0, "more than 63 link groups: \"" + group + "\" is left in none");
+				return material;
+			}
+			s_.linkGroups.push_back(group);
+			g = static_cast<int>(s_.linkGroups.size());
+		}
+		const int from = material >= 0 ? material : -2;
+		for (std::size_t i = 0; i < s_.materials.size(); ++i)
+			if (s_.materials[i].linkedFrom == from && s_.materials[i].linkGroup == g) return static_cast<int>(i);
+		MaterialDecl copy;
+		if (material >= 0) {
+			if (s_.materials[static_cast<std::size_t>(material)].forwardRef) {   // (named before it is made: a copy now would stay empty)
+				warn(0, "a linkgroup on a shape whose material is made later in the file is ignored (make the material first)");
+				return material;
+			}
+			copy = s_.materials[static_cast<std::size_t>(material)];
+			copy.name.clear();   // (not a second material of that name)
+		} else {
+			copy.type = "diffuse";   // pbrt's default material
+		}
+		copy.linkGroup = g;
+		copy.linkedFrom = from;
+		s_.materials.push_back(copy);
+		return static_cast<int>(s_.materials.size()) - 1;
 	}
 
 	bool readNumbers(int count, double *out, const std::string &directive) {
@@ -1351,6 +1391,7 @@ private:
 			sh.xform = gs_.ctm;
 			sh.xformEnd = gs_.ctmEnd;
 			sh.materialIndex = gs_.materialIndex;
+			if (const std::string link = sh.params.getString("linkgroup", ""); !link.empty()) sh.materialIndex = linkedMaterial(sh.materialIndex, link);
 			sh.areaLightIndex = gs_.areaLightIndex;
 			sh.insideMedium = gs_.insideMedium;
 			// The same medium on both sides is no boundary (pbrt-v4 makes a shape a medium transition only when the two differ). When that medium is the camera's own

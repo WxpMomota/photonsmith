@@ -308,7 +308,8 @@ int cpu_render_main_aovs(
 
 /// @brief The same passes as cpu_render_main_aovs, into memory: `out` holds 10 planes of width*height floats one after another (aov_pass::channelNames()'s order) - for
 /// the toon look (src/shared/toon_look.h), made from the picture and its passes in the run that rendered it. @return 0 on success, non-zero error code on failure
-int cpu_render_aov_planes(int width, int height, int spp, const char* scene_id, double cam_x, double cam_y, double cam_z, int force_camera_override, float* out);
+int cpu_render_aov_planes(int width, int height, int spp, const char* scene_id, double cam_x, double cam_y, double cam_z, int force_camera_override, float* out,
+                          int with_ids = 0);   // with_ids: two planes more, id.object and id.material (aov_pass.h renderIds) - `out` holds 12 planes then
 
 /// @brief Merges the channels of the EXR `passes_path` (see cpu_render_main_aovs) into the EXR `image_path`, writing the result over it: one multilayer EXR. A channel
 /// the image already has is kept. @return 0 on success; on failure non-zero with a message in `error_out`.

@@ -172,6 +172,11 @@ struct SceneData {
 	bool needsWavefront = false;
 	std::string needsWavefrontReason;
 
+	// Light groups (src/shared/light_groups.h): their names (none: no passes) and the sky's group (-1: none). Only the wavefront renderer splits the light, so a scene
+	// with groups needs it (needsWavefront).
+	std::vector<std::string> lightGroupNames;
+	int skyLightGroup = -1;
+
 	// Punctual (delta) lights: point/spot/distant. Separate from the area
 	// lights above - not geometry, evaluated deterministically every hit.
 	std::vector<PunctualLightGPU> punctualLights;

@@ -130,6 +130,11 @@ GpuCameraParams OptiXRenderer::makeRenderCamera(const GpuCameraParams& camera) {
 }
 
 // Hands the render to the wavefront path tracer: every setting this renderer holds is forwarded first.
+const std::vector<float>* OptiXRenderer::lightGroupPixels() const {
+	if (!isWavefrontActive() || wavefrontTracer_->lightGroupPixels().empty()) return nullptr;
+	return &wavefrontTracer_->lightGroupPixels();
+}
+
 bool OptiXRenderer::renderWavefront(unsigned int width, unsigned int height, unsigned int samplesPerPixel, unsigned int maxDepth,
 									 const GpuCameraParams& gpuCam, float* outputFramebuffer) {
 	// pbrt-v4's own "camera medium" (GpuCameraParams::cameraMediumSigmaT's own comment, optix_types.h) is real
@@ -143,6 +148,7 @@ bool OptiXRenderer::renderWavefront(unsigned int width, unsigned int height, uns
 	// shared with this class's denoise()).
 	wavefrontTracer_->setDenoiseEnabled(denoiseEnabled_);
 	wavefrontTracer_->setDenoiseBlend(denoiseBlend_);
+	wavefrontTracer_->setLightGroups(lightGroupCount_, skyLightGroup_);
 	wavefrontTracer_->setWorldPosOutputEnabled(worldPosOutputEnabled_);
 	wavefrontTracer_->setRestirEnabled(restirEnabled_);
 	wavefrontTracer_->setRestirGiEnabled(restirGiEnabled_);

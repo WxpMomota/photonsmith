@@ -371,7 +371,7 @@ extern "C" __global__ void evaluate_materials_dielectric(
 	// pbrt-v4's radiance-mode refraction: 1 / etap^2 = eventEta^2 goes into the throughput (an emitter or a camera inside glass reads as in pbrt), not into
 	// etaScale, which is for Russian roulette and now only holds what the throughput does not (the BSSRDF entry).
 	attenuation = attenuation * (eventEta * eventEta);
-	wf_finish_material_scatter(mat.type, matEta, h.materialIdx, (bool)h.any_nonspecular, glossyAlphaForNEE, glossyAlphaVForNEE, h.etaScale, h.filterWeight, maxComponentValue, normal, h.geomNormal, hit_point, h.objDpdu, seed,
+	wf_finish_material_scatter(mat.type, matEta, h.materialIdx, h.linkGroup, (bool)h.any_nonspecular, glossyAlphaForNEE, glossyAlphaVForNEE, h.etaScale, h.filterWeight, maxComponentValue, normal, h.geomNormal, hit_point, h.objDpdu, seed,
 		throughput, radiance, swl, attenuation, scattered_dir, is_specular, brdf_pdf_override,
 		phaseWo, phaseG,
 		h.pixelIndex, h.depth,

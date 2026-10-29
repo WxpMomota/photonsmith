@@ -49,6 +49,11 @@ struct PunctualLightGPU {
 	DistantLightData<float> distant;
 	GoniometricLightGPU gonio;
 	ProjectionLightGPU proj;
+	// Light linking (src/shared/light_link.h): the groups it does NOT light and the groups whose shapes do NOT cast its shadows (bit g: group g) - inverted, so that a
+	// zeroed light lights every group and is shadowed by every shape.
+	unsigned long long notLit = 0ull, notShadowing = 0ull;
+	// Light groups (src/shared/light_groups.h): its group + 1, 0 for none.
+	int lightGroupPlus1 = 0;
 };
 
 // Alias table entry for power-weighted light sampling (pbrt-v4 PowerLightSampler pattern)

@@ -335,11 +335,14 @@ inline void apply_texture_footprint(const camera& cam, const ray& current_ray, b
 }
 
 // What an emitter hit adds: its full radiance on a camera or specular hit, else weighted by MIS against the light sampling at the previous vertex.
-inline void add_hit_emission(const hittable& lights, const ray& current_ray, const hit_record& rec, bool specular_bounce, double prev_bsdf_pdf, const point3& prev_surface_p, const color& beta, color& L) {
+// `prev_group`: the link group of the surface the ray left (-1: the camera, which sees every light): an emitter that does not light it adds nothing (light linking).
+inline void add_hit_emission(const hittable& lights, const ray& current_ray, const hit_record& rec, bool specular_bounce, double prev_bsdf_pdf, const point3& prev_surface_p, int prev_group, const color& beta, color& L) {
+    if (!light_link::covers(rec.mat->lights_groups, prev_group)) return;
     color Le = rec.mat->emitted(current_ray, rec, rec.u, rec.v, rec.p);
     if (Le.x() > 0 || Le.y() > 0 || Le.z() > 0) {
         if (specular_bounce) {
             L += beta * Le;
+            light_group_tally::credit(rec.mat->light_group, beta * Le);
         } else {
             // Use prev_surface_p as the PDF origin -- mirrors pbrt-v4 prevIntrCtx.
             // The light PDF must be evaluated from where the BSDF ray was *spawned*
@@ -348,6 +351,7 @@ inline void add_hit_emission(const hittable& lights, const ray& current_ray, con
             double pdf_l = light_pdf_mis.value(current_ray.direction());
             double w_b   = camera::mis_power_heuristic(prev_bsdf_pdf, pdf_l);
             L += beta * w_b * Le;
+            light_group_tally::credit(rec.mat->light_group, beta * w_b * Le);
         }
     }
 }
@@ -421,8 +425,8 @@ inline void add_direct_lighting(const camera& cam, const hittable& world, const 
                 if (render_stats::enabled())
                     render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
                 if (shadow_ray_hit(world, shadow_ray, light_rec, infinity, &trans)) {
-                    color Le_d = light_rec.mat->emitted(
-                        shadow_ray, light_rec, light_rec.u, light_rec.v, light_rec.p);
+                    color Le_d = light_link::covers(light_rec.mat->lights_groups, rec.mat->link_group)   // (light linking)
+                        ? light_rec.mat->emitted(shadow_ray, light_rec, light_rec.u, light_rec.v, light_rec.p) : color(0, 0, 0);
                     if (Le_d.x() > 0 || Le_d.y() > 0 || Le_d.z() > 0) {
                         color atten = rec.mat->scattering_attenuation(current_ray, rec, shadow_ray, srec.attenuation) * refraction_scale(light_dir);
                         // shadow_ray_hit() restarts its ray at every transmissive surface it walks through (an interface
@@ -434,6 +438,7 @@ inline void add_direct_lighting(const camera& cam, const hittable& world, const 
                             * shape_media_trans(shadow_ray, t_light);
                         const color nee_area = beta * w_l * atten * trans * med_trans * f_pdf * Le_d / pdf_l;
                         L += nee_area;
+                        light_group_tally::credit(light_rec.mat->light_group, nee_area);
                         if (probing) path_probe::light(light_rec.mat.get(), typeid(*light_rec.mat).name(), light_rec.p.x(), light_rec.p.y(), light_rec.p.z(), nee_area.x(), nee_area.y(), nee_area.z());
                     }
                 }
@@ -472,6 +477,7 @@ inline void add_direct_lighting(const camera& cam, const hittable& world, const 
                     color atten = rec.mat->scattering_attenuation(current_ray, rec, portal_shadow, srec.attenuation) * refraction_scale(portal_dir);
                     color med_trans = camera_medium_trans(portal_shadow, infinity) * shape_media_trans(portal_shadow, infinity);
                     L += beta * w_portal * atten * trans * med_trans * f_pdf * Le_portal / pdf_portal;
+                    light_group_tally::credit(cam.sky_light_group, beta * w_portal * atten * trans * med_trans * f_pdf * Le_portal / pdf_portal);
                 }
             }
         }
@@ -495,6 +501,7 @@ inline void add_direct_lighting(const camera& cam, const hittable& world, const 
                     color atten = rec.mat->scattering_attenuation(current_ray, rec, sky_shadow, srec.attenuation) * refraction_scale(sky_dir);
                     color med_trans = camera_medium_trans(sky_shadow, infinity) * shape_media_trans(sky_shadow, infinity);
                     L += beta * w_sky * atten * trans * med_trans * f_pdf * Le_sky / pdf_sky;
+                    light_group_tally::credit(cam.sky_light_group, beta * w_sky * atten * trans * med_trans * f_pdf * Le_sky / pdf_sky);
                 }
             }
         }
@@ -508,6 +515,7 @@ inline void add_direct_lighting(const camera& cam, const hittable& world, const 
     if (punct_lights && !punct_lights->empty()) {
         punct_lights->for_each_sample(rec.p, [&](const PunctualLiSample& ps) {
             if (ps.Li.x() <= 0 && ps.Li.y() <= 0 && ps.Li.z() <= 0) return;
+            if (!light_link::covers(ps.illuminates, rec.mat->link_group)) return;   // (light linking)
             ray punct_ray(rec.p, ps.wi, current_ray.time());
             double f_pdf = rec.mat->scattering_pdf(current_ray, rec, punct_ray);
             if (f_pdf <= 0.0) return;
@@ -516,11 +524,12 @@ inline void add_direct_lighting(const camera& cam, const hittable& world, const 
             color trans;
             if (render_stats::enabled())
                 render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
-            if (!shadow_ray_hit(world, punct_ray, shadow_rec, shadow_t_max, &trans)) {
+            if (!shadow_ray_hit(world, punct_ray, shadow_rec, shadow_t_max, &trans, ps.shadowsFrom)) {
                 // delta light: pdf=1, no MIS weight needed
                 color atten = rec.mat->scattering_attenuation(current_ray, rec, punct_ray, srec.attenuation) * refraction_scale(ps.wi);
                 color med_trans = camera_medium_trans(punct_ray, ps.t_max) * shape_media_trans(punct_ray, shadow_t_max);
                 L += beta * atten * trans * med_trans * f_pdf * ps.Li;
+                light_group_tally::credit(ps.lightGroup, beta * atten * trans * med_trans * f_pdf * ps.Li);
             }
         });
     }
@@ -543,6 +552,7 @@ template <typename Sampler>
     bool   specular_bounce    = true;
     bool   any_nonspecular    = false;  // pbrt-v4: anyNonSpecularBounces
     point3 prev_surface_p     = r.origin(); // pbrt-v4: prevIntrCtx shading point
+    int    prev_group         = -1;          // light linking: the link group of that surface (-1: the camera)
     int    medium_boundary_crossings = 0;
     const bool probing = path_probe::active();   // `--probe X Y`: this path's light is booked by source (path_probe.h)
     if (probing) path_probe::beginSample();
@@ -616,6 +626,7 @@ template <typename Sampler>
         if (!hit_something) {
             const color L_before_escape = L;
             camera_path_detail::add_escaped_radiance(*this, current_ray, specular_bounce, prev_bsdf_pdf, beta, L);
+            if (sky || portal) light_group_tally::credit(sky_light_group, L - L_before_escape);   // (the sky's light group; a flat background is no light)
             if (probing) {
                 path_probe::add(path_probe::kEscaped, L.x() - L_before_escape.x(), L.y() - L_before_escape.y(), L.z() - L_before_escape.z());
                 if (bounces_left == depth) path_probe::primaryMiss();
@@ -648,13 +659,13 @@ template <typename Sampler>
                 path_probe::firstHit(material_name, rec.p.x(), rec.p.y(), rec.p.z(), rec.normal.x(), rec.normal.y(), rec.normal.z(), rec.u, rec.v, rec.front_face);
             }
             const color L_before_emission = L;
-            camera_path_detail::add_hit_emission(lights, current_ray, rec, specular_bounce, prev_bsdf_pdf, prev_surface_p, beta, L);
+            camera_path_detail::add_hit_emission(lights, current_ray, rec, specular_bounce, prev_bsdf_pdf, prev_surface_p, prev_group, beta, L);
             const color emitted = L - L_before_emission;
             path_probe::add(path_probe::kEmission, emitted.x(), emitted.y(), emitted.z());
             if (emitted.x() > 0.0 || emitted.y() > 0.0 || emitted.z() > 0.0)
                 path_probe::light(rec.mat.get(), typeid(*rec.mat).name(), rec.p.x(), rec.p.y(), rec.p.z(), emitted.x(), emitted.y(), emitted.z());
         } else {
-            camera_path_detail::add_hit_emission(lights, current_ray, rec, specular_bounce, prev_bsdf_pdf, prev_surface_p, beta, L);
+            camera_path_detail::add_hit_emission(lights, current_ray, rec, specular_bounce, prev_bsdf_pdf, prev_surface_p, prev_group, beta, L);
         }
 
         // The final, emission-only iteration (see the loop's own comment): the emission above is all this vertex contributes; no light
@@ -755,6 +766,7 @@ template <typename Sampler>
             current_ray     = bsdf_ray;
             prev_bsdf_pdf   = srec.walk_specular ? 0.0 : srec.mis_pdf().value(bsdf_ray.direction());
             prev_surface_p  = rec.p;
+            prev_group      = rec.mat->link_group;
             specular_bounce = srec.walk_specular;
             if (!srec.walk_specular) any_nonspecular = true;
             --bounces_left;
@@ -797,6 +809,7 @@ template <typename Sampler>
             current_ray     = bsdf_ray;
             prev_bsdf_pdf   = pdf_b;
             prev_surface_p  = rec.p;   // pbrt-v4: prevIntrCtx = si->intr
+            prev_group      = rec.mat->link_group;
             specular_bounce = false;
             any_nonspecular = true;   // pbrt-v4: anyNonSpecularBounces |= true
             --bounces_left;
@@ -903,8 +916,8 @@ inline void add_direct_lighting_spectral(const camera& cam, const hittable& worl
                 if (render_stats::enabled())
                     render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
                 if (shadow_ray_hit(world, shadow_ray, light_rec, infinity, &trans)) {
-                    color Le_d_rgb = light_rec.mat->emitted(
-                        shadow_ray, light_rec, light_rec.u, light_rec.v, light_rec.p);
+                    color Le_d_rgb = light_link::covers(light_rec.mat->lights_groups, rec.mat->link_group)   // (light linking)
+                        ? light_rec.mat->emitted(shadow_ray, light_rec, light_rec.u, light_rec.v, light_rec.p) : color(0, 0, 0);
                     if (Le_d_rgb.x() > 0 || Le_d_rgb.y() > 0 || Le_d_rgb.z() > 0) {
                         color atten_rgb = rec.mat->scattering_attenuation(current_ray, rec, shadow_ray, srec.attenuation) * refraction_scale(light_dir);
                         float scale = static_cast<float>(w_l * f_pdf / pdf_l);
@@ -972,6 +985,7 @@ inline void add_direct_lighting_spectral(const camera& cam, const hittable& worl
     if (punct_lights && !punct_lights->empty()) {
         punct_lights->for_each_sample(rec.p, [&](const PunctualLiSample& ps) {
             if (ps.Li.x() <= 0 && ps.Li.y() <= 0 && ps.Li.z() <= 0) return;
+            if (!light_link::covers(ps.illuminates, rec.mat->link_group)) return;   // (light linking)
             ray punct_ray(rec.p, ps.wi, current_ray.time());
             double f_pdf = scattering_pdf_at(punct_ray);
             if (f_pdf <= 0.0) return;
@@ -980,7 +994,7 @@ inline void add_direct_lighting_spectral(const camera& cam, const hittable& worl
             color trans;
             if (render_stats::enabled())
                 render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
-            if (!shadow_ray_hit(world, punct_ray, shadow_rec, shadow_t_max, &trans)) {
+            if (!shadow_ray_hit(world, punct_ray, shadow_rec, shadow_t_max, &trans, ps.shadowsFrom)) {
                 color atten_rgb = rec.mat->scattering_attenuation(current_ray, rec, punct_ray, srec.attenuation) * refraction_scale(ps.wi);
                 L += beta * static_cast<float>(f_pdf) * albedo(atten_rgb) * albedo(trans) * illuminant(ps.Li);
             }
@@ -1028,6 +1042,7 @@ template <typename Sampler>
     bool   specular_bounce    = true;
     bool   any_nonspecular    = false;
     point3 prev_surface_p     = r.origin();
+    int    prev_group         = -1;          // light linking: the link group of that surface (-1: the camera)
     int    medium_boundary_crossings = 0;
 
     // See ray_color()'s own kMaxPathThroughput comment - identical
@@ -1061,7 +1076,7 @@ template <typename Sampler>
         const bool primary_hit = bounces_left == depth && current_ray.has_differentials();
         camera_path_detail::apply_texture_footprint(*this, current_ray, primary_hit, rec);
 
-        color Le_rgb = rec.mat->emitted(current_ray, rec, rec.u, rec.v, rec.p);
+        color Le_rgb = light_link::covers(rec.mat->lights_groups, prev_group) ? rec.mat->emitted(current_ray, rec, rec.u, rec.v, rec.p) : color(0, 0, 0);   // (light linking)
         if (Le_rgb.x() > 0 || Le_rgb.y() > 0 || Le_rgb.z() > 0) {
             SS Le = illuminant(Le_rgb);
             if (specular_bounce) {
@@ -1191,6 +1206,7 @@ template <typename Sampler>
             current_ray     = bsdf_ray;
             prev_bsdf_pdf   = srec.walk_specular ? 0.0 : srec.mis_pdf().value(bsdf_ray.direction());
             prev_surface_p  = rec.p;
+            prev_group      = rec.mat->link_group;
             specular_bounce = srec.walk_specular;
             if (!srec.walk_specular) any_nonspecular = true;
             --bounces_left;
@@ -1212,6 +1228,7 @@ template <typename Sampler>
             current_ray     = bsdf_ray;
             prev_bsdf_pdf   = pdf_b;
             prev_surface_p  = rec.p;
+            prev_group      = rec.mat->link_group;
             specular_bounce = false;
             any_nonspecular = true;
             --bounces_left;

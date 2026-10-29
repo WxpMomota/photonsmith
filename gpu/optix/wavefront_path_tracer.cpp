@@ -188,6 +188,21 @@ bool WavefrontPathTracer::renderPrepareBuffers(RenderCall &rc) {
 							   numPixels * sizeof(float), stream_));
 	float* d_weightPtr = reinterpret_cast<float*>(d_weight);
 
+	// Light groups' pictures (setLightGroups()): zeroed per call like the picture, and wired into the kernels (wavefront_light_groups.h) - or unwired.
+	lightGroupPixels_.clear();
+	if (lightGroupCount_ > 0) {
+		const size_t want = static_cast<size_t>(lightGroupCount_) * numPixels;
+		if (lightGroupFbCapacity_ < want) {
+			if (d_lightGroupFb_) { cudaFree(reinterpret_cast<void*>(d_lightGroupFb_)); d_lightGroupFb_ = 0; lightGroupFbCapacity_ = 0; }
+			CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_lightGroupFb_), want * sizeof(float3)));
+			lightGroupFbCapacity_ = want;
+		}
+		CUDA_CHECK(cudaMemsetAsync(reinterpret_cast<void*>(d_lightGroupFb_), 0, want * sizeof(float3), stream_));
+		wf_set_light_groups(reinterpret_cast<float3*>(d_lightGroupFb_), lightGroupCount_, numPixels, skyLightGroup_);
+	} else {
+		wf_set_light_groups(nullptr, 0, 0, -1);
+	}
+
 	// Live Preview's adaptive sampling - see setActivePixelMask()'s own
 	// comment. Only allocated/uploaded when the caller actually supplied a
 	// mask THIS call; nullptr is forwarded to launchGenerateCameraRays()
@@ -1201,6 +1216,13 @@ void WavefrontPathTracer::renderSampleLoop(RenderCall &rc) {
 	// exits) is what makes this ordering possible without SVGF needing a
 	// SECOND, separate "pre-history-overwrite" hook of its own.
 	launchNormalizeFramebuffer((unsigned int)numPixels, d_weightPtr, d_fbPtr);
+	// The light groups' pictures, normalised by the same filter weights, then brought back (setLightGroups()).
+	if (lightGroupCount_ > 0 && d_lightGroupFb_) {
+		for (int g = 0; g < lightGroupCount_; ++g)
+			launchNormalizeFramebuffer((unsigned int)numPixels, d_weightPtr, reinterpret_cast<float3*>(d_lightGroupFb_) + static_cast<size_t>(g) * numPixels);
+		lightGroupPixels_.resize(static_cast<size_t>(lightGroupCount_) * numPixels * 3);
+		CUDA_CHECK(cudaMemcpyAsync(lightGroupPixels_.data(), reinterpret_cast<void*>(d_lightGroupFb_), lightGroupPixels_.size() * sizeof(float), cudaMemcpyDeviceToHost, stream_));
+	}
 	CUDA_CHECK(cudaStreamSynchronize(stream_));
 	rc.d_fbPtr = d_fbPtr;
 	rc.d_weightPtr = d_weightPtr;
@@ -1515,6 +1537,7 @@ void WavefrontPathTracer::cleanup() {
 	destroyAovBuffers();
 	if (d_fb_) { cudaFree(reinterpret_cast<void*>(d_fb_)); d_fb_ = 0; }
 	if (d_weight_) { cudaFree(reinterpret_cast<void*>(d_weight_)); d_weight_ = 0; }
+	if (d_lightGroupFb_) { cudaFree(reinterpret_cast<void*>(d_lightGroupFb_)); d_lightGroupFb_ = 0; lightGroupFbCapacity_ = 0; }
 	fbCapacity_ = 0;
 	if (d_activePixelMask_) { cudaFree(reinterpret_cast<void*>(d_activePixelMask_)); d_activePixelMask_ = 0; }
 	activePixelMaskCapacity_ = 0;

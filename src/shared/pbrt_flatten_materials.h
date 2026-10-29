@@ -1360,6 +1360,8 @@ inline void flattenOneMaterial(const pbrt_scene::Scene &scene, FlatScene &out,
 	pbrt_scene::MaterialDecl md = mdSrc;
 	bakeConstantTextureParams(scene, out, namedMaterialIndex, md);
 	Material m;
+	m.linkGroup = md.linkGroup;
+	m.name = md.name.empty() && md.linkedFrom >= 0 && static_cast<std::size_t>(md.linkedFrom) < scene.materials.size() ? scene.materials[static_cast<std::size_t>(md.linkedFrom)].name : md.name;
 	readMaterialBindings(scene, out, namedMaterialIndex, md, m);
 	readMaterialKindParams(scene, out, namedMaterialIndex, md, m);
 	// pbrt's own spelling of a normal map: a material parameter `"string normalmap" "file"` naming an image (a tangent-space normal in RGB, read linear), not a texture. The renderers'

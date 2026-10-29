@@ -155,6 +155,7 @@ extern "C" __global__ void resolve_bssrdf_exit(
 	SS attenuation = SS(weight);
 
 	wf_finish_material_scatter(MaterialType::NormalizedFresnel, eta, /*matIdx=*/-1,
+		/*linkGroup=*/item.matIdx >= 0 ? materials[item.matIdx].linkGroup : 0,
 		// do_regularize is inert here regardless of value: is_specular=false
 		// below already forces next.any_nonspecular=1 unconditionally, and
 		// NormalizedFresnel never reaches glossy_isType (see BssrdfProbeWorkItem

@@ -116,6 +116,10 @@ extern "C" __global__ void __closesthit__triangle() {
 	int matIdx = tri.materialIdx;
 	const float2 mixUv = triangle_hit_uv(tri, optixGetTriangleBarycentrics());
 	const MaterialData mat = resolve_mix_material(params.materials[matIdx], matIdx, hit_point, mixUv.x, mixUv.y, matIdx);
+	// Light linking (light_link.h): whether this hit's light reaches the surface the ray left, read before this hit reports its own group (payload p28),
+	// which the light sampling below reads as the receiver's.
+	const bool linkLit = link_lit_from_previous(mat);
+	link_report_group(mat);
 
 	float3 shading_normal;
 	// Real UV when authored, else the same barycentric fallback CPU's own
@@ -331,6 +335,7 @@ extern "C" __global__ void __closesthit__triangle() {
 			bssrdf_exit, bssrdf_exit_pos, out_eta, rgbChannel);
 	}
 
+	if (!linkLit) emission = make_float3(0.0f, 0.0f, 0.0f);   // light linking (light_link.h)
 	optixSetPayload_3(__float_as_uint(emission.x));
 	optixSetPayload_4(__float_as_uint(emission.y));
 	optixSetPayload_5(__float_as_uint(emission.z));
@@ -381,7 +386,7 @@ extern "C" __global__ void __closesthit__triangle() {
 		// A lamp that also reflects: its own light, weighted against the light sampling (p13-p15, which only a subsurface exit otherwise uses; raygen
 		// adds it for flag 1). The input p12 (the arriving BSDF pdf) is read here, before this program overwrites it.
 		float3 lamp_le = make_float3(0.0f, 0.0f, 0.0f);
-		if (lamp_scatters(mat))
+		if (lamp_scatters(mat) && linkLit)
 			lamp_le = lamp_own_emission(material_emission(mat, front_face, uv_u, uv_v, hit_point), __uint_as_float(optixGetPayload_12()), tri_light_pdf());
 		float t_hit = optixGetRayTmax();
 		float brdf_pdf_out = is_specular ? 0.0f

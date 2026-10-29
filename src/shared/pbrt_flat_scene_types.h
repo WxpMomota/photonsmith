@@ -5,12 +5,14 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <string>
 #include <vector>
 
 #include "pbrt_scene.h"
+#include "light_groups.h"   // a light's "string lightgroup"
 #include "loop_subdivide.h"
 #include "conductor_data.h"
 #include "glass_data.h"
@@ -50,6 +52,9 @@ struct Emission {
 	// comment for the formula.
 	bool hasPower = false;
 	double power = 0.0;
+	// Light linking (light_link.h): the groups it lights (`"string illuminates"`; bit g: group g) - the shapes of its own group too, since it is one of them
+	std::uint64_t illuminates = ~0ull;
+	int lightGroup = -1;   // its light group (light_groups.h: `"string lightgroup"`, FlatScene::lightGroups); -1: none
 };
 
 // LightSource "infinite" - a scene's environment/sky light. This is the one
@@ -147,6 +152,9 @@ struct PunctualLight {
 	// ProjectionLight has no "I"/"L" of its own; the projected image supplies
 	// colour directly (see the image-file comment on `fovDeg` below).
 	double intensity[3] = {1, 1, 1};
+	// Light linking (light_link.h): the groups it lights (`"string illuminates"`) and the groups whose shapes cast its shadows (`"string shadowsfrom"`); bit g: group g
+	std::uint64_t illuminates = ~0ull, shadowsFrom = ~0ull;
+	int lightGroup = -1;   // its light group (light_groups.h); -1: none
 
 	// pbrt's "scale" parameter, read the same way for all five kinds.
 	double scale = 1.0;
@@ -395,6 +403,11 @@ struct ShapeRange {
 };
 
 struct FlatScene {
+	// Light groups (light_groups.h): their names, in the order the scene names them; a light's lightGroup indexes it. skyLightGroup: the infinite light's (all of them).
+	std::vector<std::string> lightGroups;
+	int skyLightGroup = -1;
+	// Light linking (light_link.h): the link groups' names, group g is linkGroups[g - 1] (pbrt_scene::Scene::linkGroups) - for the ID passes' names
+	std::vector<std::string> linkGroups;
 	std::vector<ShapeRange> shapeRanges;
 	std::vector<Triangle> triangles;
 	// See AnimatedTriangleMesh's own comment - real object motion blur for

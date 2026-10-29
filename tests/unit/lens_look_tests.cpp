@@ -1,6 +1,8 @@
 // lens_look_tests.cpp -- the camera's look (src/shared/lens_look.h): bloom, vignette, warmth and saturation on a linear picture, and how a scene file and the flags set them.
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -159,4 +161,65 @@ TEST(LensLook, StarWordsAreReadAndKeptInRange) {
 	EXPECT_EQ(look.starAngle, 30.0);
 	EXPECT_EQ(look.starLength, 0.2);
 	EXPECT_EQ(look.starThreshold, 3.0);
+}
+
+// ---- the painting (kuwahara.h: the anisotropic Kuwahara filter) ----
+
+namespace {
+// A picture split down the middle (dark left, bright right) with noise on it, as a render's grain.
+std::vector<float> noisyStep(int w, int h) {
+	std::vector<float> img(static_cast<std::size_t>(w) * h * 3);
+	unsigned s = 12345u;
+	for (int y = 0; y < h; ++y)
+		for (int x = 0; x < w; ++x)
+			for (int c = 0; c < 3; ++c) {
+				s = s * 1664525u + 1013904223u;
+				const float noise = (static_cast<float>(s >> 8) / 16777216.0f - 0.5f) * 0.2f;
+				img[(static_cast<std::size_t>(y) * w + x) * 3 + c] = (x < w / 2 ? 0.2f : 0.8f) + noise;
+			}
+	return img;
+}
+double spread(const std::vector<float> &img, int w, int x0, int x1, int y0, int y1) {   // the standard deviation of the red channel over the box
+	double s = 0.0, s2 = 0.0;
+	int n = 0;
+	for (int y = y0; y < y1; ++y)
+		for (int x = x0; x < x1; ++x) {
+			const double v = img[(static_cast<std::size_t>(y) * w + x) * 3];
+			s += v, s2 += v * v, ++n;
+		}
+	return std::sqrt((std::max)(0.0, s2 / n - (s / n) * (s / n)));
+}
+}  // namespace
+
+TEST(LensLook, PaintSmoothsTheGrainButKeepsTheEdgeSharpAndTheLight) {
+	const int w = 96, h = 64;
+	std::vector<float> img = noisyStep(w, h);
+	const std::vector<float> before = img;
+	lens_look::Look look;
+	ASSERT_TRUE(lens_look::parse("paint 60", look).empty());   // (60 at 1080 high: 3.6 pixels here)
+	lens_look::apply(img.data(), w, h, look);
+	EXPECT_LT(spread(img, w, 8, 40, 8, 56), 0.5 * spread(before, w, 8, 40, 8, 56)) << "the grain inside the dark side goes";
+	EXPECT_LT(spread(img, w, 56, 88, 8, 56), 0.5 * spread(before, w, 56, 88, 8, 56));
+	for (int y = 8; y < 56; ++y) {   // the edge: a pixel next to it keeps its own side's colour, not a blend of both
+		EXPECT_LT(img[(static_cast<std::size_t>(y) * w + w / 2 - 2) * 3], 0.4f) << y;
+		EXPECT_GT(img[(static_cast<std::size_t>(y) * w + w / 2 + 1) * 3], 0.6f) << y;
+	}
+	const double sumBefore = std::accumulate(before.begin(), before.end(), 0.0), sumAfter = std::accumulate(img.begin(), img.end(), 0.0);
+	EXPECT_NEAR(sumAfter, sumBefore, 0.02 * sumBefore) << "the picture keeps its light";
+
+	std::vector<float> even = flat(32, 24, 0.3f, 0.5f, 0.7f);
+	lens_look::apply(even.data(), 32, 24, look);
+	for (std::size_t i = 0; i < even.size(); i += 3) EXPECT_NEAR(even[i], 0.3f, 1e-5f) << "an even picture stays as it is";
+}
+
+TEST(LensLook, PaintWordsAreReadAndKeptInRange) {
+	lens_look::Look look;
+	EXPECT_TRUE(lens_look::parse("paint 99 paint-sharpness 2 paint-stretch 0.5 paint-smoothness 8", look).empty());
+	EXPECT_EQ(look.paint, 40.0);
+	EXPECT_EQ(look.paintSharpness, 1.0);
+	EXPECT_EQ(look.paintStretch, 0.5);
+	EXPECT_EQ(look.paintSmoothness, 8.0);
+	EXPECT_TRUE(look.active());
+	lens_look::Look none;
+	EXPECT_FALSE(none.active()) << "off by default";
 }

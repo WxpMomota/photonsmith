@@ -52,6 +52,9 @@ struct BuildResult {
 	std::shared_ptr<hittable_list> world;
 	std::shared_ptr<hittable_list> lights;   // emissive shapes, for NEE
 	std::shared_ptr<sky_light> sky;          // null if the scene has no infinite light
+	// Light groups (src/shared/light_groups.h): their names, and the sky's (and portals') group, -1 for none
+	std::vector<std::string> lightGroupNames;
+	int skyLightGroup = -1;
 	// LightSource "infinite" "point3 portal[4]" (pbrt-v4's windowed infinite
 	// light - visible only through a finite rectangular window instead of
 	// the whole sphere) - null unless the scene's infinite light declared a
@@ -351,6 +354,8 @@ inline void buildSkyOrPortal(const pbrt_flatten::FlatScene &scene, BuildResult &
 	} else if (scene.infiniteLight.present) {
 		out.sky = buildPlainSky(scene.infiniteLight);
 	}
+	out.lightGroupNames = scene.lightGroups;   // (light groups: src/shared/light_groups.h)
+	out.skyLightGroup = scene.skyLightGroup;
 }
 
 // ---- camera medium --------------------------------------------------------
@@ -397,6 +402,7 @@ inline void buildPunctualLights(const pbrt_flatten::FlatScene &scene, BuildResul
 	if (!scene.punctualLights.empty()) {
 		out.punctLights = std::make_shared<punctual_light_list>();
 		for (const pbrt_flatten::PunctualLight &pl : scene.punctualLights) {
+			out.punctLights->link_next(pl.illuminates, pl.shadowsFrom, pl.lightGroup);   // (light linking and light groups: they go with the light added below)
 			switch (pl.kind) {
 			case pbrt_flatten::PunctualLightKind::Point:
 				out.punctLights->add_point(

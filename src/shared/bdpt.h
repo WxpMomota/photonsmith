@@ -107,6 +107,10 @@ struct BDPTHit {
 	// we call back through the Scene trait methods.
 	int bsdf_id;    // opaque index used by Scene::BSDFf / BSDFSampleF / BSDFPdf
 	int light_id;   // -1 if not an area light; otherwise light index for PDF queries
+	// The ID passes (aov_pass.h): the hit material's index and name and its link group's name (they live as long as the scene); -1 and null where not known.
+	int material_index = -1;
+	const char* material_name = nullptr;
+	const char* group_name = nullptr;
 };
 
 // BDPTLightSample<T>: result of Scene::SampleLight (direct illumination)
