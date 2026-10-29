@@ -209,6 +209,8 @@ private:
 			base->link_group = m.linkGroup;
 			base->bevel_radius = m.bevel;   // (rounded edges: bevel.h)
 			base->terminator_offset = m.terminator;   // (round shadows on coarse smooth meshes: shadow_terminator.h)
+			for (int k = 0; k < 3; ++k) base->proxy_center[k] = m.proxyCenter[k];   // (shading normals from a proxy sphere: proxy_normal.h)
+			base->proxy_radius = m.proxyRadius, base->proxy_blend = m.proxyBlend;
 			base->camera_visible = m.cameraVisible, base->casts_shadow = m.castsShadow;   // (ray visibility)
 			if (em) base->lights_groups = em->illuminates, base->light_group = em->lightGroup;
 			base->material_index = materialIndex;   // (the ID passes: aov_pass.h)
@@ -490,7 +492,7 @@ private:
 				auto tri = std::make_shared<triangle>(mesh, static_cast<int>(i), mat,
 													   alphaMaskFor(perTriangleMaterial[i].first));
 				world.add(tri);
-				if (perTriangleMaterial[i].second >= 0) lights.add(tri);
+				if (perTriangleMaterial[i].second >= 0 && scene.areaLights[static_cast<std::size_t>(perTriangleMaterial[i].second)].sampled) lights.add(tri);   // (Emission::sampled)
 			}
 			out.triangleCount += perTriangleMaterial.size();
 		}

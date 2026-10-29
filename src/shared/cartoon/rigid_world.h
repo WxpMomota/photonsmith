@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -181,13 +182,37 @@ struct Run {
 	std::size_t kept() const { return bodies ? poses.size() / bodies : 0; }
 };
 
-inline Run simulate(const std::vector<BodyDef> &defs, double seconds, double ground = 0.0) {
+// A moving collider the world cannot move: a ball that goes where it is told - a character's body or foot, sampled every `step` seconds from time 0 (pbrt's coordinates).
+// The bodies it touches are pushed (and woken); it is not pushed back.
+struct Kinematic {
+	double radius = 0.1, step = 1.0 / 120.0;
+	std::vector<Vec3> at;
+	Vec3 placeAt(double t) const {
+		if (at.empty()) return {0.0, -1e6, 0.0};
+		const double s = std::clamp(t / step, 0.0, static_cast<double>(at.size() - 1));
+		const std::size_t i = static_cast<std::size_t>(s), j = std::min(at.size() - 1, i + 1);
+		return at[i] + (at[j] - at[i]) * (s - static_cast<double>(i));
+	}
+};
+
+inline Run simulate(const std::vector<BodyDef> &defs, double seconds, double ground = 0.0, const std::vector<Kinematic> *movers = nullptr) {
 	using namespace detail;
 	Run run;
-	std::vector<Body> bodies(defs.size());
-	for (std::size_t i = 0; i < defs.size(); ++i) {
-		const BodyDef &d = defs[i];
+	// the movers, as fixed balls at the end of the list whose place and velocity are set every step
+	std::vector<BodyDef> moverDefs;
+	if (movers)
+		for (const Kinematic &k : *movers) {
+			BodyDef d;
+			d.block = "(mover)", d.sphere = true, d.radius = k.radius, d.fixed = true, d.friction = 0.8, d.bounce = 0.1;
+			d.at = k.placeAt(0.0);
+			moverDefs.push_back(d);
+		}
+	std::vector<Body> bodies(defs.size() + moverDefs.size());
+	const std::size_t real = defs.size();
+	for (std::size_t i = 0; i < bodies.size(); ++i) {
+		const BodyDef &d = i < real ? defs[i] : moverDefs[i - real];
 		Body &b = bodies[i];
+		if (i >= real) b.awake = true;   // (a mover: always about, never moved by the world)
 		b.def = &d;
 		b.x = d.at;
 		b.q = qaxis({0.0, 1.0, 0.0}, d.turn * kPi / 180.0);
@@ -205,13 +230,18 @@ inline Run simulate(const std::vector<BodyDef> &defs, double seconds, double gro
 	const int steps = static_cast<int>(std::ceil(std::max(0.0, seconds) / run.step)) + 2;
 	const double dt = run.step;
 	std::vector<char> pushed(defs.size(), 0);
-	std::vector<double> lastImpact(defs.size(), -1.0);
-	run.bodies = bodies.size();
-	run.poses.reserve(static_cast<std::size_t>(steps / run.keepEvery + 1) * bodies.size());
+	std::vector<double> lastImpact(bodies.size(), -1.0);
+	run.bodies = real;
+	run.poses.reserve(static_cast<std::size_t>(steps / run.keepEvery + 1) * real);
 	for (int s = 0; s < steps; ++s) {
 		const double time = s * dt;
+		for (std::size_t i = real; i < bodies.size(); ++i) {   // the movers where they are told, at the speed they go
+			const Kinematic &k = (*movers)[i - real];
+			bodies[i].x = k.placeAt(time);
+			bodies[i].v = (k.placeAt(time + dt) - k.placeAt(time - dt)) * (1.0 / (2.0 * dt));
+		}
 		if (s % run.keepEvery == 0)
-			for (const Body &b : bodies) run.poses.push_back({b.x, b.q});
+			for (std::size_t i = 0; i < real; ++i) run.poses.push_back({bodies[i].x, bodies[i].q});
 		// pushes, and gravity on what is awake
 		for (std::size_t i = 0; i < bodies.size(); ++i) {
 			Body &b = bodies[i];
@@ -227,9 +257,9 @@ inline Run simulate(const std::vector<BodyDef> &defs, double seconds, double gro
 		std::vector<Contact> contacts;
 		for (std::size_t i = 0; i < bodies.size(); ++i) {
 			if (!bodies[i].awake) continue;
-			collide(bodies, static_cast<int>(i), -1, ground, contacts);
+			if (i < real) collide(bodies, static_cast<int>(i), -1, ground, contacts);   // (a mover is not stopped by the ground)
 			for (std::size_t j = 0; j < bodies.size(); ++j) {
-				if (j == i || (bodies[j].awake && j < i) || !nearby(bodies[i], bodies[j])) continue;
+				if (j == i || (bodies[j].awake && j < i) || !nearby(bodies[i], bodies[j]) || (i >= real && j >= real)) continue;
 				const std::size_t before = contacts.size();
 				collide(bodies, static_cast<int>(i), static_cast<int>(j), ground, contacts);
 				if (contacts.size() > before && !bodies[j].awake && bodies[j].invMass > 0.0) {   // (it wakes what it touches when it touches it hard enough)
@@ -335,10 +365,12 @@ inline std::vector<Pose> posesAt(const Run &run, double t) {
 }
 
 // A film's world, worked out once in this process (by what its bodies are) for `seconds`.
-inline std::shared_ptr<const Run> runFor(const std::vector<BodyDef> &defs, double seconds) {
+// movers (if given) are made only when the world is first worked out under moversKey (what they follow: a film's characters - the film's text says them).
+inline std::shared_ptr<const Run> runFor(const std::vector<BodyDef> &defs, double seconds, const std::string &moversKey = std::string(),
+										  const std::function<std::vector<Kinematic>()> &movers = nullptr) {
 	std::ostringstream key;
 	key.precision(9);
-	key << seconds;
+	key << seconds << '#' << moversKey;
 	for (const BodyDef &d : defs)
 		key << '|' << d.block << ' ' << d.sphere << ' ' << d.half.x << ' ' << d.half.y << ' ' << d.half.z << ' ' << d.radius << ' ' << d.at.x << ' ' << d.at.y << ' ' << d.at.z << ' '
 			<< d.turn << ' ' << d.mass << ' ' << d.start << ' ' << d.velocity.x << ' ' << d.velocity.y << ' ' << d.velocity.z << ' ' << d.spin.x << ' ' << d.spin.y << ' ' << d.spin.z
@@ -347,7 +379,10 @@ inline std::shared_ptr<const Run> runFor(const std::vector<BodyDef> &defs, doubl
 	static std::map<std::string, std::shared_ptr<const Run>> cache;
 	const std::lock_guard<std::mutex> hold(lock);
 	std::shared_ptr<const Run> &slot = cache[key.str()];
-	if (!slot) slot = std::make_shared<const Run>(simulate(defs, seconds));
+	if (!slot) {
+		const std::vector<Kinematic> m = movers ? movers() : std::vector<Kinematic>();
+		slot = std::make_shared<const Run>(simulate(defs, seconds, 0.0, m.empty() ? nullptr : &m));
+	}
 	return slot;
 }
 

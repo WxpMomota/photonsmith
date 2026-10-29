@@ -25,6 +25,9 @@ namespace pbrt_flatten {
 struct Emission {
 	double L[3] = {1.0, 1.0, 1.0};
 	double scale = 1.0;
+	// `"bool sampled" false` (our extension): a glow the camera sees that is no light to aim at - left out of next-event estimation (a film's matte painting,
+	// film_matte.h, of thousands of glowing triangles that light nothing: its light linking keeps bounces from taking its light too). Triangles and quads.
+	bool sampled = true;
 	// Round 6 Phase 4: pbrt-v4's real AreaLightSource "diffuse" also accepts
 	// a "filename" parameter for spatially-varying emission (an image
 	// mapped onto the shape instead of a flat L) - when set, this wins over

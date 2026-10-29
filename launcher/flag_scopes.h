@@ -35,10 +35,10 @@ inline constexpr FlagScopeEntry kFlagScopes[] = {
 	{"--cartoon-worker", FlagScope::Video},  // (a worker is started by the video, with a job file of its own)
 	// other things than rendering
 	{"--help", FlagScope::Mode}, {"-h", FlagScope::Mode}, {"--diagnose", FlagScope::Mode}, {"--probe", FlagScope::Mode}, {"--list-video-presets", FlagScope::Mode},
-	{"--film-table", FlagScope::Mode}, {"--film-check", FlagScope::Mode}, {"--film-scene", FlagScope::Mode}, {"--film-onion", FlagScope::Mode}, {"--film-shots", FlagScope::Mode}, {"--film-subjects", FlagScope::Mode}, {"--film-events", FlagScope::Mode}, {"--film-feet", FlagScope::Mode}, {"--film-media", FlagScope::Mode}, {"--film-cuts", FlagScope::Mode}, {"--film-cues", FlagScope::Mode}, {"--film-baseline", FlagScope::Mode}, {"--prepare-gpu", FlagScope::Mode}, {"--assemble-video", FlagScope::Mode}, {"--export-gltf", FlagScope::Mode},
+	{"--film-table", FlagScope::Mode}, {"--film-check", FlagScope::Mode}, {"--film-scene", FlagScope::Mode}, {"--film-onion", FlagScope::Mode}, {"--film-colours", FlagScope::Mode}, {"--film-storyboard", FlagScope::Mode}, {"--film-animatic", FlagScope::Mode}, {"--film-shots", FlagScope::Mode}, {"--film-subjects", FlagScope::Mode}, {"--film-events", FlagScope::Mode}, {"--film-feet", FlagScope::Mode}, {"--film-media", FlagScope::Mode}, {"--film-cuts", FlagScope::Mode}, {"--film-cues", FlagScope::Mode}, {"--film-baseline", FlagScope::Mode}, {"--prepare-gpu", FlagScope::Mode}, {"--assemble-video", FlagScope::Mode}, {"--export-gltf", FlagScope::Mode},
 	{"--scene-report", FlagScope::Mode}, {"--print-scene-size", FlagScope::Mode},
 	// set by the program for its own runs
-	{"--ppm-only", FlagScope::Internal}, {"--defer-print", FlagScope::Internal}, {"--preview", FlagScope::Render},
+	{"--ppm-only", FlagScope::Internal}, {"--defer-print", FlagScope::Internal}, {"--shot-samples", FlagScope::Internal}, {"--noise-target", FlagScope::Video}, {"--render-farm", FlagScope::Video}, {"--preview", FlagScope::Render},
 	// how to render
 	{"--gpu", FlagScope::Render}, {"-gpu", FlagScope::Render}, {"--gpu-device", FlagScope::Render}, {"--cpu", FlagScope::Render}, {"-cpu", FlagScope::Render}, {"--wavefront", FlagScope::Render}, {"--optix-validate", FlagScope::Render},
 	{"--isolate-pbrt-lighting", FlagScope::Render}, {"--denoise", FlagScope::Render}, {"--denoise-guides", FlagScope::Render}, {"--denoise-blend", FlagScope::Render},

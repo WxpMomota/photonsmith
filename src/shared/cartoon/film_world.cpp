@@ -418,6 +418,7 @@ std::string DataFilm::worldAt(const std::string &header, double t) const {
 		out += b.head + transformsFor(b.name, t) + lightsScaled(b.name, b.body, t);
 	}
 	out += clothAt(t);   // cloth (film_cloth.h): simulated up to now
+	for (std::size_t k = 0; k < spec.mattes.size(); ++k) out += matte::textOf(spec.mattes[k], static_cast<int>(k));   // matte paintings behind the set (film_matte.h)
 	for (const Character &c : spec.characters) {   // the characters, as their kinds draw them
 		const CharacterKind &kind = characterKinds().at(c.kind);
 		if (!kind.text) continue;
@@ -428,7 +429,17 @@ std::string DataFilm::worldAt(const std::string &header, double t) const {
 			m.voice = music_cues::voiceAt(spec.key, c.name, tc, shotStarts(), shotNameList(), &m.mouth);   // (a recording's loudness and mouth shapes)
 			speakingAt(c, tc, m);
 			m.face = faces::faceAt(c.feelings, tc);
-			return motionOf(c, kind, tc, m);
+			std::string drawn = motionOf(c, kind, tc, m);
+			// clean cel shadows on its face: its materials' shading normals from a sphere round its head (`face-normals`, proxy_normal.h; pbrt's x)
+			const double faceBlend = motion::amountFor(spec.faceNormals, c.name);
+			if (faceBlend > 0.0) {
+				const Vec3 head = transformPoint(m.frame, kind.head * c.scale);
+				char words[200];
+				std::snprintf(words, sizeof words, " \"point3 normalcenter\" [ %.6g %.6g %.6g ] \"float normalradius\" [ %.6g ] \"float normalblend\" [ %.4g ]", -head.x, head.y, head.z,
+							  std::max(0.05, (kind.height - kind.head.y) * c.scale * m.scale), faceBlend);
+				drawn = withMaterialWords(drawn, words);
+			}
+			return drawn;
 		};
 		const double tc = motion::heldTime(spec.stepping, c.name, t, spec.fps);   // (on twos: the moment of the frame it holds; film_motion.h)
 		std::string text = drawnAt(tc);
@@ -694,6 +705,11 @@ std::string DataFilm::motionOf(const Character &c, const CharacterKind &kind, do
 			momentOf(c, u, &at);
 			return at;
 		}, t, kind.height * c.scale, squash));
+	// its walk's personality: a sneak's lean, a strut's sway, a skip's hops (film_motion.h gaitPose)
+	if (m.gait != motion::Gait::Plain) text = motion::wrapped(text, motion::gaitPose(m.gait, m.frame, m.steps, m.going, kind.height * c.scale));
+	// anticipation and settle: wound up before a start or a turn, overshooting after a stop (film_motion.h)
+	if (const double ant = motion::amountFor(spec.anticipate, c.name); ant > 0.0)
+		text = motion::wrapped(text, motion::anticipation([&](double u) { return momentOf(c, u).frame; }, t, kind.height * c.scale, ant));
 	// a smear frame on a dash: drawn out back along its way (film_motion.h)
 	if (const motion::Smear *sm = motion::smearFor(spec.smears, c.name); sm && sm->amount > 0.0)
 		text = motion::wrapped(text, motion::smearStretch([&](double u) {

@@ -331,7 +331,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 			}
 			s.characters.push_back(c);
 		} else if (verb == "walk" || verb == "run" || verb == "jump" || verb == "sit" || verb == "gesture" || verb == "feel") {
-			const std::vector<std::string> t = detail::tokens(line);
+			std::vector<std::string> t = detail::tokens(line);   // (a walk's gait word is taken out of it)
 			Character *c = nullptr;
 			for (Character &each : s.characters)
 				if (t.size() > 1 && each.name == t[1]) c = &each;
@@ -387,6 +387,9 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 				WalkLine wl;
 				wl.line = n;
 				if (verb == "run") wl.style = WalkLine::Run;
+				if (t.size() > 4 && motion::gaitNamed(t[4], wl.gait)) {   // walk NAME FROM SPEED GAIT ...: its personality (film_motion.h), the rest as without it
+					t.erase(t.begin() + 4);
+				}
 				if (t.size() > 4 && t[4] == "to") {   // places to go to, finding its way
 					if (!number(t[2], wl.t0) || !number(t[3], wl.speed) || wl.speed <= 0.0 || (t.size() - 4) % 3 != 0) return fail("`walk NAME FROM SPEED to X Z [to X Z ...]`");
 					for (std::size_t i = 4; i + 2 < t.size(); i += 3) {
@@ -480,6 +483,30 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 				}
 			}
 			s.rigged.push_back(rg);
+		} else if (verb == "mocap") {   // a motion capture a rigged character plays (mocap_bvh.h)
+			const std::vector<std::string> t = detail::tokens(line);
+			const char *usage = "`mocap NAME FILE.bvh at T [to T1] [speed S] [turn DEGREES] [travel]`";
+			Spec::Mocap mc;
+			mc.line = n;
+			mc.dir = sources.back().dir;
+			if (t.size() < 5 || t[3] != "at" || !number(t[4], mc.at)) return fail(usage);
+			mc.who = t[1], mc.file = t[2];
+			if (std::none_of(s.characters.begin(), s.characters.end(), [&](const Character &c) { return c.name == mc.who; }))
+				return fail("`mocap NAME ...` needs a character brought in before it with `character`");
+			for (std::size_t i = 5; i < t.size(); ++i) {
+				if (t[i] == "travel") {
+					mc.travel = true;
+					continue;
+				}
+				double v = 0.0;
+				if (i + 1 >= t.size() || !number(t[i + 1], v)) return fail(usage);
+				if (t[i] == "to" && v > mc.at) mc.to = v;
+				else if (t[i] == "speed" && v > 0.0 && v <= 10.0) mc.speed = v;
+				else if (t[i] == "turn") mc.turn = v;
+				else return fail(usage);
+				++i;
+			}
+			s.mocaps.push_back(mc);
 		} else if (verb == "title") {   // a title card over the opening
 			const std::vector<std::string> t = detail::tokens(line);
 			s.hasTitle = true;
@@ -797,7 +824,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, set, cast, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, spacecam, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, mute, music, toon, voices, acting, lighting, terrain, water, river, waterfall, clouds, fogbank, forest, flock, herd, whale, dolphins, bioluminescence, fireflies, fungi, glacier, iceberg, seaice, wind, tornado, optics, caustics, closeup, tracks, space, planet, moon, nebula, galaxy, star, blackhole, comet, asteroids, remnant, ship, astronaut, descent, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst, mark, cloth, animate, squash, jiggle)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, set, cast, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, spacecam, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, mute, music, toon, voices, acting, lighting, terrain, water, river, waterfall, clouds, fogbank, forest, flock, herd, whale, dolphins, bioluminescence, fireflies, fungi, glacier, iceberg, seaice, wind, tornado, optics, caustics, closeup, tracks, space, planet, moon, nebula, galaxy, star, blackhole, comet, asteroids, remnant, ship, astronaut, descent, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst, mark, cloth, animate, squash, jiggle, smear, anticipate, rigid, terminator, face-normals, mocap, matte)");
 		}
 	}
 	n = shotLine;

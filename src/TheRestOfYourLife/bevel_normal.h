@@ -4,6 +4,7 @@
 // weighted by the cubic falloff and the three axes' multiple importance sampling. camera_path.h calls it right after a path's hit.
 
 #include "../shared/bevel.h"
+#include "../shared/proxy_normal.h"   // proxy_shading_normal_of
 #include "hittable.h"
 #include "rtweekend.h"
 
@@ -47,3 +48,14 @@ inline vec3 at(const hittable &world, const hit_record &rec, double radius, doub
 }
 
 }  // namespace bevel_normal
+
+// The shading normal of `rec` taken towards its material's proxy sphere (src/shared/proxy_normal.h: a cartoon face's clean cel shadows); rec.normal when it has none.
+// (rec.mat's material is known to be material_base's: the caller has read proxy_blend through it.)
+template <class Hit>
+inline vec3 proxy_shading_normal_of(const Hit &rec) {
+	const auto &m = *rec.mat;
+	const double p[3] = {rec.p.x(), rec.p.y(), rec.p.z()}, n[3] = {rec.normal.x(), rec.normal.y(), rec.normal.z()};
+	double out[3];
+	proxy_normal::apply(p, n, m.proxy_center, m.proxy_radius, m.proxy_blend, out);
+	return vec3(out[0], out[1], out[2]);
+}

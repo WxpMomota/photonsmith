@@ -424,6 +424,9 @@ inline void setupMaterialLookup(BuildCtx &c) {
 		built.linkGroup = m.linkGroup;   // light linking (light_link.h)
 		built.bevelRadius = static_cast<float>(m.bevel);   // (rounded edges: bevel.h)
 		built.terminatorOffset = static_cast<float>(m.terminator);   // (round shadows on coarse smooth meshes: shadow_terminator.h)
+		built.proxyCenter = make_float3(static_cast<float>(m.proxyCenter[0]), static_cast<float>(m.proxyCenter[1]), static_cast<float>(m.proxyCenter[2]));   // (proxy_normal.h)
+		built.proxyRadius = static_cast<float>(m.proxyRadius);
+		built.proxyBlend = static_cast<float>(m.proxyBlend);
 		built.hidden = (m.cameraVisible ? 0 : 1) | (m.castsShadow ? 0 : 2);   // (ray visibility)
 		if (em) built.notLit = ~em->illuminates, built.lightGroupPlus1 = em->lightGroup + 1;   // (and light groups: light_groups.h)
 		const int idx = static_cast<int>(out.materials.size());
@@ -1250,7 +1253,7 @@ inline void addTrianglesAndQuads(BuildCtx &c) {
 		qd.normal = make_float3(n.x / len, n.y / len, n.z / len);
 		qd.D = dot(qd.normal, qd.Q);
 		qd.materialIdx = materialIndex(q.material, q.areaLight);
-		if (q.areaLight >= 0) {
+		if (q.areaLight >= 0 && scene.areaLights[static_cast<std::size_t>(q.areaLight)].sampled) {   // (Emission::sampled)
 			out.lightIndices.push_back(static_cast<int>(out.quads.size()));
 			out.lightKinds.push_back(GpuLightKind::Quad);
 		}
@@ -1291,7 +1294,7 @@ inline void addTrianglesAndQuads(BuildCtx &c) {
 		// out darker and noisier than the CPU one with nothing on screen to
 		// explain why. GpuLightKind::Triangle and sample_triangle_light() are
 		// the two halves of the fix.
-		if (t.areaLight >= 0) {
+		if (t.areaLight >= 0 && scene.areaLights[static_cast<std::size_t>(t.areaLight)].sampled) {   // (Emission::sampled)
 			out.lightIndices.push_back(static_cast<int>(out.triangles.size()));
 			out.lightKinds.push_back(GpuLightKind::Triangle);
 		}

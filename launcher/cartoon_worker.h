@@ -37,6 +37,7 @@
 #include "render_setup.h"
 #include "../src/shared/cartoon/cartoons.h"
 #include "../src/shared/cartoon/shot_cameras.h"   // a shot's share of the samples
+#include "shot_samples.h"   // and --noise-target's
 
 namespace cartoon_worker {
 
@@ -169,7 +170,7 @@ inline int run(const Job &job, const LaunchArgs &args, const RenderSetup &setup,
 			a.cam_y = s.cam_y = eye[1];
 			a.cam_z = s.cam_z = eye[2];
 			s.out_path = job.picturePath(frame);
-			s.samples_per_pixel = cartoon::shot_cameras::samplesFor(setup.samples_per_pixel, share);
+			s.samples_per_pixel = cartoon::shot_cameras::samplesFor(setup.samples_per_pixel, share * shot_samples::factorAt(args.shot_samples, job.timeOf(frame)));   // (and --noise-target's)
 			if (job.seeds) a.seed = cartoon_render::frameSeed(args, frame);
 			rc = render(a, s);
 		}

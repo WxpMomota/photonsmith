@@ -17,7 +17,11 @@
 #include <cstdint>
 #include <vector>
 
+#include "cube_lut.h"   // lut: a .cube colour grade
 #include "ppm_text.h"   // parallel_ranges
+#include <cstdio>
+#include <mutex>
+#include <string>
 
 namespace print_look {
 
@@ -26,7 +30,9 @@ struct Params {
 	double watercolor = 0.0;
 	double vintage = 0.0, vintageTone = 0.5;
 	int seed = 0;
-	bool active() const { return halftone > 0.0 || watercolor > 0.0 || vintage > 0.0; }
+	std::string lut;          // a .cube colour grade (cube_lut.h), applied first: the print, paper and film go over the graded picture
+	double lutMix = 1.0;
+	bool active() const { return halftone > 0.0 || watercolor > 0.0 || vintage > 0.0 || !lut.empty(); }
 };
 
 namespace detail {
@@ -215,6 +221,18 @@ inline void vintage(float *rgb, int w, int h, double amount, double tone, int se
 // All of them that `p` asks for, on the shown picture (sRGB 0..1, w x h x 3), in place: the paint first (a watercolour), then the print (the halftone), then the film.
 inline void apply(float *rgb, int w, int h, const Params &p) {
 	if (!p.active() || w < 4 || h < 4) return;
+	if (!p.lut.empty()) {   // the grade (a LUT that cannot be read is said once and left out)
+		std::string why;
+		if (const std::shared_ptr<const cube_lut::Lut> lut = cube_lut::load(p.lut, why)) {
+			const std::size_t n = static_cast<std::size_t>(w) * h;
+			ppm_text::parallel_ranges(n, [&](std::size_t b, std::size_t e) {
+				for (std::size_t i = b; i < e; ++i) cube_lut::apply(*lut, rgb + 3 * i, p.lutMix);
+			});
+		} else {
+			static std::once_flag said;
+			std::call_once(said, [&] { std::fprintf(stderr, "WARNING: %s; the look's LUT is left out\n", why.c_str()); });
+		}
+	}
 	if (p.watercolor > 0.0) watercolor(rgb, w, h, p.watercolor);
 	if (p.halftone > 0.0) halftone(rgb, w, h, p.halftone, p.halftoneMix);
 	if (p.vintage > 0.0) vintage(rgb, w, h, p.vintage, p.vintageTone, p.seed);

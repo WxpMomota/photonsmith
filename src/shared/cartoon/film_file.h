@@ -370,6 +370,10 @@ class DataFilm {
 	std::string sceneAt(double t) const { return inCredits(t) ? creditsScene() : terminated(worldAt(headerAt(t), t)); }
 	// A frame's text with the film's shadow terminator offset (`terminator`, shadow_terminator.h) on every one of its materials; as it is without one.
 	std::string terminated(std::string text) const;
+	// `text` with `words` (pbrt parameters) added to every Material and MakeNamedMaterial statement in it.
+	static std::string withMaterialWords(const std::string &text, const std::string &words);
+	// The film's rigid-body world (igid, rigid_world.h), with its characters' bodies and feet pushing what is in their way.
+	std::shared_ptr<const rigid::Run> rigidRun() const;
 
 	// ---- how shots give way to each other ----
 	std::vector<Transition> transitions() const;

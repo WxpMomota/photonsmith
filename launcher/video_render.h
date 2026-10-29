@@ -73,6 +73,8 @@ extern char** environ;
 #include "launcher/film_captions.h"    // a film's words on its frames
 #include "launcher/film_transitions.h" // its dissolves, fades and wipes
 #include "launcher/film_temporal.h"    // --temporal-denoise
+#include "launcher/noise_budget.h"     // --noise-target: each shot's samples
+#include "launcher/render_farm.h"      // --render-farm: frames shared out with other computers
 #include "launcher/video_frames.h"     // the frames folder: kept on a resume, emptied (when ours) on a fresh start
 #include "launcher/run_log.h"          // the run's own log beside the video, and its warnings summed up at the end
 
@@ -597,6 +599,22 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
         completed, inOrder));
 }
 
+// --render-farm DIR: the frames renderCartoonFrames would render, shared out with the other computers rendering the same film into DIR (render_farm.h): this computer renders a
+// batch of the frames no one has taken at a time, and ends with every frame's picture in `frames_dir`. `set` names the frames on the farm (the film's own, or the other side of its
+// dissolves). Returns the number of frames this computer rendered.
+inline int farmCartoonFrames(const LaunchArgs &args, const RenderSetup &s, const cartoon::Film &film, const std::filesystem::path &frames_dir, int render_frame_count,
+                             const std::vector<char> *only, bool across, const char *set) {
+    const render_farm::Farm farm = render_farm::Farm::at(args.render_farm, set);
+    const int draftStep = std::max(1, args.draft_step);
+    std::vector<char> wanted(static_cast<std::size_t>(render_frame_count), 0);
+    for (int f = 0; f < render_frame_count; f += draftStep) wanted[static_cast<std::size_t>(f)] = !only || (*only)[static_cast<std::size_t>(f)];
+    return render_farm::run(farm, frames_dir, wanted, [&](const std::vector<char> &mask) {
+        BackgroundPngConverter png(frames_dir);
+        renderCartoonFrames(args, s, film, frames_dir, render_frame_count, png, &mask, across);
+        png.finish();
+    });
+}
+
 // Renders every frame (the camera moving along the path), converts them to PNG on a background thread, and reports the counts. SUCCESS, or the error code to exit with;
 // `converted` is the number of PNG frames the assembly will read.
 inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const VideoPaths &paths, int render_frame_count, const camera_keyframes::Path &keyframes,
@@ -637,7 +655,39 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
     const cartoon::Film *cartoon_film = cartoon::forCameraPath(camera_path.c_str());
 
     // A cartoon's frames: by workers or by a child run each (renderCartoonFrames); the picture sequence is handed to the converter in frame order whatever order they finish in.
-    if (cartoon_film) successful_frames = renderCartoonFrames(args, s, *cartoon_film, frames_dir, render_frame_count, png_converter);
+    // --noise-target: each shot's samples measured first, and handed to every frame's run (noise_budget.h)
+    // --render-farm: the farm's video must be this one (render_farm.h); its shots' samples are measured by one computer for all
+    const bool farmed = cartoon_film && !args.render_farm.empty();
+    if (farmed) {
+        const std::string settings = std::string(cartoon_film->key) + " | " + std::to_string(render_frame_count) + " frames at " + std::to_string(video_fps) + " fps | " +
+                                     std::to_string(image_width) + "x" + std::to_string(image_height) + " | " + std::to_string(samples_per_pixel) + " samples | depth " +
+                                     std::to_string(max_ray_depth) + " | draft " + std::to_string(std::max(1, args.draft_step)) + (args.temporal_radius > 0 ? " | a seed a frame" : "") +
+                                     (args.noise_target > 0.0 ? " | noise " + std::to_string(std::lround(args.noise_target * 1000.0)) + "/1000" : "");
+        std::string problem;
+        if (!render_farm::join(args.render_farm, settings, problem)) {
+            std::cerr << "ERROR: --render-farm: " << problem << std::endl;
+            return ERR_INVALID_ARGUMENTS;
+        }
+        std::cout << "\nRender farm in " << args.render_farm << ": " << settings << " (this computer: " << render_farm::hostName() << ")" << std::endl;
+    }
+    LaunchArgs budgeted = args;
+    if (cartoon_film && args.noise_target > 0.0) {
+        const std::filesystem::path file = frames_dir / shot_samples::kFile;
+        const auto measure = [&](const std::filesystem::path &to) {
+            const shot_samples::Table table = noise_budget::measure(*cartoon_film, args, s.exe_path, image_width, image_height, samples_per_pixel, max_ray_depth, s.use_gpu,
+                                                                    frames_dir / "noise", args.noise_target);
+            return shot_samples::save(table, to);
+        };
+        std::error_code ec;
+        if (farmed ? render_farm::once(render_farm::Farm::at(args.render_farm, "frames"), shot_samples::kFile, measure) &&
+                         (std::filesystem::copy_file(std::filesystem::path(args.render_farm) / shot_samples::kFile, file, std::filesystem::copy_options::overwrite_existing, ec), !ec)
+                   : measure(file))
+            budgeted.shot_samples = file.string();
+    }
+    if (farmed) {
+        farmCartoonFrames(budgeted, s, *cartoon_film, frames_dir, render_frame_count, nullptr, false, "frames");
+        successful_frames = cartoon_render::countFrames(frames_dir, render_frame_count);
+    } else if (cartoon_film) successful_frames = renderCartoonFrames(budgeted, s, *cartoon_film, frames_dir, render_frame_count, png_converter);
 
     // Render each frame with animated camera position
     for (int frame = 0; frame < (cartoon_film ? 0 : render_frame_count); ++frame) {
@@ -834,7 +884,10 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
         side.sceneAt = side.sceneAcross;
         std::cout << "\nRendering the other side of the dissolves and wipes of " << cartoon_film->name << "..." << std::endl;
         BackgroundPngConverter across_png(across);
-        renderCartoonFrames(args, s, side, across, render_frame_count, across_png, &only, true);
+        LaunchArgs sideArgs = args;   // (the other side of a dissolve with the same shots' samples)
+        if (const std::filesystem::path file = frames_dir / shot_samples::kFile; args.noise_target > 0.0 && std::filesystem::exists(file)) sideArgs.shot_samples = file.string();
+        if (farmed) farmCartoonFrames(sideArgs, s, side, across, render_frame_count, &only, true, "across");
+        else renderCartoonFrames(sideArgs, s, side, across, render_frame_count, across_png, &only, true);
         across_png.finish();
         // (a draft renders one frame in N here too: each gap in a dissolve is filled with its frame before, as the film's own frames are - left empty, every other frame of
         // a dissolve was blended and the next was not, and it flickered)

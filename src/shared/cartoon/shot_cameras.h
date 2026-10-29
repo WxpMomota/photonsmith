@@ -439,15 +439,30 @@ inline std::string withFrameSeed(std::string text, double t) {
 	return text.insert(end, " seed " + std::to_string(std::llround(std::max(0.0, t) * 100.0)));
 }
 
+// A frame's text with its look line's `lut FILE` made a full path (cube_lut.h): a film's own (beside its cameras file), else the library's (library/luts/), as given when
+// neither has it. A frame's scene is written to a folder of its own, so a bare name would not be found where it is rendered.
+inline std::string withLutPath(std::string text, const std::string &key) {
+	const std::size_t at = text.find("# @rt-look"), world = text.find("WorldBegin");
+	if (at == std::string::npos || (world != std::string::npos && at > world)) return text;
+	const std::size_t end = std::min(text.find('\n', at), text.size()), word = text.find(" lut ", at);
+	if (word == std::string::npos || word > end) return text;
+	const std::size_t from = word + 5, to = std::min(text.find_first_of(" \r\n", from), end);
+	const std::string name = text.substr(from, to - from);
+	if (name.empty() || std::filesystem::path(name).is_absolute()) return text;
+	for (const std::string &rel : {key + "/" + name, std::string("library/luts/") + name, std::string("library/") + name})
+		if (const std::string found = film_cache::asset(rel); !found.empty()) return text.replace(from, to - from, std::filesystem::path(found).generic_string());
+	return text;
+}
+
 inline std::string at(const std::string &key, const std::function<std::vector<double>()> &starts, const std::vector<std::string> &shotNames, double t, const std::string &text) {
 	const std::shared_ptr<const File> file = forFilm(key);
-	if (!file || file->empty()) return withFrameSeed(text, t);
+	if (!file || file->empty()) return withLutPath(withFrameSeed(text, t), key);
 	const std::vector<double> shotStarts = starts ? starts() : std::vector<double>();
 	int shot = 0;
 	for (std::size_t i = 0; i < shotStarts.size(); ++i)
 		if (t >= shotStarts[i]) shot = static_cast<int>(i);
 	const std::string name = shot < static_cast<int>(shotNames.size()) ? shotNames[static_cast<std::size_t>(shot)] : std::string();
-	return withFrameSeed(shot_cameras::apply(text, changeFor(*file, shot, name)), t);
+	return withLutPath(withFrameSeed(shot_cameras::apply(text, changeFor(*file, shot, name)), t), key);
 }
 
 }  // namespace shot_cameras

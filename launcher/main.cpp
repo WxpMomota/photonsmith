@@ -95,7 +95,9 @@ extern char** environ;
 #include "launcher/toon_frame.h"
 #include "launcher/marks_frame.h"   // a scene's cartoon marks, drawn over the finished picture
 #include "launcher/onion_frame.h"   // --film-onion: an onion-skin sheet of a stretch of a film
+#include "launcher/colour_script.h"   // --film-colours: a film's colour script
 #include "launcher/video_render.h"   // --video, --assemble-video
+#include "launcher/storyboard.h"   // --film-storyboard, --film-animatic: a film drawn before it is rendered
 #ifdef RT_HAVE_AVFOUNDATION_ENCODER
 #include "launcher/video_encoder_mac.h"   // Video -> MP4 via AVFoundation, no ffmpeg needed
 #endif
@@ -1239,6 +1241,12 @@ int main(int argc, char** argv) {
 	}
 	// `ray_tracer --film-onion <key> T0 T1 OUT.png [W H] [EVERY]`: an onion-skin sheet of a stretch of a film - ghosts and motion paths (onion_frame.h)
 	if (argc >= 2 && std::string(argv[1]) == "--film-onion") return onion_frame::run(argc, argv);
+	// `ray_tracer --film-colours <key> OUT.png [WIDTH] [gpu]`: a film's colour script - each shot's picture over its main colours (colour_script.h)
+	if (argc >= 2 && std::string(argv[1]) == "--film-colours") return colour_script::run(argc, argv);
+	// `ray_tracer --film-storyboard <key> OUT.png [WIDTH] [colour]` and `--film-animatic <key> OUT.mp4 [WIDTH] [FPS] [colour]`: the film drawn as a storyboard sheet, and as a
+	// video of drawings with its sound (storyboard.h)
+	if (argc >= 2 && std::string(argv[1]) == "--film-storyboard") return storyboard::runSheet(argc, argv);
+	if (argc >= 2 && std::string(argv[1]) == "--film-animatic") return storyboard::runAnimatic(argc, argv);
 	// `ray_tracer --film-scene <key>@<seconds> OUT.pbrt`: writes the scene text of a film's frame at that time (what a render of `cartoon:<key>@<seconds>` draws), to look
 	// into or render by itself. Relative paths in it (Include, pictures) are the film cache's absolute ones or relative to the film's scenes folder.
 	if (argc >= 2 && std::string(argv[1]) == "--film-scene") {

@@ -1185,6 +1185,7 @@ __device__ __forceinline__ void shade_material(
 				found = hit.found, p = hit.position, n = hit.normal, m = hit.materialIdx;
 			},
 			[&seed]() { return static_cast<double>(random_float(seed)); });
+	if (mat.proxyBlend > 0.0f) shadingNormal = gpu_proxy_normal(mat, hit_point, shadingNormal);   // (a proxy sphere's normals: proxy_normal.h)
 	shade_material_surface(*use, matIdx, shadingNormal, ray_dir, hit_point, front_face, uv_u, uv_v, dpdu, do_regularize, seed,
 		out_attenuation, out_scattered_dir, out_scattered, out_is_specular, out_is_medium_boundary, out_brdf_pdf_override, emission,
 		out_bssrdf_exit, out_bssrdf_exit_pos, out_eta, inout_rgb_channel);

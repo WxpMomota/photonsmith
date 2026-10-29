@@ -27,6 +27,7 @@
 #include "film_cloth.h"
 #include "film_motion.h"
 #include "rigid_world.h"
+#include "film_matte.h"
 #include "film_particles.h"
 #include "film_paths.h"
 #include "film_acting.h"
@@ -125,6 +126,7 @@ struct Shot {
 // A character a film file brings in (`character NAME KIND ...`), its walks (`walk`) and its gestures (`gesture`).
 struct WalkLine {
 	enum Style { Walk, Run, Jump } style = Walk;
+	motion::Gait gait = motion::Gait::Plain;   // (`walk NAME FROM SPEED GAIT ...`) its personality: sneak, tiptoe, stomp, strut, skip, shuffle, stagger (film_motion.h)
 	double height = 0.5;   // (a jump) how high it rises
 	double t0 = 0.0, speed = 0.8;
 	std::vector<std::pair<double, double>> points;   // pbrt x z (for a walk that finds its way: the way found, when the film is loaded)
@@ -181,6 +183,7 @@ struct CharacterMoment {
 	Reach look;
 	bool idle = false;   // its idle life: breathing, a shifting weight, darting eyes (the film's `idle`, on unless it says off)
 	double running = 0.0;    // 1 while it runs (a longer stride: its gait 1.6 times as wide), 0 walking
+	motion::Gait gait = motion::Gait::Plain;   // the gait of the walk it is on (film_motion.h gaitPose)
 	double crouch = 0.0;     // 0..1: crouched before a jump, squashed by a landing
 	bool airborne = false;   // in the air in a jump
 	double sit = 0.0;        // 0 standing .. 1 sitting, on a seat `seat` high
@@ -277,6 +280,17 @@ struct Spec {
 	// props with physics: the block they move, and the line that says so
 	std::vector<std::pair<std::string, physics::Bounce>> bounces;
 	std::vector<rigid::BodyDef> rigids;   // (`rigid`: one rigid-body world for all of them, rigid_world.h)
+	// `mocap NAME FILE.bvh at T [to T1] [speed S] [turn DEG] [travel]`: a motion capture played by a rigged character (mocap_bvh.h, film_rigged.h addMocapClip)
+	struct Mocap {
+		std::string who, file;
+		std::filesystem::path dir;   // (the file's folder: the film file's, or its cast's)
+		double at = 0.0, to = -1.0;  // to < 0: the capture's own length
+		double speed = 1.0, turn = 0.0;
+		bool travel = false;
+		int line = 0;
+	};
+	std::vector<Mocap> mocaps;
+	std::vector<matte::Matte> mattes;   // (`matte`: painted pictures projected behind the set, film_matte.h)
 	std::vector<std::pair<std::string, physics::Topple>> topples;
 	std::vector<std::pair<std::string, int>> physicsLines;
 	std::vector<speech::Line> lines;   // what the characters say (`say`)
@@ -481,8 +495,9 @@ struct Spec {
 	std::vector<cloth::Cloth> cloths;
 	// the cartoon's ways of moving (film_motion.h): on twos (`animate`), squash and stretch (`squash`), follow-through (`jiggle`)
 	std::vector<motion::Stepping> stepping;
-	std::vector<motion::Amount> squash, jiggle;
+	std::vector<motion::Amount> squash, jiggle, anticipate;
 	std::vector<motion::Smear> smears;   // (`smear`: film_motion.h)
+	std::vector<motion::Amount> faceNormals;   // (`face-normals [NAME] [B]`: a character's shading normals from a sphere round its head, proxy_normal.h)
 };
 
 struct Parsed {

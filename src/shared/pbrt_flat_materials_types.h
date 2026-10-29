@@ -158,6 +158,8 @@ struct Material {
 	int linkGroup = 0;                 // light linking (light_link.h): the group of the shapes it is on (pbrt_scene.h MaterialDecl::linkGroup)
 	double bevel = 0.0;                // the bevel shader's radius (bevel.h: `"float bevel"`, our extension); 0: none
 	double terminator = 0.0;           // the shadow terminator offset's cutoff (shadow_terminator.h: `"float terminator"`, our extension, Cycles'); 0: off
+	double proxyCenter[3] = {0, 0, 0}; // shading normals from a proxy sphere (proxy_normal.h: "point3 normalcenter", "float normalradius", "float normalblend"); blend 0: off
+	double proxyRadius = 0.0, proxyBlend = 0.0;
 	bool cameraVisible = true;         // ray visibility (pbrt_scene.h MaterialDecl): seen by camera rays
 	bool castsShadow = true;           //   and casting shadows
 	std::string name;                  // a named material's name (a link group's copy has its original's), for the ID passes (cryptomatte.h); empty: unnamed

@@ -122,7 +122,7 @@ inline std::string cartoonLine(Spec &s, const std::string &verb, const std::stri
 		s.stepping.push_back(st);
 		return "";
 	}
-	if (verb == "squash" || verb == "jiggle") {   // squash [NAME] S, jiggle [NAME] S (film_motion.h)
+	if (verb == "squash" || verb == "jiggle" || verb == "anticipate") {   // squash [NAME] S, jiggle [NAME] S, anticipate [NAME] A (film_motion.h)
 		const std::vector<std::string> t = detail::tokens(line);
 		motion::Amount a;
 		const double most = verb == "squash" ? 2.0 : 3.0;
@@ -133,7 +133,7 @@ inline std::string cartoonLine(Spec &s, const std::string &verb, const std::stri
 		}
 		if ((t.size() != 2 && t.size() != 3) || !number(t.back(), a.amount) || a.amount < 0.0 || a.amount > most)
 			return fail("`" + verb + " [NAME] S`: S from 0 (none) to " + (verb == "squash" ? std::string("2") : std::string("3")) + " (1 the usual)");
-		(verb == "squash" ? s.squash : s.jiggle).push_back(a);
+		(verb == "squash" ? s.squash : verb == "jiggle" ? s.jiggle : s.anticipate).push_back(a);
 		return "";
 	}
 	if (verb == "smear") {   // smear [NAME] S [multiples N] (film_motion.h)
@@ -198,6 +198,43 @@ inline std::string cartoonLine(Spec &s, const std::string &verb, const std::stri
 		if (d.start < 0.0 && (length(d.velocity) > 0.0 || length(d.spin) > 0.0)) d.start = 0.0;   // (thrown from the start)
 		s.rigids.push_back(d);
 		s.physicsLines.push_back({d.block, n});
+		return "";
+	}
+	if (verb == "face-normals") {   // face-normals [NAME] [B]: clean cel shadows on a face (proxy_normal.h)
+		const std::vector<std::string> t = detail::tokens(line);
+		motion::Amount a;
+		std::size_t i = 1;
+		if (i < t.size() && !number(t[i], a.amount)) {
+			a.who = t[i++];
+			if (std::none_of(s.characters.begin(), s.characters.end(), [&](const Character &c) { return c.name == a.who; }))
+				return fail("`face-normals NAME` needs a character brought in before it with `character`");
+		}
+		a.amount = 1.0;
+		if (i < t.size() && (!number(t[i++], a.amount) || a.amount < 0.0 || a.amount > 1.0)) return fail("`face-normals [NAME] [B]`: B how much, from 0 (none) to 1 (1 if not given)");
+		if (i != t.size()) return fail("`face-normals [NAME] [B]`");
+		s.faceNormals.push_back(a);
+		return "";
+	}
+	if (verb == "matte") {   // matte FILE from X Y Z to X Y Z [fov F] [distance D] [floor Y] [bright B] (film_matte.h)
+		const std::vector<std::string> t = detail::tokens(line);
+		const char *usage = "`matte FILE from X Y Z to X Y Z [fov F] [distance D] [floor Y] [bright B]`";
+		matte::Matte m;
+		m.line = n;
+		if (t.size() < 10 || t[2] != "from" || t[6] != "to") return fail(usage);
+		m.file = t[1];
+		if (!number(t[3], m.from.x) || !number(t[4], m.from.y) || !number(t[5], m.from.z) || !number(t[7], m.to.x) || !number(t[8], m.to.y) || !number(t[9], m.to.z)) return fail(usage);
+		if (length(m.to - m.from) < 1e-6) return fail("a matte's `from` and `to` must differ");
+		for (std::size_t i = 10; i + 1 < t.size() + 1; i += 2) {
+			if (i + 1 >= t.size()) return fail(usage);
+			double v = 0.0;
+			if (!number(t[i + 1], v)) return fail(usage);
+			if (t[i] == "fov" && v > 1.0 && v < 170.0) m.fov = v;
+			else if (t[i] == "distance" && v > 0.0) m.distance = v;
+			else if (t[i] == "floor") m.hasFloor = true, m.floor = v;
+			else if (t[i] == "bright" && v >= 0.0) m.bright = v;
+			else return fail(usage);
+		}
+		s.mattes.push_back(m);
 		return "";
 	}
 	if (verb == "terminator") {   // terminator C: every material of the frames rounds the shadows of coarse smooth meshes (shadow_terminator.h)

@@ -421,6 +421,12 @@ struct LaunchArgs {
 	// --defer-print: leave the look's print (halftone, watercolor, vintage: print_look.h) off the picture. A film's frames get it when the video denoises them over time (--temporal-
 	// denoise): it goes on after the denoising (film_temporal.h), which would otherwise average a vintage film's grain and dust away and blur its weave.
 	bool defer_print = false;
+	// --noise-target N: a film's shots given their samples by how noisy each is, so every shot comes out about equally clean (noise_budget.h: N a relative noise, 0.01 to
+	// 0.2); 0 = off. --shot-samples FILE: the shots' factors it measured, handed to every frame's run (shot_samples.h).
+	double noise_target = 0.0;
+	std::string shot_samples;
+	// --render-farm DIR: a film's frames shared out with the other computers rendering the same film into the shared folder DIR (render_farm.h); "" = this computer alone.
+	std::string render_farm;
 	// --preview: a quick look at a film: its sculpted characters three times coarser (RAY_TRACER_FILM_PREVIEW, cartoon_lib.h previewCoarsening; set for the programs the
 	// video starts too), its frames in a folder of their own (frames-<key>-preview). With a small size, few samples and --draft: a whole film in minutes (film.py preview).
 	bool preview = false;
@@ -1011,6 +1017,25 @@ inline FlagResult handle_image_and_video_flag(const std::string& arg, int argc, 
 	} else if (arg == "--defer-print") {
 		out.defer_print = true;
 		consumed_args.insert(i);
+	} else if ((arg == "--noise-target" || arg == "--shot-samples") && i + 1 < argc) {
+		if (arg == "--shot-samples") {
+			out.shot_samples = argv[i + 1];
+		} else {
+			char *end = nullptr;
+			out.noise_target = std::strtod(argv[i + 1], &end);
+			if (!end || *end != '\0' || !(out.noise_target >= 0.005 && out.noise_target <= 0.5)) {
+				std::cerr << "Error: --noise-target takes a relative noise from 0.005 to 0.5 (0.02: clean)\n";
+				return FlagResult::Error;
+			}
+		}
+		consumed_args.insert(i);
+		consumed_args.insert(i + 1);
+		++i;
+	} else if (arg == "--render-farm" && i + 1 < argc) {
+		out.render_farm = argv[i + 1];
+		consumed_args.insert(i);
+		consumed_args.insert(i + 1);
+		++i;
 	} else if (arg == "--preview") {
 		out.preview = true;
 		consumed_args.insert(i);
@@ -1446,7 +1471,7 @@ inline bool parse_launch_args(int argc, char** argv, LaunchArgs& out,
 			// `i + 1 < argc`), or one of the commands that must come first (--export-gltf ...). It used to be dropped without a word unless it was the last token, and the
 			// render went ahead without what was asked for.
 			static const std::set<std::string> kCommands = {"--prepare-gpu", "--assemble-video", "--export-gltf", "--scene-report", "--print-scene-size", "--list-video-presets",
-															 "--film-table", "--film-check", "--film-shots", "--film-subjects", "--film-events", "--film-feet", "--film-media", "--film-scene", "--film-onion", "--film-cuts", "--film-cues", "--film-baseline"};
+															 "--film-table", "--film-check", "--film-shots", "--film-subjects", "--film-events", "--film-feet", "--film-media", "--film-scene", "--film-onion", "--film-colours", "--film-storyboard", "--film-animatic", "--film-cuts", "--film-cues", "--film-baseline"};
 			if (kCommands.count(arg)) std::cerr << "Error: " << arg << " is a command of its own and must be the first argument (see --help)\n";
 			else if (i + 1 >= argc) std::cerr << "Error: \"" << arg << "\" is not an option, or is missing the value it expects (see --help)\n";
 			else std::cerr << "Error: \"" << arg << "\" is not an option (see --help)\n";

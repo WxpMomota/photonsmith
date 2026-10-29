@@ -3,6 +3,7 @@
 // the reading of its lines.
 
 #include "film_file.h"
+#include "../../external/stb_image.h"   // (a matte painting's size: stbi_info)
 
 namespace cartoon {
 namespace film_file {
@@ -92,6 +93,38 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 		if (const std::string e = addRiggedKind(own, file.string(), rg.options); !e.empty()) return filePath + ":" + std::to_string(rg.line) + ": " + e;
 		for (Character &c : spec.characters)
 			if (c.kind == rg.kind) c.kind = own;
+	}
+	for (matte::Matte &m : spec.mattes) {   // the matte paintings' pictures: beside the film file, else in the library; their shapes as wide as they are
+		std::filesystem::path file = std::filesystem::path(m.file).is_absolute() ? std::filesystem::path(m.file) : base / m.file;
+		std::error_code ec;
+		if (!std::filesystem::exists(file, ec) && !std::filesystem::path(m.file).is_absolute())
+			if (const std::string lib = film_cache::asset("library/" + m.file); !lib.empty()) file = lib;
+		int w = 0, h = 0, comp = 0;
+		if (!stbi_info(file.string().c_str(), &w, &h, &comp) || w <= 0 || h <= 0) return filePath + ":" + std::to_string(m.line) + ": the matte painting " + file.string() + " cannot be read";
+		m.file = std::filesystem::absolute(file, ec).generic_string();
+		m.aspect = static_cast<double>(w) / h;
+	}
+	for (const Spec::Mocap &mc : spec.mocaps) {   // the motion captures its rigged characters play: a clip of the kind's rig, played as a gesture
+		std::filesystem::path file = std::filesystem::path(mc.file).is_absolute() ? std::filesystem::path(mc.file) : (mc.dir.empty() ? base : mc.dir) / mc.file;
+		std::error_code ec;
+		if (!std::filesystem::exists(file, ec) && !std::filesystem::path(mc.file).is_absolute())
+			if (const std::string lib = film_cache::asset("library/" + mc.file); !lib.empty()) file = lib;
+		Character *who = nullptr;
+		for (Character &c : spec.characters)
+			if (c.name == mc.who) who = &c;
+		if (!who) continue;
+		char clip[300];
+		std::snprintf(clip, sizeof clip, "mocap:%s|%g|%g|%d", file.filename().string().c_str(), mc.speed, mc.turn, mc.travel ? 1 : 0);
+		mocap::Options o;
+		o.speed = mc.speed, o.turn = mc.turn, o.travel = mc.travel;
+		double length = 0.0;
+		if (const std::string e = addMocapClip(who->kind, clip, file.string(), o, length); !e.empty()) return filePath + ":" + std::to_string(mc.line) + ": " + e;
+		rig::Gesture g;   // (played from its start - a gesture's clip runs from its in0 - faded in over its first 0.3 s and out over its last)
+		g.pose = clip;
+		const double end = mc.to > mc.at ? mc.to : mc.at + length;
+		g.in0 = mc.at, g.in1 = std::min(mc.at + 0.3, 0.5 * (mc.at + end));
+		g.out0 = std::max(g.in1, end - 0.3), g.out1 = end;
+		who->gestures.push_back(g);
 	}
 	for (const Character &c : spec.characters)
 		if (!characterKinds().count(c.kind)) {
@@ -827,7 +860,7 @@ rig::PathWalk DataFilm::pathOf(const Character &c, std::size_t walk) const {
 	for (std::size_t p = 0; p < wl.points.size(); ++p) w.points.push_back(story(wl.points[p].first, p < wl.heights.size() ? wl.heights[p] : c.start[1], wl.points[p].second));
 	w.start = c.walks[walk].t0;
 	w.speed = c.walks[walk].speed;
-	w.stride = kind.stride * c.scale * (c.walks[walk].style == WalkLine::Run ? kRunStride : 1.0);
+	w.stride = kind.stride * c.scale * (c.walks[walk].style == WalkLine::Run ? kRunStride : 1.0) * motion::gaitStride(c.walks[walk].gait);   // (a sneak's long steps, a tiptoe's short)
 	w.firstStep = kind.firstStep;
 	return w;
 }
@@ -868,6 +901,7 @@ CharacterMoment DataFilm::momentOf(const Character &c, double t, Vec3 *at) const
 	Vec3 where = story(c.start[0], c.start[1], c.start[2]);
 	double heading = -c.facing, steps = 0.0, running = 0.0, crouch = 0.0, going = 0.0;
 	bool moving = false, airborne = false;
+	motion::Gait gait = motion::Gait::Plain;
 	for (std::size_t i = 0; i < c.walks.size(); ++i) {
 		const WalkLine &w = c.walks[i];
 		if (t < w.t0 || w.points.empty()) {   // (a way not found yet: the film is being loaded)
@@ -903,11 +937,13 @@ CharacterMoment DataFilm::momentOf(const Character &c, double t, Vec3 *at) const
 		steps = a.steps;
 		moving = a.moving;
 		running = w.style == WalkLine::Run ? 1.0 : 0.0;
+		gait = w.gait;
 		if (moving) break;
 	}
 	CharacterMoment m;
 	m.running = running;
-	m.crouch = crouch;
+	m.gait = moving || going > 0.0 ? gait : motion::Gait::Plain;
+	m.crouch = std::max(crouch, motion::gaitCrouch(m.gait) * going);   // (a sneak goes crouched)
 	m.airborne = airborne;
 	for (const Character::Sit &st : c.sits) {
 		const double s = smoothstep(st.t0, st.t0 + 0.7, t) * (1.0 - smoothstep(st.t1, st.t1 + 0.7, t));
@@ -1087,7 +1123,7 @@ std::vector<FilmEvent> DataFilm::events() const {
 		impacts.insert(impacts.end(), i.begin(), i.end());
 	}
 	if (!spec.rigids.empty()) {   // (the rigid-body world's hard landings)
-		const std::vector<physics::Impact> &i = rigid::runFor(spec.rigids, std::max(spec.length, spec.storyEnd) + 1.0)->impacts;
+		const std::vector<physics::Impact> &i = rigidRun()->impacts;
 		impacts.insert(impacts.end(), i.begin(), i.end());
 	}
 	for (const physics::Impact &i : impacts) {
@@ -1371,6 +1407,34 @@ std::string DataFilm::terminated(std::string text) const {
 	if (spec.terminator <= 0.0) return text;
 	char words[64];
 	std::snprintf(words, sizeof words, " \"float terminator\" [ %g ]", spec.terminator);
+	return withMaterialWords(text, words);
+}
+
+std::shared_ptr<const rigid::Run> DataFilm::rigidRun() const {
+	// the characters push what is in their way: each a mover of its body and (a kind that says where its feet are) its two feet, sampled 120 times a second
+	return rigid::runFor(spec.rigids, std::max(spec.length, spec.storyEnd) + 1.0, spec.version, [this] {
+		std::vector<rigid::Kinematic> out;
+		const double seconds = std::max(spec.length, spec.storyEnd) + 1.0;
+		for (const Character &c : spec.characters) {
+			const CharacterKind &kind = characterKinds().at(c.kind);
+			rigid::Kinematic body, feet[2];
+			body.radius = std::max(0.05, kind.radius * c.scale);
+			for (rigid::Kinematic &f : feet) f.radius = std::max(0.03, 0.06 * kind.height * c.scale);
+			for (double u = 0.0; u <= seconds; u += body.step) {
+				const CharacterMoment m = momentOf(c, u);
+				const auto pbrt = [](Vec3 p) { return Vec3{-p.x, p.y, p.z}; };   // (story space to pbrt's)
+				body.at.push_back(pbrt(transformPoint(m.frame, Vec3{0.0, 0.5 * kind.height, 0.0} * c.scale)));
+				for (int s = 0; s < 2; ++s)
+					feet[s].at.push_back(kind.footAt ? pbrt(transformPoint(m.frame, kind.footAt(m.steps, s) * c.scale)) + Vec3{0.0, feet[s].radius, 0.0} : Vec3{0.0, -1e6, 0.0});
+			}
+			out.push_back(body);
+			if (kind.footAt) out.push_back(feet[0]), out.push_back(feet[1]);
+		}
+		return out;
+	});
+}
+
+std::string DataFilm::withMaterialWords(const std::string &text, const std::string &words) {
 	// one pass, the text copied once (a frame is megabytes, with thousands of materials): after each `Material "TYPE"` and `MakeNamedMaterial "NAME"` - a statement, not the
 	// end of a longer word (NamedMaterial, MakeNamedMaterial's own `Material "`) - the words, the parameters' order being free
 	const std::string key = "Material \"";
@@ -1474,7 +1538,7 @@ std::string DataFilm::transformsAt(const std::string &name, double t) const {
 	}
 	for (std::size_t k = 0; k < spec.rigids.size(); ++k) {   // a body of the film's rigid-body world (rigid_world.h): where the world has it
 		if (spec.rigids[k].block != name) continue;
-		const std::vector<rigid::Pose> poses = rigid::posesAt(*rigid::runFor(spec.rigids, std::max(spec.length, spec.storyEnd) + 1.0), t);
+		const std::vector<rigid::Pose> poses = rigid::posesAt(*rigidRun(), t);
 		if (k < poses.size()) out += rigid::transformOf(spec.rigids[k], poses[k], &DataFilm::num);
 	}
 	for (const auto &[block, p] : spec.topples) {

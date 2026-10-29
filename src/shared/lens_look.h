@@ -128,6 +128,12 @@ inline std::string parse(const std::string &text, Look &out) {
 			out.sunbeamsAt = true, out.sunbeamsX = std::clamp(x, -2.0, 3.0), out.sunbeamsY = std::clamp(y, -2.0, 3.0);
 			continue;
 		}
+		if (word == "lut") {   // a .cube colour grade (cube_lut.h): a path, no spaces
+			std::string path;
+			if (!(in >> path)) return "\"lut\" takes a .cube file";
+			out.print.lut = path;
+			continue;
+		}
 		if (word == "tonemap") {
 			std::string name;
 			in >> name;
@@ -161,9 +167,10 @@ inline std::string parse(const std::string &text, Look &out) {
 		else if (word == "vintage") out.print.vintage = std::clamp(v, 0.0, 2.0);
 		else if (word == "vintage-tone") out.print.vintageTone = std::clamp(v, 0.0, 1.0);
 		else if (word == "seed") out.print.seed = static_cast<int>(std::clamp(v, -1e9, 1e9));
+		else if (word == "lut-mix") out.print.lutMix = std::clamp(v, 0.0, 1.0);
 		else return "unknown word \"" + word + "\" (bloom, bloom-radius, flare, star, star-points, star-angle, star-length, star-threshold, vignette, warmth, saturation, lift, "
 					"gamma, gain, tint, tonemap, paint, paint-sharpness, paint-stretch, paint-smoothness, sunbeams, sunbeams-length, sunbeams-threshold, sunbeams-at, halftone, "
-					"halftone-mix, watercolor, vintage, vintage-tone, seed)";
+					"halftone-mix, watercolor, vintage, vintage-tone, seed, lut, lut-mix)";
 	}
 	return "";
 }

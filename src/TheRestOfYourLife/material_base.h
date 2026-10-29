@@ -158,6 +158,8 @@ class material {
     double bevel_radius = 0.0;
     // The shadow terminator offset (src/shared/shadow_terminator.h, Cycles'): below this cosine a shadow ray leaves a smooth-shaded mesh from its round surface; 0: off.
     double terminator_offset = 0.0;
+    // Shading normals from a proxy sphere (src/shared/proxy_normal.h): its centre, radius and blend (0: off) - a cartoon face's clean cel shadows.
+    double proxy_center[3] = {0.0, 0.0, 0.0}, proxy_radius = 0.0, proxy_blend = 0.0;
     // Ray visibility (src/shared/pbrt_scene.h MaterialDecl): a shape the camera's rays pass through, and one that casts no shadows.
     bool camera_visible = true, casts_shadow = true;
 

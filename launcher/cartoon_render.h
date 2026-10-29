@@ -35,6 +35,7 @@
 #include "frame_fingerprint.h"
 #include "launcher_args.h"
 #include "../src/shared/cartoon/cartoons.h"
+#include "shot_samples.h"
 #include "../src/shared/cartoon/shot_cameras.h"   // a shot's share of the samples
 #include "../src/shared/cartoon/film_cache.h"
 
@@ -55,7 +56,8 @@ inline std::vector<std::string> frameFlags(const LaunchArgs &args, const cartoon
 	// noisy at 500 samples for their pixels to stop, and cost what they did.
 	if (gpu && !args.adaptive_sampling && !args.no_adaptive) flags.push_back("--adaptive");
 	flags.push_back("--ppm-only");   // (the video makes the PNG of every frame itself: video_render.h, BackgroundPngConverter)
-	if (args.temporal_radius > 0) flags.push_back("--defer-print");   // (the look's print goes on after the frames are denoised over time: film_temporal.h)
+	if (args.temporal_radius > 0) flags.push_back("--defer-print");
+	if (!args.shot_samples.empty()) flags.push_back("--shot-samples"), flags.push_back(args.shot_samples);   // (--noise-target: each shot's samples, shot_samples.h)   // (the look's print goes on after the frames are denoised over time: film_temporal.h)
 	return flags;
 }
 
@@ -104,7 +106,7 @@ inline int renderFrame(const cartoon::Film &film, double t, const std::filesyste
 		}
 		const std::string fp = frame_fingerprint::of(text);
 		if (fingerprint) *fingerprint = fp;
-		spp = cartoon::shot_cameras::samplesFor(spp, cartoon::shot_cameras::sampleShareOf(text));   // (a shot that needs fewer samples: its cameras file's `samples`)
+		spp = cartoon::shot_cameras::samplesFor(spp, cartoon::shot_cameras::sampleShareOf(text) * shot_samples::factorAt(args.shot_samples, t));   // (and --noise-target's)   // (a shot that needs fewer samples: its cameras file's `samples`)
 		if (!keepIf.empty() && fp == keepIf) {
 			if (kept) *kept = true;
 			return 0;

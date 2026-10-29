@@ -720,6 +720,7 @@ inline void flattenAreaLights(const pbrt_scene::Scene &scene, FlatScene &out) {
 		// comment on each field.
 		e.filename = ld.params.getString("filename", "");
 		e.twoSided = ld.params.getBool("twosided", false);
+		e.sampled = ld.params.getBool("sampled", true);   // (a glow that is no light to aim at: Emission::sampled)
 		if (const pbrt_scene::Param *p = ld.params.find("power")) {
 			if (!p->numbers.empty()) {
 				e.hasPower = true;

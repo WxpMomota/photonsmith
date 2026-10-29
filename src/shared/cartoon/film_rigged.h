@@ -16,6 +16,7 @@
 #include <mutex>
 
 #include "../gltf_skin.h"
+#include "mocap_bvh.h"   // motion capture onto a rigged character (addMocapClip)
 
 namespace cartoon {
 namespace film_file {
@@ -170,11 +171,24 @@ inline std::string textOf(const Kept &k, const std::string &kind, const RigOptio
 
 }  // namespace rigged
 
+namespace rigged {
+// The rig each rigged kind draws with now (a motion capture adds a clip to it: addMocapClip), and its sizing.
+struct Registered {
+	std::shared_ptr<const Kept> kept;
+	RigOptions options;
+};
+inline std::map<std::string, Registered> &registered() {
+	static std::map<std::string, Registered> r;
+	return r;
+}
+}  // namespace rigged
+
 // A kind made from a rigged glTF character (see above): "" when it is added to the kinds under `kind`, else what is wrong.
 inline std::string addRiggedKind(const std::string &kind, const std::string &path, const RigOptions &o) {
 	std::string why;
 	const std::shared_ptr<const rigged::Kept> k = rigged::kept(path, o, why);
 	if (!k) return why;
+	rigged::registered()[kind] = {k, o};
 	CharacterKind c;
 	const double h = o.height;
 	c.chest = {0.0, 0.72 * h, 0.0};
@@ -190,6 +204,33 @@ inline std::string addRiggedKind(const std::string &kind, const std::string &pat
 		if (static_cast<int>(i) != k->walk && static_cast<int>(i) != k->idle && static_cast<int>(i) != k->run) c.poses.push_back(k->rig.clips[i].name);
 	c.text = [k, kind, o](const CharacterMoment &m) { return rigged::textOf(*k, kind, o, m); };
 	characterKinds()[kind] = c;
+	return std::string();
+}
+
+// A motion capture (mocap_bvh.h) as a clip `clip` of the rigged kind `kind`, which its gestures can then play: "" or what is wrong. `length` gets the clip's seconds.
+inline std::string addMocapClip(const std::string &kind, const std::string &clip, const std::string &bvhPath, const mocap::Options &o, double &length) {
+	const auto reg = rigged::registered().find(kind);
+	if (reg == rigged::registered().end() || !characterKinds().count(kind)) return "motion capture is for a rigged character (a `rigged` model's kind)";
+	const int have = reg->second.kept->rig.clipNamed(clip);
+	if (have >= 0) {   // (the same capture again: the clip it made)
+		length = reg->second.kept->rig.clips[static_cast<std::size_t>(have)].length;
+		return std::string();
+	}
+	std::ifstream in(bvhPath, std::ios::binary);
+	if (!in) return "the motion capture " + bvhPath + " cannot be read";
+	const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+	mocap::Bvh b;
+	if (const std::string e = mocap::parse(text, b); !e.empty()) return bvhPath + ": " + e;
+	auto k = std::make_shared<rigged::Kept>(*reg->second.kept);
+	gltf_skin::Clip made;
+	if (const std::string e = mocap::retarget(k->rig, b, o, clip, made); !e.empty()) return bvhPath + ": " + e;
+	length = made.length;
+	k->rig.clips.push_back(std::move(made));
+	std::shared_ptr<const rigged::Kept> kc = k;
+	reg->second.kept = kc;
+	const RigOptions ro = reg->second.options;
+	characterKinds()[kind].text = [kc, kind, ro](const CharacterMoment &m) { return rigged::textOf(*kc, kind, ro, m); };
+	characterKinds()[kind].poses.push_back(clip);
 	return std::string();
 }
 

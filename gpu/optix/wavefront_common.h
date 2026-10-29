@@ -54,6 +54,7 @@
 #include "../../src/shared/ray_hash.h"   // pbrt-v4 stochastic alpha test hash - see wf_passes_alpha_cutout()
 #include "gpu_bump_map.h"                // grayscale "texture displacement" bump - see __closesthit__wf_triangle
 #include "../../src/shared/shadow_terminator.h"   // the shadow terminator offset - see __closesthit__wf_triangle
+#include "proxy_normal_device.h"                  // a proxy sphere's shading normals - see __raygen__wf_trace
 
 // Wavefront launch params live in constant memory.
 extern "C" { __constant__ WavefrontLaunchParams wf_params; }

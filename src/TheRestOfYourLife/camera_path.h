@@ -628,6 +628,7 @@ template <typename Sampler>
         if (camera_medium) camera_path_detail::sample_camera_medium(*this, current_ray, hit_something, rec, beta);
         // the bevel shader (bevel_normal.h): a bevelled material's edges rounded in its shading normal
         if (hit_something && rec.mat && rec.mat->bevel_radius > 0.0 && !rec.has_medium_event) rec.normal = bevel_normal::at(world, rec, rec.mat->bevel_radius, current_ray.time());
+        if (hit_something && rec.mat && rec.mat->proxy_blend > 0.0 && !rec.has_medium_event) rec.normal = proxy_shading_normal_of(rec);   // (a proxy sphere's normals: proxy_normal.h)
 
         // Miss -- query sky (HDR env map) or fall back to flat background.
         // Mirrors pbrt-v4: "Incorporate emission from infinite lights for escaped ray"
@@ -1081,6 +1082,7 @@ template <typename Sampler>
             break;
         }
         if (rec.mat && rec.mat->bevel_radius > 0.0) rec.normal = bevel_normal::at(world, rec, rec.mat->bevel_radius, current_ray.time());   // (the bevel shader)
+        if (rec.mat && rec.mat->proxy_blend > 0.0) rec.normal = proxy_shading_normal_of(rec);   // (a proxy sphere's normals: proxy_normal.h)
 
         // Texture-lookup footprint - identical to ray_color(), no
         // spectral dependence (see that function's own comment).

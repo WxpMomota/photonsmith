@@ -431,6 +431,10 @@ struct MaterialData {
 	float bevelRadius = 0.0f;
 	// The shadow terminator offset's cutoff (src/shared/shadow_terminator.h): a smooth-shaded triangle's shadow rays near the terminator start from its round surface; 0: off.
 	float terminatorOffset = 0.0f;
+	// Shading normals from a proxy sphere (src/shared/proxy_normal.h): its centre, radius and blend (0: off) - a cartoon face's clean cel shadows.
+	float3 proxyCenter = {0.0f, 0.0f, 0.0f};
+	float proxyRadius = 0.0f;
+	float proxyBlend = 0.0f;
 	// Ray visibility (src/shared/pbrt_scene.h MaterialDecl): bit 1 hidden from camera rays (they pass through it), bit 2 casts no shadows; 0 (a zeroed MaterialData) seen by all.
 	int hidden = 0;
 };

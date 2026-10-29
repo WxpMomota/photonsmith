@@ -143,6 +143,103 @@ inline std::vector<double> smearTimes(const std::function<Vec3(double)> &placeAt
 	return out;
 }
 
+// ---- walk and run personalities: `walk NAME FROM SPEED GAIT ...` ----
+// A gait as an animator draws it: sneak (crouched, leaning in, long slow steps), tiptoe (up on its toes, short quick bobbing steps, leaning back), stomp (heavy, dropping
+// onto each foot), strut (leaning back, hips swaying, a bounce), skip (a hop on every step), shuffle (slumped, short dragging steps: sad), stagger (wobbling, weaving
+// from side to side). Each changes the stride the walk's steps are counted with and adds its own lean, bob and sway about the feet, on top of whatever the kind's own
+// walk does - so every kind of character gets them.
+enum class Gait { Plain, Sneak, Tiptoe, Stomp, Strut, Skip, Shuffle, Stagger };
+
+inline const std::vector<std::string> &gaitNames() {
+	static const std::vector<std::string> names = {"plain", "sneak", "tiptoe", "stomp", "strut", "skip", "shuffle", "stagger"};
+	return names;
+}
+// The gait a word names; false when it is not one.
+inline bool gaitNamed(const std::string &word, Gait &out) {
+	const std::vector<std::string> &n = gaitNames();
+	const auto it = std::find(n.begin(), n.end(), word);
+	if (it == n.end()) return false;
+	out = static_cast<Gait>(it - n.begin());
+	return true;
+}
+// How long its steps are, as a share of the kind's own (at the same speed: longer steps are slower ones).
+inline double gaitStride(Gait g) {
+	switch (g) {
+	case Gait::Sneak: return 1.25;
+	case Gait::Tiptoe: return 0.6;
+	case Gait::Stomp: return 0.85;
+	case Gait::Strut: return 1.1;
+	case Gait::Skip: return 1.3;
+	case Gait::Shuffle: return 0.55;
+	case Gait::Stagger: return 0.9;
+	default: return 1.0;
+	}
+}
+// How far it crouches (the kind's own `crouch`, 0..1).
+inline double gaitCrouch(Gait g) { return g == Gait::Sneak ? 0.35 : g == Gait::Shuffle ? 0.12 : 0.0; }
+
+// The gait's pose: a deformation of story space about the character's feet (frame' = pose * frame), `height` tall, at `steps` (the walk's step count) and `going` (0..1:
+// how far into its walk it is - setting off and stopping ease it in and out).
+inline Mat4 gaitPose(Gait g, const Mat4 &frame, double steps, double going, double height) {
+	if (g == Gait::Plain || going <= 0.0) return identity();
+	const double h = std::max(0.1, height), p = steps - std::floor(steps), side = (static_cast<long>(std::floor(steps)) % 2 == 0) ? 1.0 : -1.0;
+	const double up1 = std::sin(kPi * p);   // (0 at each footfall, 1 at the step's middle)
+	double rise = 0.0, lean = 0.0, roll = 0.0, yaw = 0.0, across = 0.0;   // (body space: up, forward lean (degrees), roll, turn, sideways)
+	switch (g) {
+	case Gait::Sneak: rise = 0.012 * h * up1, lean = 12.0; break;
+	case Gait::Tiptoe: rise = 0.04 * h + 0.025 * h * up1, lean = -4.0; break;
+	case Gait::Stomp: rise = -0.035 * h * std::pow(1.0 - up1, 6.0) + 0.02 * h * up1, lean = 6.0; break;   // (dropping hard onto each foot)
+	case Gait::Strut: rise = 0.03 * h * up1, lean = -8.0, roll = 6.0 * side * up1; break;
+	case Gait::Skip: rise = 0.12 * h * up1 * up1, lean = 3.0; break;
+	case Gait::Shuffle: rise = -0.03 * h + 0.005 * h * up1, lean = 15.0; break;
+	case Gait::Stagger: {
+		const double w = std::sin(0.9 * steps) + 0.5 * std::sin(2.3 * steps + 1.0);
+		roll = 9.0 * w, yaw = 10.0 * std::sin(0.6 * steps + 0.4), across = 0.05 * h * w;
+		break;
+	}
+	default: break;
+	}
+	const double k = std::clamp(going, 0.0, 1.0);
+	// in the character's own space (its feet at the origin, x across it, z the way it faces), then back out through its frame
+	const Mat4 local = mul(translate({across * k, rise * k, 0.0}), rotate({0.0, 1.0, 0.0}, yaw * k), rotate({0.0, 0.0, 1.0}, roll * k), rotate({1.0, 0.0, 0.0}, lean * k));
+	return mul(frame, local, invertAffine(frame));
+}
+
+// ---- anticipation and settle: `anticipate [NAME] A` ----
+// Animation's principle that every action is wound up before and settles after, worked out from the character's own motion so no key need say it: before it sets off it
+// leans back (anticipation) and its body drags back as it speeds up; when it stops it overshoots forward and leans back upright; before a turn it turns a little the
+// other way, and after one it turns on past and back. `frameAt` is where it is and which way it faces at a time (its frame in story space), `height` its size, `amount`
+// how much (1 the usual, up to 3). A deformation about its feet, as gaitPose's.
+inline Mat4 anticipation(const std::function<Mat4(double)> &frameAt, double t, double height, double amount) {
+	if (amount <= 0.0) return identity();
+	const double dt = 1.0 / 60.0;
+	const auto place = [&](double u) { return transformPoint(frameAt(u), {0.0, 0.0, 0.0}); };
+	const auto headingOf = [&](double u) {   // (degrees, about the vertical)
+		const Vec3 z = transformPoint(frameAt(u), {0.0, 0.0, 1.0}) - place(u);
+		return std::atan2(z.x, z.z) * 180.0 / kPi;
+	};
+	const auto velocity = [&](double u) { return (place(u + dt) - place(u - dt)) * (1.0 / (2.0 * dt)); };
+	const auto accel = [&](double u) { return (velocity(u + 0.06) - velocity(u - 0.06)) * (1.0 / 0.12); };
+	const auto turnRate = [&](double u) {
+		double d = headingOf(u + dt) - headingOf(u - dt);
+		while (d > 180.0) d -= 360.0;
+		while (d < -180.0) d += 360.0;
+		return d / (2.0 * dt);   // (degrees a second)
+	};
+	const Mat4 frame = frameAt(t);
+	const Vec3 forward = normalize(transformPoint(frame, {0.0, 0.0, 1.0}) - place(t));
+	const Vec3 flat = normalize(Vec3{forward.x, 0.0, forward.z});
+	// the lean (degrees forward): back before a start and as it drags into speed, forward past a stop
+	const double ahead = dot(accel(t + 0.12), flat), behind = dot(accel(t - 0.10), flat);
+	const double lean = std::clamp(-1.5 * amount * (ahead + behind), -12.0, 12.0);
+	// the turn: the other way before it, on past after it
+	const double turn = std::clamp(0.06 * amount * (turnRate(t - 0.10) - turnRate(t + 0.12)), -12.0, 12.0);
+	if (std::fabs(lean) < 0.05 && std::fabs(turn) < 0.05) return identity();
+	(void)height;
+	const Mat4 local = mul(rotate({0.0, 1.0, 0.0}, turn), rotate({1.0, 0.0, 0.0}, lean));
+	return mul(frame, local, invertAffine(frame));
+}
+
 // How far what dangles from a point (its head) swings behind it at t: the lag of a loose spring following it (story space), scaled by `amount`. `bob` is the walk's own
 // up-and-down at a time, so a walk sets the antennae bouncing.
 inline Vec3 jiggleOf(const std::function<Vec3(double)> &pointAt, double t, double amount) {

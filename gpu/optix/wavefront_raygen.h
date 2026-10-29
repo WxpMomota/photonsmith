@@ -237,6 +237,11 @@ extern "C" __global__ void __raygen__wf_intersect() {
 			wf_resolve_mix_material(wf_params.materials[h.materialIdx], h.materialIdx, h.hitPoint, h.uv_u, h.uv_v, resolvedIdx);
 			h.materialIdx = resolvedIdx;
 		}
+		// a proxy sphere's shading normals (proxy_normal_device.h: a cartoon face's clean cel shadows)
+		if (wf_params.materials[h.materialIdx].proxyBlend > 0.0f && h.geomType != kWfGeomCameraMedium && h.geomType != kWfGeomListedMedium) {
+			if (dot(h.geomNormal, h.geomNormal) < 0.5f) h.geomNormal = h.normal;   // (spawned rays still leave along the surface's own normal)
+			h.normal = gpu_proxy_normal(wf_params.materials[h.materialIdx], h.hitPoint, h.normal);
+		}
 		// Route cheap materials (no texture/layered-BxDF work) into their
 		// own queue so evaluate_materials_simple() can process them without
 		// the big switch's register pressure - see WavefrontQueues::
