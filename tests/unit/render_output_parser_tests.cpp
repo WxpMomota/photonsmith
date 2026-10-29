@@ -84,6 +84,21 @@ TEST(RenderOutputParserTest, VideoFrameProgressSurvivesZeroTotal) {
 	EXPECT_EQ(parseVideoFrameProgress("[0/0] Rendering frame_0000.ppm"), 0);
 }
 
+// A film's 1440 frames: the count and an estimate from it, where whole percent would read 0% and "ETA --:--" for the first 15 frames (a 1080p film at Smart power: ten minutes).
+TEST(RenderOutputParserTest, AFilmsFrameCountAndTheTimeLeftFromHowFastFramesCome) {
+	int done = 0, total = 0;
+	ASSERT_TRUE(parseVideoFrameCount("[9/1440] Rendering frame_0014.png (The Crystal Heart at 0.58 s)... ? (39.4s)", done, total));
+	EXPECT_EQ(done, 9);
+	EXPECT_EQ(total, 1440);
+	EXPECT_EQ(parseVideoFrameProgress("[9/1440] Rendering frame_0014.png"), 0) << "what the bar alone could say";
+	EXPECT_FALSE(parseVideoFrameCount(kRealScanline, done, total));
+	EXPECT_FALSE(parseVideoFrameCount("[0/0] Rendering frame_0000.ppm", done, total));
+
+	EXPECT_EQ(framesSecondsLeft(0.0, 1, 1, 1440), -1.0) << "one frame: no rate yet";
+	EXPECT_DOUBLE_EQ(framesSecondsLeft(320.0, 1, 9, 1440), 40.0 * 1431) << "8 frames in 320 s since the first: 40 s each, 1431 left";
+	EXPECT_DOUBLE_EQ(framesSecondsLeft(100.0, 1, 1440, 1440), 0.0);
+}
+
 TEST(RenderOutputParserTest, DetectsVideoAssemblyHandoff) {
 	EXPECT_TRUE(isVideoAssemblyStart("=== ASSEMBLING VIDEO WITH FFMPEG ==="));
 	EXPECT_FALSE(isVideoAssemblyStart(kRealRenderTime));

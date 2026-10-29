@@ -561,6 +561,9 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
                 return free > 0 && free < 1024;
             };
         }
+        // --smart-power: the workers that go on after one is stopped for the card's memory pause as fewer frames at once (they are started again on its frames, and read this)
+        if (RunPolicy::from(args).smart)
+            hooks.workersNow = [](int n) { set_env_var(RunPolicy::kSmartFramesVariable, std::to_string(std::max(1, n)).c_str()); };
         // (a worker's first frame on a GPU also compiles the shaders when their cache is cold, about 18 minutes for the default renderer: it gets 45)
         return finish(cartoon_render::runWorkers(todo, workers, timeout, hooks, completed, inOrder, 25, cartoon_render::workerMemoryLimitBytes(args), use_gpu ? 45 * 60 : 0) + resumed);
     }

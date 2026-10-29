@@ -597,6 +597,8 @@ void RenderController::parseProgressLine(const QString &line) {
 	// onRenderComplete snaps to 100% once the subprocess actually exits.
 	if (m_videoMode) {
 		const int framePct = render_output::parseVideoFrameProgress(raw);
+		int done = 0, total = 0;
+		if (render_output::parseVideoFrameCount(raw, done, total)) emit videoFrames(done, total);
 		if (framePct != render_output::kNoProgress && framePct > m_lastProgress) {
 			emit progressUpdate(framePct);
 			m_lastProgress = framePct;

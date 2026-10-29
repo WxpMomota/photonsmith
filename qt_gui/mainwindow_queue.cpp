@@ -325,6 +325,11 @@ void MainWindow::startRenderJob(const RenderJob &job) {
 	connect(m_renderController, &RenderController::renderComplete, this, &MainWindow::onRenderComplete);
 	connect(m_renderController, &RenderController::logMessage, this, &MainWindow::onLogMessage);
 	connect(m_renderController, &RenderController::pauseStateChanged, this, &MainWindow::onControllerPauseStateChanged);
+	// a video's frame count: on the bar beside the percent, and the status line's estimate from it (progress_eta.h)
+	connect(m_renderController, &RenderController::videoFrames, this, [this](int done, int total) {
+		m_progressEta.setFrames(m_renderStartTime.msecsTo(QDateTime::currentDateTime()), done, total);
+		m_progressBar->setFormat(tr("%p%  ·  %1 of %2 frames").arg(done).arg(total));
+	});
 
 	// The controller is done once it reports completion; drop it so
 	// m_renderController is only non-null while a render is actually active.
@@ -389,6 +394,7 @@ void MainWindow::startRenderJob(const RenderJob &job) {
 	// which is the same cadence HandBrake samples at.
 	m_renderStartTime = QDateTime::currentDateTime();
 	m_progressEta.reset();
+	m_progressBar->setFormat(QStringLiteral("%p%"));   // (a video's frame count is added as frames come)
 	setProgressResultState("");
 	// Indeterminate until the first real progress line: scene loading and
 	// BVH/pipeline build report nothing, and a bar pinned at 0% reads as

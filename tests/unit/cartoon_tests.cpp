@@ -1247,15 +1247,23 @@ TEST(CartoonWorkers, WhenTheCardsMemoryStaysFullOneWorkerFewerRunsAndEveryFrameS
 		return true;   // always full
 	};
 	hooks.cardFullSeconds = 0.0, hooks.cardCheckSeconds = 0.0;
+	std::vector<int> told;
+	hooks.workersNow = [&](int n) { told.push_back(n); };
 	std::vector<int> handed;
-	const int ok = cartoon_render::runWorkers({0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, 2, 0, hooks, [](int, int, double) {}, [&](int f, int) { handed.push_back(f); }, 1);
+	std::vector<int> doneOrder;
+	const int ok = cartoon_render::runWorkers({0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, 2, 0, hooks, [&](int f, int, double) { doneOrder.push_back(f); }, [&](int f, int) { handed.push_back(f); }, 1);
 	EXPECT_EQ(ok, 10) << "no frame lost or given up";
 	EXPECT_EQ(handed, (std::vector<int>{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}));
 	int killed = 0;
 	for (const Made &m : made) killed += *m.killed ? 1 : 0;
-	EXPECT_EQ(killed, 1) << "one worker stopped; with one left there is nothing more to stop";
-	ASSERT_EQ(lists.size(), 3u) << "the stopped worker's frames are taken up again later";
-	EXPECT_LE(mostAtOnceAfterTheStop, 0) << "and only once the other worker has finished its list";
+	EXPECT_EQ(killed, 2) << "one worker stopped, and the one that goes on started again on the frames of both";
+	ASSERT_EQ(lists.size(), 3u);
+	const std::vector<int> &merged = lists[2];
+	EXPECT_TRUE(std::is_sorted(merged.begin(), merged.end())) << "the stopped worker's frames are dealt out in order, not left for the end";
+	EXPECT_GE(merged.size(), 7u) << "the frames of both workers but the ones done or in hand: " << ::testing::PrintToString(merged);
+	EXPECT_TRUE(std::is_sorted(doneOrder.begin() + 2, doneOrder.end())) << "after the stop the frames come in order: " << ::testing::PrintToString(doneOrder);
+	EXPECT_LE(mostAtOnceAfterTheStop, 0) << "never two at once after the stop";
+	EXPECT_EQ(told, (std::vector<int>{1})) << "told that one worker goes on (smart power's pauses follow it)";
 	EXPECT_GT(asked, 0);
 
 	// a card with room: nothing is stopped

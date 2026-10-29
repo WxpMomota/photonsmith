@@ -1441,6 +1441,7 @@ void MainWindow::runVideoFramesSelfTest(const std::function<void(const QString &
 		check(m_framesStrip->count() == 12, QString("and the strip lists all 12 (%1)").arg(m_framesStrip->count()));
 		check(m_framesStrip->item(0)->text() == "1" && m_framesStrip->item(11)->text() == "12", "in order");
 		check(m_framesStripLabel->text().contains("12"), "the label says how many: " + m_framesStripLabel->text());
+		check(m_progressBar->text().contains("12 of 12 frames"), "the bar counts the frames beside its percent: " + m_progressBar->text());
 		log(*shotTaken ? "a picture was taken while frames were coming in" : "(the video was too quick for a picture part-way)");
 		shot("videoframes_done");
 		// the Preview tab opens for the finished video a moment later: its sidebar (the render's info, the scene's description and the technique note in one column) is photographed then

@@ -23,6 +23,8 @@
 #include <QCoreApplication>
 #include <QString>
 
+#include "render_output_parser.h"   // framesSecondsLeft
+
 class ProgressEta {
   public:
 	static constexpr int kProgressSamples = 4;     // ring depth (~3s window at 1Hz)
@@ -31,10 +33,32 @@ class ProgressEta {
 	void reset() {
 		m_count = 0;
 		for (Sample &sample : m_ring) sample = Sample{};
+		m_framesTotal = m_framesDone = m_firstDone = 0;
+		m_firstFrameMs = 0;
+	}
+
+	// A video's frame count, as each "[n/total]" line comes (render_output::parseVideoFrameCount). From then on status() speaks in frames: a film has 1440 and more, and in whole
+	// percent its first 15 read 0% with no estimate.
+	void setFrames(qint64 elapsedMs, int done, int total) {
+		if (m_framesTotal == 0) m_firstDone = done, m_firstFrameMs = elapsedMs;
+		m_framesDone = done;
+		m_framesTotal = total;
 	}
 
 	// Appends a sample and returns the formatted "elapsed / ETA" status text for the current tick.
 	QString status(qint64 elapsedMs, int percent) {
+		if (m_framesTotal > 0) {
+			QString text = QCoreApplication::translate("MainWindow", "Rendering  ·  frame %1 of %2  ·  elapsed %3")
+				.arg(m_framesDone).arg(m_framesTotal).arg(formatDuration(elapsedMs / 1000));
+			const double left = render_output::framesSecondsLeft((elapsedMs - m_firstFrameMs) / 1000.0, m_firstDone, m_framesDone, m_framesTotal);
+			if (left >= 0.0)
+				text += QCoreApplication::translate("MainWindow", "  ·  %1 s a frame  ·  ETA %2")
+					.arg(double(elapsedMs - m_firstFrameMs) / 1000.0 / (m_framesDone - m_firstDone), 0, 'f', 1)
+					.arg(formatDuration(qint64(left)));
+			else
+				text += QCoreApplication::translate("MainWindow", "  ·  ETA --:--");
+			return text;
+		}
 		// Append this tick's sample, shifting the ring when it's full.
 		if (m_count < kProgressSamples) {
 			m_ring[m_count++] = Sample{elapsedMs, percent};
@@ -91,4 +115,6 @@ class ProgressEta {
 	};
 	Sample m_ring[kProgressSamples];
 	int m_count = 0;   // how many slots are actually filled
+	int m_framesTotal = 0, m_framesDone = 0, m_firstDone = 0;   // a video's frames (setFrames); total 0: not a video, or no frame yet
+	qint64 m_firstFrameMs = 0;                                  // when the first frame count came
 };

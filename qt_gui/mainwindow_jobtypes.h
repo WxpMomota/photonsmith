@@ -288,6 +288,7 @@ public:
 
 signals:
 	void progressUpdate(int percentage);
+	void videoFrames(int done, int total);   // a video's "[n/total]" frame count (the status line's frame count and estimate: progress_eta.h)
 	void renderComplete(bool success, const QString &message, double totalTime, const QString &outputPath);
 	void logMessage(const QString &message);
 	// Fired from pauseRender()/resumeRender() so MainWindow can flip the

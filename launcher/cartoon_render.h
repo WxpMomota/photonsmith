@@ -321,6 +321,9 @@ struct WorkerHooks {
 	// full for `cardFullSeconds` one worker fewer runs at a time (down to one).
 	std::function<bool()> cardFull;
 	double cardFullSeconds = 20.0, cardCheckSeconds = 2.0;
+	// Told how many workers render at once from now on, when the card's memory has made it fewer (null: nobody asks); before the workers that go on are started again, so they
+	// can be given the number (smart power's pauses follow it: RunPolicy::smartFrames).
+	std::function<void(int workers)> workersNow;
 };
 
 // Renders `todo` (frame numbers) with `workers` long-lived workers: worker w is given every workers-th frame and renders its list in order. The pool watches the markers the workers
@@ -338,6 +341,7 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 		std::deque<int> remaining;
 		std::unique_ptr<WorkerHandle> handle;
 		int framesSinceStart = 0;   // frames this worker (process) has finished: a worker is only replaced for its size after it has made some progress, so replacing never loops
+		int restartAfter = -1;      // when this frame is finished the worker is started again, on a list it was given since (a stopped worker's frames: see cardFull below)
 		std::chrono::steady_clock::time_point last = std::chrono::steady_clock::now();   // (not the function's `Clock` alias: MSVC does not find a function-local alias inside a local struct)
 	};
 	std::vector<Worker> ws(static_cast<std::size_t>(workers));
@@ -351,7 +355,7 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 	const auto limitFor = [&](const Worker &worker) { return worker.framesSinceStart == 0 && stallSeconds > 0 ? (std::max)(stallSeconds, firstFrameStallSeconds) : stallSeconds; };
 	Clock::time_point lastTick = Clock::now();
 	// workers at work (started, frames left); at most `allowed` at a time, one fewer each time the card stays full (hooks.cardFull): the one that began its frame last is stopped (that
-	// frame is begun again later, not counted against it) and waits until another worker has finished its list
+	// frame is begun again, not counted against it), and its frames go to the workers that go on, in order (handOver)
 	int allowed = workers;
 	Clock::time_point lastCardCheck = Clock::now(), fullSince = lastCardCheck;
 	bool full = false;
@@ -359,6 +363,31 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 		int n = 0;
 		for (const Worker &x : ws) n += x.handle && !x.remaining.empty() ? 1 : 0;
 		return n;
+	};
+	// The frames of the workers that are not running (the one just stopped for the card's memory, its frame in hand too) and the frames after the one in hand of those that are, dealt
+	// out again in order to the ones that are running; each is started again on its new list when it has finished the frame in hand. The stopped worker's frames used to wait until
+	// another worker had finished its whole list: half of a film's frames came at the end, and the in-order pictures (the video, the GUI's strip of frames) stalled for hours.
+	const auto handOver = [&] {
+		std::vector<int> rest;
+		std::vector<Worker *> going;
+		for (Worker &x : ws) {
+			if (x.remaining.empty()) continue;
+			if (x.handle) {
+				going.push_back(&x);
+				rest.insert(rest.end(), std::next(x.remaining.begin()), x.remaining.end());
+				x.remaining.resize(1);
+			} else {
+				rest.insert(rest.end(), x.remaining.begin(), x.remaining.end());
+				x.remaining.clear();
+			}
+		}
+		if (going.empty()) return;   // (cannot happen: the card check stops a worker only while another runs)
+		std::sort(rest.begin(), rest.end());
+		for (std::size_t i = 0; i < rest.size(); ++i) going[i % going.size()]->remaining.push_back(rest[i]);
+		for (Worker *x : going)
+			if (x->remaining.size() > 1) x->restartAfter = x->remaining.front();
+		allowed = static_cast<int>(going.size());
+		if (hooks.workersNow) hooks.workersNow(allowed);
 	};
 	auto report = [&](int frame, int rc, double took) {
 		result[frame] = rc;
@@ -390,10 +419,10 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 					if (x.handle && !x.remaining.empty() && (!latest || x.last > latest->last)) latest = &x;
 				latest->handle->kill();
 				latest->handle.reset();
-				allowed = atWork();
+				handOver();
 				full = false;
 				std::cerr << "\nNote: the graphics card's memory is used up (these frames do not fit " << allowed + 1 << " at a time); going on with " << allowed << " worker" << (allowed == 1 ? "" : "s")
-						  << " at a time." << std::endl;
+						  << " at a time, which take up the stopped one's frames in order." << std::endl;
 			}
 		}
 		for (std::size_t w = 0; w < ws.size(); ++w) {
@@ -404,6 +433,7 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 				worker.last = Clock::now();
 				worker.handle = hooks.start(static_cast<int>(w), std::vector<int>(worker.remaining.begin(), worker.remaining.end()));
 				worker.framesSinceStart = 0;
+				worker.restartAfter = -1;   // (started on its whole list)
 				if (!worker.handle) {   // it could not be started: the frame in hand fails
 					report(worker.remaining.front(), -1, 0.0);
 					worker.remaining.pop_front();
@@ -418,6 +448,14 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 				++worker.framesSinceStart;
 			}
 			if (worker.remaining.empty()) continue;
+			// given more frames (handOver) and the frame that was in hand is done: started again on the new list (what it began after that frame is begun again)
+			if (worker.restartAfter >= 0 && worker.remaining.front() != worker.restartAfter) {
+				worker.restartAfter = -1;
+				worker.handle->kill();
+				worker.handle.reset();
+				worker.last = Clock::now();
+				continue;
+			}
 			// Too big: replaced now, between two frames (the frame it has started is begun again by the next worker), and not counted against that frame: nothing went wrong with it.
 			if (maxWorkerBytes > 0 && worker.framesSinceStart > 0 && worker.handle->running()) {
 				const unsigned long long held = worker.handle->memoryBytes();

@@ -151,6 +151,24 @@ inline int parseVideoFrameProgress(const std::string &line) {
 	return std::max(0, std::min(percent, 95));
 }
 
+// The same line's frame count: true, with how many frames are done (`done`, the line's own frame included) and how many there are. A film has 1440 frames and more: in whole
+// percent the bar sits at 0% for the first 15 and the estimate waits for 1%, so the GUI shows the count and an estimate from it (framesSecondsLeft).
+inline bool parseVideoFrameCount(const std::string &line, int &done, int &total) {
+	static const std::regex re(R"(\[(\d+)/(\d+)\] Rendering frame_)");
+	std::smatch m;
+	if (!std::regex_search(line, m, re)) return false;
+	done = std::stoi(m[1].str());
+	total = std::stoi(m[2].str());
+	return total > 0;
+}
+
+// The time left for a video's frames, in seconds, from how fast they have come since the first one (the time before it is loading and building, not a frame's): -1 until two
+// frames are done. `sinceFirst` is the seconds from the first frame's arrival to now.
+inline double framesSecondsLeft(double sinceFirst, int firstDone, int done, int total) {
+	if (done - firstDone < 1 || sinceFirst <= 0.0) return -1.0;
+	return sinceFirst / (done - firstDone) * std::max(0, total - done);
+}
+
 // The point where frame rendering ends and ffmpeg assembly begins.
 inline bool isVideoAssemblyStart(const std::string &line) {
 	return detail::contains(line, "ASSEMBLING VIDEO WITH FFMPEG");
