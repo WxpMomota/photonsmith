@@ -21,8 +21,11 @@ build, how to test, what a good change looks like, and where help is wanted.
 
 * **Windows**: build `ray_tracer_tests`, then run
   `powershell -ExecutionPolicy Bypass -File scripts/run_tests_parallel.ps1 -Tier Split`
-  (about six minutes on a desktop GPU; `-Tier Fast` is the cheap tests only, about 40 s, `-Filter` narrows
+  (about six minutes on a desktop GPU; `-Tier Fast` is the cheap tests only, about 75 s, `-Filter` narrows
   by name). The suite has over 5,000 tests and needs to stay green.
+* **Before every commit**: `python scripts/pre_commit_checks.py` (a few seconds) runs the checks CI's
+  build-lists and code-size jobs run - both test build lists, every environment variable in
+  `docs/ENVIRONMENT.md`, the code size ratchet - and lists source files git does not track yet.
 * **Anywhere, and on GitHub CI** (no GPU): the CMake targets `unit_tests` and
   `cpu_integrator_tests` (see `tests/CMakeLists.txt` and `.github/workflows/unit-tests.yml`).
 * **macOS Metal**: `ctest` in a `-DRT_BUILD_METAL=ON` build runs the CPU-vs-Metal parity
