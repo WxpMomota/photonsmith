@@ -539,12 +539,15 @@ TEST(FilmVoices, ALineSaidInAComputersVoiceIsItsRecording) {
 		cartoon::tts::runner() = kept;
 		GTEST_SKIP() << "this computer has no text-to-speech voice";
 	}
-	// (a hosted macOS runner lists `say`'s voices but cannot make a recording with them: the engine itself is asked first, so only a film that loses a recording the
-	// engine did make fails)
-	std::string why;
-	if (cartoon::tts::wavFor("Testing the speech engine.", "system", 1, 0.0, 1.0, &why).empty()) {
-		cartoon::tts::runner() = kept;
-		GTEST_SKIP() << "this computer's text-to-speech voices make no recording: " << why;
+	// (a hosted macOS runner lists `say`'s voices but cannot make a recording with some of them, and the film picks a character's voice among them all: the engine is
+	// asked for a recording in every listed voice first, so only a film that loses a recording the engine can make fails)
+	const std::vector<std::string> listed = cartoon::tts::voices();
+	for (unsigned k = 0; k < listed.size(); ++k) {   // ("system" with seed k is voice k: tts::pick)
+		std::string why;
+		if (cartoon::tts::wavFor("Testing the speech engine.", "system", k, 0.0, 1.0, &why).empty()) {
+			cartoon::tts::runner() = kept;
+			GTEST_SKIP() << "this computer's text-to-speech voice " << listed[k] << " makes no recording: " << why;
+		}
 	}
 	ff::DataFilm said;
 	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 6\nvoices system\ncharacter ann person\nsay ann 1 \"Hello there, how are you today?\"\n", said), "");
