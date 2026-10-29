@@ -747,6 +747,8 @@ void MetalPocApp::applyPbrtMediumUniforms(Uniforms& uniforms) {
         uniforms.fogChromatic = chromaticShapeMedium | (pbrtFogChromatic ? 1u : 0u);
         uniforms.fogAlbedo = PackedFloat3{pbrtFogAlbedo.x, pbrtFogAlbedo.y, pbrtFogAlbedo.z};
         uniforms.fogAsymmetryG = pbrtFogAsymmetryG;
+        uniforms.fogBoundCenter = PackedFloat3{pbrtFogBoundCenter.x, pbrtFogBoundCenter.y, pbrtFogBoundCenter.z};
+        uniforms.fogBoundRadius = pbrtFogBoundRadius;
     } else {
         uniforms.fogSigmaT = 0.0f;                      // no participating medium in this scene
     }
