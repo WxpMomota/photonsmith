@@ -122,7 +122,7 @@ static std::string universeText(const Spec &spec, const std::string &header, dou
 		Vec3 eye, target;
 		double fov = 40.0;
 		film_subjects::cameraOf(header, eye, target, fov);
-		out += space::spaceText(film, spec.space, space::narrowOnTheSun(spec.space, eye, target, fov));
+		out += space::spaceText(film, spec.space, space::narrowOnTheSun(spec.space, eye, target, fov), eye);
 		if (spec.space.planetshine > 0.0 && spec.space.sun)   // (film_voyage.h)
 			out += cosmos::planetshineText(spec.planets, nt, {-eye.x, eye.y, eye.z}, space::sunDirection(spec.space), spec.space.planetshine * spec.space.sunStrength);
 	}
@@ -436,7 +436,7 @@ void DataFilm::soundscape(audio::Mix &m) const {
 	const bool eagles = std::any_of(spec.flocks.begin(), spec.flocks.end(), [](const wildlife::Flock &f) { return f.kind == "eagles"; });
 	if (spec.falls.empty() && spec.fires.empty() && spec.lavas.empty() && spec.volcanoes.empty() && spec.wildfires.empty() && !spec.swell.on && spec.herds.empty() && !eagles &&
 		spec.forests.empty() && spec.geysers.empty() && spec.rockfalls.empty() && spec.avalanches.empty() && spec.quakes.empty() && spec.whales.empty() && spec.pods.empty() && spec.glaciers.empty() && spec.tornadoes.empty() &&
-		!spec.space.on)
+		!spec.space.on && spec.ships.empty() && spec.astronauts.empty() && spec.descents.empty())
 		return;
 	namespace ss = soundscape;
 	const ss::Ears ears = ss::earsOf(m.seconds(), [this](double t, Vec3 &eye, Vec3 &target) {
@@ -447,9 +447,10 @@ void DataFilm::soundscape(audio::Mix &m) const {
 	const auto groundAt = [&](double x, double z) { return ground ? ground->heightAt(x, z) : 0.0; };
 	const double T = m.seconds();
 	const auto always = [](double) { return 1.0; };
-	if (spec.space.on) {   // sound in space (film_voyage.h)
+	// sound in space, and craft anywhere (film_voyage.h): a descent onto a terrain under a sky, or a ship over it, has no `space` line (it cannot be with a sky) and was silent
+	if (spec.space.on || !spec.ships.empty() || !spec.astronauts.empty() || !spec.descents.empty()) {
 		cosmos::SpaceSounds s;
-		s.hum = spec.space.hum, s.ships = spec.ships, s.astronauts = spec.astronauts, s.stars = spec.stars, s.remnants = spec.remnants, s.blackHoles = spec.blackHoles;
+		s.hum = spec.space.on ? spec.space.hum : 0.0, s.ships = spec.ships, s.astronauts = spec.astronauts, s.stars = spec.stars, s.remnants = spec.remnants, s.blackHoles = spec.blackHoles;
 		s.natureAt = [this](double t) { return natureAt(t); };
 		for (std::size_t k = 0; k < spec.shots.size(); ++k)
 			if (spec.shots[k].spaceCam.kind == cosmos::SpaceCam::Hyperspace) s.jumps.push_back({spec.shots[k].start, k + 1 < spec.shots.size() ? spec.shots[k + 1].start : spec.length});

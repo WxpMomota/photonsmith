@@ -198,14 +198,20 @@ inline Voxel galaxyVoxel(const Galaxy &g, double u, double v, double h) {
 	out.le = stars > 1e-4 ? colour * (stars / (stars + 15.0 * dust + 1e-9)) * (1.0 + 2.0 * knots) : Vec3{0.0, 0.0, 0.0};
 	return out;
 }
+// The half-sizes, in radii, of the box round a galaxy's disc tipped by its tilt about x: untilted the disc is the x-y plane (galaxyFrame), so it spans y and is thin
+// in z; at 90 degrees it spans z. (Until 2026-10-28 y and z were the other way round: a face-on galaxy was cut to a strip, one at 20 degrees to half its disc.)
+inline Vec3 galaxyHalf(const Galaxy &g) {
+	const double ti = g.tilt * kPi / 180.0, thick = g.kind == "elliptical" ? 0.75 : 0.12;   // (the disc's half-thickness, in radii)
+	return {1.0, std::abs(std::cos(ti)) + thick * std::abs(std::sin(ti)), std::abs(std::sin(ti)) + thick * std::abs(std::cos(ti))};
+}
 // A galaxy as scene text: its grid in the box round its (tipped) disc, made once, and the sphere it fills.
 inline std::string galaxyText(const std::string &film, const Galaxy &g) {
-	const double R = 0.5 * g.size, ti = g.tilt * kPi / 180.0, thick = g.kind == "elliptical" ? 0.75 : 0.12;   // (the disc's half-thickness, in radii)
-	const Vec3 half{1.0, std::abs(std::sin(ti)) + thick * std::abs(std::cos(ti)), std::abs(std::cos(ti)) + thick * std::abs(std::sin(ti))};   // (in radii)
+	const double R = 0.5 * g.size;
+	const Vec3 half = galaxyHalf(g);
 	const double longest = std::max({half.x, half.y, half.z});
 	const int nx = std::max(8, static_cast<int>(144 * half.x / longest)), ny = std::max(8, static_cast<int>(144 * half.y / longest)), nz = std::max(8, static_cast<int>(144 * half.z / longest));
 	char file[200];
-	std::snprintf(file, sizeof file, "galaxy_v4_%s_%s_%d_%.1f_%.1f_%.0f_%.4g.pbrt", g.name.c_str(), g.kind.c_str(), g.seed, g.tilt, g.turn, g.size, g.brightness);
+	std::snprintf(file, sizeof file, "galaxy_v5_%s_%s_%d_%.1f_%.1f_%.0f_%.4g.pbrt", g.name.c_str(), g.kind.c_str(), g.seed, g.tilt, g.turn, g.size, g.brightness);
 	const std::string name = "galaxy_" + g.name;
 	const std::string path = rgbGridFile(film, file, name, nx, ny, nz, 0.4, 0.04 * g.brightness, [&](int i, int j, int k) {
 		const Vec3 p{((i + 0.5) / nx * 2.0 - 1.0) * half.x, ((j + 0.5) / ny * 2.0 - 1.0) * half.y, ((k + 0.5) / nz * 2.0 - 1.0) * half.z};
@@ -309,7 +315,7 @@ inline std::string starText(const std::string &film, const Star &s, double nt) {
 	// its glow
 	const int N = 48;
 	char file[160];
-	std::snprintf(file, sizeof file, "starglow_v1_%s_%d_%.0f_%.4g.pbrt", s.name.c_str(), s.seed, s.kelvin(), s.brightness);
+	std::snprintf(file, sizeof file, "starglow_v2_%s_%d_%.0f_%.4g_%.0f.pbrt", s.name.c_str(), s.seed, s.kelvin(), s.brightness, s.radius);   // (the radius too: the glow's density is per radius)
 	const std::string name = "glow_" + s.name;
 	const std::string path = rgbGridFile(film, file, name, N, N, N, 0.0, 0.06 * s.brightness, [&](int i, int j, int k) {
 		return starGlowVoxel(s, ((i + 0.5) / N * 2.0 - 1.0) * 3.0, ((j + 0.5) / N * 2.0 - 1.0) * 3.0, ((k + 0.5) / N * 2.0 - 1.0) * 3.0);
@@ -463,7 +469,8 @@ inline std::string blackHoleText(const BlackHole &b, double nt, Vec3 eye) {
 	if (b.jets > 1.5) {
 		for (int side = -1; side <= 1; side += 2)
 			for (int k = 0; k < 40; ++k) {
-				const double f = std::fmod(k / 40.0 + nt * 0.04 * b.spin / std::max(1.0, b.jets / 10.0) + 10.0, 1.0);
+				double f = k / 40.0 + nt * 0.04 * b.spin / std::max(1.0, b.jets / 10.0);
+				f -= std::floor(f);   // (0..1 whichever way it spins: fmod kept the sign, and a negative spin's knots went behind the pole with negative sizes)
 				const double along = 1.3 + (b.jets - 1.3) * f, wob = 0.15 * std::sin(nt * 0.7 + k);
 				const Vec3 p = b.at + n * (side * along * b.radius) + e1 * (wob * f * b.radius);
 				const double flick = 0.7 + 0.3 * std::sin(nt * 3.0 + k * 1.7);
@@ -606,9 +613,10 @@ inline BeltRock beltRock(const Belt &b, int k, double nt) {
 		r.at = b.at + Vec3{std::sqrt(1.0 - z * z) * std::cos(a), z, std::sqrt(1.0 - z * z) * std::sin(a)} * rr + drift * nt;
 		return r;
 	}
-	const double rr = b.radius + b.width * (hash01(sd, 8) + hash01(sd, 9) - 1.0) * 0.5 * 1.4;   // (thicker in the middle of the band)
+	const double w = std::min(b.width, b.radius);   // (a band no wider than its ring's radius: wider, rocks came to the middle and went round it thousands of times too fast)
+	const double rr = b.radius + w * (hash01(sd, 8) + hash01(sd, 9) - 1.0) * 0.5 * 1.4;   // (thicker in the middle of the band)
 	const double omega = 2.0 * kPi / 600.0 * b.spin * std::pow(b.radius / std::max(1.0, rr), 1.5);   // (a turn in ten minutes at the band's middle)
-	const double a = 2.0 * kPi * hash01(sd, 10) + omega * nt, h = b.width * 0.1 * (hash01(sd, 11) + hash01(sd, 12) - 1.0);
+	const double a = 2.0 * kPi * hash01(sd, 10) + omega * nt, h = w * 0.1 * (hash01(sd, 11) + hash01(sd, 12) - 1.0);
 	const double ti = b.tilt * kPi / 180.0, tu = b.turn * kPi / 180.0;
 	const Vec3 flat{rr * std::cos(a), h, rr * std::sin(a)};
 	const Vec3 tipped{flat.x, flat.y * std::cos(ti) - flat.z * std::sin(ti), flat.y * std::sin(ti) + flat.z * std::cos(ti)};

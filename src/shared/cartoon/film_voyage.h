@@ -488,15 +488,17 @@ inline void spaceSound(audio::Mix &m, const soundscape::Ears &ears, const SpaceS
 		}
 	}
 	for (std::size_t i = 0; i < s.stars.size(); ++i)   // a flare's whoomp (nature's time: heard at the film time it comes to)
-		for (std::size_t k = 0; k < s.stars[i].flares.size(); ++k)
+		for (std::size_t k = 0; k < s.stars[i].flares.size(); ++k) {
+			if (nature(0.0) > s.stars[i].flares[k]) continue;   // (a flare before the film began is not heard: it used to whoomp at 0 s)
 			for (double t = 0.0; t < T; t += 1.0 / 24.0)
 				if (nature(t) >= s.stars[i].flares[k]) {
 					heard(m, ears, t, s.stars[i].at, audio::noiseBurst(3.0, 0.05, 1.8, 50.0, 900.0, 2401u + static_cast<unsigned>(i * 7 + k)), 0.6, 30.0 * s.stars[i].radius);
 					break;
 				}
+		}
 	for (std::size_t i = 0; i < s.remnants.size(); ++i) {   // a supernova's boom and long rumble
 		const Remnant &r = s.remnants[i];
-		if (r.kind != "supernova") continue;
+		if (r.kind != "supernova" || nature(0.0) > r.blast) continue;   // (one that blew up before the film began is not heard either)
 		for (double t = 0.0; t < T; t += 1.0 / 24.0)
 			if (nature(t) >= r.blast) {
 				heard(m, ears, t, r.at, audio::noiseBurst(7.0, 0.01, 3.5, 35.0, 500.0, 2501u + static_cast<unsigned>(i)), 1.0, 50.0 * r.size);
@@ -618,7 +620,8 @@ inline void descentSound(audio::Mix &m, const soundscape::Ears &ears, const std:
 		const Descent &d = all[i];
 		const std::vector<std::vector<float>> roar = soundscape::roar(40.0, 900.0, 0.6, 2901u + static_cast<unsigned>(i));
 		int k = 0;
-		bool retro = false, down = false;
+		const double u0 = descentTime(d, natureAt ? natureAt(0.0) : 0.0);
+		bool retro = u0 > 0.93, down = u0 >= 1.0;   // (what had happened before the film began is not heard at 0 s)
 		for (double t = 0.0; t < T; t += 0.3, ++k) {
 			const double nt = natureAt ? natureAt(t) : t, s = descentU(d, nt), u = descentTime(d, nt), heat = descentHeat(d, s);
 			const Vec3 at = descentAt(d, s);

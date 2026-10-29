@@ -787,3 +787,110 @@ TEST(FilmUniverseDescent, ACraftBurnsInOpensItsChutesFiresItsRocketsAndLands) {
 	expectProblems({{"descent pod from 0 1 0 to 0 0 0 start 5 land 2", "\"land\" before \"start\""}, {"descent pod from 0 1 0 to 0 0 0", "when it starts and when it lands"},
 					{"descent pod from 0 1 0 to 0 0 0 start 0 land 9 chutes maybe", "\"chutes\""}});
 }
+
+// ---- found in review (2026-10-28) -----------------------------------------------------------------------------------------------------------------------------------------
+
+// A galaxy's grid box holds its whole disc, whatever its tilt: the rim of the disc, taken back from the disc's frame (galaxyFrame) into the box's, is inside it.
+TEST(FilmUniverseReview, AGalaxysBoxHoldsItsWholeDiscAtEveryTilt) {
+	for (double tilt : {0.0, 20.0, 60.0, 90.0}) {
+		cs::Galaxy g;
+		g.tilt = tilt, g.turn = 30.0;
+		const cartoon::Vec3 half = cs::galaxyHalf(g);
+		const double ti = tilt * cartoon::kPi / 180.0, tu = g.turn * cartoon::kPi / 180.0;
+		for (int k = 0; k < 64; ++k) {
+			const double a = 2.0 * cartoon::kPi * k / 64.0, u = 0.95 * std::cos(a), v = 0.95 * std::sin(a), h = 0.0;
+			const double x = u * std::cos(tu) - v * std::sin(tu), y1 = u * std::sin(tu) + v * std::cos(tu);
+			const double y = y1 * std::cos(ti) - h * std::sin(ti), z = y1 * std::sin(ti) + h * std::cos(ti);
+			double uu = 0.0, vv = 0.0, hh = 0.0;
+			cs::galaxyFrame(g, {x, y, z}, uu, vv, hh);
+			ASSERT_NEAR(uu, u, 1e-9) << "the inverse is right";
+			EXPECT_LE(std::abs(x), half.x + 1e-9) << "tilt " << tilt;
+			EXPECT_LE(std::abs(y), half.y + 1e-9) << "tilt " << tilt << ": the disc's rim is outside the box";
+			EXPECT_LE(std::abs(z), half.z + 1e-9) << "tilt " << tilt << ": the disc's rim is outside the box";
+		}
+	}
+}
+
+// In a narrow shot of the sun, the sun's ball is along the sun's direction from the camera, wherever the camera is.
+TEST(FilmUniverseReview, TheSunsBallIsAlongTheSunFromTheCamera) {
+	cartoon::space::Space s;
+	s.on = true, s.sunBearing = 180.0, s.sunElevation = 0.0;
+	const cartoon::Vec3 eye{40000.0, 0.0, 0.0};   // (story space: far from the origin)
+	const std::string text = cartoon::space::spaceText("review_sunball", s, true, eye);
+	const std::size_t at = text.find("Translate ", text.find("the sun as a ball"));
+	ASSERT_NE(at, std::string::npos);
+	double px = 0.0, py = 0.0, pz = 0.0;
+	std::istringstream(text.substr(at + 10)) >> px >> py >> pz;   // (pbrt's)
+	const cartoon::Vec3 d = cartoon::space::sunDirection(s), toBall = normalize(cartoon::Vec3{-px, py, pz} - eye);   // (both into story space)
+	EXPECT_GT(dot(toBall, cartoon::Vec3{-d.x, d.y, d.z}), std::cos(0.01 * cartoon::kPi / 180.0)) << "the ball is the sun's direction from the camera, not from the origin";
+}
+
+// A black hole spinning the other way: its jets' knots stay between the pole and the jets' end, with sizes, however long the film.
+TEST(FilmUniverseReview, AJetSpinningTheOtherWayKeepsItsKnotsInPlace) {
+	cs::BlackHole b;
+	b.jets = 18.0, b.spin = -2.0;
+	const std::string text = cs::blackHoleText(b, 300.0, {0.0, 0.0, 0.0});
+	int spheres = 0;
+	for (std::size_t at = text.find("\"float radius\" [ "); at != std::string::npos; at = text.find("\"float radius\" [ ", at + 1)) {
+		++spheres;
+		EXPECT_GE(std::atof(text.c_str() + at + 17), 0.0) << "a knot with a negative size";
+	}
+	EXPECT_GT(spheres, 40) << "the jets' knots";
+}
+
+// A planet with a negative spin turns slowly the other way, not once a second.
+TEST(FilmUniverseReview, ANegativeSpinTurnsAPlanetSlowlyTheOtherWay) {
+	pl::Planet p;
+	p.spin = -600.0;
+	EXPECT_NE(pl::placement(p, 60.0).find("Rotate -36.0000 0 1 0"), std::string::npos) << pl::placement(p, 60.0);
+}
+
+// A star's glow is baked per radius: another radius is another file, not the old one again.
+TEST(FilmUniverseReview, AStarsGlowIsMadeAgainForAnotherRadius) {
+	cs::Star a, b;
+	a.name = b.name = "reviewstar", b.radius = 0.5 * a.radius;
+	const auto glowFile = [](const std::string &text) {
+		const std::size_t at = text.find("starglow_");
+		return at == std::string::npos ? std::string() : text.substr(at, text.find(".pbrt", at) - at);
+	};
+	const std::string fa = glowFile(cs::starText("review_star", a, 0.0)), fb = glowFile(cs::starText("review_star", b, 0.0));
+	ASSERT_FALSE(fa.empty());
+	EXPECT_NE(fa, fb);
+}
+
+// A belt narrower in radius than its band is wide (`radius 2000`, the default width 4000): no rock comes to the middle, and none whirls round thousands of times too fast.
+TEST(FilmUniverseReview, ARingBeltNarrowerThanItsBandKeepsItsRocksOutOfTheMiddle) {
+	cs::Belt b;
+	b.radius = 2000.0;
+	for (int k = 0; k < 400; ++k) {
+		const cs::BeltRock r0 = cs::beltRock(b, k, 10.0), r1 = cs::beltRock(b, k, 10.0 + 1.0 / 24.0);
+		EXPECT_GT(length(r0.at - b.at), 0.25 * b.radius) << "rock " << k;
+		EXPECT_LT(length(r1.at - r0.at), 0.05 * b.radius) << "rock " << k << " moved too far in a frame";
+	}
+}
+
+// A total eclipse: the corona is there, and the diamond ring is not (it is the last sliver going, before totality).
+TEST(FilmUniverseReview, TotalityHasTheCoronaButNoDiamondRing) {
+	pl::Planet p;
+	p.name = "blocker", p.at = {0.0, 0.0, -1000.0}, p.radius = 100.0;
+	const std::string text = pl::eclipseText("review_eclipse", {p}, 0.0, {0.0, 0.0, 0.0}, {0.0, 0.0, -1.0}, 0.53);
+	EXPECT_NE(text.find("corona"), std::string::npos);
+	EXPECT_EQ(text.find("diamond ring"), std::string::npos);
+}
+
+// A descent onto a terrain (no `space` line) is heard, and a blast or a landing before the film began is not heard at its start.
+TEST(FilmUniverseReview, ADescentOverLandIsHeardAndWhatWasOverBeforeTheFilmIsNot) {
+	const auto mixOf = [](const std::string &key, const std::string &lines, double seconds) {
+		ff::DataFilm film;
+		EXPECT_EQ(loadFilm(key, "scene s.pbrt\nlength " + std::to_string(seconds) + "\n" + lines + "shot 0 A\n key 0 0 0  0 0 -100  50\n", film), "");
+		cartoon::audio::Mix m(seconds);
+		film.soundscape(m);
+		const std::vector<std::int16_t> pcm = m.finish(0.0, 0.0, 0.89, 0.0);
+		double e = 0.0;
+		for (std::int16_t v : pcm) e += double(v) * v;
+		return e;
+	};
+	EXPECT_GT(mixOf("landing", "terrain hills size 200 height 20 seed 1 far off\ndescent pod from 0 2000 -3000 to 0 0 -300 start 0 land 8 size 10\n", 10.0), 0.0) << "a landing on land roars and thumps";
+	EXPECT_EQ(mixOf("pastblast", "space hum 0\nremnant crab at 0 0 -40000 size 12000 blast -200\n", 4.0), 0.0) << "a supernova that blew up long before";
+	EXPECT_EQ(mixOf("pastlanding", "space hum 0\ndescent pod from 0 2000 -3000 to 0 0 -300 start -60 land -30 size 10\n", 4.0), 0.0) << "a craft that landed before the film";
+}

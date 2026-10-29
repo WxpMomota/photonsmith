@@ -209,7 +209,7 @@ inline Pictures pictures(const std::string &film, const Planet &p) {
 inline std::string placement(const Planet &p, double nt) {
 	char buf[240];
 	std::snprintf(buf, sizeof buf, "  Translate %.4f %.4f %.4f\n  Rotate %.4f 1 0 0\n  Rotate %.4f 0 1 0\n  Rotate -90 1 0 0\n", p.at.x, p.at.y, p.at.z, p.tilt,
-				  std::fmod(360.0 * nt / std::max(1.0, p.spin), 360.0));
+				  std::fmod(360.0 * nt / (p.spin < 0.0 ? std::min(-1.0, p.spin) : std::max(1.0, p.spin)), 360.0));   // (a negative spin turns it the other way: max(1, spin) made it a turn a second)
 	return buf;
 }
 // ---- air ----
@@ -424,7 +424,7 @@ inline std::string eclipseText(const std::string &film, const std::vector<Planet
 	}
 	if (covered < 0.97) return std::string();
 	std::string out;
-	const double D = std::min(4.0e5, 20.0 * nearest);   // (far beyond the body that covers the sun)
+	const double D = std::max(std::min(4.0e5, 20.0 * nearest), 2.0 * nearest);   // (far beyond the body that covers the sun - always beyond it: a body 450 km off had the card in front)
 	Vec3 e1 = normalize(cross(sunDir, Vec3{0.0, 1.0, 0.0}) + Vec3{1e-9, 0.0, 0.0});
 	const Vec3 e2 = cross(e1, sunDir), mid = eye + sunDir * D;
 	const double corona = smoothstep(0.985, 0.9995, covered), half = D * std::tan(6.0 * s);
@@ -440,7 +440,8 @@ inline std::string eclipseText(const std::string &film, const std::vector<Planet
 		out += "# the sun's corona (film_planets.h)\nAttributeBegin\n  AreaLightSource \"diffuse\" \"string filename\" [ \"" + coronaPicture(film) + "\" ] \"float scale\" [ " + scale +
 			   " ] \"bool twosided\" [ true ]\n  Material \"dielectric\" \"float eta\" [ 1 ]\n" + emitMesh(m, identity()) + "AttributeEnd\n";
 	}
-	const double ring = std::exp(-std::pow((covered - 0.996) / 0.003, 2.0));   // (the diamond ring: as the last sliver goes)
+	// (the diamond ring: as the last sliver goes - and gone once it has: the curve alone was still a sixth of its brightness at totality)
+	const double ring = std::exp(-std::pow((covered - 0.996) / 0.003, 2.0)) * std::clamp((1.0 - covered) / 0.002, 0.0, 1.0);
 	if (ring > 0.02) {
 		const Vec3 limb = normalize(sunDir * std::cos(0.97 * s) + normalize(away - sunDir * dot(away, sunDir) + Vec3{1e-9, 0, 0}) * std::sin(0.97 * s));
 		const Vec3 q = eye + limb * D;

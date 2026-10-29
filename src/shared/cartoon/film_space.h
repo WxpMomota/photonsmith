@@ -228,15 +228,16 @@ inline std::string recentred(const std::string &scene) {
 inline Vec3 sunDirection(const Space &s) { return direction(s.sunBearing, s.sunElevation); }
 // The set in space as scene text: the starfield, with the sun in it (the sky's picture as an infinite light). `sunAsBall`: for a narrow shot with the sun in it (the
 // sky's picture is too coarse there: the sun showed as a square of its pixels), the sun is a glowing ball a thousand kilometres off instead, round however close the
-// lens, and the picture leaves it out.
-inline std::string spaceText(const std::string &film, const Space &s, bool sunAsBall = false) {
+// lens, and the picture leaves it out. `eye` (story space): the camera, which the ball is that far from along the sun's direction - placed from the world's origin, a
+// camera tens of kilometres out saw it degrees off the sun, and an eclipse's corona round a planet with no sun behind it.
+inline std::string spaceText(const std::string &film, const Space &s, bool sunAsBall = false, Vec3 eye = {0.0, 0.0, 0.0}) {
 	if (!sunAsBall || !s.sun) return "# space (film_space.h)\nLightSource \"infinite\" \"string filename\" [ \"" + starfieldPicture(film, s) + "\" ]\n";
 	Space without = s;
 	without.sun = false;
 	const double D = 1.0e6, radius = D * std::tan(0.5 * s.sunSize * kPi / 180.0), L = 3.0 * s.sunStrength / (kPi * std::pow(radius / D, 2.0));
-	const Vec3 p = sunDirection(s) * D;
+	const Vec3 p = sunDirection(s) * D;   // (pbrt's)
 	return "# space (film_space.h): the sun as a ball, for a narrow shot of it\nLightSource \"infinite\" \"string filename\" [ \"" + starfieldPicture(film, without) + "\" ]\n" +
-		   emissiveSphere({-p.x, p.y, p.z}, radius, blackbody(5800.0) * L);
+		   emissiveSphere(eye + Vec3{-p.x, p.y, p.z}, radius, blackbody(5800.0) * L);
 }
 // Whether a shot (its camera at `eye` looking at `target`, story space, `fov` degrees) is narrow and has the sun in it.
 inline bool narrowOnTheSun(const Space &s, Vec3 eye, Vec3 target, double fov) {
