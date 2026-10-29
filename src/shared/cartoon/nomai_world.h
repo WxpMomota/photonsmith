@@ -436,7 +436,7 @@ inline std::string groundText() {
 	});
 	static const std::string wallPic = film_sky::picture(kFilmKey, "ground_walls", 4096, 1024, [](std::vector<float> &rgb) {
 		const int W = 4096, H = 1024;
-		for (int j = 0; j < H; ++j)
+		film_sky::eachRow(H, [&](int j) {
 			for (int i = 0; i < W; ++i) {
 				const double x = -kInnerR + 2.0 * kInnerR * (i + 0.5) / W, h = -70.0 + 90.0 * (1.0 - (j + 0.5) / H);
 				const double n1 = nature::fbm2(x / 2.5, h / 2.5, 52);
@@ -448,11 +448,12 @@ inline std::string groundText() {
 				rgb[k + 1] = static_cast<float>(c.y);
 				rgb[k + 2] = static_cast<float>(c.z);
 			}
+		});
 	});
 	static const std::string outerPly = film_cache::ply(kFilmKey, "ground_outer", [] { return groundMeshPart(false); });
 	static const std::string innerPic = film_sky::picture(kFilmKey, "ground_inner", 4096, 4096, [](std::vector<float> &rgb) {
 		const int N = 4096;
-		for (int j = 0; j < N; ++j)
+		film_sky::eachRow(N, [&](int j) {
 			for (int i = 0; i < N; ++i) {
 				// (image row 0 is v = 1)
 				const double x = -kInnerR + 2.0 * kInnerR * (i + 0.5) / N, z = -kInnerR + 2.0 * kInnerR * (1.0 - (j + 0.5) / N);
@@ -462,11 +463,12 @@ inline std::string groundText() {
 				rgb[k + 1] = static_cast<float>(c.y);
 				rgb[k + 2] = static_cast<float>(c.z);
 			}
+		});
 	});
 	static const std::string outerPic = film_sky::picture(kFilmKey, "ground_outer", 2048, 2048, [](std::vector<float> &rgb) {
 		const int N = 2048;
 		const double total = kPi * kMoonR;
-		for (int j = 0; j < N; ++j)
+		film_sky::eachRow(N, [&](int j) {
 			for (int i = 0; i < N; ++i) {
 				const double u = (i + 0.5) / N - 0.5, v = (1.0 - (j + 0.5) / N) - 0.5;
 				const double g = std::min(1.0, 2.0 * std::sqrt(u * u + v * v));
@@ -483,6 +485,7 @@ inline std::string groundText() {
 				rgb[k + 1] = static_cast<float>(c.y);
 				rgb[k + 2] = static_cast<float>(c.z);
 			}
+		});
 	});
 	const auto mat = [](const std::string &tex, const std::string &pic) {
 		return "Texture \"" + tex + "\" \"spectrum\" \"imagemap\" \"string filename\" [ \"" + pic + "\" ]\n  Material \"diffuse\" \"texture reflectance\" \"" + tex + "\"";

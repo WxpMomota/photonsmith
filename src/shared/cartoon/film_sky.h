@@ -389,6 +389,19 @@ inline std::string file(const std::string &film, const Spec &s) {
 	}
 	return film_cache::scenePath(target);
 }
+// Calls f(row) for every row of a picture, the rows spread over the processors: for a picture whose every pixel is worked out from its own place alone, so it is the same
+// whatever thread makes which row. (The Nomai film's 4096 x 4096 ground took 44 s on one, every time a rebuilt program made its cache again.)
+template <typename F>
+inline void eachRow(int rows, F f) {
+	const int n = static_cast<int>(std::max(1u, std::min(16u, std::thread::hardware_concurrency())));
+	std::vector<std::thread> workers;
+	for (int k = 0; k < n; ++k)
+		workers.emplace_back([&f, rows, k, n] {
+			for (int r = k; r < rows; r += n) f(r);
+		});
+	for (std::thread &w : workers) w.join();
+}
+
 // A picture a film paints for itself (a planet's face, a ground's colours: an "imagemap" texture or an area light's image), w x h linear RGB from `make(rgb)`, written once as
 // an HDR file in the film's cache folder of this build (film_cache::dir) and named by every frame that uses it. Returns the path as a scene file wants it.
 template <typename Make>
