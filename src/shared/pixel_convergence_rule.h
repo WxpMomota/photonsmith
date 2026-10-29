@@ -12,11 +12,14 @@ namespace pixel_convergence {
 // picture. Its standard error is carried to display values through a gamma-2.2 response (d = L^(1/2.2), so dd = dL / 2.2 * L^(1/2.2 - 1)),
 // so `threshold` is a noise in display units (0.005: a little over one level of 255) - a dark pixel may keep more noise relative to its
 // mean than a bright one, as the eye sees it. (A relative error - standard error over the mean - asked a dark pixel in fog for
-// thousands of samples, so on a dim scene nothing stopped early at 500.) A pixel darker than 1e-4 counts as converged black.
+// thousands of samples, so on a dim scene nothing stopped early at 500.) A pixel darker than 1e-4 counts as converged black - once it has
+// kBlackSamples samples (`count`): a pixel lit only by rare paths (a caustic under glass, a glint in fog) may have none in its first few
+// dozen, and stopping it at the first check (64 at 500 samples) left one that is lit 1 sample in 50 black 29% of the time; after 128, 7%.
+constexpr int kBlackSamples = 128;
 template <class T>
-CPU_GPU bool converged_by_standard_error(T mean, T standardError, T threshold, T exposure) {
+CPU_GPU bool converged_by_standard_error(T mean, T standardError, T threshold, T exposure, T count) {
 	const T L = mean * exposure;
-	if (L < T(1e-4)) return true;
+	if (L < T(1e-4)) return count >= T(kBlackSamples);
 	const T displayNoise = standardError * exposure / T(2.2) * std::pow(L, T(1.0 / 2.2 - 1.0));
 	return displayNoise < threshold;
 }
@@ -24,7 +27,7 @@ CPU_GPU bool converged_by_standard_error(T mean, T standardError, T threshold, T
 template <class T>
 CPU_GPU bool converged(T count, T mean, T m2, T threshold, T exposure) {
 	if (count < T(2)) return false;
-	return converged_by_standard_error(mean, std::sqrt(m2 / (count - T(1)) / count), threshold, exposure);
+	return converged_by_standard_error(mean, std::sqrt(m2 / (count - T(1)) / count), threshold, exposure, count);
 }
 
 // One more sample `x` into a Welford running mean and sum of squared deviations (count already incremented to include it).

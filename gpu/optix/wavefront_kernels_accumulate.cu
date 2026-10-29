@@ -342,7 +342,7 @@ extern "C" __global__ void adaptive_sampling_update(
 	bool done = false;
 	if (st.x >= float(minSamples) && st.y >= 2.0f) {
 		const float sampleVariance = st.w / (st.y - 1.0f);
-		done = pixel_convergence::converged_by_standard_error(st.z, sqrtf(fmaxf(sampleVariance, 0.0f) / st.x), threshold, exposure);
+		done = pixel_convergence::converged_by_standard_error(st.z, sqrtf(fmaxf(sampleVariance, 0.0f) / st.x), threshold, exposure, st.x);
 	}
 	if (done)
 		activeMask[idx] = 0;

@@ -63,15 +63,29 @@ TEST(PixelConvergenceHasConverged, MoreSamplesEventuallyConvergeTheSameTrueMean)
 	EXPECT_TRUE(has_converged(e, 0.001));
 }
 
-TEST(PixelConvergenceHasConverged, NearBlackPixelConvergesUnconditionally) {
+TEST(PixelConvergenceHasConverged, NearBlackPixelConvergesOnceItHasEnoughSamples) {
 	// A pixel correctly converging toward zero (e.g. deep shadow) must not
 	// be judged by RELATIVE error against a near-zero mean - that ratio
-	// would stay large (or explode) forever otherwise.
+	// would stay large (or explode) forever otherwise. It is done once it
+	// has kBlackSamples samples: before that, a pixel lit only by rare
+	// paths may simply not have met one yet.
 	VarianceEstimator<double> e;
 	e.Add(0.0);
 	e.Add(1e-6);
 	e.Add(2e-6);
+	EXPECT_FALSE(has_converged(e, 0.001)) << "three samples are too few to call it black";
+	while (e.Count() < pixel_convergence::kBlackSamples) e.Add(1e-6);
 	EXPECT_TRUE(has_converged(e, 0.001));
+}
+
+// A pixel lit 1 sample in 50 (a caustic under glass, a glint in fog) whose first 64 samples all missed is not called black: it goes on, and
+// the first lit sample makes it what it is.
+TEST(PixelConvergenceHasConverged, APixelLitByRarePathsIsNotStoppedBlackAtTheFirstCheck) {
+	VarianceEstimator<double> e;
+	for (int i = 0; i < 64; ++i) e.Add(0.0);
+	EXPECT_FALSE(has_converged(e, 0.003));
+	e.Add(50.0);
+	EXPECT_FALSE(has_converged(e, 0.003)) << "now it is lit, and noisy";
 }
 
 TEST(PixelConvergenceHasConverged, TighterThresholdNeedsMoreSamples) {
@@ -91,10 +105,12 @@ TEST(PixelConvergenceHasConverged, TighterThresholdNeedsMoreSamples) {
 // is actually applied.
 TEST(PixelConvergenceHasConverged, ExposureAffectsNearBlackShortcut) {
 	VarianceEstimator<double> e;
-	e.Add(0.0);
-	e.Add(2e-5);  // below the 1e-4 default black_floor on its own
+	for (int i = 0; i < pixel_convergence::kBlackSamples / 2; ++i) {
+		e.Add(0.0);
+		e.Add(2e-5);  // below the 1e-4 default black_floor on its own
+	}
 	// At exposure=1.0 (default), this is still near-black - converges
-	// unconditionally regardless of its (high) relative variance.
+	// (with its kBlackSamples) regardless of its (high) relative variance.
 	EXPECT_TRUE(has_converged(e, 0.001, 1.0));
 	// At exposure=50.0, the same raw mean (1e-5) scales to 5e-4, ABOVE the
 	// 1e-4 floor - no longer near-black, so it falls through to the
