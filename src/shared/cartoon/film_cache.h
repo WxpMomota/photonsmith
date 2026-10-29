@@ -62,8 +62,10 @@ inline std::string buildStamp() {
 	return stamp;
 }
 
-// <temp>/photonsmith_film_cache: every film's folder is in it (not created here).
+// <temp>/photonsmith_film_cache: every film's folder is in it (not created here). RAY_TRACER_FILM_CACHE names another folder: the test runner gives every shard its own
+// temp folder, and points them all at the machine's cache with it, so a long film's meshes are not made again in each shard (scripts/run_tests_parallel.ps1).
 inline std::filesystem::path cacheRoot() {
+	if (const char *own = std::getenv("RAY_TRACER_FILM_CACHE"); own && own[0]) return std::filesystem::path(own);
 	std::error_code ec;
 	std::filesystem::path base = std::filesystem::temp_directory_path(ec);
 	if (ec) base = ".";

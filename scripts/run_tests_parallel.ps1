@@ -366,52 +366,54 @@ $jobs = for ($i = 0; $i -lt $Shards; $i++) {
 	# across all shards close to the real core count instead of Shards-times
 	# over it.
 	$threadsPerShard = [Math]::Max(1, [Math]::Ceiling([System.Environment]::ProcessorCount / $Shards))
-	Start-Job -Name "shard_$i" -ArgumentList $testsExe, $Shards, $i, $Filter, $logFile, $shardDir, $threadsPerShard, ($Tier -eq "Fast"), $(if ($env:RT_MACHINE_TEMP) { $env:RT_MACHINE_TEMP } else { $env:TEMP }) -ScriptBlock {
-		param($exe, $total, $index, $filter, $log, $cwd, $threads, $forbidGpu, $machineTemp)
-		Set-Location $cwd
-		# Each shard's own TEMP/TMP: about ten test fixtures build a scratch tree under a FIXED name in %TEMP% (pbrt_load_tests, pbrt_discover_tests,
-		# ...), and tests of one fixture land in different shards, so two shards used to delete each other's files mid-test ("found.size() 0, expected 2").
-		$shardTemp = Join-Path $cwd "tmp"
-		New-Item -ItemType Directory -Force -Path $shardTemp | Out-Null
-		$env:TEMP = $shardTemp
-		$env:TMP = $shardTemp
-		# (the machine's own, for what is made to be shared between processes: the film tests run the program with it, so their films use the film cache every run of the
-		# program shares - built once - and not a cold one in every shard: tests/unit/film_whole_tests.cpp)
-		$env:RT_MACHINE_TEMP = $machineTemp
-		$env:GTEST_TOTAL_SHARDS = $total
-		$env:GTEST_SHARD_INDEX = $index
-		$env:RAY_TRACER_THREADS = $threads
-		# The Fast tier runs its shards side by side on the assumption that no test in them uses the GPU: a GPU test that its name does not give away stops its shard
-		# (RT_FORBID_GPU, gpu/optix/optix_renderer_init.cpp) instead of running there unnoticed.
-		if ($forbidGpu) { $env:RT_FORBID_GPU = "1" }
-		# The shards run in folders linked to the repository, so every file of it is there: a test that cannot find one fails instead of skipping (tests/unit/fixture_skip.h).
-		$env:RT_REQUIRE_FIXTURES = "1"
-		$argList = @("--gtest_brief=1")
-		if ($filter) { $argList += "--gtest_filter=$filter" }
-		& $exe @argList *> $log
-		# Return (not `exit`) the real process exit code so the parent can
-		# read it via Receive-Job. `exit` inside a Start-Job scriptblock only
-		# terminates that job's own runspace - it is NOT reflected in
-		# $job.State (State stays "Completed" even after `exit 1`), so a
-		# hard crash (access violation, etc.) used to look identical to a
-		# clean run to every check the parent script had.
-		$LASTEXITCODE
-	}
+	$machineTemp = if ($env:RT_MACHINE_TEMP) { $env:RT_MACHINE_TEMP } else { $env:TEMP }
+	# The test program is started as a process of its own, through cmd only to send its output to the shard's log. (Each shard used to be a Start-Job, a whole PowerShell
+	# started for it: sixteen of them took 20 s to start, a third of a Fast run; sixteen plain processes take 3 s.)
+	$psi = New-Object System.Diagnostics.ProcessStartInfo
+	$psi.FileName = Join-Path $env:SystemRoot "System32\cmd.exe"
+	$gtestArgs = @("--gtest_brief=1", "--gtest_output=xml:$(Join-Path $shardDir 'times.xml')")   # (each test's time, for the summary of the slowest shard and tests after the run)
+	if ($Filter) { $gtestArgs += "--gtest_filter=$Filter" }
+	$quotedArgs = ($gtestArgs | ForEach-Object { '"' + $_ + '"' }) -join ' '
+	$psi.Arguments = '/d /s /c ""' + $testsExe + '" ' + $quotedArgs + ' > "' + $logFile + '" 2>&1"'
+	$psi.WorkingDirectory = $shardDir
+	$psi.UseShellExecute = $false
+	$psi.CreateNoWindow = $true
+	# Each shard's own TEMP/TMP: about ten test fixtures build a scratch tree under a FIXED name in %TEMP% (pbrt_load_tests, pbrt_discover_tests,
+	# ...), and tests of one fixture land in different shards, so two shards used to delete each other's files mid-test ("found.size() 0, expected 2").
+	$shardTemp = Join-Path $shardDir "tmp"
+	New-Item -ItemType Directory -Force -Path $shardTemp | Out-Null
+	$psi.EnvironmentVariables["TEMP"] = $shardTemp
+	$psi.EnvironmentVariables["TMP"] = $shardTemp
+	# (the machine's own, for what is made to be shared between processes: the film tests run the program with it, so their films use the film cache every run of the
+	# program shares - built once - and not a cold one in every shard: tests/unit/film_whole_tests.cpp)
+	$psi.EnvironmentVariables["RT_MACHINE_TEMP"] = $machineTemp
+	# (and the films the tests build in their own process use that cache too, src/shared/cartoon/film_cache.h: with a cold one in every shard, a frame of the Nomai
+	# film took a minute in each shard that drew one)
+	$psi.EnvironmentVariables["RAY_TRACER_FILM_CACHE"] = Join-Path $machineTemp "photonsmith_film_cache"
+	$psi.EnvironmentVariables["GTEST_TOTAL_SHARDS"] = "$Shards"
+	$psi.EnvironmentVariables["GTEST_SHARD_INDEX"] = "$i"
+	$psi.EnvironmentVariables["RAY_TRACER_THREADS"] = "$threadsPerShard"
+	# The Fast tier runs its shards side by side on the assumption that no test in them uses the GPU: a GPU test that its name does not give away stops its shard
+	# (RT_FORBID_GPU, gpu/optix/optix_renderer_init.cpp) instead of running there unnoticed.
+	if ($Tier -eq "Fast") { $psi.EnvironmentVariables["RT_FORBID_GPU"] = "1" }
+	# The shards run in folders linked to the repository, so every file of it is there: a test that cannot find one fails instead of skipping (tests/unit/fixture_skip.h).
+	$psi.EnvironmentVariables["RT_REQUIRE_FIXTURES"] = "1"
+	[pscustomobject]@{ Name = "shard_$i"; Process = [System.Diagnostics.Process]::Start($psi); Hung = $false }
 }
 
 Write-Host "Waiting for $($jobs.Count) shards (timeout: ${TimeoutSeconds}s)..."
-Wait-Job -Job $jobs -Timeout $TimeoutSeconds | Out-Null
-
-# Wait-Job's own -Timeout only stops WAITING - a job still Running after it
-# elapses keeps executing in the background forever unless explicitly
-# stopped. Without this, a single deadlocked/hung test (GPU driver stall,
-# etc.) in any one shard used to block the whole script indefinitely with
-# no diagnostic at all.
-$hungJobs = $jobs | Where-Object { $_.State -eq "Running" }
-foreach ($job in $hungJobs) {
-	Write-Host "[FAIL] $($job.Name): timed out after ${TimeoutSeconds}s - stopping" -ForegroundColor Red
+$deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+foreach ($job in $jobs) {
+	$left = [int][Math]::Max(0, ($deadline - (Get-Date)).TotalMilliseconds)
+	if (-not $job.Process.WaitForExit($left)) { $job.Hung = $true }
 }
-if ($hungJobs) { Stop-Job -Job $hungJobs | Out-Null }
+
+# A shard still running at the deadline is stopped with its test program (cmd's child: the whole tree), and said - a deadlocked or hung test (a GPU driver
+# stall ...) used to keep the run waiting with no word at all.
+foreach ($job in ($jobs | Where-Object { $_.Hung })) {
+	Write-Host "[FAIL] $($job.Name): timed out after ${TimeoutSeconds}s - stopping" -ForegroundColor Red
+	& taskkill /T /F /PID $job.Process.Id 2>&1 | Out-Null
+}
 
 $failedShards = @()
 $totalPassed = 0
@@ -421,10 +423,8 @@ foreach ($job in $jobs) {
 	$logFile = Join-Path $logDir "$($job.Name).log"
 	$content = if (Test-Path $logFile) { Get-Content $logFile -Raw } else { "" }
 	if ($null -eq $content) { $content = "" }   # (Get-Content -Raw of an empty log is $null: a shard that died before writing anything)
-	# Receive-Job returns the scriptblock's own last expression (see the job
-	# definition above) - the real process exit code, not PowerShell's
-	# notion of job State (which stays "Completed" even after a crash).
-	$exitCode = Receive-Job -Job $job -ErrorAction SilentlyContinue
+	# The test program's own exit code (cmd /c passes it on): a hard crash (an access violation ...) is not a clean run.
+	$exitCode = if ($job.Hung) { $null } else { $job.Process.ExitCode }
 	$passedMatch = [regex]::Match($content, '\[\s*PASSED\s*\]\s*(\d+)')
 	$failedMatch = [regex]::Match($content, '\[\s*FAILED\s*\]\s*(\d+)')
 	$passedCount = if ($passedMatch.Success) { [int]$passedMatch.Groups[1].Value } else { 0 }
@@ -445,7 +445,7 @@ foreach ($job in $jobs) {
 	# (e.g. an over-narrow -Filter) needs both the real exit code AND
 	# whether a PASSED line ever appeared at all, neither of which the old
 	# $job.State/text-search checks here actually caught.
-	$crashedOrHung = ($job.State -eq "Stopped") -or ($null -ne $exitCode -and $exitCode -ne 0) -or (-not $passedMatch.Success)
+	$crashedOrHung = $job.Hung -or ($null -ne $exitCode -and $exitCode -ne 0) -or (-not $passedMatch.Success)
 	if ($crashedOrHung -or $failedCount -gt 0) {
 		$failedShards += $job.Name
 		$reason = if ($failedCount -gt 0) { "$failedCount test(s) failed: $($failedNames -join ', ')" } elseif ($crashedOrHung) { "crashed/timed out (exit code: $exitCode)" } else { "failed" }
@@ -455,7 +455,7 @@ foreach ($job in $jobs) {
 	}
 }
 
-Remove-Job -Job $jobs
+foreach ($job in $jobs) { $job.Process.Dispose() }
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
@@ -464,6 +464,24 @@ Write-Host "Total: $totalPassed passed, $totalFailed failed across $Shards shard
 if ($totalSkipped -gt 0) { Write-Host "Skipped: $totalSkipped" -ForegroundColor Yellow }
 Write-Host "========================================" -ForegroundColor Cyan
 foreach ($w in $staleWarnings) { Write-Host "[STALE?] $w" -ForegroundColor Yellow }
+
+# What set the run's length: the shards are given tests by count, not by time, so the run lasts as long as its slowest shard, and one long test can be most of it
+# (a sweep over every film took 150 s of one shard of the Fast tier until it was cut into parts: tests/unit/test_parts.h).
+$shardTimes = @()
+$testTimes = @()
+foreach ($report in (Get-ChildItem -Path $logDir -Filter "times.xml" -Recurse -ErrorAction SilentlyContinue)) {
+	try { $xml = [xml](Get-Content $report.FullName -Raw) } catch { continue }
+	$shardTimes += [pscustomobject]@{ Name = $report.Directory.Name -replace '^cwd_', 'shard_'; Seconds = [double]$xml.testsuites.time }
+	foreach ($case in $xml.SelectNodes("//testcase")) {
+		if ($case.status -eq "run") { $testTimes += [pscustomobject]@{ Name = "$($case.classname).$($case.name)"; Seconds = [double]$case.time } }
+	}
+}
+if ($shardTimes.Count -gt 0) {
+	$slowest = $shardTimes | Sort-Object Seconds -Descending | Select-Object -First 1
+	$median = ($shardTimes | Sort-Object Seconds)[[int][Math]::Floor($shardTimes.Count / 2)].Seconds
+	Write-Host ("Slowest shard: {0} {1:N0} s (the median shard {2:N0} s). Slowest tests:" -f $slowest.Name, $slowest.Seconds, $median)
+	foreach ($t in ($testTimes | Sort-Object Seconds -Descending | Select-Object -First 5)) { Write-Host ("  {0,6:N1} s  {1}" -f $t.Seconds, $t.Name) }
+}
 
 if ($failedShards.Count -gt 0) {
 	Write-Host "Failed shards: $($failedShards -join ', ')" -ForegroundColor Red
