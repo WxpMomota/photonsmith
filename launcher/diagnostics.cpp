@@ -16,6 +16,7 @@
 #endif
 #include "../cpu_renderer/cpu_interface.h"
 #include "../src/TheRestOfYourLife/error_codes.h"
+#include "../src/shared/scene_descriptor.h"   // SceneCategories::isFilmCategory
 
 #include <filesystem>
 #include <fstream>
@@ -190,6 +191,9 @@ void append_scene_assets(std::ostringstream& report) {
 			++requires_files_count;
 		}
 
+		// A film's still is written when something renders it: asking its path here (cpu_scene_pbrt_path_by_id writes it) built every film's frame,
+		// which on a 4-core CI runner took the GUI's Diagnostics past its two minutes. It is there whenever it is needed, so it is not counted.
+		if (SceneCategories::isFilmCategory(cpu_scene_category_by_id(id))) continue;
 		const char* pbrt_path = cpu_scene_pbrt_path_by_id(id);
 		if (pbrt_path && *pbrt_path) {
 			++pbrt_checked;
