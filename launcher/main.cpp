@@ -1271,11 +1271,11 @@ int main(int argc, char** argv) {
 #endif
 	}
 
-	// --background (or RAY_TRACER_BACKGROUND=1): lower priorities for this process, which the programs it starts inherit (launcher/background_mode.h, decided by RunPolicy)
+	// --background (or RAY_TRACER_BACKGROUND=1), --smart-power (or =auto): lower priorities for this process, which the programs it starts inherit (launcher/background_mode.h, decided by RunPolicy)
 	const RunPolicy run_policy = RunPolicy::from(args);
-	if (run_policy.background) {
-		args.background = true;   // (so that the programs a video starts are given the flag too)
-		std::cout << "Background mode: " << background_mode::apply(run_policy) << "." << std::endl;
+	if (run_policy.background || run_policy.smart) {
+		args.background = run_policy.background;   // (so that the programs a video starts are given the flag too)
+		std::cout << (run_policy.smart ? "Smart power: " : "Background mode: ") << background_mode::apply(run_policy) << "." << std::endl;
 	}
 
 	// --gpu-device N: the renderer reads RAY_TRACER_GPU_DEVICE (gpu/optix/optix_renderer_init.cpp), and so do the programs a video starts

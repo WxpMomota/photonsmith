@@ -12,6 +12,8 @@
 //     card to another program that is doing compute or heavy graphics (see above: measured, no effect), only the pauses do that;
 //   * half of the CPU cores for a CPU render (unless RAY_TRACER_THREADS says otherwise).
 // The pauses (pauseAfter) make a video take about twice as long even when nothing else is running; the priorities cost nothing then.
+//
+// Smart mode (--smart-power, the GUI's Power "Smart") takes the priorities (not the halved CPU threads) all the time and the pauses only while the computer is busy (smart_power.h).
 
 #include <chrono>
 #include <cstdlib>
@@ -19,6 +21,7 @@
 #include <thread>
 
 #include "run_policy.h"
+#include "smart_power.h"
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -42,9 +45,9 @@ inline bool lowerGpuSchedulingClass() {
 }
 #endif
 
-// Applies the process-wide parts of `policy` (nothing outside background mode). Safe to call more than once. Returns what was done, for the run's log.
+// Applies the process-wide parts of `policy` (nothing outside background and smart mode). Safe to call more than once. Returns what was done, for the run's log.
 inline std::string apply(const RunPolicy &policy) {
-	if (!policy.background) return std::string();
+	if (!policy.background && !policy.smart) return std::string();
 	std::string done;
 #ifdef _WIN32
 	if (SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS)) done += "CPU priority below normal";
@@ -66,14 +69,17 @@ inline std::string apply(const RunPolicy &policy) {
 			done += ", " + s + " CPU threads";
 		}
 	}
-	done += ", paused " + std::to_string(100 - policy.dutyPercent) + "% of the time between frames";
+	if (policy.smart) done += ", all of the computer while it is free and a video paused " + std::to_string(100 - policy.dutyPercent) + "% of the time between frames while it is busy";
+	else done += ", paused " + std::to_string(100 - policy.dutyPercent) + "% of the time between frames";
 	return done;
 }
 
-// Sleeps for policy.pauseSecondsAfter(workSeconds): nothing outside background mode.
+// Sleeps for policy.pauseSecondsAfter(workSeconds): nothing outside background mode; in smart mode only while the computer is busy, and no longer than it stays busy.
 inline void pauseAfter(const RunPolicy &policy, double workSeconds) {
-	const double s = policy.pauseSecondsAfter(workSeconds);
-	if (s > 0.0) std::this_thread::sleep_for(std::chrono::duration<double>(s));
+	const double s = policy.pauseSecondsAfter(workSeconds, !policy.smart || smart_power::busyNow());
+	if (s <= 0.0) return;
+	if (policy.smart) smart_power::pauseWhileBusy(s);
+	else std::this_thread::sleep_for(std::chrono::duration<double>(s));
 }
 
 }  // namespace background_mode

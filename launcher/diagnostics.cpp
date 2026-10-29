@@ -31,6 +31,7 @@
 #define NOMINMAX
 #include <windows.h>
 #endif
+#include "smart_power.h"   // what the Power box's Smart sees
 
 namespace {
 
@@ -226,6 +227,20 @@ void append_scene_assets(std::ostringstream& report) {
 	}
 }
 
+// What the Power box's Smart (--smart-power) sees now, read over half a second, and whether a video would pause between its frames.
+void append_smart_power(std::ostringstream& report) {
+#ifdef _WIN32
+	const smart_power::Signals s = smart_power::readOnce(0.5);
+	const std::string why = smart_power::busyReason(s, smart_power::Limits::fromEnvironment());
+	char line[256];
+	std::snprintf(line, sizeof(line), "last key or mouse %.0f s ago, full-screen program %s, other programs on the graphics card %.0f%%, on the processor %.0f%%",
+				  s.idleSeconds, s.fullScreen ? "yes" : "no", s.otherGpuPercent, s.otherCpuPercent);
+	report << "Smart Power: " << (why.empty() ? std::string("free") : "busy (" + why + ")") << "; " << line << "\n";
+#else
+	report << "Smart Power: not read on this system (Smart renders like Keep the PC responsive)\n";
+#endif
+}
+
 } // namespace
 
 int run_diagnostics(const LaunchArgs& args) {
@@ -235,6 +250,7 @@ int run_diagnostics(const LaunchArgs& args) {
 	append_gpu(report);
 	append_disk(report, args.custom_output_path);
 	append_scene_assets(report);
+	append_smart_power(report);
 	report << "======================================\n";
 
 	std::string text = report.str();

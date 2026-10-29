@@ -386,6 +386,9 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
     if (use_gpu && !kMetalVideoFrames) load.freeVramMb = gpu_memory::freeMb(args.gpu_device >= 0 ? args.gpu_device : (std::getenv("RAY_TRACER_GPU_DEVICE") ? std::atoi(std::getenv("RAY_TRACER_GPU_DEVICE")) : 0));
     const int workers = cartoon_render::workersFor(args, use_gpu, kMetalVideoFrames, load);
     const int jobs = cartoon_render::jobsFor(args, use_gpu, load);
+    // --smart-power: on a busy computer each of the frames rendered at once pauses that many times as long, so that together they keep to the duty (RunPolicy::smartFrames; set before
+    // the watchdog's limit is worked out and the workers are started, which read it)
+    if (RunPolicy::from(args).smart) set_env_var(RunPolicy::kSmartFramesVariable, std::to_string(std::max({1, workers, jobs})).c_str());
     for (int w = 0; w < std::max(jobs, workers); ++w) std::filesystem::create_directories(frames_dir / ("work" + std::to_string(w)));
     // A GPU frame is written as a PNG by the renderer itself (OutputOptions::write_png; Metal always did), not as a text PPM to convert: the picture of GPU SPPM is the one exception
     const bool frame_is_png = use_gpu && (kMetalVideoFrames || !args.use_sppm);
@@ -605,6 +608,7 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
     auto video_start_time = std::chrono::high_resolution_clock::now();
     int successful_frames = 0;
     const RunPolicy run_policy = RunPolicy::from(args);
+    if (run_policy.smart) smart_power::start();   // (--smart-power: watch the computer from before the first frame; the workers and frame runs read what it finds)
 
     // Converts each frame to PNG on a background thread as soon as it's
     // rendered, instead of after the whole video finishes - overlaps
@@ -758,7 +762,7 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
 
         auto frame_end = std::chrono::high_resolution_clock::now();
         auto frame_duration = std::chrono::duration_cast<std::chrono::milliseconds>(frame_end - frame_start);
-        background_mode::pauseAfter(run_policy, std::chrono::duration<double>(frame_end - frame_start).count());   // (--background)
+        background_mode::pauseAfter(run_policy, std::chrono::duration<double>(frame_end - frame_start).count());   // (--background, or smart on a busy computer)
 
         if (render_result == SUCCESS) {
             successful_frames++;

@@ -39,6 +39,7 @@ namespace render_flags {
 	constexpr const char* kGpuDevice     = "--gpu-device";     // which NVIDIA GPU (Settings tab)
 	constexpr const char* kWorkerMaxMb   = "--worker-max-mb";  // a cartoon worker's memory limit (Settings tab)
 	constexpr const char* kBackground    = "--background";   // low priority, one worker: for using the computer meanwhile (launcher/background_mode.h)
+	constexpr const char* kSmartPower    = "--smart-power";  // full power while the computer is free, --background's pauses while it is busy (launcher/smart_power.h)
 	constexpr const char* kOptixValidate = "--optix-validate";
 	constexpr const char* kExposure      = "--exposure";
 	constexpr const char* kBloom         = "--bloom";        // the camera's look: src/shared/lens_look.h

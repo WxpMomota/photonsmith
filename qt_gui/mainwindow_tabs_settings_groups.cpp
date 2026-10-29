@@ -978,30 +978,47 @@ void MainWindow::buildQualityRows(QWidget *basicTab, QFormLayout *renderLayout) 
 // is replaced for holding too much memory (launcher --background / --gpu-device / --worker-max-mb). All remembered between runs and passed to the renderer only when
 // they differ from its own defaults, which are the full power of the computer: no background mode, the first card, no memory limit.
 void MainWindow::buildMachineRows(QWidget *basicTab, QFormLayout *renderLayout) {
-	// Full power, or a render that is a polite guest so the computer stays usable: lower CPU and GPU priority, half the CPU cores, one worker and one frame at a time,
-	// a pause after every video frame (launcher/background_mode.h). Applies to renders and videos, not to Live Preview (which runs inside this program).
+	// Full power; Smart, which is full power while nobody uses the computer and a guest while it is busy (launcher/smart_power.h; it reads the signs on Windows only, so the Mac
+	// does not offer it); or a render that is always a polite guest so the computer stays usable: lower CPU and GPU priority, half the CPU cores, one worker and one frame at a
+	// time, a pause after every video frame (launcher/background_mode.h). Applies to renders and videos, not to Live Preview (which runs inside this program).
 	m_powerCombo = new QComboBox(basicTab);
-	m_powerCombo->addItem(tr("Full power (fastest)"), false);
-	m_powerCombo->addItem(tr("Keep the PC responsive while rendering"), true);
+	m_powerCombo->addItem(tr("Full power (fastest)"), QStringLiteral("full"));
+#ifndef Q_OS_MAC
+	m_powerCombo->addItem(tr("Smart: full power while the PC is not in use"), QStringLiteral("smart"));
+#endif
+	m_powerCombo->addItem(tr("Keep the PC responsive while rendering"), QStringLiteral("background"));
 	styleComboBox(m_powerCombo);
 	m_powerCombo->setToolTip(
 		tr("Full power: the render uses all of the computer - every CPU core, the graphics card\n"
 		"flat out - and finishes as soon as it can.\n\n"
+#ifndef Q_OS_MAC
+		"Smart: full power while nobody uses the computer; as soon as it is busy - the keyboard or\n"
+		"mouse used in the last minute, a full-screen game or film, another program working the\n"
+		"graphics card or the processor - a video pauses after every frame, as below, until it has\n"
+		"been free for half a minute. A frame already rendering is finished first.\n\n"
+#endif
 		"Keep the PC responsive: renders politely so you can use the computer meanwhile - a lower\n"
 		"CPU priority, half of the CPU cores, and a video pauses after every frame for as long as\n"
 		"the frame took. A video takes about twice as long. The pictures are the same."));
 	{
 		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
-		m_powerCombo->setCurrentIndex(settings.value(settings_keys::kBackgroundModeKey, false).toBool() ? 1 : 0);
+		const QString remembered = settings.value(settings_keys::kPowerModeKey,
+			settings.value(settings_keys::kBackgroundModeKey, false).toBool() ? QStringLiteral("background") : QStringLiteral("full")).toString();
+		m_powerCombo->setCurrentIndex(std::max(0, m_powerCombo->findData(remembered)));
 		m_powerCombo->setProperty("rt_default", 0);   // (the section's Defaults button: Full power, whatever was remembered)
 	}
 	connect(m_powerCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) {
 		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
-		settings.setValue(settings_keys::kBackgroundModeKey, m_powerCombo->currentData().toBool());
+		settings.setValue(settings_keys::kPowerModeKey, m_powerCombo->currentData().toString());
 	});
 	renderLayout->addRow(labelWithInfo(tr("Power:"),
 		tr("How much of the computer a render or a video takes. Full power, the default, uses "
-		"everything and is the fastest. Keep the PC responsive leaves room for other programs "
+		"everything and is the fastest. "
+#ifndef Q_OS_MAC
+		"Smart uses everything while nobody is using the computer, and leaves room as soon as "
+		"someone is (or a game, a film or another heavy program runs). "
+#endif
+		"Keep the PC responsive always leaves room for other programs "
 		"(lower priority, half the CPU cores, a pause after every video frame), so a video takes "
 		"about twice as long; the pictures are the same.")),
 		m_powerCombo);

@@ -24,23 +24,42 @@ struct FrameLoad {
 struct RunPolicy {
 	// True in background mode: a render that is a polite guest on the computer (background_mode.h).
 	bool background = false;
-	// The share of the time a background render may keep the machine busy, in percent (100 outside background mode). After work that took W seconds it pauses W * (100 - duty) / duty.
+	// True in smart mode (the GUI's Power "Smart", --smart-power): full power while the computer is free, a background render's pauses while it is busy (smart_power.h says which). Its
+	// workers and frames at once are full power's; its priorities are background mode's (which cost nothing on a free computer).
+	bool smart = false;
+	// In smart mode, how many frames the video renders at once (RAY_TRACER_SMART_FRAMES, which the video sets for its workers and frame runs): on a busy computer each pauses that
+	// many times as long, so that together they keep to the duty.
+	int smartFrames = 1;
+	static constexpr const char *kSmartFramesVariable = "RAY_TRACER_SMART_FRAMES";
+	// The share of the time a background render (or a smart one on a busy computer) may keep the machine busy, in percent (100 otherwise). After work that took W seconds it pauses
+	// W * (100 - duty) / duty.
 	int dutyPercent = 100;
 
-	// From the arguments and the environment (RAY_TRACER_BACKGROUND=1, RAY_TRACER_BACKGROUND_DUTY=percent, 10 to 100).
+	// From the arguments and the environment (RAY_TRACER_BACKGROUND=1, or =auto for smart mode; RAY_TRACER_BACKGROUND_DUTY=percent, 10 to 100).
 	static RunPolicy from(const LaunchArgs &args) {
 		RunPolicy p;
 #ifdef _MSC_VER
 #pragma warning(suppress : 4996)
 #endif
 		const char *env = std::getenv("RAY_TRACER_BACKGROUND");
-		p.background = args.background || (env && *env && std::string(env) != "0");
-		if (p.background) {
+		const bool envAuto = env && std::string(env) == "auto";
+		p.background = args.background || (env && *env && std::string(env) != "0" && !envAuto);
+		p.smart = !p.background && (args.smart_power || envAuto);
+#ifndef _WIN32
+		if (p.smart) p.smart = false, p.background = true;   // (the signs of a busy computer are read on Windows only: elsewhere Smart is always polite)
+#endif
+		if (p.background || p.smart) {
 			p.dutyPercent = 50;
 #ifdef _MSC_VER
 #pragma warning(suppress : 4996)
 #endif
 			if (const char *duty = std::getenv("RAY_TRACER_BACKGROUND_DUTY")) p.dutyPercent = (std::max)(10, (std::min)(std::atoi(duty), 100));
+		}
+		if (p.smart) {
+#ifdef _MSC_VER
+#pragma warning(suppress : 4996)
+#endif
+			if (const char *frames = std::getenv(kSmartFramesVariable)) p.smartFrames = (std::max)(1, (std::min)(std::atoi(frames), 16));
 		}
 		return p;
 	}
@@ -79,16 +98,19 @@ struct RunPolicy {
 	}
 
 	// The limit a frame (or a worker between two finished frames) may take: the watchdog measures the time since a worker's last finished frame and a background worker pauses after every
-	// frame, so the limit grows by the same factor as the pauses (twice at 50%); 0 (never) stays 0.
+	// frame, so the limit grows by the same factor as the pauses (twice at 50%; a smart one's pauses are smartFrames times longer); 0 (never) stays 0.
 	int stallSeconds(int seconds) const {
-		if (!background || seconds <= 0) return seconds;
-		return static_cast<int>((std::min)(static_cast<long long>(seconds) * 100 / dutyPercent, 24LL * 3600));
+		if ((!background && !smart) || seconds <= 0) return seconds;
+		const long long share = smart ? smartFrames : 1;
+		return static_cast<int>((std::min)(static_cast<long long>(seconds) * 100 * share / dutyPercent, 24LL * 3600));
 	}
 
-	// How long to pause after work that took `workSeconds`, to keep to the duty (0 outside background mode).
-	double pauseSecondsAfter(double workSeconds) const {
-		if (!background || dutyPercent >= 100) return 0.0;
-		return workSeconds * (100 - dutyPercent) / dutyPercent;
+	// How long to pause after work that took `workSeconds`, to keep to the duty: in background mode always, in smart mode when the computer is `busy` (smart_power.h; then as one of
+	// smartFrames frames at once: W * (100 * frames - duty) / duty), else never.
+	double pauseSecondsAfter(double workSeconds, bool busy = true) const {
+		if (!(background || (smart && busy))) return 0.0;
+		const double share = smart ? smartFrames : 1;
+		return (std::max)(0.0, workSeconds * (100.0 * share - dutyPercent) / dutyPercent);
 	}
 
 	// The CPU threads a render may use when the user has not chosen a number (RAY_TRACER_THREADS): half of the cores in background mode; 0 = no limit of ours.

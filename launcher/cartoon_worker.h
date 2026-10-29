@@ -182,7 +182,7 @@ inline int run(const Job &job, const LaunchArgs &args, const RenderSetup &setup,
 		std::error_code ec;
 		std::filesystem::rename(temporary, marker, ec);
 		std::cout.flush();
-		background_mode::pauseAfter(policy, std::chrono::duration<double>(std::chrono::steady_clock::now() - frameStart).count());   // (--background: leave the machine to its user for a while)
+		background_mode::pauseAfter(policy, std::chrono::duration<double>(std::chrono::steady_clock::now() - frameStart).count());   // (--background, or smart on a busy computer: leave the machine to its user for a while)
 	}
 	return 0;
 }

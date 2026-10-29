@@ -77,7 +77,7 @@ inline int timeoutFor(const LaunchArgs &args, bool gpu) {
 	int seconds = gpu ? 900 : 0;
 	if (args.cartoon_timeout >= 0) seconds = args.cartoon_timeout;
 	else if (const char *env = std::getenv("RAY_TRACER_CARTOON_TIMEOUT")) seconds = std::max(0, std::atoi(env));
-	// --background: a worker pauses after every frame, so the limit grows with the pauses (RunPolicy::stallSeconds)
+	// --background (and --smart-power): a worker pauses after every frame, so the limit grows with the pauses (RunPolicy::stallSeconds)
 	return RunPolicy::from(args).stallSeconds(seconds);
 }
 
@@ -119,6 +119,7 @@ inline int renderFrame(const cartoon::Film &film, double t, const std::filesyste
 		return -1;
 	}
 	const std::vector<std::string> childArgs = frameArgs(frameFlags(args, film, gpu), width, height, spp, depth, framePath, scenePath.string(), timeLimitSeconds);
+	const RunPolicy policy = RunPolicy::from(args);
 	const auto frameStart = std::chrono::steady_clock::now();
 	int rc = -1;
 	for (int attempt = 0; attempt < 2; ++attempt) {
@@ -131,7 +132,7 @@ inline int renderFrame(const cartoon::Film &film, double t, const std::filesyste
 	}
 	std::error_code ec;
 	std::filesystem::remove(scenePath, ec);
-	background_mode::pauseAfter(RunPolicy::from(args), std::chrono::duration<double>(std::chrono::steady_clock::now() - frameStart).count());   // (--background)
+	background_mode::pauseAfter(policy, std::chrono::duration<double>(std::chrono::steady_clock::now() - frameStart).count());   // (--background, or smart on a busy computer)
 	return rc;
 }
 

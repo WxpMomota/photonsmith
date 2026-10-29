@@ -422,6 +422,9 @@ struct LaunchArgs {
 	// --background: be a polite guest on the computer (launcher/background_mode.h): lower CPU and GPU priority, half the CPU cores, one worker and one frame at a time. Passed on to every program
 	// a video starts. RAY_TRACER_BACKGROUND=1 does the same.
 	bool background = false;
+	// --smart-power: full power while the computer is free, --background's pauses while it is busy (someone using it, a full-screen program, another program on the graphics card or the
+	// processor: launcher/smart_power.h). Passed on to every program a video starts. RAY_TRACER_BACKGROUND=auto does the same.
+	bool smart_power = false;
 	// --cartoon-worker JOBFILE: render the frames the job file lists, one after the other in this one process (launcher/cartoon_worker.h). Started by a cartoon video, not by people.
 	std::string cartoon_worker;
 	// --cartoon-workers N: render a cartoon video's frames with N long-lived worker processes (the default on a GPU) instead of a process per frame; 0 = a process per frame; -1 = automatic.
@@ -997,6 +1000,9 @@ inline FlagResult handle_image_and_video_flag(const std::string& arg, int argc, 
 	} else if (arg == "--background") {
 		out.background = true;
 		consumed_args.insert(i);
+	} else if (arg == render_flags::kSmartPower) {
+		out.smart_power = true;
+		consumed_args.insert(i);
 	} else if (arg == render_flags::kFps && i + 1 < argc) {
 		try {
 			const int fps = strict_stoi(argv[i + 1]);
@@ -1341,6 +1347,9 @@ inline void print_launch_help(const char* program) {
 				  << "  --background: use the computer lightly, for when you want to use it meanwhile: lower CPU and GPU\n"
 				  << "               priority, half the CPU cores, one worker and one frame at a time for a cartoon video\n"
 				  << "               (the environment variable RAY_TRACER_BACKGROUND=1 also sets it)\n"
+				  << "  --smart-power: full power while nobody uses the computer, --background's pauses between a video's\n"
+				  << "               frames while it is busy (keys or mouse used in the last minute, a full-screen program, other\n"
+				  << "               programs on the graphics card or the processor; Windows only; RAY_TRACER_BACKGROUND=auto too)\n"
 				  << "  --resume:    continue an interrupted cartoon video from the frames already rendered, when the film and\n"
 				  << "               the settings (size, samples, flags) are the same; otherwise it starts again\n"
 				  << "  --preview:   a quick look at a cartoon: its characters built coarser (most of a frame's time), its frames\n"

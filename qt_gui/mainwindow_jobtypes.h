@@ -108,6 +108,7 @@ struct AdvancedRenderFlags {
 	double denoiseBlend = render_defaults::kDenoiseBlend;
 	bool stats = false;
 	bool background = false;   // --background: render as a polite guest (Settings tab, Render Settings: Power "Keep the PC responsive"; the default is Full power)
+	bool smartPower = false;   // --smart-power: full power while the computer is free, a guest while it is busy (Power "Smart")
 	int gpuDevice = 0;         // --gpu-device N, passed only when not 0 (the CLI's own default)
 	int workerMaxGb = 0;       // --worker-max-mb N*1024, passed only when not 0 (the CLI's own default: never replace a video's worker)
 	// The camera's look (--bloom/--vignette/--warmth/--saturation); below the range = the scene's own, not passed

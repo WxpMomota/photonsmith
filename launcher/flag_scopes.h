@@ -48,6 +48,7 @@ inline constexpr FlagScopeEntry kFlagScopes[] = {
 	{"--regularize", FlagScope::Render}, {"--maxcomponentvalue", FlagScope::Render}, {"--crop", FlagScope::Render}, {"--seed", FlagScope::Render}, {"--aperture", FlagScope::Render},
 	{"--focus-distance", FlagScope::Render}, {"--spectral", FlagScope::Render}, {"--tonemap", FlagScope::Render},
 	{"--background", FlagScope::Render},     // (the frames' runs lower their own priority too: run_policy.h)
+	{"--smart-power", FlagScope::Render},    // (and take turns and pause on a busy computer: smart_power.h)
 	// the other integrators and their options
 	{"--sppm", FlagScope::Render}, {"--sppm-iterations", FlagScope::Render}, {"--sppm-photons", FlagScope::Render}, {"--bdpt", FlagScope::Render}, {"--bdpt-max-depth", FlagScope::Render},
 	{"--mlt", FlagScope::Render}, {"--mlt-bootstrap", FlagScope::Render}, {"--mlt-mutations", FlagScope::Render}, {"--mlt-max-depth", FlagScope::Render}, {"--randomwalk", FlagScope::Render},

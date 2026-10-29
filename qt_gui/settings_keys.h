@@ -28,7 +28,10 @@ constexpr const char *kLanguageKey = "ui/language";
 // Points added to (or, if negative, taken from) the Log/Diagnostics text views'
 // 9pt base size - see MainWindow::changeLogFontSize(). Absent = 0.
 constexpr const char *kLogFontDeltaKey = "ui/logFontDelta";
-// The Power box: true = "Keep the PC responsive while rendering" (--background), false = Full power. Remembered between runs. Absent = Full power.
+// The Power box: "full", "smart" (--smart-power) or "background" (--background, "Keep the PC responsive while rendering"). Remembered between runs. Absent = the old
+// kBackgroundModeKey's choice, else Full power.
+constexpr const char *kPowerModeKey = "render/power";
+// The Power box before it had Smart: true = Keep the PC responsive, false = Full power. Read only when kPowerModeKey is absent.
 constexpr const char *kBackgroundModeKey = "render/backgroundMode";
 // The graphics card renders run on (--gpu-device; Windows/Linux only). Absent = 0, the first card.
 constexpr const char *kGpuDeviceKey = "render/gpuDevice";

@@ -1572,7 +1572,10 @@ void MainWindow::runResolutionSelfTest(const std::function<void(const QString &)
 		return false;
 	};
 	check(inRenderSettings(m_powerCombo), "the Power box is in Render Settings");
-	check(m_powerCombo->itemData(0).toBool() == false && m_powerCombo->itemData(1).toBool() == true, "its first choice is Full power, its second Keep the PC responsive");
+	check(m_powerCombo->itemData(0).toString() == "full" && m_powerCombo->findData("background") > 0, "its first choice is Full power, and Keep the PC responsive is one of the others");
+#ifndef Q_OS_MAC
+	check(m_powerCombo->itemData(1).toString() == "smart", "its second is Smart (full power while the computer is free)");
+#endif
 	check(m_workerMemorySpin->value() == m_workerMemorySpin->minimum() || QSettings(settings_keys::kOrg, settings_keys::kApp).contains(settings_keys::kWorkerMaxGbKey),
 		  "the video helper memory limit is No limit unless one was chosen: " + m_workerMemorySpin->text());
 	check(inRenderSettings(m_workerMemorySpin), "the video helper memory limit is in Render Settings");

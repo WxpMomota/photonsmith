@@ -1667,6 +1667,149 @@ TEST(BackgroundMode, ItLowersThePriorityOfThisProcessAndHalvesTheCpuThreads) {
 }
 #endif
 
+// Smart power: full power's workers and threads, background mode's pauses only while the computer is busy (as long again for each other frame rendered at the same time), and a
+// watchdog that allows for them.
+TEST(RunPolicy, SmartPowerIsFullPowerUntilTheComputerIsBusy) {
+	LaunchArgs smartArgs;
+	ASSERT_TRUE(parseArgs({"--smart-power", "--video", "--camera-path", "cartoon:fireflies"}, smartArgs));
+	EXPECT_TRUE(smartArgs.smart_power);
+	const RunPolicy smart = RunPolicy::from(smartArgs);
+#ifdef _WIN32
+	EXPECT_TRUE(smart.smart);
+	EXPECT_FALSE(smart.background);
+	EXPECT_EQ(smart.dutyPercent, 50);
+	EXPECT_EQ(smart.defaultWorkers(true, false, {214 * 120, 16, 15600}), 4) << "full power's workers";
+	EXPECT_EQ(smart.defaultFrameJobs(true), 2);
+	EXPECT_EQ(smart.cpuThreads(16), 0u) << "every core: the lower priority leaves the processor to the user";
+	EXPECT_EQ(smart.pauseSecondsAfter(2.0, false), 0.0) << "a free computer: no pause";
+	EXPECT_NEAR(smart.pauseSecondsAfter(2.0, true), 2.0, 1e-9) << "a busy one: background mode's";
+	EXPECT_EQ(smart.stallSeconds(900), 1800);
+	EXPECT_EQ(cartoon_render::timeoutFor(smartArgs, true), 1800);
+	// four frames at once (the video says so to its workers): each pauses so that the four together render half of the time
+	set_env_var(RunPolicy::kSmartFramesVariable, "4");
+	const RunPolicy four = RunPolicy::from(smartArgs);
+	EXPECT_EQ(four.smartFrames, 4);
+	EXPECT_NEAR(four.pauseSecondsAfter(2.0, true), 14.0, 1e-9) << "2 s of work in 16: a quarter of 50%";
+	EXPECT_EQ(four.pauseSecondsAfter(2.0, false), 0.0);
+	EXPECT_EQ(four.stallSeconds(900), 900 * 8);
+	set_env_var(RunPolicy::kSmartFramesVariable, "99");
+	EXPECT_EQ(RunPolicy::from(smartArgs).smartFrames, 16) << "at most 16";
+	EXPECT_EQ(RunPolicy::from(LaunchArgs()).smartFrames, 1) << "outside smart mode it means nothing";
+	_putenv_s(RunPolicy::kSmartFramesVariable, "");
+#else
+	EXPECT_TRUE(smart.background) << "elsewhere the signs are not read: always polite";
+	EXPECT_FALSE(smart.smart);
+#endif
+	const cartoon::Film *pip = cartoon::find("pip-and-the-moon");
+	ASSERT_NE(pip, nullptr);
+	const std::vector<std::string> flags = cartoon_render::frameFlags(smartArgs, *pip, true);
+	EXPECT_NE(std::find(flags.begin(), flags.end(), "--smart-power"), flags.end()) << "the workers and frame runs take turns and pause too";
+
+	LaunchArgs both = smartArgs;
+	both.background = true;
+	EXPECT_TRUE(RunPolicy::from(both).background) << "Keep the PC responsive wins over Smart";
+	EXPECT_FALSE(RunPolicy::from(both).smart);
+	EXPECT_EQ(RunPolicy::from(LaunchArgs()).pauseSecondsAfter(2.0, true), 0.0) << "full power never pauses";
+}
+
+TEST(SmartPower, ABusyComputerIsOneInUseOrWorkedByAnotherProgramAndStaysBusyForHalfAMinute) {
+	const smart_power::Limits limits;
+	smart_power::Signals idle;
+	idle.idleSeconds = 600;
+	EXPECT_EQ(smart_power::busyReason(idle, limits), "");
+	smart_power::Signals s = idle;
+	s.idleSeconds = 5;
+	EXPECT_EQ(smart_power::busyReason(s, limits), "someone is using it");
+	s = idle;
+	s.fullScreen = true;
+	EXPECT_EQ(smart_power::busyReason(s, limits), "a full-screen program is running");
+	s = idle;
+	s.otherGpuPercent = 40;
+	EXPECT_EQ(smart_power::busyReason(s, limits), "another program keeps the graphics card 40% busy");
+	s.otherGpuPercent = 10;
+	EXPECT_EQ(smart_power::busyReason(s, limits), "") << "the desktop's own drawing is not a busy card";
+	s.otherCpuPercent = 70;
+	EXPECT_EQ(smart_power::busyReason(s, limits), "other programs keep the processor 70% busy");
+
+	smart_power::Decision d(limits);
+	EXPECT_FALSE(d.update(idle, 0.0)) << "free from the start: no change";
+	EXPECT_FALSE(d.busy());
+	smart_power::Signals used = idle;
+	used.idleSeconds = 1;
+	EXPECT_TRUE(d.update(used, 10.0));
+	EXPECT_TRUE(d.busy());
+	EXPECT_EQ(d.reason(), "someone is using it");
+	EXPECT_FALSE(d.update(idle, 30.0)) << "a lull of 20 s: still busy";
+	EXPECT_TRUE(d.busy());
+	EXPECT_TRUE(d.update(idle, 40.5)) << "30 s after the last sign: free";
+	EXPECT_FALSE(d.busy());
+
+	set_env_var("RAY_TRACER_SMART_IDLE_SECONDS", "300");
+	EXPECT_EQ(smart_power::Limits::fromEnvironment().idleSeconds, 300);
+	set_env_var("RAY_TRACER_SMART_IDLE_SECONDS", "1");
+	EXPECT_EQ(smart_power::Limits::fromEnvironment().idleSeconds, 5) << "not below 5 s";
+#ifdef _WIN32
+	_putenv_s("RAY_TRACER_SMART_IDLE_SECONDS", "");
+#else
+	unsetenv("RAY_TRACER_SMART_IDLE_SECONDS");
+#endif
+}
+
+TEST(SmartPower, OtherProgramsShareOfTheGraphicsCardIsTheirsOnItsBusiestEngine) {
+	std::string engine;
+	EXPECT_EQ(smart_power::pidOfEngineInstance("pid_1234_luid_0x00000000_0x0000D1A3_phys_0_eng_0_engtype_3D", &engine), 1234);
+	EXPECT_EQ(engine, "luid_0x00000000_0x0000D1A3_phys_0_eng_0_engtype_3D");
+	EXPECT_EQ(smart_power::pidOfEngineInstance("_Total"), -1);
+	EXPECT_EQ(smart_power::pidOfEngineInstance("pid__luid"), -1);
+	EXPECT_EQ(smart_power::pidOfEngineInstance("pid_99999999999_luid"), -1) << "not a process id";
+
+	const std::vector<std::pair<std::string, double>> instances = {
+		{"pid_10_luid_0x0_0x1_phys_0_eng_0_engtype_3D", 30.0},        // ours: not counted
+		{"pid_20_luid_0x0_0x1_phys_0_eng_0_engtype_3D", 6.0},         // two others on one engine add up
+		{"pid_30_luid_0x0_0x1_phys_0_eng_0_engtype_3D", 7.0},
+		{"pid_30_luid_0x0_0x1_phys_0_eng_3_engtype_Compute", 9.0},    // another engine of its own
+		{"_Total", 99.0},
+	};
+	const auto ours = [](int pid) { return pid == 10; };
+	EXPECT_DOUBLE_EQ(smart_power::othersOnBusiestEngine(instances, ours), 13.0);
+	EXPECT_DOUBLE_EQ(smart_power::othersOnBusiestEngine(instances, [](int) { return true; }), 0.0);
+}
+
+#ifdef _WIN32
+// The watching process's verdict reaches the workers through its named event, and a pause on a busy computer ends as soon as it is free again.
+TEST(SmartPower, WorkersReadTheVerdictAndAPauseEndsWhenTheComputerIsFree) {
+	const char *saved = std::getenv(smart_power::kEventVariable);
+	const std::string savedValue = saved ? saved : "";
+	const std::string name = "Local\\photonsmith-busy-test-" + std::to_string(GetCurrentProcessId());
+	const HANDLE event = CreateEventA(nullptr, TRUE, FALSE, name.c_str());
+	ASSERT_NE(event, nullptr);
+	_putenv_s(smart_power::kEventVariable, name.c_str());
+
+	EXPECT_FALSE(smart_power::busyNow());
+	auto t0 = std::chrono::steady_clock::now();
+	smart_power::pauseWhileBusy(5.0);
+	EXPECT_LT(std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(), 0.2) << "a free computer: no pause at all";
+
+	SetEvent(event);
+	EXPECT_TRUE(smart_power::busyNow());
+	std::thread freeAgain([&] {
+		std::this_thread::sleep_for(std::chrono::milliseconds(700));
+		ResetEvent(event);
+	});
+	t0 = std::chrono::steady_clock::now();
+	smart_power::pauseWhileBusy(30.0);
+	const double paused = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+	freeAgain.join();
+	EXPECT_GT(paused, 0.6) << "it paused while the computer was busy";
+	EXPECT_LT(paused, 2.0) << "and went on soon after it was free, not after 30 s";
+
+	_putenv_s(smart_power::kEventVariable, "");
+	EXPECT_TRUE(smart_power::busyNow()) << "nobody watching: polite";
+	CloseHandle(event);
+	_putenv_s(smart_power::kEventVariable, savedValue.c_str());
+}
+#endif
+
 TEST(CartoonRender, ABackgroundVideoTheWatchdogAllowsForThePausesBetweenFrames) {
 	LaunchArgs normal;
 	EXPECT_EQ(cartoon_render::timeoutFor(normal, true), 900);
