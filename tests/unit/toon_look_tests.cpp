@@ -317,3 +317,87 @@ TEST(ToonLook, HandDrawnLinesWanderBoilAndGoThickAndThinWithThePen) {
 	EXPECT_EQ(toon_look::tagOf(again), tag) << "the line reads back as it was written";
 	EXPECT_EQ(toon_look::tagOf(st).find("wobble"), std::string::npos) << "a look without them writes none of the new words";
 }
+
+// ---- edges and crevices (cavity.h: Blender's Workbench cavity) ----
+
+TEST(ToonLook, ARidgeCatchesLightAndAValleyDarkensWithTheRestLeftAlone) {
+	const int w = 60, h = 20;
+	const auto fold = [&](double towards) {   // two planes meeting down the middle column: towards > 0 their join nearer the camera (a ridge), < 0 further (a valley)
+		auto passes = flatPasses(w, h, 0.5f, 3.0f);
+		for (int y = 0; y < h; ++y)
+			for (int x = 0; x < w; ++x) {
+				const std::size_t i = static_cast<std::size_t>(y) * w + x;
+				const double side = x < w / 2 ? -1.0 : 1.0;
+				passes[3][i] = static_cast<float>(side * 0.70710678 * (towards > 0 ? 1.0 : -1.0));
+				passes[5][i] = 0.70710678f;
+				passes[6][i] = static_cast<float>(3.0 - towards * 0.05 * (w / 2 - std::abs(x + 0.5 - w / 2.0)));
+			}
+		return passes;
+	};
+	toon_look::Style st;
+	st.on = true, st.cel = false, st.lines = 0.0, st.saturation = 1.0;
+	st.cavity.edges = 1.0, st.cavity.cavity = 1.0;
+	std::vector<float> ridge(static_cast<std::size_t>(w) * h * 3, 0.4f), valley = ridge;
+	toon_look::apply(ridge, w, h, fold(1.0), st);
+	toon_look::apply(valley, w, h, fold(-1.0), st);
+	const auto at = [&](const std::vector<float> &img, int x) { return img[(static_cast<std::size_t>(10) * w + x) * 3]; };
+	EXPECT_GT(at(ridge, w / 2), 0.45f) << "the ridge's edge lightened";
+	EXPECT_LT(at(valley, w / 2), 0.35f) << "the valley's crease darkened";
+	EXPECT_NEAR(at(ridge, 8), 0.4f, 1e-4f) << "the flat faces left alone";
+	EXPECT_NEAR(at(valley, 52), 0.4f, 1e-4f);
+	toon_look::Style read;
+	ASSERT_EQ(toon_look::parse("cel off edges 0.6 cavity 0.4 edge-width 5 lines 0", read), "");
+	EXPECT_FALSE(read.cel);
+	EXPECT_EQ(read.cavity.edges, 0.6);
+	EXPECT_EQ(read.cavity.width, 5.0);
+	toon_look::Style again;
+	const std::string tag = toon_look::tagOf(read);
+	ASSERT_EQ(toon_look::parse(tag.substr(std::string("# @rt-toon").size()), again), "");
+	EXPECT_EQ(toon_look::tagOf(again), tag);
+}
+
+// ---- a look per layer (Blender's view layers: the film's characters, cast/..., and the set) ----
+
+TEST(ToonLook, CelOnTheCastOnlyAndAPaintedSetLeaveTheOtherLayerAlone) {
+	const int w = 120, h = 40;
+	auto passes = flatPasses(w, h, 0.5f, 3.0f);
+	passes.resize(12, std::vector<float>(static_cast<std::size_t>(w) * h, 0.0f));
+	const float pip = cryptomatte::idToFloat(cryptomatte::murmur3_32("cast/pip")), set = cryptomatte::idToFloat(cryptomatte::murmur3_32("rest"));
+	std::vector<float> rgb(static_cast<std::size_t>(w) * h * 3);
+	unsigned s = 7u;
+	for (int y = 0; y < h; ++y)
+		for (int x = 0; x < w; ++x) {
+			const std::size_t i = static_cast<std::size_t>(y) * w + x;
+			passes[10][i] = x < w / 2 ? pip : set;   // the left half Pip, the right the set
+			s = s * 1664525u + 1013904223u;
+			const float v = 0.5f * (x % 60 + 0.5f) / 60.0f + 0.03f * (static_cast<float>(s >> 8) / 16777216.0f - 0.5f);   // a ramp of light, a little grain
+			for (int c = 0; c < 3; ++c) rgb[i * 3 + c] = v;
+		}
+	toon_look::Style st;
+	st.on = true, st.lines = 0.0, st.saturation = 1.0, st.bands = 3, st.celOn = "cast";
+	st.castIds = {pip};
+	EXPECT_TRUE(st.needsIds());
+	std::vector<float> cel = rgb;
+	toon_look::apply(cel, w, h, passes, st);
+	const auto px = [&](const std::vector<float> &img, int x) { return img[(static_cast<std::size_t>(20) * w + x) * 3]; };
+	int changedSet = 0, changedCast = 0;
+	for (int x = 0; x < w; ++x) (x < w / 2 ? changedCast : changedSet) += std::abs(px(cel, x) - px(rgb, x)) > 1e-4f ? 1 : 0;
+	EXPECT_GT(changedCast, 20) << "Pip's light in bands";
+	EXPECT_EQ(changedSet, 0) << "the set's as rendered";
+
+	toon_look::Style painted;
+	painted.on = true, painted.lines = 0.0, painted.saturation = 1.0, painted.cel = false, painted.paint = 108.0;   // (4 pixels here, 40 high)
+	painted.castIds = {pip};
+	std::vector<float> out = rgb;
+	toon_look::apply(out, w, h, passes, painted);
+	changedSet = changedCast = 0;
+	for (int x = 2; x < w - 2; ++x)
+		if (std::abs(x - w / 2) > 3) (x < w / 2 ? changedCast : changedSet) += std::abs(px(out, x) - px(rgb, x)) > 1e-4f ? 1 : 0;
+	EXPECT_GT(changedSet, 20) << "the set painted (its grain smoothed into strokes)";
+	EXPECT_EQ(changedCast, 0) << "Pip left as he was";
+	toon_look::Style read;
+	ASSERT_EQ(toon_look::parse("cel cast paint 8 paint-on set", read), "");
+	EXPECT_EQ(read.celOn, "cast");
+	EXPECT_EQ(read.paint, 8.0);
+	EXPECT_NE(toon_look::tagOf(read).find("cel cast paint 8"), std::string::npos) << toon_look::tagOf(read);
+}

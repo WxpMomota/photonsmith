@@ -79,7 +79,8 @@ inline bool shadow_ray_hit(
             return false;  // nothing (opaque or otherwise) left before t_max
 
         // shadow linking: a shape whose group does not cast this light's shadows is not there for it
-        if (shadow_groups != ~0ull && !light_link::covers(shadow_groups, rec.mat ? rec.mat->link_group : 0)) {
+        // (and a shape that casts no shadows at all: ray visibility's `"bool shadow" false`)
+        if ((shadow_groups != ~0ull && !light_link::covers(shadow_groups, rec.mat ? rec.mat->link_group : 0)) || (rec.mat && !rec.mat->casts_shadow)) {
             remaining -= rec.t;
             if (remaining <= t_min) return false;
             current = ray(rec.p, r.direction(), r.time());

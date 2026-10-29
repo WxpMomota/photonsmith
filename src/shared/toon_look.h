@@ -23,6 +23,11 @@
 // Lines drawn as by hand, after Blender's Freestyle line styles (ink_strokes.h): `line-depth D` thins the far lines (0..1), `wobble W` lets them wander W pixels (at
 // 1080), `boil on` draws the wobble afresh every other frame (a film writes the frame's `seed`), `pen ANGLE` makes them thick and thin as a broad pen held at that angle
 // (`pen-amount A`, 0..1, how thin along the pen), and `ink-tint T` colours them from the surface they edge (0 the ink, 1 the surface's own colour, darkened).
+// Edges and crevices (cavity.h, Blender's Workbench cavity): `edges E` lightens the outer edges of things by up to E, `cavity C` darkens their creases and corners by up to C,
+// `edge-width W` how far it reaches (pixels at 1080). `cel off` leaves the rendered light as it is (no bands): the look's lines and edges on a realistic picture.
+// Different looks for the characters and the set (Blender's view layers in the compositor, through the object IDs: a film's characters are the `cast/...` groups):
+// `cel cast` bands the characters' light only, `cel set` the set's only; `paint SIZE` paints the picture (kuwahara.h, SIZE pixels at 1080) where `paint-on` says - the
+// set (the default), the cast or all - before the bands: painted sets and graphic characters, Arcane's and Spider-Verse's mix.
 // Set by a scene file's `# @rt-toon [bands N] [lines W] [ink COLOUR] [saturation S] [shadow S]` line (a film writes one into every frame: film_file.h `toon`), or by
 // --toon (the scene's style, or the default one). Off by default: a picture without it is the rendered one.
 
@@ -32,6 +37,8 @@
 
 #include "cryptomatte.h"   // a material's or object's ramp found by its name's ID (the ID passes)
 #include "ink_strokes.h"   // lines drawn as by hand
+#include "cavity.h"        // edges and crevices
+#include "kuwahara.h"      // a painted layer
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -54,6 +61,12 @@ struct Style {
 	ink_strokes::Params strokes;                // the lines as drawn by hand (line-depth, wobble, seed, pen, pen-amount)
 	bool boil = false;                          // a film draws the wobble afresh every other frame (its frames' `seed`)
 	double inkTint = 0.0;                       // 0..1: the lines coloured from the surface they edge
+	cavity::Params cavity;                      // edges lightened, crevices darkened (edges, cavity, edge-width)
+	bool cel = true;                            // the light put into bands (`cel off`: the rendered light kept)
+	std::string celOn = "all";                  // where: all, cast (the film's characters) or set (the rest)
+	double paint = 0.0;                         // a painted layer: the strokes' size in pixels at 1080 (0: none), on `paintOn` (all, cast or set)
+	std::string paintOn = "set";
+	std::vector<float> castIds;                 // (not a word: the object IDs of the scene's cast/... groups, toon_frame.h fills them in)
 	// the shading's ramp: the picture's, and the materials' and objects' own
 	struct Ramp {
 		std::string name;                            // the material's or object's name (empty: the picture's own)
@@ -69,7 +82,7 @@ struct Style {
 	double highlight = 0.0;
 	double highlightColour[3] = {1.0, 1.0, 1.0};
 	std::vector<Ramp> ramps;                     // `material NAME ...` / `object NAME ...`
-	bool needsIds() const { return materials || objects || !ramps.empty(); }
+	bool needsIds() const { return materials || objects || !ramps.empty() || celOn != "all" || (paint > 0.0 && paintOn != "all"); }
 	// The picture's own ramp.
 	Ramp base() const {
 		Ramp r;
@@ -158,6 +171,22 @@ inline std::string parse(const std::string &words, Style &s) {
 		} else if (w == "pen") {
 			if (!isNumber || x < 0 || x >= 360) return "pen is the pen's angle in degrees, from 0 to 360";
 			s.strokes.pen = x;
+		} else if (w == "edges" || w == "cavity") {
+			if (!isNumber || x < 0 || x > 1) return w + " is from 0 (none) to 1";
+			(w == "edges" ? s.cavity.edges : s.cavity.cavity) = x;
+		} else if (w == "edge-width") {
+			if (!isNumber || x < 1 || x > 20) return "edge-width is in pixels (at 1080 high), from 1 to 20";
+			s.cavity.width = x;
+		} else if (w == "cel") {
+			if (v != "on" && v != "off" && v != "all" && v != "cast" && v != "set") return "cel is on (all), off, cast (the characters only) or set (the rest only)";
+			s.cel = v != "off";
+			s.celOn = v == "cast" || v == "set" ? v : std::string("all");
+		} else if (w == "paint") {
+			if (!isNumber || x < 0 || x > 40) return "paint is the strokes' size in pixels (at 1080 high), from 0 (none) to 40";
+			s.paint = x;
+		} else if (w == "paint-on") {
+			if (v != "all" && v != "cast" && v != "set") return "paint-on is all, cast (the characters) or set (the rest)";
+			s.paintOn = v;
 		} else if (w == "boil") {
 			if (v != "on" && v != "off") return "boil is on or off";
 			s.boil = v == "on";
@@ -165,7 +194,7 @@ inline std::string parse(const std::string &words, Style &s) {
 			if (!isNumber || x != std::floor(x)) return "seed is a whole number";
 			s.strokes.seed = static_cast<int>(x);
 		} else {
-			return "\"" + w + "\": the toon look takes bands, lines, ink, saturation, shadow, inner, materials, objects, line-depth, wobble, boil, seed, pen, pen-amount, ink-tint, "
+			return "\"" + w + "\": the toon look takes bands, lines, ink, saturation, shadow, inner, materials, objects, line-depth, wobble, boil, seed, pen, pen-amount, ink-tint, edges, cavity, edge-width, cel, paint, paint-on, "
 					"shadow-tint, highlight, highlight-colour, material and object";
 		}
 	}
@@ -194,6 +223,12 @@ inline std::string tagOf(const Style &s) {
 	if (s.strokes.seed != 0) tag += " seed " + std::to_string(s.strokes.seed);
 	if (s.strokes.pen >= 0.0) tag += numberWord("pen", s.strokes.pen) + numberWord("pen-amount", s.strokes.penAmount);
 	if (s.inkTint > 0.0) tag += numberWord("ink-tint", s.inkTint);
+	if (s.cavity.edges > 0.0) tag += numberWord("edges", s.cavity.edges);
+	if (s.cavity.cavity > 0.0) tag += numberWord("cavity", s.cavity.cavity);
+	if (s.cavity.width != 3.0) tag += numberWord("edge-width", s.cavity.width);
+	if (!s.cel) tag += " cel off";
+	else if (s.celOn != "all") tag += " cel " + s.celOn;
+	if (s.paint > 0.0) tag += numberWord("paint", s.paint) + (s.paintOn != "set" ? " paint-on " + s.paintOn : std::string());
 	const auto colourWords = [&](const char *word, const double c[3]) {
 		std::snprintf(buf, sizeof buf, " %s %.4f,%.4f,%.4f", word, linearToSrgb(c[0]), linearToSrgb(c[1]), linearToSrgb(c[2]));
 		return std::string(buf);
@@ -258,6 +293,17 @@ inline void apply(std::vector<float> &rgb, int w, int h, const std::vector<std::
 	// texture's edge stays). The light's colour at a pixel is the picture over that colour, its fireflies cut to the picture's 99th percentile, averaged with its neighbours on
 	// the same surface (no depth jump, the normal within about 25 degrees) along the rows and the columns, twice, which takes the render's noise out without crossing an
 	// edge; and the picture is then the surface's colour in the banded light: flat, whatever the noise was.
+	// the cast's pixels (the film's characters: their object IDs, castIds), for a look on one layer only
+	const bool idsHere = planes.size() >= 12 && planes[10].size() >= n;
+	const auto isCast = [&](std::size_t i) { return idsHere && std::find(st.castIds.begin(), st.castIds.end(), planes[10][i]) != st.castIds.end(); };
+	const auto onLayer = [&](const std::string &layer, std::size_t i) { return layer == "all" || (layer == "cast") == isCast(i); };
+	if (st.paint > 0.0) {   // the painted layer, first: the bands and lines go over it
+		std::vector<float> painted = rgb;
+		kuwahara::apply(painted.data(), w, h, kuwahara::Params{st.paint * h / 1080.0, 0.5, 1.0, 4.0 * h / 1080.0});
+		for (std::size_t i = 0; i < n; ++i)
+			if (onLayer(st.paintOn, i))
+				for (int c = 0; c < 3; ++c) rgb[3 * i + c] = painted[3 * i + c];
+	}
 	std::vector<unsigned char> shaded(n, 0);   // 0: not shaded (the background, a surface that only gives light)
 	for (std::size_t i = 0; i < n; ++i) shaded[i] = covered(i) && detail::luminance(planes[0][i], planes[1][i], planes[2][i]) >= 0.02;
 	const auto sameSurface = [&](std::size_t i, std::size_t j) {
@@ -347,7 +393,7 @@ inline void apply(std::vector<float> &rgb, int w, int h, const std::vector<std::
 			return pictureRamp;
 		};
 		for (std::size_t i = 0; i < n; ++i) {
-			if (!shaded[i]) continue;
+			if (!shaded[i] || !st.cel || !onLayer(st.celOn, i)) continue;   // (`cel off`: the rendered light kept; `cel cast`/`cel set`: on that layer only)
 			const Style::Ramp &rp = rampAt(i);
 			const double L = detail::luminance(light[3 * i], light[3 * i + 1], light[3 * i + 2]);
 			const double x = L / ref;
@@ -373,6 +419,11 @@ inline void apply(std::vector<float> &rgb, int w, int h, const std::vector<std::
 			const double y = detail::luminance(rgb[3 * i], rgb[3 * i + 1], rgb[3 * i + 2]);
 			for (int c = 0; c < 3; ++c) rgb[3 * i + c] = static_cast<float>(std::max(0.0, y + (rgb[3 * i + c] - y) * st.saturation));
 		}
+	// ---- edges and crevices (cavity.h) ----
+	if (st.cavity.edges > 0.0 || st.cavity.cavity > 0.0) {
+		const std::vector<float> *normal[3] = {&planes[3], &planes[4], &planes[5]};
+		cavity::apply(rgb, w, h, normal, depth, cover, st.cavity);
+	}
 	// ---- the lines ----
 	if (st.lines <= 0.0) return;
 	std::vector<float> edge(n, 0.0f), innerEdge(n, 0.0f);   // the silhouette's, and the lines inside a shape (the same map when they are as wide)

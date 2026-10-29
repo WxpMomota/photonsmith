@@ -1,6 +1,7 @@
 #pragma once
 #include <typeinfo>
 
+#include "bevel_normal.h"   // the bevel shader's rounded edges
 #include "../shared/path_probe.h"   // `--probe X Y`: where a pixel's light came from (a null-pointer check per call site when no probe runs)
 // camera_path.h -- camera::ray_color(), ray_color_spectral() and sample_bssrdf_exit(): the CPU path tracing integrators, defined out of class here
 // (declarations stay in camera.h). A pure move; included by camera.h after the class.
@@ -615,11 +616,18 @@ template <typename Sampler>
         if (probing) path_probe::setBounce(depth - bounces_left);
         hit_record rec;
         bool hit_something = world.hit(current_ray, interval(0.001, infinity), rec);
+        // ray visibility: the camera's own rays pass straight through a shape hidden from the camera (it still casts shadows and shows in reflections)
+        for (int pass = 0; pass < 16 && hit_something && bounces_left == depth && rec.mat && !rec.mat->camera_visible; ++pass) {
+            current_ray = ray(rec.p, current_ray.direction(), current_ray.time());
+            hit_something = world.hit(current_ray, interval(0.001, infinity), rec);
+        }
 
         // Per-channel-extinction shape media (see sample_shape_media).
         if (!shape_media.empty()) camera_path_detail::sample_shape_media(*this, current_ray, hit_something, rec, beta);
 
         if (camera_medium) camera_path_detail::sample_camera_medium(*this, current_ray, hit_something, rec, beta);
+        // the bevel shader (bevel_normal.h): a bevelled material's edges rounded in its shading normal
+        if (hit_something && rec.mat && rec.mat->bevel_radius > 0.0 && !rec.has_medium_event) rec.normal = bevel_normal::at(world, rec, rec.mat->bevel_radius, current_ray.time());
 
         // Miss -- query sky (HDR env map) or fall back to flat background.
         // Mirrors pbrt-v4: "Incorporate emission from infinite lights for escaped ray"
@@ -1062,11 +1070,17 @@ template <typename Sampler>
             render_stats::bounce_rays().fetch_add(1, std::memory_order_relaxed);
 
         hit_record rec;
+        bool hit_something = world.hit(current_ray, interval(0.001, infinity), rec);
+        for (int pass = 0; pass < 16 && hit_something && bounces_left == depth && rec.mat && !rec.mat->camera_visible; ++pass) {   // (ray visibility, as above)
+            current_ray = ray(rec.p, current_ray.direction(), current_ray.time());
+            hit_something = world.hit(current_ray, interval(0.001, infinity), rec);
+        }
 
-        if (!world.hit(current_ray, interval(0.001, infinity), rec)) {
+        if (!hit_something) {
             camera_path_detail::add_escaped_radiance_spectral(*this, current_ray, specular_bounce, prev_bsdf_pdf, beta, L, illuminant);
             break;
         }
+        if (rec.mat && rec.mat->bevel_radius > 0.0) rec.normal = bevel_normal::at(world, rec, rec.mat->bevel_radius, current_ray.time());   // (the bevel shader)
 
         // Texture-lookup footprint - identical to ray_color(), no
         // spectral dependence (see that function's own comment).

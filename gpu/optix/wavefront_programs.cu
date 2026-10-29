@@ -16,4 +16,5 @@
 #include "wavefront_miss.h"
 #include "wavefront_anyhit_shadow.h"   // (before the raygen programs: __raygen__wf_shadow uses its wf_shadow_through_medium)
 #include "wavefront_raygen.h"
+#include "wavefront_bevel.h"   // __raygen__wf_bevel: the bevel shader's normals of a bounce's hits
 #include "wavefront_probe_cache.h"

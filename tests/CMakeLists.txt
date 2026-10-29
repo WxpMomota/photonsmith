@@ -359,6 +359,7 @@ add_executable(cpu_integrator_tests
     unit/scene_sky_tests.cpp
     unit/scene_lighting_tests.cpp
     unit/light_link_tests.cpp
+    unit/bevel_tests.cpp
     unit/scene_projector_tests.cpp
     unit/scene_room_tests.cpp
     unit/material_from_photo_tests.cpp

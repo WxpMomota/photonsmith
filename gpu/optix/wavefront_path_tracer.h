@@ -307,6 +307,8 @@ public:
     /// groups, render() also leaves each group's picture in lightGroupPixels() (group g's numPixels*3 floats at g*numPixels*3, normalised like the picture);
     /// without, that is empty.
     void setLightGroups(int count, int skyGroup) { lightGroupCount_ = count; skyLightGroup_ = skyGroup; }
+    /// Whether the scene has a material with a bevel radius (src/shared/bevel.h): then each bounce's hits get the bevel launch (wavefront_bevel.h). Set per render().
+    void setHasBevel(bool on) { hasBevel_ = on; }
     const std::vector<float>& lightGroupPixels() const { return lightGroupPixels_; }
 
     /// Mirrors OptiXRenderer::setDenoiseBlend() - see that method's own
@@ -726,6 +728,7 @@ private:
     // BSSRDF probe walk above via a second SBT (probeCacheSBT_) - see
     // buildSBT()'s own comment for why no new hit/miss programs are needed.
     OptixProgramGroup raygenProbeCachePG_        = nullptr;
+    OptixProgramGroup raygenBevelPG_             = nullptr;   // the bevel shader's normals (wavefront_bevel.h)
     OptixProgramGroup missProbePG_               = nullptr;
     OptixProgramGroup hitProbeSpherePG_          = nullptr;
     OptixProgramGroup hitProbeQuadPG_            = nullptr;
@@ -747,6 +750,7 @@ private:
     // record buffers verbatim, only raygenRecord differs - see buildSBT()'s
     // own comment.
     OptixShaderBindingTable probeCacheSBT_ = {};
+    OptixShaderBindingTable bevelSBT_ = {};   // (probeSBT_'s records with __raygen__wf_bevel's)
     CUdeviceptr d_intersectRaygenRecord_ = 0;
     CUdeviceptr d_intersectMissRecord_   = 0;
     CUdeviceptr d_intersectHitRecords_   = 0;
@@ -761,6 +765,7 @@ private:
     // miss/hit/exception records are probeSBT_'s own (see buildSBT()'s own
     // comment), so no separate device buffers are needed for those.
     CUdeviceptr d_probeCacheRaygenRecord_ = 0;
+    CUdeviceptr d_bevelRaygenRecord_ = 0;
     CUdeviceptr d_intersectExceptionRecord_ = 0;  ///< see exceptionPG_
     CUdeviceptr d_shadowExceptionRecord_    = 0;
     CUdeviceptr d_wfLaunchParams_   = 0;
@@ -1037,6 +1042,7 @@ private:
     int          fbCapacity_ = 0;
 
     // Light groups - see setLightGroups(). d_lightGroupFb_ holds lightGroupFbCapacity_ float3 (count * numPixels), reallocated when that grows.
+    bool         hasBevel_ = false;   // see setHasBevel()
     int          lightGroupCount_ = 0;
     int          skyLightGroup_ = -1;
     CUdeviceptr  d_lightGroupFb_ = 0;

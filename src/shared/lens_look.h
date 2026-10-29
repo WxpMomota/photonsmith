@@ -14,6 +14,10 @@
 // And a painting: `paint SIZE` turns the picture into strokes of paint that follow its edges (kuwahara.h: the anisotropic Kuwahara filter, as Blender's compositor
 // Kuwahara node has it), SIZE the strokes' radius in pixels at a picture 1080 high; `paint-sharpness` (0..1), `paint-stretch` (0..2: how far a stroke runs along an
 // edge) and `paint-smoothness` (pixels at 1080: how even the strokes' directions are). First of all the steps, so the lens's glow and the grade go over the paint.
+//
+// And god rays: `sunbeams S` streaks the light of the sun (or a lamp) out across the frame from where it is (sun_beams.h: Blender's compositor Sun Beams node), S how
+// much (0..2); `sunbeams-length L` how far (0..1 of the way to the source), `sunbeams-threshold T` the linear luminance that sends beams (1), `sunbeams-at X Y` where the
+// source is (0..1 across and down, outside the picture too; without it, the middle of the brightest light).
 
 #include <algorithm>
 #include <cmath>
@@ -25,6 +29,7 @@
 #include <vector>
 
 #include "kuwahara.h"
+#include "sun_beams.h"
 #include "ppm_text.h"
 
 namespace lens_look {
@@ -49,6 +54,12 @@ struct Look {
 	double paintSharpness = 0.5;
 	double paintStretch = 1.0;
 	double paintSmoothness = 4.0;
+	// god rays (sun_beams.h): how much, how far, from what luminance, and from where (sunbeamsAt false: the brightest light's middle)
+	double sunbeams = 0.0;
+	double sunbeamsLength = 0.35;
+	double sunbeamsThreshold = 1.0;
+	bool sunbeamsAt = false;
+	double sunbeamsX = 0.5, sunbeamsY = 0.5;
 	// the grade: c' = (max(0, c * gain * tint + lift))^(1 / gamma), per channel
 	double lift[3] = {0.0, 0.0, 0.0};
 	double gamma[3] = {1.0, 1.0, 1.0};
@@ -62,7 +73,7 @@ struct Look {
 			if (lift[k] != 0.0 || gamma[k] != 1.0 || gain[k] != 1.0 || tint[k] != 1.0) return true;
 		return false;
 	}
-	bool active() const { return paint > 0.0 || bloom > 0.0 || flare > 0.0 || star > 0.0 || vignette > 0.0 || warmth != 0.0 || saturation != 1.0 || graded(); }
+	bool active() const { return paint > 0.0 || sunbeams > 0.0 || bloom > 0.0 || flare > 0.0 || star > 0.0 || vignette > 0.0 || warmth != 0.0 || saturation != 1.0 || graded(); }
 };
 
 // Values that were set (a flag, a scene line) override `base`; a negative bloom/vignette or a saturation below 0 means "not given" in `given`.
@@ -104,6 +115,12 @@ inline std::string parse(const std::string &text, Look &out) {
 			for (int k = 0; k < 3; ++k) dst[k] = word == "lift" ? std::clamp(v[k], -1.0, 1.0) : std::clamp(v[k], 0.01, 10.0);
 			continue;
 		}
+		if (word == "sunbeams-at") {   // two numbers: where the source is on the screen
+			double x = 0.0, y = 0.0;
+			if (!(in >> x >> y) || !std::isfinite(x) || !std::isfinite(y)) return "\"sunbeams-at\" takes two numbers: across and down, 0..1 (outside the picture too)";
+			out.sunbeamsAt = true, out.sunbeamsX = std::clamp(x, -2.0, 3.0), out.sunbeamsY = std::clamp(y, -2.0, 3.0);
+			continue;
+		}
 		if (word == "tonemap") {
 			std::string name;
 			in >> name;
@@ -128,8 +145,11 @@ inline std::string parse(const std::string &text, Look &out) {
 		else if (word == "paint-sharpness") out.paintSharpness = std::clamp(v, 0.0, 1.0);
 		else if (word == "paint-stretch") out.paintStretch = std::clamp(v, 0.0, 2.0);
 		else if (word == "paint-smoothness") out.paintSmoothness = std::clamp(v, 0.0, 40.0);
+		else if (word == "sunbeams") out.sunbeams = std::clamp(v, 0.0, 2.0);
+		else if (word == "sunbeams-length") out.sunbeamsLength = std::clamp(v, 0.0, 1.0);
+		else if (word == "sunbeams-threshold") out.sunbeamsThreshold = std::clamp(v, 0.0, 1000.0);
 		else return "unknown word \"" + word + "\" (bloom, bloom-radius, flare, star, star-points, star-angle, star-length, star-threshold, vignette, warmth, saturation, lift, "
-					"gamma, gain, tint, tonemap, paint, paint-sharpness, paint-stretch, paint-smoothness)";
+					"gamma, gain, tint, tonemap, paint, paint-sharpness, paint-stretch, paint-smoothness, sunbeams, sunbeams-length, sunbeams-threshold, sunbeams-at)";
 	}
 	return "";
 }
@@ -328,6 +348,9 @@ inline void apply(float *rgb, int w, int h, const Look &look) {
 				}
 		});
 	}
+
+	if (look.sunbeams > 0.0)   // god rays from the light (before the bloom, so they glow a little too)
+		sun_beams::apply(rgb, w, h, sun_beams::Params{look.sunbeams, look.sunbeamsLength, look.sunbeamsThreshold, look.sunbeamsAt, look.sunbeamsX, look.sunbeamsY});
 
 	if (look.bloom > 0.0) {
 		// The glow is three Gaussians of the whole picture (a tight halo, a middle one and a wide haze, like a real lens's veiling glare), mixed in with weight `bloom`.

@@ -400,13 +400,21 @@ __device__ __forceinline__ float3 mis_origin_from_payload() {
 __device__ __forceinline__ bool link_lit_from_previous(const MaterialData& m) {
 	return light_link::covers(~m.notLit, static_cast<int>(optixGetPayload_28()));
 }
+// Bit 16 of payload 28 after link_report_group(): the ray that hit is the camera's own (it came in as -1). Ray visibility's camera-hidden shapes are passed by it
+// (shade_material); the group is the low bits (raygen and current_link_group() mask it off).
+constexpr unsigned int kFromCameraBit = 1u << 16;
 // This hit's link group, for the bounce that leaves it.
 __device__ __forceinline__ void link_report_group(const MaterialData& m) {
-	optixSetPayload_28(static_cast<unsigned int>(m.linkGroup));
+	const bool fromCamera = static_cast<int>(optixGetPayload_28()) < 0;
+	optixSetPayload_28(static_cast<unsigned int>(m.linkGroup) | (fromCamera ? kFromCameraBit : 0u));
 }
 // The link group of the surface being shaded, for its light sampling (closest-hit programs only: after link_report_group()).
 __device__ __forceinline__ int current_link_group() {
-	return static_cast<int>(optixGetPayload_28());
+	return static_cast<int>(optixGetPayload_28() & 0xFFFFu);
+}
+// Whether the ray that hit came from the camera (closest-hit programs only: after link_report_group()).
+__device__ __forceinline__ bool hit_from_camera() {
+	return (optixGetPayload_28() & kFromCameraBit) != 0u;
 }
 
 // Integrator "bool regularize" gate for THIS bounce, read fresh by each

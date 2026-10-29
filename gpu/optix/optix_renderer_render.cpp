@@ -149,6 +149,7 @@ bool OptiXRenderer::renderWavefront(unsigned int width, unsigned int height, uns
 	wavefrontTracer_->setDenoiseEnabled(denoiseEnabled_);
 	wavefrontTracer_->setDenoiseBlend(denoiseBlend_);
 	wavefrontTracer_->setLightGroups(lightGroupCount_, skyLightGroup_);
+	wavefrontTracer_->setHasBevel(hasBevel_);
 	wavefrontTracer_->setWorldPosOutputEnabled(worldPosOutputEnabled_);
 	wavefrontTracer_->setRestirEnabled(restirEnabled_);
 	wavefrontTracer_->setRestirGiEnabled(restirGiEnabled_);

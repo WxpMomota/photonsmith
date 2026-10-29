@@ -8,6 +8,7 @@
 ///          Shader Binding Table that ties geometry to hit-group programs.
 
 #include "optix_renderer_scene_helpers.h"
+#include <algorithm>   // (std::any_of: a bevelled material)
 
 struct SceneInputs {
 	const std::vector<SphereData>& spheres;
@@ -1486,6 +1487,7 @@ bool OptiXRenderer::buildScene(
 	SceneBuildState st;
 	uploadGeometryBuffers(in, st);
 	uploadLightBuffers(in, st);
+	hasBevel_ = std::any_of(materials.begin(), materials.end(), [](const MaterialData &m) { return m.bevelRadius > 0.0f; });   // (the wavefront renderer's bevel launch)
 	if (!buildCustomAabbs(in, st)) return false;
 	buildGeometryGases(in, st);
 	buildInstanceGases(in, st);

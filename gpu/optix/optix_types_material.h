@@ -427,6 +427,10 @@ struct MaterialData {
 	unsigned long long notLit = 0ull;
 	// Light groups (src/shared/light_groups.h): an emitter's group + 1, 0 for none (so a zeroed MaterialData is in none). The wavefront renderer credits its light to it.
 	int lightGroupPlus1 = 0;
+	// The bevel shader's radius (src/shared/bevel.h): the shading normal averaged over the surface within it, rounding the edges; 0: none.
+	float bevelRadius = 0.0f;
+	// Ray visibility (src/shared/pbrt_scene.h MaterialDecl): bit 1 hidden from camera rays (they pass through it), bit 2 casts no shadows; 0 (a zeroed MaterialData) seen by all.
+	int hidden = 0;
 };
 
 // A lamp that also reflects (pbrt-v4: an AreaLightSource keeps the shape's Material, default diffuse 0.5). The builder (pbrt_gpu_builder_materials.h makeMaterial) stores a flat

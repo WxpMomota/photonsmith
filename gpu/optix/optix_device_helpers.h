@@ -30,6 +30,7 @@ extern "C" { __constant__ LaunchParams params; }
 #include "optix_device_basics.h"
 #include "optix_device_textures.h"
 #include "optix_device_scatter_helpers.h"
+#include "bevel_device.h"   // the bevel shader's normal (optix_device_shade.h shade_material)
 #include "optix_device_shade.h"
 #include "optix_device_mix_camera.h"
 #include "optix_device_media_helpers.h"

@@ -624,7 +624,7 @@ extern "C" __global__ void __raygen__rg() {
 
 				ray_origin = scatter_origin;
 				mis_origin = scatter_origin;
-				link_group = p28;
+				link_group = p28 & 0xFFFFu;   // (the low bits: the hit's group; bit 16 says only that the ray was the camera's)
 				ray_direction = normalize(payload.scatterDir);  // MUST normalize!
 			} else {
 				// Absorbed — add any surface emission (e.g. background hit) then stop

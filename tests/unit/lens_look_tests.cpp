@@ -223,3 +223,29 @@ TEST(LensLook, PaintWordsAreReadAndKeptInRange) {
 	lens_look::Look none;
 	EXPECT_FALSE(none.active()) << "off by default";
 }
+
+// ---- god rays (sun_beams.h: Blender's Sun Beams node) ----
+
+TEST(LensLook, SunbeamsStreakALightsGlowAcrossThePictureFromWhereItIs) {
+	const int w = 160, h = 90;
+	std::vector<float> img = flat(w, h, 0.05f, 0.05f, 0.05f);
+	for (int y = 40; y < 50; ++y)
+		for (int x = 75; x < 85; ++x)
+			for (int c = 0; c < 3; ++c) img[(static_cast<std::size_t>(y) * w + x) * 3 + c] = 40.0f;   // a sun in the middle
+	const std::vector<float> before = img;
+	lens_look::Look look;
+	ASSERT_TRUE(lens_look::parse("sunbeams 1 sunbeams-length 0.4", look).empty());
+	lens_look::apply(img.data(), w, h, look);
+	const auto at = [&](const std::vector<float> &v, int x, int y) { return v[(static_cast<std::size_t>(y) * w + x) * 3]; };
+	EXPECT_GT(at(img, 110, 45), at(before, 110, 45) + 0.02f) << "light streams out sideways from the sun";
+	EXPECT_GT(at(img, 80, 20), at(before, 80, 20) + 0.02f) << "and up";
+	EXPECT_GT(at(img, 110, 45), at(img, 150, 45)) << "fading with the distance";
+	std::vector<float> dark = flat(w, h, 0.3f, 0.3f, 0.3f);
+	const std::vector<float> darkBefore = dark;
+	lens_look::apply(dark.data(), w, h, look);
+	EXPECT_EQ(dark, darkBefore) << "nothing above the threshold: no beams";
+	lens_look::Look placed;
+	EXPECT_TRUE(lens_look::parse("sunbeams 0.5 sunbeams-at 1.2 -0.1", placed).empty()) << "a source outside the picture";
+	EXPECT_TRUE(placed.sunbeamsAt);
+	EXPECT_EQ(placed.sunbeamsX, 1.2);
+}

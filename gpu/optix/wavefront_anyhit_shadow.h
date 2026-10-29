@@ -52,6 +52,11 @@
 // Thin glass lets a shadow ray through, scaled by the share it transmits at this angle (ThinDielectricTransmittance, src/shared/bxdfs_simple.h): the
 // straight-through scatter off it is a free crossing on the path side (wavefront_kernels_materials.cu), so the two estimators add up. `cosTheta` is the
 // ray's cosine with the surface (1 where there is no cheap normal: spheres, disks, cylinders, bilinear patches).
+// Whether this shadow ray passes a shape of `mat`: one that casts no shadows (ray visibility), or one whose link group does not cast this light's (shadow linking).
+__device__ __forceinline__ bool wf_shadow_skips(const WfShadowPayload *sp, const MaterialData &mat) {
+	return (mat.hidden & 2) != 0 || (sp->notShadowing != 0ull && !light_link::covers(~sp->notShadowing, mat.linkGroup));
+}
+
 __device__ __forceinline__ void wf_shadow_pass_thin_glass(WfShadowPayload* sp, const MaterialData& mat, float cosTheta) {
 	sp->transmittance *= ThinDielectricTransmittance(cosTheta, mat.ior);
 	if (sp->transmittance <= 0.0f) { optixTerminateRay(); return; }
@@ -276,7 +281,7 @@ extern "C" __global__ void __anyhit__wf_shadow_sphere() {
 
 	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
 		optixGetPayload_0(), optixGetPayload_1());
-	if (sp->notShadowing != 0ull && !light_link::covers(~sp->notShadowing, mat.linkGroup)) {   // shadow linking (light_link.h): not a group that casts this light's shadows
+	if (wf_shadow_skips(sp, mat)) {   // shadow linking (light_link.h): not a group that casts this light's shadows
 		optixIgnoreIntersection();
 		return;
 	}
@@ -329,7 +334,7 @@ extern "C" __global__ void __anyhit__wf_shadow_quad() {
 
 	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
 		optixGetPayload_0(), optixGetPayload_1());
-	if (sp->notShadowing != 0ull && !light_link::covers(~sp->notShadowing, mat.linkGroup)) {   // shadow linking (light_link.h): not a group that casts this light's shadows
+	if (wf_shadow_skips(sp, mat)) {   // shadow linking (light_link.h): not a group that casts this light's shadows
 		optixIgnoreIntersection();
 		return;
 	}
@@ -353,7 +358,7 @@ extern "C" __global__ void __anyhit__wf_shadow_bilinear_patch() {
 
 	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
 		optixGetPayload_0(), optixGetPayload_1());
-	if (sp->notShadowing != 0ull && !light_link::covers(~sp->notShadowing, mat.linkGroup)) {   // shadow linking (light_link.h): not a group that casts this light's shadows
+	if (wf_shadow_skips(sp, mat)) {   // shadow linking (light_link.h): not a group that casts this light's shadows
 		optixIgnoreIntersection();
 		return;
 	}
@@ -405,7 +410,7 @@ extern "C" __global__ void __anyhit__wf_shadow_triangle() {
 
 	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
 		optixGetPayload_0(), optixGetPayload_1());
-	if (sp->notShadowing != 0ull && !light_link::covers(~sp->notShadowing, mat.linkGroup)) {   // shadow linking (light_link.h): not a group that casts this light's shadows
+	if (wf_shadow_skips(sp, mat)) {   // shadow linking (light_link.h): not a group that casts this light's shadows
 		optixIgnoreIntersection();
 		return;
 	}
@@ -435,7 +440,7 @@ extern "C" __global__ void __anyhit__wf_shadow_disk() {
 
 	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
 		optixGetPayload_0(), optixGetPayload_1());
-	if (sp->notShadowing != 0ull && !light_link::covers(~sp->notShadowing, mat.linkGroup)) {   // shadow linking (light_link.h): not a group that casts this light's shadows
+	if (wf_shadow_skips(sp, mat)) {   // shadow linking (light_link.h): not a group that casts this light's shadows
 		optixIgnoreIntersection();
 		return;
 	}
@@ -461,7 +466,7 @@ extern "C" __global__ void __anyhit__wf_shadow_cylinder() {
 
 	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
 		optixGetPayload_0(), optixGetPayload_1());
-	if (sp->notShadowing != 0ull && !light_link::covers(~sp->notShadowing, mat.linkGroup)) {   // shadow linking (light_link.h): not a group that casts this light's shadows
+	if (wf_shadow_skips(sp, mat)) {   // shadow linking (light_link.h): not a group that casts this light's shadows
 		optixIgnoreIntersection();
 		return;
 	}

@@ -1166,7 +1166,26 @@ __device__ __forceinline__ void shade_material(
 		patch_roughness_textures(*view, uv_u, uv_v, hit_point);
 		use = view;
 	}
-	shade_material_surface(*use, matIdx, normal, ray_dir, hit_point, front_face, uv_u, uv_v, dpdu, do_regularize, seed,
+	// Ray visibility: a shape hidden from the camera is a free crossing for the camera's own rays (raygen's flag 4: on, unchanged, no bounce counted)
+	if ((mat.hidden & 1) != 0 && hit_from_camera()) {
+		out_attenuation = make_float3(1.0f, 1.0f, 1.0f);
+		out_scattered_dir = ray_dir;
+		out_scattered = true;
+		out_is_specular = true;
+		out_is_medium_boundary = true;
+		emission = make_float3(0.0f, 0.0f, 0.0f);
+		return;
+	}
+	// The bevel shader (bevel_device.h): the shading normal averaged over the same material round the hit, so its edges look rounded
+	float3 shadingNormal = normal;
+	if (mat.bevelRadius > 0.0f)
+		shadingNormal = bevel_normal(matIdx, mat.bevelRadius, hit_point, normal,
+			[](const float3 &o, const float3 &d, float tmax, bool &found, float3 &p, float3 &n, int &m) {
+				const ProbeHit hit = trace_probe_ray(o, d, tmax);
+				found = hit.found, p = hit.position, n = hit.normal, m = hit.materialIdx;
+			},
+			[&seed]() { return static_cast<double>(random_float(seed)); });
+	shade_material_surface(*use, matIdx, shadingNormal, ray_dir, hit_point, front_face, uv_u, uv_v, dpdu, do_regularize, seed,
 		out_attenuation, out_scattered_dir, out_scattered, out_is_specular, out_is_medium_boundary, out_brdf_pdf_override, emission,
 		out_bssrdf_exit, out_bssrdf_exit_pos, out_eta, inout_rgb_channel);
 }

@@ -1108,6 +1108,12 @@ void WavefrontPathTracer::renderSampleLoop(RenderCall &rc) {
 			const int *counts = readCounterBlock();
 			const int numHits = blockCount(counts, d_hitCounter_), numSimpleHits = blockCount(counts, d_simpleHitCounter_);
 			const int numDielectricHits = blockCount(counts, d_dielectricHitCounter_), numMiss = blockCount(counts, d_missCounter_);
+			if (hasBevel_ && numHits + numSimpleHits + numDielectricHits > 0) {   // the bevel shader's normals of this bounce's hits (wavefront_bevel.h), before they are shaded
+				OPTIX_CHECK(optixLaunch(intersectPipeline_, stream_, d_wfLaunchParams_, sizeof(WavefrontLaunchParams), &bevelSBT_,
+										(unsigned int)(numHits + numSimpleHits + numDielectricHits), 1, 1));
+				CUDA_CHECK(cudaStreamSynchronize(stream_));   // (the simple and dielectric material kernels run on streams of their own: they must see the new normals)
+				++hostSyncs_;
+			}
 			stats.hits += numHits;
 			stats.simpleHits += numSimpleHits;
 			stats.dielectricHits += numDielectricHits;
@@ -1481,6 +1487,7 @@ void WavefrontPathTracer::destroyProgramGroups() {
 	destroyPG(raygenProbePG_);       destroyPG(missProbePG_);
 	destroyPG(hitProbeSpherePG_);    destroyPG(hitProbeQuadPG_);   destroyPG(hitProbeBilinearPatchPG_); destroyPG(hitProbeTrianglePG_);
 	destroyPG(raygenProbeCachePG_);
+	destroyPG(raygenBevelPG_);
 	destroyPG(exceptionPG_);
 }
 
@@ -1491,12 +1498,14 @@ void WavefrontPathTracer::destroySBT() {
 	freeDev(d_intersectRaygenRecord_); freeDev(d_intersectMissRecord_); freeDev(d_intersectHitRecords_);
 	freeDev(d_shadowRaygenRecord_);    freeDev(d_shadowMissRecord_);    freeDev(d_shadowHitRecords_);
 	freeDev(d_probeRaygenRecord_);     freeDev(d_probeMissRecord_);     freeDev(d_probeHitRecords_);
+	freeDev(d_bevelRaygenRecord_);
 	freeDev(d_probeCacheRaygenRecord_);  // probeCacheSBT_'s own miss/hit/exception records ARE probeSBT_'s, freed just above
 	freeDev(d_intersectExceptionRecord_); freeDev(d_shadowExceptionRecord_); freeDev(d_probeExceptionRecord_);
 	intersectSBT_ = {};
 	shadowSBT_    = {};
 	probeSBT_     = {};
 	probeCacheSBT_ = {};
+	bevelSBT_ = {};
 }
 
 bool WavefrontPathTracer::readWorldPosBuffer(unsigned int width, unsigned int height, std::vector<float>& out) const {

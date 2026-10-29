@@ -185,6 +185,7 @@ __device__ __forceinline__ void shadow_medium_sphere_chord(const SphereData& sph
 // surface, in whichever space the caller has both in (1 where an any-hit has no cheap normal: disks, cylinders, bilinear patches).
 // Shadow linking (src/shared/light_link.h): whether this shadow ray passes a shape of `m`'s link group (the light's shadow is cast by other groups only).
 __device__ __forceinline__ bool shadow_link_skips(const MaterialData& m) {
+	if ((m.hidden & 2) != 0) return true;   // (ray visibility: a shape that casts no shadows at all)
 	const unsigned long long notShadowing = shadow_state_from_payload()->notShadowing;
 	return notShadowing != 0ull && !light_link::covers(~notShadowing, m.linkGroup);
 }

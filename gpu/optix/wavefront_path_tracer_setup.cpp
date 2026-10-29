@@ -300,6 +300,8 @@ bool WavefrontPathTracer::createProgramGroups() {
 	// via a second SBT (probeCacheSBT_) that shares probeSBT_'s own hit/miss record buffers - see buildSBT()'s own comment. This raygen wants exactly the same "find the
 	// closest surface hit, report position/normal/materialIdx" query the probe walk already has.
 	make(raygen(wfModule_, "__raygen__wf_probe_cache"), &raygenProbeCachePG_);
+	// The bevel shader's normals (wavefront_bevel.h): a raygen of its own over a bounce's hits, with the probe walk's hit/miss groups (bevelSBT_ shares probeSBT_'s records).
+	make(raygen(wfModule_, "__raygen__wf_bevel"), &raygenBevelPG_);
 	make(miss(wfModule_, "__miss__wf_probe"), &missProbePG_);
 	make(hit(wfModule_, "__intersection__wf_sphere", "__closesthit__wf_probe_sphere", nullptr), &hitProbeSpherePG_);
 	make(hit(wfModule_, "__intersection__wf_quad", "__closesthit__wf_probe_quad", nullptr), &hitProbeQuadPG_);
@@ -356,6 +358,7 @@ bool WavefrontPathTracer::linkPipeline(unsigned int maxTraceDepth) {
 		hitTrianglePG_,
 		raygenProbePG_,
 		raygenProbeCachePG_,
+		raygenBevelPG_,
 		missProbePG_,
 		hitProbeSpherePG_,
 		hitProbeQuadPG_,
@@ -656,6 +659,16 @@ bool WavefrontPathTracer::buildSBT(unsigned int numSpheres, unsigned int numQuad
 		probeCacheSBT_.hitgroupRecordStrideInBytes = probeSBT_.hitgroupRecordStrideInBytes;
 		probeCacheSBT_.hitgroupRecordCount         = probeSBT_.hitgroupRecordCount;
 		probeCacheSBT_.exceptionRecord             = probeSBT_.exceptionRecord;
+	}
+	// ---- Bevel SBT (the bevel shader's normals: wavefront_bevel.h) - its own raygen record, every other record probeSBT_'s ----
+	{
+		RaygenRecord rg;
+		OPTIX_CHECK(optixSbtRecordPackHeader(raygenBevelPG_, &rg));
+		rg.data = 0;
+		CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_bevelRaygenRecord_), sizeof(RaygenRecord)));
+		CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(d_bevelRaygenRecord_), &rg, sizeof(RaygenRecord), cudaMemcpyHostToDevice));
+		bevelSBT_ = probeCacheSBT_;
+		bevelSBT_.raygenRecord = d_bevelRaygenRecord_;
 	}
 
 	// ---- Shadow SBT ----

@@ -154,6 +154,10 @@ class material {
     std::string material_name, link_group_name = "rest";
     // An emitter's light group (src/shared/light_groups.h): the pass its light is credited to; -1 for none.
     int light_group = -1;
+    // The bevel shader's radius (src/shared/bevel.h): the shading normal averaged over the surface within it, rounding the edges; 0: none.
+    double bevel_radius = 0.0;
+    // Ray visibility (src/shared/pbrt_scene.h MaterialDecl): a shape the camera's rays pass through, and one that casts no shadows.
+    bool camera_visible = true, casts_shadow = true;
 
     virtual color emitted(
         const ray& r_in, const hit_record& rec, double u, double v, const point3& p

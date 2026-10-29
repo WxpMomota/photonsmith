@@ -255,6 +255,9 @@ struct MaterialDecl {
 	// (Scene::linkGroups[linkGroup - 1]), so that a renderer reads a hit's group from its material.
 	int linkGroup = 0;
 	int linkedFrom = -1;
+	// Ray visibility (Cycles' object visibility, our extension): a shape's `"bool camera" false` hides it from camera rays (it still casts shadows and shows in reflections),
+	// `"bool shadow" false` keeps it from casting shadows. Carried by the shape's copy of its material, as its link group is.
+	bool cameraVisible = true, castsShadow = true;
 };
 
 struct TextureDecl {
@@ -898,23 +901,25 @@ private:
 		s_.warnings.push_back({line, fileOf(pos_ ? pos_ - 1 : 0), msg});
 	}
 
-	// A shape's `"string linkgroup"` (light_link.h): the index of a copy of material `material` (-1: pbrt's default) for that group, made once per material and group.
-	int linkedMaterial(int material, const std::string &group) {
+	// A shape's `"string linkgroup"` (light_link.h) and its ray visibility (`"bool camera"`, `"bool shadow"`): the index of a copy of material `material` (-1: pbrt's default)
+	// for that group and visibility, made once per material, group and visibility ("" or "rest" and both visible: the material itself).
+	int linkedMaterial(int material, const std::string &group, bool camera = true, bool shadow = true) {
 		int g = 0;
 		for (std::size_t i = 0; i < s_.linkGroups.size() && g == 0; ++i)
 			if (s_.linkGroups[i] == group) g = static_cast<int>(i) + 1;
-		if (g == 0) {
-			if (group == "rest") return material;   // (the shapes in no group)
+		if (g == 0 && !group.empty() && group != "rest") {
 			if (s_.linkGroups.size() >= 63) {
 				warn(0, "more than 63 link groups: \"" + group + "\" is left in none");
-				return material;
+			} else {
+				s_.linkGroups.push_back(group);
+				g = static_cast<int>(s_.linkGroups.size());
 			}
-			s_.linkGroups.push_back(group);
-			g = static_cast<int>(s_.linkGroups.size());
 		}
+		if (g == 0 && camera && shadow) return material;   // (the shapes in no group, seen by every ray)
 		const int from = material >= 0 ? material : -2;
 		for (std::size_t i = 0; i < s_.materials.size(); ++i)
-			if (s_.materials[i].linkedFrom == from && s_.materials[i].linkGroup == g) return static_cast<int>(i);
+			if (s_.materials[i].linkedFrom == from && s_.materials[i].linkGroup == g && s_.materials[i].cameraVisible == camera && s_.materials[i].castsShadow == shadow)
+				return static_cast<int>(i);
 		MaterialDecl copy;
 		if (material >= 0) {
 			if (s_.materials[static_cast<std::size_t>(material)].forwardRef) {   // (named before it is made: a copy now would stay empty)
@@ -928,6 +933,7 @@ private:
 		}
 		copy.linkGroup = g;
 		copy.linkedFrom = from;
+		copy.cameraVisible = camera, copy.castsShadow = shadow;
 		s_.materials.push_back(copy);
 		return static_cast<int>(s_.materials.size()) - 1;
 	}
@@ -1391,7 +1397,11 @@ private:
 			sh.xform = gs_.ctm;
 			sh.xformEnd = gs_.ctmEnd;
 			sh.materialIndex = gs_.materialIndex;
-			if (const std::string link = sh.params.getString("linkgroup", ""); !link.empty()) sh.materialIndex = linkedMaterial(sh.materialIndex, link);
+			{   // light linking and ray visibility: the shape's own copy of its material
+				const std::string link = sh.params.getString("linkgroup", "");
+				const bool camera = sh.params.getBool("camera", true), shadow = sh.params.getBool("shadow", true);
+				if (!link.empty() || !camera || !shadow) sh.materialIndex = linkedMaterial(sh.materialIndex, link, camera, shadow);
+			}
 			sh.areaLightIndex = gs_.areaLightIndex;
 			sh.insideMedium = gs_.insideMedium;
 			// The same medium on both sides is no boundary (pbrt-v4 makes a shape a medium transition only when the two differ). When that medium is the camera's own

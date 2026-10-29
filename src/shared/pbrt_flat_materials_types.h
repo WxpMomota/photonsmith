@@ -156,6 +156,9 @@ inline bool isPerHitTextureGraph(const std::vector<TexMeanNode> &nodes) {
 struct Material {
 	MaterialKind kind = MaterialKind::Diffuse;
 	int linkGroup = 0;                 // light linking (light_link.h): the group of the shapes it is on (pbrt_scene.h MaterialDecl::linkGroup)
+	double bevel = 0.0;                // the bevel shader's radius (bevel.h: `"float bevel"`, our extension); 0: none
+	bool cameraVisible = true;         // ray visibility (pbrt_scene.h MaterialDecl): seen by camera rays
+	bool castsShadow = true;           //   and casting shadows
 	std::string name;                  // a named material's name (a link group's copy has its original's), for the ID passes (cryptomatte.h); empty: unnamed
 	std::string pbrtType;              // as written, for diagnostics
 	double color[3] = {0.5, 0.5, 0.5}; // reflectance / albedo

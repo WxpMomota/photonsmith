@@ -65,11 +65,15 @@ extern "C" __global__ void __raygen__wf_intersect() {
 	unsigned int p0, p1;
 	packPointer(&payload, p0, p1);
 
+	// (ray visibility: a camera ray traces on past a shape hidden from the camera - the trace again from just beyond it)
+	float traceTMin = ray.tMin;
+	for (int pass = 0; pass < 16; ++pass) {
+	payload.hit = false;
 	optixTrace(
 		wf_params.traversable,
 		ray.origin,
 		ray.direction,
-		ray.tMin,
+		traceTMin,
 		ray.tMax,
 		ray.time,                         // object (per-primitive sphere)
 		                                   // motion blur shutter time - see
@@ -85,6 +89,9 @@ extern "C" __global__ void __raygen__wf_intersect() {
 		0,                                // miss SBT index (radiance miss)
 		p0, p1
 	);
+	if (!(payload.hit && ray.depth == 0 && payload.materialIdx >= 0 && (wf_params.materials[payload.materialIdx].hidden & 1) != 0)) break;
+	traceTMin = payload.t + fmaxf(1e-4f, 1e-6f * payload.t);
+	}
 
 	// The listed volumes (GpuMediumShape: fog, smoke and cloud volumes, whose boundary spheres the trace skipped): the first one the flight from
 	// mediaTMin to the nearest surface enters, and the part of the flight inside it - pbrt's medium along the ray up to the next surface, so the

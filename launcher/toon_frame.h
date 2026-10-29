@@ -5,6 +5,8 @@
 // `# @rt-toon` line, and --toon is passed on to every frame's run).
 
 #include <algorithm>
+#include <fstream>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -59,10 +61,23 @@ inline bool apply(const std::string &imagePath, int width, int height, const too
 	}
 	std::vector<std::vector<float>> planes(planeCount);
 	for (std::size_t p = 0; p < planeCount; ++p) planes[p].assign(flat.begin() + static_cast<std::ptrdiff_t>(p * count), flat.begin() + static_cast<std::ptrdiff_t>((p + 1) * count));
+	// the film's characters' object IDs (their `cast/NAME` link groups in the scene: cryptomatte.h), for a look on one layer only
+	toon_look::Style st = style;
+	const char *sceneFile = cpu_scene_pbrt_path_by_id(sceneId.c_str());
+	if (st.needsIds() && sceneFile) {
+		std::ifstream f(sceneFile);
+		std::string text((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+		for (std::size_t at = text.find("\"cast/"); at != std::string::npos; at = text.find("\"cast/", at + 1)) {
+			const std::size_t end = text.find('"', at + 1);
+			if (end == std::string::npos) break;
+			const float id = cryptomatte::idToFloat(cryptomatte::murmur3_32(text.substr(at + 1, end - at - 1)));
+			if (std::find(st.castIds.begin(), st.castIds.end(), id) == st.castIds.end()) st.castIds.push_back(id);
+		}
+	}
 	// the look, on the linear picture
 	std::vector<float> rgb(count * 3);
 	for (std::size_t i = 0; i < rgb.size(); ++i) rgb[i] = static_cast<float>(toon_look::srgbToLinear(static_cast<double>(samples[i]) / maxValue));
-	toon_look::apply(rgb, w, h, planes, style);
+	toon_look::apply(rgb, w, h, planes, st);
 	for (std::size_t i = 0; i < rgb.size(); ++i) samples[i] = static_cast<int>(std::lround(toon_look::linearToSrgb(rgb[i]) * maxValue));
 	if (ppm) {
 		if (!output_crop::writePpm(imagePath, w, h, maxValue, samples)) {

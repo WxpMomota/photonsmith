@@ -372,3 +372,48 @@ TEST(LightGroupsGpu, TheWavefrontRendererSplitsTheLightAndAGpuRenderGoesToIt) {
 	checkLightGroups("--gpu --wavefront", "wf");
 	checkLightGroups("--gpu", "gpu");   // (asked for the default renderer: the scene's groups send it to the wavefront renderer)
 }
+
+// ---- ray visibility (Cycles' object visibility: a shape's `"bool camera" false`, `"bool shadow" false`) ----
+
+namespace {
+// A green card over tile A, between it and the point light (and the camera): seen or not, shadowing or not.
+std::string withCard(const std::string &words) {
+	return scene(std::string(kPoint) + "\n", "AttributeBegin\n  Material \"diffuse\" \"rgb reflectance\" [ 0.1 0.9 0.1 ]\n"
+												"  Shape \"trianglemesh\" " + words + " \"integer indices\" [ 0 1 2 0 2 3 ] \"point3 P\" [ -1.6 1 -1.1  -0.2 1 -1.1  -0.2 1 1.1  -1.6 1 1.1 ]\nAttributeEnd\n");
+}
+struct Side {
+	double red = 0.0, green = 0.0;
+};
+Side leftSide(const std::vector<float> &rgb) {   // (tile A's side of the picture)
+	Side s;
+	for (int y = 8; y < 56; ++y)
+		for (int x = 0; x < 32; ++x) {
+			const std::size_t i = (static_cast<std::size_t>(y) * 64 + x) * 3;
+			s.red += rgb[i], s.green += rgb[i + 1];
+		}
+	return s;
+}
+void checkVisibility(const char *backend, const std::string &tag) {
+	std::vector<float> none, seen, hidden, ghost;
+	ASSERT_TRUE(render(scene(std::string(kPoint) + "\n"), (tag + "_none").c_str(), backend, 16, 1, none));
+	ASSERT_TRUE(render(withCard(""), (tag + "_seen").c_str(), backend, 16, 1, seen));
+	ASSERT_TRUE(render(withCard("\"bool camera\" false"), (tag + "_hidden").c_str(), backend, 16, 1, hidden));
+	ASSERT_TRUE(render(withCard("\"bool camera\" false \"bool shadow\" false"), (tag + "_ghost").c_str(), backend, 16, 1, ghost));
+	const Side n = leftSide(none), s = leftSide(seen), h = leftSide(hidden), g = leftSide(ghost);
+	EXPECT_GT(s.green, s.red) << tag << ": the card is seen (green)";
+	EXPECT_LT(h.green, n.green * 1.02 + 0.5) << tag << ": hidden from the camera: none of its green is seen";
+	EXPECT_LT(h.red, 0.8 * n.red) << tag << ": but it still casts its shadow on the tile";
+	EXPECT_NEAR(g.red, n.red, 0.03 * n.red) << tag << ": hidden and casting no shadow: as if it were not there";
+}
+}  // namespace
+
+TEST(RayVisibilityCpu, AShapeHiddenFromTheCameraStillShadowsUnlessItCastsNone) {
+	if (findRayTracerLauncher().empty()) GTEST_SKIP() << "ray_tracer was not found";
+	checkVisibility("--cpu", "vis_cpu");
+}
+
+TEST(RayVisibilityGpu, TheSameOnBothOptixRenderers) {
+	if (!haveGpu()) GTEST_SKIP() << "no launcher, or the GPU is not for this run";
+	checkVisibility("--gpu", "vis_gpu");
+	checkVisibility("--gpu --wavefront", "vis_wf");
+}
