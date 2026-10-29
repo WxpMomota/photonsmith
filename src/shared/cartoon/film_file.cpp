@@ -1331,11 +1331,11 @@ std::string DataFilm::creditsScene() const {
 
 std::string DataFilm::headerAt(double t) const {
 	if (inCredits(t)) return scene.header;
-	if (spec.shots.empty()) return toonLine() + scene.header;
+	if (spec.shots.empty()) return toonLine(t) + scene.header;
 	std::string lookAt, camera;
 	cameraAt(t, lookAt, camera);
 	// The scene's lines before its LookAt, then the new LookAt, the lines between, the new Camera, the lines after. A scene with neither statement gets both after all its header lines.
-	return toonLine() + scene.headerBefore + lookAt + scene.headerBetween + camera + scene.headerAfter + "WorldBegin\n";
+	return toonLine(t) + scene.headerBefore + lookAt + scene.headerBetween + camera + scene.headerAfter + "WorldBegin\n";
 }
 
 std::vector<Transition> DataFilm::transitions() const {
@@ -1357,7 +1357,7 @@ std::string DataFilm::sceneAcross(double t) const {
 		if (tr.length <= 0.0 || tr.kind == Transition::Fade || std::abs(t - cut) > 0.5 * tr.length) continue;
 		std::string lookAt, camera;
 		cameraAt(t, lookAt, camera, static_cast<int>(t < cut ? k : k - 1));
-		return worldAt(toonLine() + (spec.shots.empty() ? scene.header : scene.headerBefore + lookAt + scene.headerBetween + camera + scene.headerAfter + "WorldBegin\n"), t);
+		return worldAt(toonLine(t) + (spec.shots.empty() ? scene.header : scene.headerBefore + lookAt + scene.headerBetween + camera + scene.headerAfter + "WorldBegin\n"), t);
 	}
 	return sceneAt(t);
 }

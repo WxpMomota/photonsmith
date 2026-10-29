@@ -359,7 +359,13 @@ class DataFilm {
 	std::string creditsScene() const;
 	std::string headerAt(double t) const;
 	// The `# @rt-toon` line of every frame of a film with the toon look (`toon`), else nothing.
-	std::string toonLine() const { return spec.toon.on ? toon_look::tagOf(spec.toon) : std::string(); }
+	// The frame's `# @rt-toon` line at t: the film's toon look, with the frame's seed when its lines boil (drawn afresh every other frame).
+	std::string toonLine(double t) const {
+		if (!spec.toon.on) return std::string();
+		toon_look::Style st = spec.toon;
+		if (st.boil) st.strokes.seed = 1 + static_cast<int>(std::floor(std::max(0.0, t) * std::max(1, spec.fps) / 2.0 + 1e-6));
+		return toon_look::tagOf(st);
+	}
 
 	std::string sceneAt(double t) const { return inCredits(t) ? creditsScene() : worldAt(headerAt(t), t); }
 

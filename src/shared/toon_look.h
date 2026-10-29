@@ -20,6 +20,9 @@
 // `highlight-colour`; and `material NAME ...` or `object NAME ...` starts a ramp of a material's or an object's own (its bands, shadow, tint and highlight: the words
 // after it, up to the next), found through the ID passes (aov_pass.h renderIds: a material by its scene name, an object by its link group - a film's character is
 // `cast/<name>`). A material's own ramp wins over its object's, and either over the picture's.
+// Lines drawn as by hand, after Blender's Freestyle line styles (ink_strokes.h): `line-depth D` thins the far lines (0..1), `wobble W` lets them wander W pixels (at
+// 1080), `boil on` draws the wobble afresh every other frame (a film writes the frame's `seed`), `pen ANGLE` makes them thick and thin as a broad pen held at that angle
+// (`pen-amount A`, 0..1, how thin along the pen), and `ink-tint T` colours them from the surface they edge (0 the ink, 1 the surface's own colour, darkened).
 // Set by a scene file's `# @rt-toon [bands N] [lines W] [ink COLOUR] [saturation S] [shadow S]` line (a film writes one into every frame: film_file.h `toon`), or by
 // --toon (the scene's style, or the default one). Off by default: a picture without it is the rendered one.
 
@@ -28,6 +31,7 @@
 #include <utility>
 
 #include "cryptomatte.h"   // a material's or object's ramp found by its name's ID (the ID passes)
+#include "ink_strokes.h"   // lines drawn as by hand
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -47,6 +51,9 @@ struct Style {
 	double inner = 1.0;                         // the lines inside a shape (creases, materials, objects) as a share of the silhouette's width
 	bool materials = false;                     // lines where materials meet (the ID passes)
 	bool objects = false;                       // lines where objects meet with no depth jump (the ID passes)
+	ink_strokes::Params strokes;                // the lines as drawn by hand (line-depth, wobble, seed, pen, pen-amount)
+	bool boil = false;                          // a film draws the wobble afresh every other frame (its frames' `seed`)
+	double inkTint = 0.0;                       // 0..1: the lines coloured from the surface they edge
 	// the shading's ramp: the picture's, and the materials' and objects' own
 	struct Ramp {
 		std::string name;                            // the material's or object's name (empty: the picture's own)
@@ -142,8 +149,24 @@ inline std::string parse(const std::string &words, Style &s) {
 			(w == "materials" ? s.materials : s.objects) = v == "on";
 		} else if (w == "ink") {   // #rrggbb or r,g,b (0..1), as a picture's colours are
 			if (!colourOf(v, s.ink)) return "ink is a colour: #rrggbb or r,g,b from 0 to 1";
+		} else if (w == "line-depth" || w == "pen-amount" || w == "ink-tint") {
+			if (!isNumber || x < 0 || x > 1) return w + " is from 0 to 1";
+			(w == "line-depth" ? s.strokes.depthThin : w == "pen-amount" ? s.strokes.penAmount : s.inkTint) = x;
+		} else if (w == "wobble") {
+			if (!isNumber || x < 0 || x > 20) return "wobble is how far a line wanders, in pixels (at 1080 high) from 0 to 20";
+			s.strokes.wobble = x;
+		} else if (w == "pen") {
+			if (!isNumber || x < 0 || x >= 360) return "pen is the pen's angle in degrees, from 0 to 360";
+			s.strokes.pen = x;
+		} else if (w == "boil") {
+			if (v != "on" && v != "off") return "boil is on or off";
+			s.boil = v == "on";
+		} else if (w == "seed") {
+			if (!isNumber || x != std::floor(x)) return "seed is a whole number";
+			s.strokes.seed = static_cast<int>(x);
 		} else {
-			return "\"" + w + "\": the toon look takes bands, lines, ink, saturation, shadow, inner, materials, objects, shadow-tint, highlight, highlight-colour, material and object";
+			return "\"" + w + "\": the toon look takes bands, lines, ink, saturation, shadow, inner, materials, objects, line-depth, wobble, boil, seed, pen, pen-amount, ink-tint, "
+					"shadow-tint, highlight, highlight-colour, material and object";
 		}
 	}
 	return std::string();
@@ -161,6 +184,16 @@ inline std::string tagOf(const Style &s) {
 	}
 	if (s.materials) tag += " materials on";
 	if (s.objects) tag += " objects on";
+	const auto numberWord = [&](const char *word, double v) {
+		std::snprintf(buf, sizeof buf, " %s %g", word, v);
+		return std::string(buf);
+	};
+	if (s.strokes.depthThin > 0.0) tag += numberWord("line-depth", s.strokes.depthThin);
+	if (s.strokes.wobble > 0.0) tag += numberWord("wobble", s.strokes.wobble);
+	if (s.boil) tag += " boil on";
+	if (s.strokes.seed != 0) tag += " seed " + std::to_string(s.strokes.seed);
+	if (s.strokes.pen >= 0.0) tag += numberWord("pen", s.strokes.pen) + numberWord("pen-amount", s.strokes.penAmount);
+	if (s.inkTint > 0.0) tag += numberWord("ink-tint", s.inkTint);
 	const auto colourWords = [&](const char *word, const double c[3]) {
 		std::snprintf(buf, sizeof buf, " %s %.4f,%.4f,%.4f", word, linearToSrgb(c[0]), linearToSrgb(c[1]), linearToSrgb(c[2]));
 		return std::string(buf);
@@ -401,10 +434,24 @@ inline void apply(std::vector<float> &rgb, int w, int h, const std::vector<std::
 				ink[static_cast<std::size_t>(y) * w + x] = static_cast<float>(m);
 			}
 	};
-	stroke(edge, st.lines);
-	if (apart && st.inner > 0.0) stroke(innerEdge, st.lines * st.inner);
-	for (std::size_t i = 0; i < n; ++i)
-		for (int c = 0; c < 3; ++c) rgb[3 * i + c] = static_cast<float>(rgb[3 * i + c] + (st.ink[c] - rgb[3 * i + c]) * ink[i]);
+	if (st.strokes.active()) {   // drawn as by hand (ink_strokes.h): wandering, thinner far off, thick and thin with the pen
+		const double radius = std::max(0.75, 0.5 * st.lines * h / 1080.0);
+		const std::vector<float> e = ink_strokes::wobbled(edge, w, h, st.strokes);
+		ink_strokes::draw(ink, e, ink_strokes::widths(e, depth, w, h, st.strokes), w, h, radius);
+		if (apart && st.inner > 0.0) {
+			const std::vector<float> in = ink_strokes::wobbled(innerEdge, w, h, st.strokes);
+			ink_strokes::draw(ink, in, ink_strokes::widths(in, depth, w, h, st.strokes), w, h, radius * st.inner);
+		}
+	} else {
+		stroke(edge, st.lines);
+		if (apart && st.inner > 0.0) stroke(innerEdge, st.lines * st.inner);
+	}
+	for (std::size_t i = 0; i < n; ++i) {
+		double colour[3] = {st.ink[0], st.ink[1], st.ink[2]};
+		if (st.inkTint > 0.0 && ink[i] > 0.0f)   // (the surface's own colour, deep: a quarter of its light, a little more saturated)
+			for (int c = 0; c < 3; ++c) colour[c] += st.inkTint * (0.25 * rgb[3 * i + c] - colour[c]);
+		for (int c = 0; c < 3; ++c) rgb[3 * i + c] = static_cast<float>(rgb[3 * i + c] + (colour[c] - rgb[3 * i + c]) * ink[i]);
+	}
 }
 
 }  // namespace toon_look

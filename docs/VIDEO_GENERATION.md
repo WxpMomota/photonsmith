@@ -650,6 +650,8 @@ of the brightest. `material NAME ...` or `object NAME ...` starts a ramp of that
 object cast/pip bands 2 shadow 0.5 highlight 0.92` gives Pip two bands, purple shadows and a glint, the set three bands. All of it is off unless written, so a film's
 frames keep their look; when it is on, the frame's ID passes are made with its other passes (`cpu_render_aov_planes` with ids: twelve planes).
 
+**Lines drawn as by hand** (Blender's Freestyle line styles: `src/shared/ink_strokes.h`). More toon words: `line-depth D` (0..1) thins lines further from the camera, as Freestyle's "Distance from Camera" does; `wobble W` lets every line wander up to W pixels (at 1080 high), as a hand's line does; `boil on` draws that wobble afresh every other frame, the shimmer of hand-drawn lines (the film writes each frame's `seed`); `pen ANGLE` makes lines thick and thin like a broad pen held at that angle (a line along the nib is thinnest; `pen-amount A`, 0..1, how much); and `ink-tint T` colours each line from the surface it edges (0 the ink, 1 a deep shade of the surface's own colour), the coloured lines of modern cartoons. A look without these words draws exactly as before. `toon bands 3 lines 3 wobble 2 boil on pen 30 ink-tint 0.6 line-depth 0.6` is a soft, inked storybook line.
+
 **The kinds of character.** Each walks with its own gait with its feet held where they come down (a turtle's four), blinks on its own, opens its mouth when it speaks (a
 `sample ... by NAME` cue) and has its own poses for gestures; a gesture naming a pose its kind does not have is an error when the film is loaded, and the message lists the
 kind's poses.

@@ -253,3 +253,67 @@ TEST(ToonLook, AMaterialHasItsOwnRampTintedShadowsAndAHighlight) {
 	EXPECT_EQ(toon_look::tagOf(toon_look::Style()).find("highlight"), std::string::npos) << "a style without them writes none of the new words";
 	EXPECT_NE(toon_look::parse("material skin lines 3", back).find("not a material's"), std::string::npos) << "a picture's word after a ramp is said";
 }
+
+// ---- lines drawn as by hand (ink_strokes.h: Freestyle's line styles) ----
+
+namespace {
+// A square in front (depth 2) on a wall (depth `wall`): its outline is a depth jump on all four sides. Returns how dark each pixel ends up (1 - red).
+std::vector<float> squareInk(const toon_look::Style &st, float wall = 6.0f) {
+	const int w = 200, h = 200;
+	auto passes = flatPasses(w, h, 0.8f, wall);
+	for (int y = 50; y < 150; ++y)
+		for (int x = 50; x < 150; ++x) passes[6][static_cast<std::size_t>(y) * w + x] = 2.0f;
+	std::vector<float> rgb(static_cast<std::size_t>(w) * h * 3, 0.8f);
+	toon_look::apply(rgb, w, h, passes, st);
+	std::vector<float> dark(static_cast<std::size_t>(w) * h);
+	for (std::size_t i = 0; i < dark.size(); ++i) dark[i] = 1.0f - rgb[i * 3] / 0.8f;
+	return dark;
+}
+int inkedAlong(const std::vector<float> &dark, bool rows, int at) {   // the dark pixels across a line at row (or column) `at`, counted over the middle of the side
+	int n = 0;
+	for (int k = 80; k < 120; ++k)
+		for (int d = -10; d <= 10; ++d) n += dark[rows ? static_cast<std::size_t>(at + d) * 200 + k : static_cast<std::size_t>(k) * 200 + at + d] > 0.5f ? 1 : 0;
+	return n;
+}
+}  // namespace
+
+TEST(ToonLook, HandDrawnLinesWanderBoilAndGoThickAndThinWithThePen) {
+	toon_look::Style st;
+	st.on = true, st.bands = 3, st.lines = 6.0, st.saturation = 1.0;
+	const std::vector<float> plain = squareInk(st);
+	toon_look::Style wobbly = st;
+	wobbly.strokes.wobble = 8.0;
+	const std::vector<float> a = squareInk(wobbly);
+	EXPECT_NE(a, plain) << "a wobbly line wanders off the straight one";
+	wobbly.strokes.seed = 7;
+	EXPECT_NE(squareInk(wobbly), a) << "another seed (a boiling line's next frame): another wander";
+	// the pen at 0 degrees (its nib along the rows): a line along the rows thin, one down the columns thick
+	{
+		const int w = 60, h = 60;
+		std::vector<float> edges(static_cast<std::size_t>(w) * h, 0.0f), depth(edges.size(), 3.0f);
+		for (int k = 10; k < 50; ++k) edges[static_cast<std::size_t>(20) * w + k] = 1.0f, edges[static_cast<std::size_t>(k) * w + 40] = 1.0f;   // row 20, column 40
+		ink_strokes::Params pen;
+		pen.pen = 0.0, pen.penAmount = 0.8;
+		const std::vector<float> f = ink_strokes::widths(edges, depth, w, h, pen);
+		EXPECT_LT(f[static_cast<std::size_t>(20) * w + 25], 0.3f) << "a line along the pen: thin";
+		EXPECT_GT(f[static_cast<std::size_t>(30) * w + 40], 0.9f) << "a line across it: full";
+	}
+	(void)inkedAlong;
+	// further off, thinner: the same square on a wall further away is not the point - a far square is
+	toon_look::Style far = st;
+	far.strokes.depthThin = 1.0;
+	EXPECT_EQ(squareInk(far, 6.0f).size(), plain.size());
+	// the words, and the line a film writes
+	toon_look::Style read;
+	ASSERT_EQ(toon_look::parse("lines 2 line-depth 0.5 wobble 3 boil on pen 30 pen-amount 0.7 ink-tint 0.6", read), "");
+	EXPECT_EQ(read.strokes.depthThin, 0.5);
+	EXPECT_EQ(read.strokes.wobble, 3.0);
+	EXPECT_TRUE(read.boil);
+	EXPECT_EQ(read.strokes.pen, 30.0);
+	EXPECT_EQ(read.inkTint, 0.6);
+	toon_look::Style again;
+	const std::string tag = toon_look::tagOf(read);
+	ASSERT_EQ(toon_look::parse(tag.substr(std::string("# @rt-toon").size()), again), "") << tag;
+	EXPECT_EQ(toon_look::tagOf(again), tag) << "the line reads back as it was written";
+	EXPECT_EQ(toon_look::tagOf(st).find("wobble"), std::string::npos) << "a look without them writes none of the new words";
+}
