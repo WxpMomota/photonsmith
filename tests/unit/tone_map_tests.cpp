@@ -170,3 +170,98 @@ TEST(ToneMapModeFromName, RejectsUnrecognizedNames) {
 	EXPECT_FALSE(tone_map_mode_from_name("ACES", mode))
 		<< "names are case-sensitive lowercase, matching --sampler's own convention";
 }
+
+// ---------------------------------------------------------------------------
+// AgX and Khronos PBR Neutral -- whole-colour curves (apply_tone_map_rgb)
+// ---------------------------------------------------------------------------
+
+namespace {
+double hueOf(double r, double g, double b) {   // degrees, 0..360
+	const double mx = std::fmax(r, std::fmax(g, b)), mn = std::fmin(r, std::fmin(g, b)), d = mx - mn;
+	if (d <= 0.0) return 0.0;
+	double h = mx == r ? std::fmod((g - b) / d, 6.0) : mx == g ? (b - r) / d + 2.0 : (r - g) / d + 4.0;
+	h *= 60.0;
+	return h < 0.0 ? h + 360.0 : h;
+}
+}  // namespace
+
+TEST(ToneMapModeFromName, KnowsAgxAndNeutral) {
+	ToneMapMode mode;
+	EXPECT_TRUE(tone_map_mode_from_name("agx", mode));
+	EXPECT_EQ(mode, ToneMapMode::AgX);
+	EXPECT_TRUE(tone_map_mode_from_name("neutral", mode));
+	EXPECT_EQ(mode, ToneMapMode::Neutral);
+	EXPECT_TRUE(tone_map_mode_from_name("agx-punchy", mode));
+	EXPECT_EQ(mode, ToneMapMode::AgXPunchy);
+}
+
+// The punchy look: the same curve with more contrast (a mid grey darker, a bright one still near white) and more colour.
+TEST(ApplyToneMapRgb, AgxPunchyHasMoreContrastAndColourThanAgx) {
+	double r = 0.18, g = 0.18, b = 0.18, pr = r, pg = g, pb = b;
+	apply_tone_map_rgb(r, g, b, ToneMapMode::AgX);
+	apply_tone_map_rgb(pr, pg, pb, ToneMapMode::AgXPunchy);
+	EXPECT_LT(pg, g) << "mid grey darker";
+	double cr = 0.6, cg = 0.25, cb = 0.1, kr = cr, kg = cg, kb = cb;
+	apply_tone_map_rgb(cr, cg, cb, ToneMapMode::AgX);
+	apply_tone_map_rgb(kr, kg, kb, ToneMapMode::AgXPunchy);
+	EXPECT_GT((kr - kb) / (kr + 1e-9), (cr - cb) / (cr + 1e-9)) << "an orange more saturated";
+}
+
+TEST(ApplyToneMapRgb, AcesAndReinhardAreStillTheirPerChannelCurves) {
+	for (ToneMapMode mode : {ToneMapMode::ACES, ToneMapMode::Reinhard, ToneMapMode::None}) {
+		double r = 2.0, g = 0.5, b = 0.05;
+		apply_tone_map_rgb(r, g, b, mode);
+		EXPECT_DOUBLE_EQ(r, apply_tone_map(2.0, mode));
+		EXPECT_DOUBLE_EQ(g, apply_tone_map(0.5, mode));
+		EXPECT_DOUBLE_EQ(b, apply_tone_map(0.05, mode));
+	}
+}
+
+// Every curve: black stays black, grey stays grey, the result is in [0, 1], and more light never gives a darker colour.
+TEST(ApplyToneMapRgb, AgxAndNeutralKeepGreyGreyAndAreInRangeAndRising) {
+	for (ToneMapMode mode : {ToneMapMode::AgX, ToneMapMode::AgXPunchy, ToneMapMode::Neutral}) {
+		double r = 0.0, g = 0.0, b = 0.0;
+		apply_tone_map_rgb(r, g, b, mode);
+		EXPECT_LT(g, 0.002) << tone_map_mode_display_name(mode);
+		double previous = -1.0;
+		for (double x = 0.001; x < 200.0; x *= 1.5) {
+			double rr = x, gg = x, bb = x;
+			apply_tone_map_rgb(rr, gg, bb, mode);
+			EXPECT_NEAR(rr, gg, 1e-3) << "grey stays grey at " << x;
+			EXPECT_NEAR(bb, gg, 1e-3) << "grey stays grey at " << x;
+			EXPECT_GE(gg, 0.0);
+			EXPECT_LE(gg, 1.0);
+			EXPECT_GE(gg, previous - 1e-9) << "rising at " << x;
+			previous = gg;
+		}
+		EXPECT_GT(previous, 0.9) << "very bright light is near white";
+	}
+}
+
+// The reason for them: a bright saturated light. ACES on each channel turns a bright blue (a glowing crystal) cyan-ward and a bright red yellow-ward; AgX and
+// PBR Neutral keep the hue much closer.
+TEST(ApplyToneMapRgb, ABrightSaturatedLightKeepsItsHueUnderAgxAndNeutralBetterThanUnderAces) {
+	struct Light { double r, g, b; };
+	for (const Light l : {Light{0.4, 1.2, 8.0}, Light{8.0, 0.9, 0.2}}) {
+		const double want = hueOf(l.r, l.g, l.b);
+		const auto shift = [&](ToneMapMode mode) {
+			double r = l.r, g = l.g, b = l.b;
+			apply_tone_map_rgb(r, g, b, mode);
+			const double d = std::fabs(hueOf(r, g, b) - want);
+			return std::fmin(d, 360.0 - d);
+		};
+		const double aces = shift(ToneMapMode::ACES), agx = shift(ToneMapMode::AgX), neutral = shift(ToneMapMode::Neutral);
+		EXPECT_LT(agx, aces) << "AgX against ACES, light " << l.r << " " << l.g << " " << l.b;
+		EXPECT_LT(neutral, aces) << "Neutral against ACES";
+		EXPECT_LT(neutral, 6.0) << "Neutral keeps the hue within a few degrees";
+	}
+}
+
+// PBR Neutral's promise: below its knee (0.76) a colour is what it was, but for a small offset at the darkest end.
+TEST(ApplyToneMapRgb, NeutralLeavesTheColoursBelowItsKneeAsTheyWere) {
+	double r = 0.6, g = 0.3, b = 0.15;
+	apply_tone_map_rgb(r, g, b, ToneMapMode::Neutral);
+	EXPECT_NEAR(r, 0.6 - 0.04, 1e-12);
+	EXPECT_NEAR(g, 0.3 - 0.04, 1e-12);
+	EXPECT_NEAR(b, 0.15 - 0.04, 1e-12);
+}

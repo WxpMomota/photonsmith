@@ -41,9 +41,7 @@ inline void write_color(std::ostream& out, const color& pixel_color,
     if (!std::isfinite(b)) b = 0.0;
 
     // Tone map from HDR linear to [0,1].
-    r = apply_tone_map(r, tone_map);
-    g = apply_tone_map(g, tone_map);
-    b = apply_tone_map(b, tone_map);
+    apply_tone_map_rgb(r, g, b, tone_map);
 
     // Apply sRGB OETF (standard piecewise gamma ~2.2).
     r = linear_to_srgb(r);

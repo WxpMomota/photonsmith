@@ -2,6 +2,7 @@
 // render_setup.h -- what every render mode of the launcher reads: the settings resolved from the command line once (RenderSetup), the renderer options built from the arguments, and the
 // environment variables some options set for the renderers.
 
+#include <algorithm>
 #include <cstdlib>
 #include <string>
 
@@ -57,6 +58,8 @@ inline lens_look::Look look_for_scene(const LaunchArgs& args, const std::string&
     std::string problem;
     if (path && *path && lens_look::fromSceneFile(path, look, problem) && !problem.empty())
         std::cerr << "Warning: the scene's @rt-look line: " << problem << "\n";
+    // (a --tonemap given on the command line wins over the scene's `tonemap`)
+    if (std::find(args.consumed_tokens.begin(), args.consumed_tokens.end(), std::string(render_flags::kTonemap)) != args.consumed_tokens.end()) look.tonemap.clear();
     return lens_look::merged(look, args.look);
 }
 

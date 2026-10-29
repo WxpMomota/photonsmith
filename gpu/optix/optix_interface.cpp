@@ -379,10 +379,12 @@ extern "C" int optix_render_main(
 		if (options.tonemap != nullptr) {
 			if (!tone_map_mode_from_name(options.tonemap, tone_map_mode) && options.tonemap[0] != '\0') {
 				std::cerr << "Warning: unrecognized --tonemap \"" << options.tonemap
-						  << "\", using aces. Valid: aces, reinhard, none.\n";
+						  << "\", using aces. Valid: aces, agx, agx-punchy, neutral, reinhard, none.\n";
 				tone_map_mode = ToneMapMode::ACES;
 			}
 		}
+		// a film's own curve (its look line's `tonemap`: lens_look.h; the launcher leaves it out when --tonemap was given)
+		if (!options.output.look.tonemap.empty()) tone_map_mode_from_name(options.output.look.tonemap, tone_map_mode);
 
 		// Initialize renderer on first call
 		if (!g_renderer) {
@@ -673,9 +675,10 @@ extern "C" int optix_render_main(
 			g *= options.exposure;
 			b *= options.exposure;
 
-			r = linear_to_srgb(apply_tone_map(r, tone_map_mode));
-			g = linear_to_srgb(apply_tone_map(g, tone_map_mode));
-			b = linear_to_srgb(apply_tone_map(b, tone_map_mode));
+			apply_tone_map_rgb(r, g, b, tone_map_mode);
+			r = linear_to_srgb(r);
+			g = linear_to_srgb(g);
+			b = linear_to_srgb(b);
 
 			// Clamp and convert to byte (matches write_color()'s
 			// interval(0.000, 0.999) clamp-then-*256 convention exactly).

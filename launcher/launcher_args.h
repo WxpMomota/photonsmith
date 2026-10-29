@@ -764,12 +764,12 @@ inline FlagResult handle_quality_flag(const std::string& arg, int argc, char** a
 		std::string name = argv[i + 1];
 		std::transform(name.begin(), name.end(), name.begin(),
 						[](unsigned char c) { return std::tolower(c); });
-		static const std::set<std::string> kValidTonemaps = {"aces", "reinhard", "none"};
+		static const std::set<std::string> kValidTonemaps = {"aces", "agx", "agx-punchy", "neutral", "reinhard", "none"};
 		if (kValidTonemaps.count(name)) {
 			out.tonemap = name;
 		} else {
 			std::cerr << "Invalid --tonemap \"" << argv[i + 1] << "\", using default (aces). "
-						 "Valid: aces, reinhard, none\n";
+						 "Valid: aces, agx, agx-punchy, neutral, reinhard, none\n";
 		}
 		consumed_args.insert(i);
 		consumed_args.insert(i + 1);
@@ -1242,7 +1242,10 @@ inline void print_launch_help(const char* program) {
 				  << "               path (spectral upsampling table lookups every bounce).\n"
 				  << "  " << render_flags::kTonemap << " MODE: Which tone-mapping operator to apply before the sRGB\n"
 				  << "               OETF (default aces, this project's pre-existing behavior).\n"
-				  << "               One of aces, reinhard, none. Applies to both CPU and GPU\n"
+				  << "               One of aces, agx (Blender's: bright colours keep their hue),\n"
+				  << "               agx-punchy (the same with more contrast and colour),\n"
+				  << "               neutral (Khronos PBR Neutral: colours as painted), reinhard,\n"
+				  << "               none. Applies to both CPU and GPU\n"
 				  << "               (recursive and wavefront). No effect under\n"
 				  << "               --bdpt/--mlt/--sppm (warns).\n"
 				  << "  --sppm     : Render with Stochastic Progressive Photon Mapping instead of\n"

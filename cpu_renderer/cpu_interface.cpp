@@ -503,10 +503,12 @@ extern "C" int cpu_render_main(int width, int height, int spp, int max_depth, co
 				cam.tone_map = mode;
 			} else if (options.tonemap[0] != '\0') {
 				std::cerr << "Warning: unrecognized --tonemap \"" << options.tonemap
-						  << "\", using aces. Valid: aces, reinhard, none.\n";
+						  << "\", using aces. Valid: aces, agx, agx-punchy, neutral, reinhard, none.\n";
 			}
 		}
-		cam.vup               = vec3(0, 1, 0);  // Up direction is +Y
+		// a film's own curve (its look line's `tonemap`: lens_look.h; the launcher leaves it out when --tonemap was given)
+		if (!options.output.look.tonemap.empty()) tone_map_mode_from_name(options.output.look.tonemap, cam.tone_map);
+		cam.vup              = vec3(0, 1, 0);  // Up direction is +Y
 
 		// Apply camera config from registry
 		const CameraConfig& cc = scene_desc->camera;

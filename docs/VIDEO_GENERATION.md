@@ -1774,6 +1774,14 @@ the frame's `# @rt-look` line (`lens_look.h` applies them with the bloom, vignet
 videos and the GUI all show them, and a resume re-renders the frames whose grade changed. The doctor notes a cut across which the colour cast changes (the two frames'
 mean chromaticity more than 0.05 apart: "warmer", "cooler", "greener"), which a grade can then match.
 
+**A film's colour curve: `tonemap`.** The curve that turns the render's light into the picture's colours, in a cameras file (`[*]` for the whole film, a shot's own on
+top) or with `--tonemap` (which wins): `aces` (the default), `agx` (Blender's default since 4.0), `agx-punchy` (AgX with more contrast and colour, like Blender's "AgX -
+Punchy"), `neutral` (Khronos PBR Neutral), `reinhard`, `none` (`src/shared/tone_map.h`). ACES works on each channel alone, so a very bright saturated light changes hue as
+its strongest channel saturates first - a glowing blue crystal turns cyan, a red flame yellow, an orange haze yellow-white. AgX and PBR Neutral work on the colour as a
+whole: AgX fades it towards white keeping its hue, PBR Neutral leaves everything below its knee exactly as painted and compresses only the brightest. On a Crystal Heart frame
+(30 s, the haze behind the heart): ACES turns the haze's bright side yellow; AgX keeps it rose but is paler and flatter; AgX Punchy keeps the hue with about ACES's contrast;
+PBR Neutral is the most saturated. The GUI's Tone mapping box (Render Options) offers them too.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

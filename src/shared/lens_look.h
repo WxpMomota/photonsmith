@@ -36,6 +36,9 @@ struct Look {
 	double gamma[3] = {1.0, 1.0, 1.0};
 	double gain[3] = {1.0, 1.0, 1.0};
 	double tint[3] = {1.0, 1.0, 1.0};
+	// `tonemap NAME`: the curve that turns the light into the picture's colours (tone_map.h: aces, agx, neutral, reinhard, none); empty: the render's own (--tonemap, aces).
+	// A film's choice (its cameras file's `tonemap`, shot_cameras.h); not applied here - the picture writers read it (a --tonemap given on the command line wins).
+	std::string tonemap;
 	bool graded() const {
 		for (int k = 0; k < 3; ++k)
 			if (lift[k] != 0.0 || gamma[k] != 1.0 || gain[k] != 1.0 || tint[k] != 1.0) return true;
@@ -83,6 +86,13 @@ inline std::string parse(const std::string &text, Look &out) {
 			for (int k = 0; k < 3; ++k) dst[k] = word == "lift" ? std::clamp(v[k], -1.0, 1.0) : std::clamp(v[k], 0.01, 10.0);
 			continue;
 		}
+		if (word == "tonemap") {
+			std::string name;
+			in >> name;
+			if (name != "aces" && name != "agx" && name != "agx-punchy" && name != "neutral" && name != "reinhard" && name != "none") return "\"tonemap\" takes aces, agx, agx-punchy, neutral, reinhard or none";
+			out.tonemap = name;
+			continue;
+		}
 		double v = 0.0;
 		if (!(in >> v) || !std::isfinite(v)) return "\"" + word + "\" needs a number after it";
 		if (word == "bloom") out.bloom = std::clamp(v, 0.0, 1.0);
@@ -91,7 +101,7 @@ inline std::string parse(const std::string &text, Look &out) {
 		else if (word == "vignette") out.vignette = std::clamp(v, 0.0, 1.0);
 		else if (word == "warmth") out.warmth = std::clamp(v, -1.0, 1.0);
 		else if (word == "saturation") out.saturation = std::clamp(v, 0.0, 3.0);
-		else return "unknown word \"" + word + "\" (bloom, bloom-radius, flare, vignette, warmth, saturation, lift, gamma, gain, tint)";
+		else return "unknown word \"" + word + "\" (bloom, bloom-radius, flare, vignette, warmth, saturation, lift, gamma, gain, tint, tonemap)";
 	}
 	return "";
 }

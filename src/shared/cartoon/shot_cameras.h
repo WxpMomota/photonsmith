@@ -20,6 +20,7 @@
 //     gamma 1.1        # ... the middle brightened (above 1) or darkened ...
 //     gain 1.05        # ... multiplied ...
 //     tint 1 0.95 1.1  # ... and a colour cast that keeps the brightness
+//     tonemap agx      # the curve from light to colours (tone_map.h): agx (Blender's: a bright crystal or neon keeps its hue), neutral (Khronos: colours as painted), aces
 //     lighting key 1.5 fill 0.5 rim 1 side right   # key, fill and rim lights round what the camera looks at (shot_lighting.h; `lighting` alone: the usual three)
 //     [The answer]
 //     tilt 3
@@ -33,6 +34,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -61,13 +63,14 @@ struct Change {
 	double samples = 1.0;   // the share of the video's samples a pixel
 	double lift[3] = {0.0, 0.0, 0.0}, gamma[3] = {1.0, 1.0, 1.0}, gain[3] = {1.0, 1.0, 1.0}, tint[3] = {1.0, 1.0, 1.0};   // the grade (lens_look::Look)
 	shot_lighting::Lighting lighting;   // key, fill and rim round what the camera looks at
+	std::string tonemap;                // the colour curve (tone_map.h: agx, neutral, aces ...); empty: the render's
 	bool graded() const {
 		for (int k = 0; k < 3; ++k)
 			if (lift[k] != 0.0 || gamma[k] != 1.0 || gain[k] != 1.0 || tint[k] != 1.0) return true;
 		return false;
 	}
 	bool moves() const { return dolly != 0.0 || truck != 0.0 || pedestal != 0.0 || pan != 0.0 || tilt != 0.0; }
-	bool any() const { return moves() || fov > 0.0 || zoom != 1.0 || iso > 0.0 || stops != 0.0 || samples != 1.0 || graded() || lighting.on; }
+	bool any() const { return moves() || fov > 0.0 || zoom != 1.0 || iso > 0.0 || stops != 0.0 || samples != 1.0 || graded() || lighting.on || !tonemap.empty(); }
 };
 
 // A section on top of another: moves add up, zooms multiply, a set fov or iso replaces.
@@ -90,6 +93,7 @@ inline Change combine(const Change &under, const Change &over) {
 	if (over.fov > 0.0) c.fov = over.fov;
 	if (over.iso > 0.0) c.iso = over.iso;
 	if (over.lighting.on) c.lighting = over.lighting;   // (a shot's own lighting, whole)
+	if (!over.tonemap.empty()) c.tonemap = over.tonemap;
 	return c;
 }
 
@@ -151,6 +155,20 @@ inline File parse(const std::string &text) {
 			}
 			continue;
 		}
+		if (word == "tonemap") {   // the film's (or the shot's) colour curve: tone_map.h
+			std::string name;
+			words >> name;
+			if (!at) {
+				f.problems.push_back(where + "'tonemap' before any [shot] section");
+				continue;
+			}
+			if (name != "aces" && name != "agx" && name != "agx-punchy" && name != "neutral" && name != "reinhard" && name != "none") {
+				f.problems.push_back(where + "'tonemap' takes aces, agx, agx-punchy, neutral, reinhard or none");
+				continue;
+			}
+			at->tonemap = name;
+			continue;
+		}
 		if (word == "lift" || word == "gamma" || word == "gain" || word == "tint") {   // one number or three (red, green, blue)
 			std::vector<double> v;
 			for (double x; words >> x;) v.push_back(x);
@@ -184,7 +202,7 @@ inline File parse(const std::string &text) {
 		else if (word == "iso" && value > 0.0) at->iso = value;
 		else if (word == "stops") at->stops = value;
 		else if (word == "samples" && value > 0.0 && value <= 8.0) at->samples = value;
-		else f.problems.push_back(where + "'" + word + " " + trimmed(line.substr(word.size())) + "' is not a change this file knows (dolly, truck, pedestal, pan, tilt, fov, zoom, iso, stops, samples 0-8, lift, gamma, gain, tint, lighting)");
+		else f.problems.push_back(where + "'" + word + " " + trimmed(line.substr(word.size())) + "' is not a change this file knows (dolly, truck, pedestal, pan, tilt, fov, zoom, iso, stops, samples 0-8, lift, gamma, gain, tint, tonemap, lighting)");
 	}
 	return f;
 }
@@ -325,10 +343,12 @@ inline std::string apply(const std::string &scene, const Change &c) {
 		}
 	}
 	if (c.samples != 1.0) head = samplesLine(c.samples) + head;
-	if (c.graded()) {   // the grade: words added to the frame's look line (later words win: lens_look::parse), or a look line of its own
-		char g[320];
-		std::snprintf(g, sizeof g, " lift %.4g %.4g %.4g gamma %.4g %.4g %.4g gain %.4g %.4g %.4g tint %.4g %.4g %.4g", c.lift[0], c.lift[1], c.lift[2], c.gamma[0], c.gamma[1],
-					  c.gamma[2], c.gain[0], c.gain[1], c.gain[2], c.tint[0], c.tint[1], c.tint[2]);
+	if (c.graded() || !c.tonemap.empty()) {   // the grade and the curve: words added to the frame's look line (later words win: lens_look::parse), or a look line of its own
+		char g[320] = "";
+		if (c.graded())
+			std::snprintf(g, sizeof g, " lift %.4g %.4g %.4g gamma %.4g %.4g %.4g gain %.4g %.4g %.4g tint %.4g %.4g %.4g", c.lift[0], c.lift[1], c.lift[2], c.gamma[0], c.gamma[1],
+						  c.gamma[2], c.gain[0], c.gain[1], c.gain[2], c.tint[0], c.tint[1], c.tint[2]);
+		if (!c.tonemap.empty()) std::snprintf(g + std::strlen(g), sizeof g - std::strlen(g), " tonemap %s", c.tonemap.c_str());
 		const std::size_t look = head.find("# @rt-look");
 		if (look != std::string::npos) {
 			std::size_t end = head.find('\n', look);

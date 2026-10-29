@@ -196,6 +196,22 @@ TEST(ShotCameras, AChangeMovesAndTurnsTheCameraOnItsOwnAxesAndSetsTheFovAndExpos
 	EXPECT_EQ(sc::apply(scene, sc::Change{}), scene) << "no change, the same text";
 }
 
+// `tonemap` in a cameras file: the film's colour curve, a shot's own on top; written onto the frame's look line, which the picture writers read.
+TEST(ShotCameras, AFilmOrAShotChoosesItsColourCurveOnTheLookLine) {
+	namespace sc = cartoon::shot_cameras;
+	const sc::File f = sc::parse("[*]\ntonemap agx\n[2]\ntonemap neutral\n[3]\ntonemap filmic\n");
+	EXPECT_EQ(f.problems.size(), 1u) << "a curve it does not know is said";
+	const std::string scene = testHeader();
+	const std::string first = sc::apply(scene, sc::changeFor(f, 0, ""));
+	EXPECT_NE(first.find("# @rt-look tonemap agx"), std::string::npos) << first.substr(0, 200);
+	const std::string second = sc::apply(scene, sc::changeFor(f, 1, ""));
+	EXPECT_NE(second.find("tonemap neutral"), std::string::npos) << "the shot's own wins";
+	lens_look::Look look;
+	const std::size_t at = second.find("# @rt-look") + 10;
+	EXPECT_TRUE(lens_look::parse(second.substr(at, second.find('\n', at) - at), look).empty());
+	EXPECT_EQ(look.tonemap, "neutral");
+}
+
 // Every film the program lists reads its cameras file when a frame is made: an edit is seen by the next frame, without a rebuild, and only in the shot it names.
 TEST(ShotCameras, AFilmsCameraFileIsReadWhenAFrameIsMadeAndChangesOnlyItsShot) {
 	const std::filesystem::path dir = std::filesystem::temp_directory_path() / "rt_shot_cameras_test";

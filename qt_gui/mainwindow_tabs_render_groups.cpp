@@ -909,6 +909,9 @@ void MainWindow::buildPostProcessingGroup(QWidget *optionsTab, QVBoxLayout *layo
 
 	m_tonemapCombo = new QComboBox(optionsTab);
 	m_tonemapCombo->addItem(tr("ACES (default)"), QString());
+	m_tonemapCombo->addItem(tr("AgX (Blender: bright colours keep their hue)"), QStringLiteral("agx"));
+	m_tonemapCombo->addItem(tr("AgX Punchy (more contrast and colour)"), QStringLiteral("agx-punchy"));
+	m_tonemapCombo->addItem(tr("PBR Neutral (colours as painted)"), QStringLiteral("neutral"));
 	m_tonemapCombo->addItem(tr("Reinhard"), QStringLiteral("reinhard"));
 	m_tonemapCombo->addItem(tr("None"), QStringLiteral("none"));
 	m_tonemapCombo->setToolTip(
@@ -923,7 +926,11 @@ void MainWindow::buildPostProcessingGroup(QWidget *optionsTab, QVBoxLayout *layo
 		"Tone mapping is the curve used to compress that huge range "
 		"down into something a screen can actually display.\n\n"
 		"ACES rolls off bright highlights gently, the way film does, "
-		"giving a soft, filmic look; Reinhard is a simpler, older way "
+		"giving a soft, filmic look, but it shifts very bright saturated "
+		"colours (a glowing blue turns cyan, a red flame yellow); AgX, "
+		"Blender's default, fades them towards white keeping their hue; "
+		"PBR Neutral leaves everything below the brightest light exactly "
+		"as painted; Reinhard is a simpler, older way "
 		"of compressing brightness; None just clips anything too "
 		"bright straight to flat white, which can look harsh.")),
 		m_tonemapCombo);

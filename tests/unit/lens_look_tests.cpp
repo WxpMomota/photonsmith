@@ -105,3 +105,16 @@ TEST(LensLook, AWordItDoesNotKnowIsReported) {
 }
 
 }  // namespace
+
+// A film chooses its colour curve on its look line (its cameras file writes it there); the picture writers read it, apply() does not.
+TEST(LensLook, ALookLineCanChooseTheColourCurve) {
+	lens_look::Look look;
+	EXPECT_TRUE(lens_look::parse("bloom 0.1 tonemap agx", look).empty());
+	EXPECT_EQ(look.tonemap, "agx");
+	EXPECT_TRUE(lens_look::parse("tonemap neutral saturation 1.1", look).empty()) << "later words win";
+	EXPECT_EQ(look.tonemap, "neutral");
+	EXPECT_FALSE(lens_look::parse("tonemap filmic", look).empty()) << "a curve it does not know";
+	lens_look::Look only;
+	only.tonemap = "agx";
+	EXPECT_FALSE(only.active()) << "the curve alone changes nothing in apply(): it is the writers'";
+}
