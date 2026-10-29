@@ -362,6 +362,10 @@ struct Uniforms {
     // A plain (non-portal) infinite light of a file that also has portal lights (pbrt sums every infinite light): 1 and its colour (L * scale; a picture sky is reduced to its mean).
     uint pbrtSkyBesidePortals;
     packed_float3 pbrtSkyColor;
+    // The camera medium ends at a sphere (FlatScene::cameraMediumBound: pbrt's `MediumInterface "fog" ""` interface sphere round the camera, air outside it): its centre and radius in the Metal
+    // world, radius 0 = the fog fills all of space (the pbrt default for a camera medium).
+    packed_float3 fogBoundCenter;
+    float fogBoundRadius;
 };
 
 // Blinn/pbrt-v4's own smooth cone falloff: 0 outside the outer cone, 1
@@ -611,6 +615,36 @@ inline float rayBoxExitDistance(float3 origin, float3 dir, float3 boxMin, float3
 inline float3 fogTransmittance(constant Uniforms& u, float dist) {
     if (!(u.fogSigmaT > 0.0)) return float3(1.0);
     return (u.fogChromatic & 1u) != 0u ? exp(-float3(u.fogSigmaT3) * dist) : float3(exp(-u.fogSigmaT * dist));
+}
+
+// The part of the segment [0, tmax] of the ray (origin o, unit direction d) that lies inside the camera medium: all of it, unless the fog ends at a sphere (fogBoundRadius > 0), then the chord
+// of the sphere. `tin` is where that part begins (0 for an unbounded fog). The CPU's constant_medium::clip.
+inline float fogLength(constant Uniforms& u, float3 o, float3 d, float tmax, thread float& tin) {
+    tin = 0.0f;
+    if (!(u.fogBoundRadius > 0.0f)) return tmax;
+    const float3 oc = o - float3(u.fogBoundCenter);
+    const float b = dot(oc, d);
+    const float disc = b * b - (dot(oc, oc) - u.fogBoundRadius * u.fogBoundRadius);
+    if (disc <= 0.0f) return 0.0f;
+    const float root = sqrt(disc);
+    const float t0 = max(0.0f, -b - root), t1 = min(tmax, -b + root);
+    tin = t0;
+    return max(0.0f, t1 - t0);
+}
+
+// The camera medium's transmittance along the segment [0, dist] of a ray: the same as fogTransmittance() over the length of it that is inside the fog.
+inline float3 fogTransmittanceAlong(constant Uniforms& u, float3 o, float3 d, float dist) {
+    if (!(u.fogSigmaT > 0.0)) return float3(1.0);
+    float tin;
+    return fogTransmittance(u, fogLength(u, o, d, dist, tin));
+}
+
+// The length of fog a ray toward the sun crosses on its way out: the chord of the sphere when the fog is bounded; when it fills all of space, so much that nothing gets through (the CPU's
+// transmittance_along: no light from infinitely far gets through infinite fog). It used to be the distance to the walls of the hardcoded room's box, which is only meaningful for an origin
+// inside that box, and a loaded scene is not (it sits 60 units to the side): a sun in an unbounded fog came out millions of times too bright.
+inline float fogExitLength(constant Uniforms& u, float3 o, float3 d) {
+    if (u.fogBoundRadius > 0.0f) { float tin; return fogLength(u, o, d, 1e9f, tin); }
+    return 1e9f;
 }
 
 // materialType: 0 = Lambertian diffuse, 1 = mirror (perfect specular),

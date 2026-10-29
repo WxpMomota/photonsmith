@@ -191,6 +191,12 @@ void PbrtSceneLoader::loadPbrtScene() {
     loadPbrtObjectInstances(scene, toWorld, materialFor, sceneScale);
     loadPbrtPunctualLights(scene, toWorld, sceneScale);
     loadPbrtMedium(scene, sceneScale);
+    pbrtFogBoundRadius = 0.0f;
+    if (havePbrtMedium && scene.cameraMediumBound[3] > 0.0) {   // the fog ends at a sphere: air outside it, so a sun or a sky outside lights it
+        pbrtFogBoundCenter = toWorld(float3{(float)scene.cameraMediumBound[0], (float)scene.cameraMediumBound[1], (float)scene.cameraMediumBound[2]});
+        pbrtFogBoundRadius = sceneScale * (float)scene.cameraMediumBound[3];
+        fprintf(stderr, "loadPbrtScene: the camera medium ends at a sphere (radius %.4g)\n", (double)scene.cameraMediumBound[3]);
+    }
     pbrtMaxComponentValue = (float)scene.maxComponentValue;
     loadPbrtInfiniteLight(scene, toWorld);
     loadPbrtCamera(scene, toWorld, bboxCenter, sceneScale, sceneOffset);
@@ -891,9 +897,18 @@ static void setSphereObjectTransform(SphereData& sd, const double xf[16], const 
     sd.radius = (float)half;
 }
 
+// The sphere of the file that is the camera medium's boundary: the same centre and radius as FlatScene::cameraMediumBound.
+static bool s_isCameraMediumBound(const pbrt_flatten::FlatScene& scene, const pbrt_flatten::Sphere& s) {
+    if (std::fabs(s.radius - scene.cameraMediumBound[3]) > 1e-9 * std::max(1.0, s.radius)) return false;
+    for (int a = 0; a < 3; ++a) if (std::fabs(s.center[a] - scene.cameraMediumBound[a]) > 1e-9 * std::max(1.0, std::fabs(s.center[a]))) return false;
+    return true;
+}
+
 void PbrtSceneLoader::loadPbrtSpheres(const pbrt_flatten::FlatScene& scene, const std::vector<pbrt_flatten::Sphere>& sphereList, const PbrtToWorldFn& toWorld,
     const PbrtMaterialForFn& materialFor, float sceneScale) {
     for (const pbrt_flatten::Sphere& sphereIn : sphereList) {
+        // The interface sphere that holds the camera medium (FlatScene::cameraMediumBound) is not a shape of its own: the fog is clipped to it (Uniforms::fogBoundCenter / Radius).
+        if (scene.cameraMediumBound[3] > 0.0 && s_isCameraMediumBound(scene, sphereIn)) continue;
         // An open shell cannot bound a medium: the CPU and OptiX drop it and draw the shell with its own surface material (Sphere::cpuMediumUnsupported), so do the same.
         pbrt_flatten::Sphere s = sphereIn;
         if (s.clipped && s.medium >= 0) s.medium = -1;

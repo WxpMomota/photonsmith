@@ -163,9 +163,17 @@ inline bool scatterInGlobalMedium(thread const KernelRes& R, thread PathState& P
         const float shadowSigmaT = inGlass ? 0.0f : fogSigmaTHere;
         shadowSpherePayload.shadowChannel = inGlass ? glassChan : fogChan;
         float surfaceDist = (result.type == intersection_type::none) ? INFINITY : result.distance;
+        // The camera fog may end at a sphere (FlatScene::cameraMediumBound): only the part of the flight inside it can collide, so the flight is drawn from where it enters and
+        // counts as a collision only before it leaves (a glass medium fills its whole flight).
+        float flightStart = 0.0f, flightEnd = surfaceDist;
+        if (!inGlass && uniforms.fogBoundRadius > 0.0f) {
+            const float fogLen = fogLength(uniforms, rayOrigin, rayDir, surfaceDist, flightStart);
+            flightEnd = flightStart + fogLen;
+            if (!(fogLen > 0.0f)) flightEnd = -1.0f;   // the ray misses the fog: nothing to collide with
+        }
         float u = randFloat(rngState);
-        float t = sampleFreePathDistance(u, curSigmaT);
-        if (t < surfaceDist) {
+        float t = flightStart + sampleFreePathDistance(u, curSigmaT);
+        if (t < flightEnd) {
             if (lastBounce) return false;   // emission-only step: no scattering, the path ends
             scatteredInMedium = true;
             fromMediumScatter = true;   // the camera fog and glass interiors do no image-sky light sampling: the continuation ray's escape takes the whole sky
@@ -218,7 +226,8 @@ inline bool scatterInGlobalMedium(thread const KernelRes& R, thread PathState& P
                     float phaseValue = henyeyGreensteinPhase(dot(wo, wi), curG);
                     float weight = (pdfSolidAngle * pdfSolidAngle)
                         / (pdfSolidAngle * pdfSolidAngle + phaseValue * phaseValue);
-                    float transmittance = exp(-shadowSigmaT * dist);
+                    float tin;
+                    float transmittance = exp(-shadowSigmaT * (inGlass ? dist : fogLength(uniforms, shadowRay.origin, shadowRay.direction, dist, tin)));
                     // `* curAlbedo`: this scattering
                     // event's own albedo weight - the SAME real bug
                     // materialType 28's own NEE block once had
@@ -254,7 +263,8 @@ inline bool scatterInGlobalMedium(thread const KernelRes& R, thread PathState& P
                     traceShadowAnyP(isect, plShadowRay, accelStructure, functionTable, shadowSpherePayload);
                 if (plShadowResult.type == intersection_type::none) {
                     float plPhaseValue = henyeyGreensteinPhase(dot(wo, plWi), curG);
-                    float plTransmittance = exp(-shadowSigmaT * plDist);
+                    float plTin;
+                    float plTransmittance = exp(-shadowSigmaT * (inGlass ? plDist : fogLength(uniforms, plShadowRay.origin, plShadowRay.direction, plDist, plTin)));
                     float plSpot = spotLightFalloff(-plWi, float3(pl.direction), pl.cosOuterAngle, pl.cosInnerAngle);
                     radiance += throughput * curAlbedo * plPhaseValue * float3(pl.emission) * plSpot * plTransmittance / plDistSq;
                 }
@@ -263,7 +273,7 @@ inline bool scatterInGlobalMedium(thread const KernelRes& R, thread PathState& P
             // Directional lights: summed unconditionally, not
             // picked - see DirectionalLight's own comment. No
             // distance falloff, but fog attenuation now DOES
-            // apply, using rayBoxExitDistance() as the real path
+            // apply, using fogExitLength() as the real path
             // length - see that function's own comment.
             for (uint dli = 0; dli < uniforms.directionalLightCount; ++dli) {
                 DirectionalLight dl = directionalLights[dli];
@@ -277,7 +287,7 @@ inline bool scatterInGlobalMedium(thread const KernelRes& R, thread PathState& P
                     traceShadowAnyP(isect, dlShadowRay, accelStructure, functionTable, shadowSpherePayload);
                 if (dlShadowResult.type == intersection_type::none) {
                     float dlPhaseValue = henyeyGreensteinPhase(dot(wo, dlWi), curG);
-                    float dlExitDist = inGlass ? 0.0f : rayBoxExitDistance(scatterPoint, dlWi, kRoomBoundsMin, kRoomBoundsMax);
+                    float dlExitDist = inGlass ? 0.0f : fogExitLength(uniforms, scatterPoint, dlWi);
                     float dlTransmittance = exp(-shadowSigmaT * dlExitDist);
                     radiance += throughput * curAlbedo * dlPhaseValue * float3(dl.emission) * dlTransmittance;
                 }
@@ -306,7 +316,8 @@ inline bool scatterInGlobalMedium(thread const KernelRes& R, thread PathState& P
                         traceShadowAnyP(isect, pjShadowRay, accelStructure, functionTable, shadowSpherePayload);
                     if (pjShadowResult.type == intersection_type::none) {
                         float pjPhaseValue = henyeyGreensteinPhase(dot(wo, pjWi), curG);
-                        float pjTransmittance = exp(-shadowSigmaT * pjDist);
+                        float pjTin;
+                        float pjTransmittance = exp(-shadowSigmaT * (inGlass ? pjDist : fogLength(uniforms, pjShadowRay.origin, pjShadowRay.direction, pjDist, pjTin)));
                         radiance += throughput * curAlbedo * pjPhaseValue * pjRadiance * pjTransmittance / pjDistSq;
                     }
                 }
@@ -334,7 +345,8 @@ inline bool scatterInGlobalMedium(thread const KernelRes& R, thread PathState& P
                         traceShadowAnyP(isect, glShadowRay, accelStructure, functionTable, shadowSpherePayload);
                     if (glShadowResult.type == intersection_type::none) {
                         float glPhaseValue = henyeyGreensteinPhase(dot(wo, glWi), curG);
-                        float glTransmittance = exp(-shadowSigmaT * glDist);
+                        float glTin;
+                        float glTransmittance = exp(-shadowSigmaT * (inGlass ? glDist : fogLength(uniforms, glShadowRay.origin, glShadowRay.direction, glDist, glTin)));
                         radiance += throughput * curAlbedo * glPhaseValue * glRadiance * glTransmittance / glDistSq;
                     }
                 }

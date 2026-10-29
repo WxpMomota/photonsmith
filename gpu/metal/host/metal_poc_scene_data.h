@@ -188,6 +188,9 @@ struct PbrtSceneLoader {
     bool pbrtFogChromatic = false;
     float3 pbrtFogAlbedo{1, 1, 1};
     float pbrtFogAsymmetryG = 0.0f;
+    // The camera medium ends at a sphere (FlatScene::cameraMediumBound), in the Metal world; radius 0 = it fills all of space.
+    float3 pbrtFogBoundCenter{0, 0, 0};
+    float pbrtFogBoundRadius = 0.0f;
 
     // pbrt-v4 Film "maxcomponentvalue" (FlatScene::maxComponentValue), applied by
     // the kernel as a per-sample firefly clamp. 1e9 = pbrt's default (unbounded).

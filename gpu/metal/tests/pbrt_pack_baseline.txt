@@ -75,7 +75,9 @@ emissive-sphere-occluder 0.9999 0.9998 0.9998
 equal-area-sky 1.0059 1.0145 1.0037
 example-cornell 1.0072 1.0103 1.0168
 film-iso-shutter 1.0003 1.0008 1.0004
+fire-around-ball 0.9290 0.9740 0.9872  # known: a volume with things inside it (a ball sunk in the ground inside a fire's interface sphere). Metal samples a volume only on its boundary sphere's chord, as OptiX did before the wavefront renderer's volume list (docs/GPU_SCENE_COMMON.md, Windows to Mac 2026-10-27): it reads 7% dark; the CPU and OptiX read 1.00
 flush-ceiling-light 1.0001 1.0001 1.0001
+fog-around-objects 0.9543 0.9733 0.9810  # known: a fog with objects inside it (the same chord-only sampling as fire-around-ball); Metal reads 4.6% dark, the CPU and OptiX 1.00
 fog-furnace 0.9994 0.9992 0.9987
 fog-point-light 1.0023 1.0022 1.0023
 fuzzed-metal-furnace 0.9996 0.9996 0.9996
@@ -91,6 +93,7 @@ infinite-light 0.9980 1.0003 0.9994
 infinite-light-image 1.0030 1.0189 1.0021
 instanced-spheres 1.0070 1.0100 1.0170
 killeroo-simple 0.9861 0.9862 0.9885
+lamp-in-fog-with-objects 0.9746 0.9981 1.0062
 lamp-inside-glass 1.0018 1.0018 1.0017
 lamp-inside-rough-glass 1.0018 1.0018 1.0021
 large-area-light-room 1.0016 1.0016 1.0016
@@ -135,6 +138,7 @@ rough-glass-lamp 1.0025 1.0023 1.0024
 rough-metal-lamp 0.9969 1.0012 1.0049
 rough-metal-spheres 0.9999 0.9999 0.9999
 simple-light 0.9980 0.9989 0.9974
+smoke-around-camera 1.3612 1.3329 1.2465  # known: by design the reference ratio is not 1 (pbrt-v4 shows no smoke here, this project does: the table's 1.318); the CPU and OptiX share it, and Metal reads 1.36 1.33 1.25, 3 to 4% above the CPU, with the same chord-only sampling as fire-around-ball
 spectral-gamut-saturation 1.0039 0.9990 0.9994
 spherical-camera 1.0049 1.0067 1.0132
 spherical-camera-scene 1.0032 0.9981 0.9992
@@ -146,6 +150,7 @@ subsurface-sky-ball 0.9996 0.9997 0.9992
 subsurface-slab 0.9990 0.9940 0.9903
 subsurface-small-ball 0.9998 0.9999 0.9998
 subsurface-textured-sky-ball 1.0142 0.9738 0.9906
+sunbeams-in-mist 1.0090 1.0254 1.0247
 texture-encoding-wrap-invert 0.9960 0.9804 0.9958
 texture-graph 1.0042 1.0056 1.0035
 texture-graph-scalars 1.0038 1.0019 1.0028
@@ -155,6 +160,7 @@ texture-mix-amount 0.9993 0.9994 0.9994
 texture-params 1.0027 1.0011 1.0018
 textured-twosided-lights 0.9867 0.9912 0.9931
 thin-dielectric-medium 0.9993 1.0001 0.9848
+thin-glass-tank 1.0075 1.0035 1.0012
 triangle-fan-light 0.9996 0.9999 1.0013
 triangle-mesh-scene 1.0029 0.9998 1.0002
 trianglemesh-uv 1.0000 0.9999 1.0000

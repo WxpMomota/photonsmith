@@ -97,7 +97,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
                 float pdfBsdf = layeredCoatedConductorPdf(woLocal, wiLocal, mat.ior, alpha, conductorEta, conductorK, baseAlpha, coatMed);
                 float weight = (pdfSolidAngle * pdfSolidAngle)
                     / (pdfSolidAngle * pdfSolidAngle + pdfBsdf * pdfBsdf);
-                float3 transmittance = fogTransmittance(uniforms, dist);
+                float3 transmittance = fogTransmittanceAlong(uniforms, shadowRay.origin, shadowRay.direction, dist);
                 radiance += throughput * f * ls.emission * cosSurface * transmittance / pdfSolidAngle * weight;
             }
         }
@@ -121,7 +121,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
                 if (plShadowResult.type == intersection_type::none) {
                     float3 plWiLocal = float3(dot(plWi, tangent), dot(plWi, bitangent), dot(plWi, facingNormal));
                     float3 plF = layeredCoatedConductorF(plWiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatMed);
-                    float3 plTransmittance = fogTransmittance(uniforms, plDist);
+                    float3 plTransmittance = fogTransmittanceAlong(uniforms, plShadowRay.origin, plShadowRay.direction, plDist);
                     float plSpot = spotLightFalloff(-plWi, float3(pl.direction), pl.cosOuterAngle, pl.cosInnerAngle);
                     radiance += throughput * plF * float3(pl.emission) * plCosSurface * plSpot * plTransmittance / plDistSq;
                 }
@@ -148,7 +148,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
                     // room bounds (see that function.s own comment for
                     // why calling it unconditionally is unsafe).
                     float3 dlTransmittance = (uniforms.fogSigmaT > 0.0)
-                        ? fogTransmittance(uniforms, rayBoxExitDistance(dlShadowRay.origin, dlWi, kRoomBoundsMin, kRoomBoundsMax))
+                        ? fogTransmittance(uniforms, fogExitLength(uniforms, dlShadowRay.origin, dlWi))
                         : float3(1.0);
                     radiance += throughput * dlF * float3(dl.emission) * dlCosSurface * dlTransmittance;
                 }
@@ -178,7 +178,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
                     if (pjShadowResult.type == intersection_type::none) {
                         float3 pjWiLocal = float3(dot(pjWi, tangent), dot(pjWi, bitangent), dot(pjWi, facingNormal));
                         float3 pjF = layeredCoatedConductorF(pjWiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatMed);
-                        float3 pjTransmittance = fogTransmittance(uniforms, pjDist);
+                        float3 pjTransmittance = fogTransmittanceAlong(uniforms, pjShadowRay.origin, pjShadowRay.direction, pjDist);
                         radiance += throughput * pjF * pjRadiance * pjCosSurface * pjTransmittance / pjDistSq;
                     }
                 }
@@ -208,7 +208,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
                     if (glShadowResult.type == intersection_type::none) {
                         float3 glWiLocal = float3(dot(glWi, tangent), dot(glWi, bitangent), dot(glWi, facingNormal));
                         float3 glF = layeredCoatedConductorF(glWiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatMed);
-                        float3 glTransmittance = fogTransmittance(uniforms, glDist);
+                        float3 glTransmittance = fogTransmittanceAlong(uniforms, glShadowRay.origin, glShadowRay.direction, glDist);
                         radiance += throughput * glF * glRadiance * glCosSurface * glTransmittance;
                     }
                 }
@@ -384,7 +384,7 @@ inline bool shadeVelvet(TriangleMaterial mat, float3 albedo, float3 hitPoint, fl
                 float pdfSolidAngle = (distSq / (ls.area * abs(cosLight))) * ls.pmf;
                 float weight = (pdfSolidAngle * pdfSolidAngle)
                     / (pdfSolidAngle * pdfSolidAngle + uniformPdf * uniformPdf);
-                float3 transmittance = fogTransmittance(uniforms, dist);
+                float3 transmittance = fogTransmittanceAlong(uniforms, shadowRay.origin, shadowRay.direction, dist);
                 radiance += throughput * albedo * velvetF(woWorld, wi, facingNormal, mat.ior)
                             * ls.emission * cosSurface * transmittance / pdfSolidAngle * weight;
             }
@@ -407,7 +407,7 @@ inline bool shadeVelvet(TriangleMaterial mat, float3 albedo, float3 hitPoint, fl
                 intersection_result<instancing, triangle_data> plShadowResult =
                     traceShadowAnyM(isect, plShadowRay, accelStructure, functionTable, mat);
                 if (plShadowResult.type == intersection_type::none) {
-                    float3 plTransmittance = fogTransmittance(uniforms, plDist);
+                    float3 plTransmittance = fogTransmittanceAlong(uniforms, plShadowRay.origin, plShadowRay.direction, plDist);
                     float plSpot = spotLightFalloff(-plWi, float3(pl.direction), pl.cosOuterAngle, pl.cosInnerAngle);
                     radiance += throughput * albedo * velvetF(woWorld, plWi, facingNormal, mat.ior)
                                 * float3(pl.emission) * plCosSurface * plSpot * plTransmittance / plDistSq;
@@ -433,7 +433,7 @@ inline bool shadeVelvet(TriangleMaterial mat, float3 albedo, float3 hitPoint, fl
                     // room bounds (see that function.s own comment for
                     // why calling it unconditionally is unsafe).
                     float3 dlTransmittance = (uniforms.fogSigmaT > 0.0)
-                        ? fogTransmittance(uniforms, rayBoxExitDistance(dlShadowRay.origin, dlWi, kRoomBoundsMin, kRoomBoundsMax))
+                        ? fogTransmittance(uniforms, fogExitLength(uniforms, dlShadowRay.origin, dlWi))
                         : float3(1.0);
                     radiance += throughput * albedo * velvetF(woWorld, dlWi, facingNormal, mat.ior)
                                 * float3(dl.emission) * dlCosSurface * dlTransmittance;
@@ -462,7 +462,7 @@ inline bool shadeVelvet(TriangleMaterial mat, float3 albedo, float3 hitPoint, fl
                     intersection_result<instancing, triangle_data> pjShadowResult =
                         traceShadowAnyM(isect, pjShadowRay, accelStructure, functionTable, mat);
                     if (pjShadowResult.type == intersection_type::none) {
-                        float3 pjTransmittance = fogTransmittance(uniforms, pjDist);
+                        float3 pjTransmittance = fogTransmittanceAlong(uniforms, pjShadowRay.origin, pjShadowRay.direction, pjDist);
                         radiance += throughput * albedo * velvetF(woWorld, pjWi, facingNormal, mat.ior)
                                     * pjRadiance * pjCosSurface * pjTransmittance / pjDistSq;
                     }
@@ -491,7 +491,7 @@ inline bool shadeVelvet(TriangleMaterial mat, float3 albedo, float3 hitPoint, fl
                     intersection_result<instancing, triangle_data> glShadowResult =
                         traceShadowAnyM(isect, glShadowRay, accelStructure, functionTable, mat);
                     if (glShadowResult.type == intersection_type::none) {
-                        float3 glTransmittance = fogTransmittance(uniforms, glDist);
+                        float3 glTransmittance = fogTransmittanceAlong(uniforms, glShadowRay.origin, glShadowRay.direction, glDist);
                         radiance += throughput * albedo * velvetF(woWorld, glWi, facingNormal, mat.ior)
                                     * glRadiance * glCosSurface * glTransmittance / glDistSq;
                     }
@@ -1138,7 +1138,7 @@ inline bool shadeMeasured(TriangleMaterial mat, float3 hitPoint, float3 facingNo
                 if (traceShadowAnyM(isect, shadowRay, accelStructure, functionTable, mat).type == intersection_type::none) {
                     float pdfSolidAngle = (distSq / (ls.area * abs(cosLight))) * ls.pmf;
                     float weight = (pdfSolidAngle * pdfSolidAngle) / (pdfSolidAngle * pdfSolidAngle + pdfBsdf * pdfBsdf);
-                    float3 transmittance = fogTransmittance(uniforms, dist);
+                    float3 transmittance = fogTransmittanceAlong(uniforms, shadowRay.origin, shadowRay.direction, dist);
                     radiance += throughput * f * ls.emission * cosSurface * transmittance / pdfSolidAngle * weight;
                 }
             }
@@ -1162,7 +1162,7 @@ inline bool shadeMeasured(TriangleMaterial mat, float3 hitPoint, float3 facingNo
                     reaimShadowRay(shadowRay, hitPoint, pDist);
                     if (traceShadowAnyM(isect, shadowRay, accelStructure, functionTable, mat).type == intersection_type::none) {
                         float spot = spotLightFalloff(-pWi, float3(pl.direction), pl.cosOuterAngle, pl.cosInnerAngle);
-                        radiance += throughput * f * float3(pl.emission) * pCos * spot * fogTransmittance(uniforms, pDist) / pDistSq;
+                        radiance += throughput * f * float3(pl.emission) * pCos * spot * fogTransmittanceAlong(uniforms, shadowRay.origin, shadowRay.direction, pDist) / pDistSq;
                     }
                 }
             }
@@ -1182,7 +1182,7 @@ inline bool shadeMeasured(TriangleMaterial mat, float3 hitPoint, float3 facingNo
                     shadowRay.max_distance = kDirectionalLightMaxDistance;
                     if (traceShadowAnyM(isect, shadowRay, accelStructure, functionTable, mat).type == intersection_type::none) {
                         float3 dTrans = (uniforms.fogSigmaT > 0.0)
-                            ? fogTransmittance(uniforms, rayBoxExitDistance(shadowRay.origin, dWi, kRoomBoundsMin, kRoomBoundsMax))
+                            ? fogTransmittance(uniforms, fogExitLength(uniforms, shadowRay.origin, dWi))
                             : float3(1.0);
                         radiance += throughput * f * float3(dl.emission) * dCos * dTrans;
                     }
@@ -1210,7 +1210,7 @@ inline bool shadeMeasured(TriangleMaterial mat, float3 hitPoint, float3 facingNo
                     shadowRay.max_distance = pDist - 0.002f;
                     reaimShadowRay(shadowRay, hitPoint, pDist);
                     if (traceShadowAnyM(isect, shadowRay, accelStructure, functionTable, mat).type == intersection_type::none)
-                        radiance += throughput * f * pjRadiance * pCos * fogTransmittance(uniforms, pDist) / pDistSq;
+                        radiance += throughput * f * pjRadiance * pCos * fogTransmittanceAlong(uniforms, shadowRay.origin, shadowRay.direction, pDist) / pDistSq;
                 }
             }
         }
@@ -1235,7 +1235,7 @@ inline bool shadeMeasured(TriangleMaterial mat, float3 hitPoint, float3 facingNo
                     shadowRay.max_distance = gDist - 0.002f;
                     reaimShadowRay(shadowRay, hitPoint, gDist);
                     if (traceShadowAnyM(isect, shadowRay, accelStructure, functionTable, mat).type == intersection_type::none)
-                        radiance += throughput * f * glRadiance * gCos * fogTransmittance(uniforms, gDist) / gDistSq;
+                        radiance += throughput * f * glRadiance * gCos * fogTransmittanceAlong(uniforms, shadowRay.origin, shadowRay.direction, gDist) / gDistSq;
                 }
             }
         }
