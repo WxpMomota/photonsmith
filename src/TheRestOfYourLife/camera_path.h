@@ -416,7 +416,7 @@ inline void add_direct_lighting(const camera& cam, const hittable& world, const 
         vec3   light_dir = light_pdf.generate();
         double pdf_l     = light_pdf.value(light_dir);
         if (pdf_l > 0.0) {
-            ray    shadow_ray(rec.p, light_dir, current_ray.time());
+            ray    shadow_ray(shadow_origin(rec, light_dir), light_dir, current_ray.time());
             double f_pdf = rec.mat->scattering_pdf(current_ray, rec, shadow_ray);
             if (f_pdf > 0.0) {
                 double pdf_b_at_l = srec.mis_pdf().value(light_dir);
@@ -462,7 +462,7 @@ inline void add_direct_lighting(const camera& cam, const hittable& world, const 
         if (portal->sample_li(ru, rv, rec.p.x(), rec.p.y(), rec.p.z(),
                                wx, wy, wz, pdf_portal) && pdf_portal > 0.0) {
             vec3 portal_dir(wx, wy, wz);
-            ray  portal_shadow(rec.p, portal_dir, current_ray.time());
+            ray  portal_shadow(shadow_origin(rec, portal_dir), portal_dir, current_ray.time());
             double f_pdf = rec.mat->scattering_pdf(current_ray, rec, portal_shadow);
             if (f_pdf > 0.0) {
                 double pdf_b_at_portal = srec.mis_pdf().value(portal_dir);
@@ -488,7 +488,7 @@ inline void add_direct_lighting(const camera& cam, const hittable& world, const 
         vec3   sky_dir  = sky_smp.direction;
         double pdf_sky  = sky_smp.pdf;
         if (pdf_sky > 0.0) {
-            ray    sky_shadow(rec.p, sky_dir, current_ray.time());
+            ray    sky_shadow(shadow_origin(rec, sky_dir), sky_dir, current_ray.time());
             double f_pdf = rec.mat->scattering_pdf(current_ray, rec, sky_shadow);
             if (f_pdf > 0.0) {
                 double pdf_b_at_sky = srec.mis_pdf().value(sky_dir);
@@ -517,7 +517,7 @@ inline void add_direct_lighting(const camera& cam, const hittable& world, const 
         punct_lights->for_each_sample(rec.p, [&](const PunctualLiSample& ps) {
             if (ps.Li.x() <= 0 && ps.Li.y() <= 0 && ps.Li.z() <= 0) return;
             if (!light_link::covers(ps.illuminates, rec.mat->link_group)) return;   // (light linking)
-            ray punct_ray(rec.p, ps.wi, current_ray.time());
+            ray punct_ray(shadow_origin(rec, ps.wi), ps.wi, current_ray.time());
             double f_pdf = rec.mat->scattering_pdf(current_ray, rec, punct_ray);
             if (f_pdf <= 0.0) return;
             hit_record shadow_rec;
@@ -914,7 +914,7 @@ inline void add_direct_lighting_spectral(const camera& cam, const hittable& worl
         vec3   light_dir = light_pdf.generate();
         double pdf_l     = light_pdf.value(light_dir);
         if (pdf_l > 0.0) {
-            ray    shadow_ray(rec.p, light_dir, current_ray.time());
+            ray    shadow_ray(shadow_origin(rec, light_dir), light_dir, current_ray.time());
             double f_pdf = scattering_pdf_at(shadow_ray);
             if (f_pdf > 0.0) {
                 double pdf_b_at_l = srec.mis_pdf().value(light_dir);
@@ -945,7 +945,7 @@ inline void add_direct_lighting_spectral(const camera& cam, const hittable& worl
         if (portal->sample_li(ru, rv, rec.p.x(), rec.p.y(), rec.p.z(),
                                wx, wy, wz, pdf_portal) && pdf_portal > 0.0) {
             vec3 portal_dir(wx, wy, wz);
-            ray  portal_shadow(rec.p, portal_dir, current_ray.time());
+            ray  portal_shadow(shadow_origin(rec, portal_dir), portal_dir, current_ray.time());
             double f_pdf = scattering_pdf_at(portal_shadow);
             if (f_pdf > 0.0) {
                 double pdf_b_at_portal = srec.mis_pdf().value(portal_dir);
@@ -970,7 +970,7 @@ inline void add_direct_lighting_spectral(const camera& cam, const hittable& worl
         vec3   sky_dir  = sky_smp.direction;
         double pdf_sky  = sky_smp.pdf;
         if (pdf_sky > 0.0) {
-            ray    sky_shadow(rec.p, sky_dir, current_ray.time());
+            ray    sky_shadow(shadow_origin(rec, sky_dir), sky_dir, current_ray.time());
             double f_pdf = scattering_pdf_at(sky_shadow);
             if (f_pdf > 0.0) {
                 double pdf_b_at_sky = srec.mis_pdf().value(sky_dir);
@@ -994,7 +994,7 @@ inline void add_direct_lighting_spectral(const camera& cam, const hittable& worl
         punct_lights->for_each_sample(rec.p, [&](const PunctualLiSample& ps) {
             if (ps.Li.x() <= 0 && ps.Li.y() <= 0 && ps.Li.z() <= 0) return;
             if (!light_link::covers(ps.illuminates, rec.mat->link_group)) return;   // (light linking)
-            ray punct_ray(rec.p, ps.wi, current_ray.time());
+            ray punct_ray(shadow_origin(rec, ps.wi), ps.wi, current_ray.time());
             double f_pdf = scattering_pdf_at(punct_ray);
             if (f_pdf <= 0.0) return;
             hit_record shadow_rec;

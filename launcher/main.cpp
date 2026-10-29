@@ -94,6 +94,7 @@ extern char** environ;
 #include "launcher/cartoon_worker.h"
 #include "launcher/toon_frame.h"
 #include "launcher/marks_frame.h"   // a scene's cartoon marks, drawn over the finished picture
+#include "launcher/onion_frame.h"   // --film-onion: an onion-skin sheet of a stretch of a film
 #include "launcher/video_render.h"   // --video, --assemble-video
 #ifdef RT_HAVE_AVFOUNDATION_ENCODER
 #include "launcher/video_encoder_mac.h"   // Video -> MP4 via AVFoundation, no ffmpeg needed
@@ -1235,6 +1236,8 @@ int main(int argc, char** argv) {
 		std::cout << "spheres" << '\t' << seen << "\t(the most medium spheres in one frame checked)" << std::endl;
 		return EXIT_SUCCESS;
 	}
+	// `ray_tracer --film-onion <key> T0 T1 OUT.png [W H] [EVERY]`: an onion-skin sheet of a stretch of a film - ghosts and motion paths (onion_frame.h)
+	if (argc >= 2 && std::string(argv[1]) == "--film-onion") return onion_frame::run(argc, argv);
 	// `ray_tracer --film-scene <key>@<seconds> OUT.pbrt`: writes the scene text of a film's frame at that time (what a render of `cartoon:<key>@<seconds>` draws), to look
 	// into or render by itself. Relative paths in it (Include, pictures) are the film cache's absolute ones or relative to the film's scenes folder.
 	if (argc >= 2 && std::string(argv[1]) == "--film-scene") {

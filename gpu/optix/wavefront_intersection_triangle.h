@@ -290,5 +290,20 @@ extern "C" __global__ void __closesthit__wf_triangle() {
 	payload->objDpdu     = tri_dpdu;
 	payload->uv_u        = uv_u;
 	payload->uv_v        = uv_v;
+	// The shadow terminator offset (src/shared/shadow_terminator.h): the lift to the round surface the vertex normals describe, for the shadow rays near the
+	// terminator (wf_terminator_from) - only for a material that asks for it
+	const float terminatorCutoff = wf_params.materials[tri.materialIdx].terminatorOffset;
+	if (terminatorCutoff > 0.0f && tri.hasNormals) {
+		float3 ng = normalize(cross(tri.p1 - tri.p0, tri.p2 - tri.p0));
+		if (dot(geometricOnRaySide, instBase >= 0 ? normalize(optixTransformNormalFromObjectToWorldSpace(ng)) : ng) < 0.0f) ng = -ng;   // (on the ray's side)
+		const float V[3][3] = {{tri.p0.x, tri.p0.y, tri.p0.z}, {tri.p1.x, tri.p1.y, tri.p1.z}, {tri.p2.x, tri.p2.y, tri.p2.z}};
+		const float N[3][3] = {{tri.n0.x, tri.n0.y, tri.n0.z}, {tri.n1.x, tri.n1.y, tri.n1.z}, {tri.n2.x, tri.n2.y, tri.n2.z}};
+		const float g[3] = {ng.x, ng.y, ng.z};
+		float out[3];
+		shadow_terminator::lift(V, N, b0, b1, b2, g, out);
+		float3 lift = make_float3(out[0], out[1], out[2]);
+		if (instBase >= 0) lift = optixTransformVectorFromObjectToWorldSpace(lift);
+		payload->terminator = make_float4(lift.x, lift.y, lift.z, terminatorCutoff);
+	}
 }
 

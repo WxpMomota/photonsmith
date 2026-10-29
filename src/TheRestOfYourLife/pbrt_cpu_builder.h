@@ -208,6 +208,7 @@ private:
 		if (base) {   // light linking (light_link.h): the shapes' group, and for an emitter the groups it lights (made per material and area light: cachedMaterial)
 			base->link_group = m.linkGroup;
 			base->bevel_radius = m.bevel;   // (rounded edges: bevel.h)
+			base->terminator_offset = m.terminator;   // (round shadows on coarse smooth meshes: shadow_terminator.h)
 			base->camera_visible = m.cameraVisible, base->casts_shadow = m.castsShadow;   // (ray visibility)
 			if (em) base->lights_groups = em->illuminates, base->light_group = em->lightGroup;
 			base->material_index = materialIndex;   // (the ID passes: aov_pass.h)

@@ -980,7 +980,7 @@ inline ray camera::get_ray(int i, int j, int /*s_i*/, int /*s_j*/, const vec3& o
                                  + ((j + offset.y()) * local_pixel_delta_v);
         point3 local_origin(0,0,0);
         if (defocus_angle > 0) {
-            auto p = random_in_unit_disk();
+            auto p = lens_point();
             local_origin = point3(0,0,0) + (p[0] * local_defocus_disk_u) + (p[1] * local_defocus_disk_v);
         }
         auto local_direction = local_pixel_sample - local_origin;

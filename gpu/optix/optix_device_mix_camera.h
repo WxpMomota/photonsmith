@@ -1,4 +1,5 @@
 #pragma once
+#include "aperture_device.h"   // the aperture's blades (generate_primary_ray)
 // optix_device_mix_camera.h -- part 5 of 5 of optix_device_helpers.h (included by it, in order; not meant to be included on its own).
 
 // True for the 7 MaterialTypes that need sphere/box-specific handling -
@@ -306,6 +307,10 @@ __device__ __forceinline__ void generate_primary_ray(
 					   cam.localDefocusDiskV.x != 0.0f || cam.localDefocusDiskV.y != 0.0f || cam.localDefocusDiskV.z != 0.0f);
 		if (hasDOF) {
 			float3 p = random_in_unit_disk(seed);
+			if (gpu_aperture_shaped(cam)) {   // (its blades' polygon: aperture_device.h)
+				const float a = random_float(seed), b = random_float(seed);
+				gpu_aperture_point(cam, a, b, p.x, p.y);
+			}
 			local_origin = p.x * cam.localDefocusDiskU + p.y * cam.localDefocusDiskV;
 		}
 		float3 local_direction = local_pixel_sample - local_origin;
@@ -391,6 +396,10 @@ __device__ __forceinline__ void generate_primary_ray(
 			float3 lens = make_float3(0.0f, 0.0f, 0.0f);
 			if (hasDOF) {
 				float3 p = random_in_unit_disk(seed);
+				if (gpu_aperture_shaped(cam)) {   // (its blades' polygon: aperture_device.h)
+					const float a = random_float(seed), b = random_float(seed);
+					gpu_aperture_point(cam, a, b, p.x, p.y);
+				}
 				lens = p.x * cam.defocus_disk_u + p.y * cam.defocus_disk_v;
 			}
 			origin = cam.origin + lens;

@@ -13,6 +13,7 @@
 
 #include "rtweekend.h"
 #include "aabb.h"
+#include "../shared/shadow_terminator.h"
 
 
 class material;
@@ -28,6 +29,10 @@ class hit_record {
     // does not fill them in. `smooth_shading_normals`: the surface has shading normals (a triangle mesh with vertex normals), whose tangents pbrt re-orthogonalises to the normal.
     vec3 dndu, dndv;
     bool smooth_shading_normals = false;
+    // The shadow terminator offset (src/shared/shadow_terminator.h): on a smooth-shaded triangle whose material asks for it (`terminator` its cutoff, 0: none),
+    // the lift from the facet to the round surface and the facet's normal on the ray's side - see shadow_origin().
+    double terminator = 0.0;
+    vec3 terminator_lift, terminator_ng;
     shared_ptr<material> mat;
     double t;
     double u;
@@ -57,6 +62,18 @@ class hit_record {
         normal = front_face ? outward_normal : -outward_normal;
     }
 };
+
+
+// Where a shadow ray from the hit towards `dir` starts: the hit point, lifted towards the round surface a smooth-shaded mesh's normals describe when the ray is
+// near the terminator and the material asks for it (shadow_terminator.h, Cycles' shadow_ray_offset; a transmitted shadow ray is left as it was).
+inline point3 shadow_origin(const hit_record& rec, const vec3& dir) {
+    if (rec.terminator <= 0.0) return rec.p;
+    const vec3 L = unit_vector(dir);
+    const double nl = dot(rec.normal, L);
+    if (nl <= 0.0) return rec.p;
+    const double a = shadow_terminator::amount(nl, dot(rec.terminator_ng, L), rec.terminator);
+    return a > 0.0 ? rec.p + a * rec.terminator_lift : rec.p;
+}
 
 
 // AreaLightSample -- result of hittable::sample_area(): a uniformly-sampled

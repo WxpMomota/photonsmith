@@ -69,6 +69,7 @@ extern "C" __global__ void __raygen__wf_intersect() {
 	float traceTMin = ray.tMin;
 	for (int pass = 0; pass < 16; ++pass) {
 	payload.hit = false;
+	payload.terminator = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
 	optixTrace(
 		wf_params.traversable,
 		ray.origin,
@@ -202,6 +203,7 @@ extern "C" __global__ void __raygen__wf_intersect() {
 			h.uv_u        = payload.uv_u;
 			h.uv_v        = payload.uv_v;
 		}
+		h.terminator  = (!ambientScatter && listed < 0) ? payload.terminator : make_float4(0.0f, 0.0f, 0.0f, 0.0f);
 		h.rayOrigin   = ray.origin;
 		h.rayDir      = ray.direction;
 		for (int i = 0; i < kWFNWavelengths; ++i) {

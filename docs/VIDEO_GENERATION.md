@@ -856,6 +856,23 @@ the top, stretch down, squash. *Jiggle* hangs what dangles from a character's he
 All three are off unless a film asks, so a film without them draws exactly as before. A frame is still a function of its time: the springs run over the second
 before it (rig::follow).
 
+**Smear frames: `smear`.** `smear pip 1.5 multiples 3` (or `smear 1` for every character) draws a dash as Blender Studio's animators draw one: the character drawn out back along its way, its leading side where it is, over S frames' travel (0 off, up to 3), and with `multiples N` (up to 4) copies of it left along that way - the cartoon's multiples. Only at a dash's speed: none below 2.5 of its heights a second, all of it from 5, so a walk or a run is drawn as it is. On top of `squash`'s stretch (film_motion.h).
+
+**A rigid-body world: `rigid`.** As Blender's Rigid Body World (our own small solver: impulses with friction and bounce, sleeping; src/shared/cartoon/rigid_world.h), the scene's blocks become boxes and balls that fall, knock into each other and the ground, tumble and come to rest:
+
+```
+rigid b1 box 0.3 0.3 0.3 at 0 0.15 0                                # three blocks in a stack (each `# @anim bN` in the scene, its middle where `at` says)
+rigid b2 box 0.3 0.3 0.3 at 0 0.45 0
+rigid b3 box 0.3 0.3 0.3 at 0 0.75 0
+rigid ball sphere 0.15 at -2 0.15 0 start 0.5 velocity 5 0 0 mass 3   # a ball rolled into them at 0.5 s
+rigid apple sphere 0.08 at 0.6 1.6 0.4 start 1.2                   # an apple let go at 1.2 s
+```
+
+Each body rests where the scene has it, asleep, until something pushes it (`start T` with `velocity X Y Z` and `spin X Y Z` in degrees a second, or another body hitting it), so a stack stands until it is knocked. `turn DEG` (a box turned about the vertical, as the scene has it), `mass M`, `bounce B` (0..1), `friction F`, and `fixed` for a still obstacle the others hit. pbrt's coordinates, as `bounce` takes them; the ground is at 0. The world is worked out once from the film's start in steps of 1/480 s, so a frame is the same whichever is rendered first, and its hard landings are heard (film events). Boxes meet at their corners and faces (an edge resting on an edge is not caught).
+
+**Onion skins and motion paths: `--film-onion`.** `ray_tracer --film-onion pip-goes-out 1 4 sheet.png [960 540] [EVERY]` writes an animator's sheet of the stretch from 1 s to 4 s, as Blender's onion skinning and motion paths show one: the frame in the middle in a quick flat shading, faint ghosts of the characters every EVERY frames (3) before it in red and after it in green, and each character's path over every frame as a line with a dot a frame - dots far apart are fast, bunched are slow, so the spacing shows the easing. All seen by the middle frame's camera. It is made from the scene's first-hit passes on the CPU, not a render: about a second a frame for a big set, to check timing, arcs and spacing before rendering (launcher/onion_frame.h).
+
+**Shaped bokeh: `aperture ... blades`.** A shot's `aperture 0.05 blades 6 rotation 15` gives its lens six blades: out-of-focus lights are drawn as hexagons, as a real lens draws them; `ratio 1.5` squeezes the aperture into an anamorphic lens's tall ovals. A pbrt Camera's `"integer blades"`, `"float bladesrotation"` (degrees) and `"float apertureratio"` (our extension; Cycles' Blades, Rotation and Ratio, `src/shared/aperture_shape.h`); under 3 blades (the default) the aperture is round, as before. CPU and both OptiX renderers.
 **Weather and particles: `weather`, `particles`, `burst`.** (film_particles.h)
 
 ```
@@ -1862,6 +1879,8 @@ of four taps, 1, 4, 16, 64 pixels apart), at half the picture's size, on the lin
 thin cross on each of Crystal Heart's floating sparks.
 
 **A painting: `paint`.** `look paint 8` turns the picture into strokes of paint that follow its edges - an oil or gouache look with every edge kept sharp - by the anisotropic Kuwahara filter (Kyprianidis et al. 2009/2010; Blender's compositor Kuwahara node, "Anisotropic"): at each pixel an ellipse along the local edge is cut into eight sectors and the pixel takes the colour of the evenest ones, so a flat area becomes one stroke and the colour never smears across an edge. `paint SIZE` is the strokes' radius in pixels at a picture 1080 high (4 fine, 8 brushy, 16 bold); `paint-sharpness` (0-1, 0.5: how strongly the evenest sector wins), `paint-stretch` (0-2, 1: how far a stroke runs along an edge; 0 gives round dabs) and `paint-smoothness` (pixels at 1080, 4: how even the strokes' directions are). It runs first, on the linear picture, so the bloom, glints and grade go over the paint; it also wipes away a render's grain, so a painted film can use fewer samples. `src/shared/kuwahara.h`; it costs about a second a 1080p frame at size 8.
+
+**Round shadows on coarse characters: `terminator`.** A film's `terminator 0.1` puts `"float terminator" [ 0.1 ]` on every material of its frames: a smooth-shaded mesh's shadow rays near its terminator start from the round surface its normals describe (Cycles' shadow terminator offset, `src/shared/shadow_terminator.h`), so a low-poly character or prop under a low sun has a smooth shadow edge instead of notches along its facets. 0.1 is Blender's default; 0 (the default here) leaves the frames as they were. CPU and both OptiX renderers (docs/PBRT_SUPPORT.md).
 
 **God rays: `sunbeams`.** `look sunbeams 0.5` streaks the light of the sun or a lamp out across the frame from where it is, as Blender's compositor Sun Beams node does (`src/shared/sun_beams.h`): every pixel gathers the bright light (above `sunbeams-threshold`, linear luminance 1) along the line towards the source, `sunbeams-length` of the way (0.35), nearer light counting more. Where leaves or a window frame stand in front of the light, the gaps send out beams and the leaves the shadows between them - god rays for the cost of a blur, against tracing light through a mist. The source is the middle of the brightest light unless `sunbeams-at X Y` gives it (0..1 across and down, outside the picture for a sun just out of the frame).
 

@@ -20,6 +20,7 @@
 #include "../shared/cpu_gpu.h"  // kMaxMediumBoundaryCrossings
 #include "../shared/tone_map.h"
 #include "../shared/lens_look.h"   // camera::look
+#include "../shared/aperture_shape.h"   // camera::lens_point
 #include "../shared/film.h"     // clamp_sensor_rgb - camera::max_component_value's own comment
 #include "sky_light.h"
 #include "../shared/portal_image_infinite_light.h"   // PortalImageInfiniteLightData<double>
@@ -323,6 +324,9 @@ class camera {
 
     double defocus_angle = 0;  // Variation angle of rays through each pixel
     double focus_dist = 10;    // Distance from camera lookfrom point to plane of perfect focus
+    // The aperture's shape (src/shared/aperture_shape.h, Cycles'): its blades (fewer than 3: round), their rotation in degrees and the anamorphic ratio.
+    int    aperture_blades = 0;
+    double aperture_rotation = 0.0, aperture_ratio = 1.0;
 
     // Camera motion blur (pbrt-v4 AnimatedTransform, src/shared/
     // animated_transform.h) - when camera_is_animated is set, the camera-
@@ -601,9 +605,18 @@ class camera {
         return radius * random_in_unit_disk();
     }
 
+    // A random point of the aperture, in units of the lens radius: the unit disk, or the blades' polygon (aperture_shape.h), squeezed by the anamorphic ratio.
+    vec3 lens_point() const {
+        if (aperture_blades < 3 && aperture_ratio == 1.0) return random_in_unit_disk();   // (a round aperture: as it always was)
+        const vec3 disk = aperture_blades < 3 ? random_in_unit_disk() : vec3(0, 0, 0);
+        double x = 0.0, y = 0.0;
+        aperture_shape::sample(aperture_blades, aperture_rotation, aperture_ratio, random_double(), random_double(), disk.x(), disk.y(), x, y);
+        return vec3(x, y, 0);
+    }
+
     point3 defocus_disk_sample() const {
         // Returns a random point in the camera defocus disk.
-        auto p = random_in_unit_disk();
+        auto p = lens_point();
         return center + (p[0] * defocus_disk_u) + (p[1] * defocus_disk_v);
     }
 

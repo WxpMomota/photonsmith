@@ -289,6 +289,7 @@ add_executable(unit_tests
     unit/film_nature_tests.cpp
     unit/film_spectacle_tests.cpp
     unit/film_universe_tests.cpp
+    unit/film_blender3_tests.cpp
     unit/film_whole_tests.cpp
     unit/toon_look_tests.cpp
     unit/height_fog_tests.cpp
@@ -360,6 +361,7 @@ add_executable(cpu_integrator_tests
     unit/scene_lighting_tests.cpp
     unit/light_link_tests.cpp
     unit/bevel_tests.cpp
+    unit/shadow_terminator_tests.cpp
     unit/scene_projector_tests.cpp
     unit/scene_room_tests.cpp
     unit/material_from_photo_tests.cpp

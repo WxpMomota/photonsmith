@@ -8,6 +8,9 @@
 //             stretches as it falls, squashes as it lands and wobbles as it settles - keeping its volume. `squash 1` for every character (0 off, up to 2), `squash pip 1.5`.
 //   jiggle    follow-through: what dangles from a character (Pip's antennae) swings behind its head on a looser spring and settles - Blender artists' wiggle bones.
 //             `jiggle 1`, `jiggle pip 1.5` (0 off, up to 3).
+//   smear     smear frames, as Blender Studio's animators draw them for a dash: the character drawn out back along its way over S frames' travel (`smear 1`, `smear pip
+//             1.5`; 0 off, up to 3), and with `multiples N` (up to 4) copies of it left along that way - the cartoon's multiples. Only at a dash's speed (from 2.5
+//             heights a second, all of it from 5): a walk or a run is drawn as it is.
 //
 // All are off unless the film asks: a film without these lines draws exactly as before. A frame is still a function of its time: the springs run over the second before t
 // (rig::follow).
@@ -36,6 +39,25 @@ struct Amount {
 	std::string who;
 	double amount = 1.0;
 };
+// `smear [NAME] S [multiples N]`
+struct Smear {
+	std::string who;
+	double amount = 1.0;   // how many frames' travel the smear draws out behind it (0..3)
+	int multiples = 0;     // copies of it left along that way (0..4)
+};
+
+// A character's smear rule: its own line's, else the film's; null for none.
+inline const Smear *smearFor(const std::vector<Smear> &rules, const std::string &who) {
+	const Smear *all = nullptr, *own = nullptr;
+	for (const Smear &r : rules) {
+		if (r.who.empty()) all = &r;
+		else if (r.who == who) own = &r;
+	}
+	return own ? own : all;
+}
+
+// How much a smear is drawn at a speed (heights a second): none below 2.5, all of it from 5 - a run is not smeared, a dash is.
+inline double smearWeight(double heightsPerSecond) { return std::clamp((heightsPerSecond - 2.5) / 2.5, 0.0, 1.0); }
 
 // The time a character is drawn at for film time t: the frame it holds (the frame at or before t that is a multiple of its step, counted from the rule's start).
 inline double heldTime(const std::vector<Stepping> &rules, const std::string &who, double t, int fps) {
@@ -91,6 +113,33 @@ inline Mat4 squashStretch(const std::function<Vec3(double)> &placeAt, double t, 
 	const double resting = 1.0 - std::clamp((speed - 0.3) / 0.6, 0.0, 1.0);
 	const double k = 1.0 + amount * resting * std::clamp(2.5 * lag.y / size, -0.25, 0.25);
 	if (std::fabs(k - 1.0) > 1e-4) out = mul(stretchAbout(at, {0.0, 1.0, 0.0}, k), out);   // (about the feet: it squashes onto the ground)
+	return out;
+}
+
+// The smear frame's stretch of a character whose place over time is `placeAt` (story space; its feet), `height` tall: on a dash its body drawn out back along its way,
+// over `amount` frames' travel (at `fps`), from its leading side (which stays where it is), thinner across as it lengthens (its volume kept) - the elongated in-between
+// of Blender Studio's smear frames. None for a slower move (smearWeight).
+inline Mat4 smearStretch(const std::function<Vec3(double)> &placeAt, double t, double height, double amount, int fps) {
+	if (amount <= 0.0 || fps <= 0) return identity();
+	const double dt = 1.0 / 120.0, size = std::max(0.1, height);
+	const Vec3 at = placeAt(t), v = (placeAt(t + dt) - placeAt(t - dt)) * (1.0 / (2.0 * dt));
+	const double w = smearWeight(length(v) / size);
+	if (w <= 0.0) return identity();
+	const Vec3 d = normalize(v);
+	const Vec3 lead = at + Vec3{0.0, 0.5 * size, 0.0} + d * (0.5 * size);
+	const double trail = w * amount * length(v) / fps;   // (the way it went in `amount` frames)
+	return stretchAbout(lead, d, std::min(3.0, 1.0 + trail / size));
+}
+
+// The times a smear's multiples are drawn at: `count` copies of the character back along the way it went over `amount` frames, evenly - on a dash only (smearWeight
+// past a half, so that copies do not flicker in and out at the edge of it).
+inline std::vector<double> smearTimes(const std::function<Vec3(double)> &placeAt, double t, double height, double amount, int fps, int count) {
+	std::vector<double> out;
+	if (amount <= 0.0 || fps <= 0 || count <= 0) return out;
+	const double dt = 1.0 / 120.0, size = std::max(0.1, height);
+	const Vec3 v = (placeAt(t + dt) - placeAt(t - dt)) * (1.0 / (2.0 * dt));
+	if (smearWeight(length(v) / size) < 0.5) return out;
+	for (int i = 1; i <= count; ++i) out.push_back(t - amount * i / (static_cast<double>(fps) * count));
 	return out;
 }
 

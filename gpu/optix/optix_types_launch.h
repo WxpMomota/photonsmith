@@ -181,6 +181,10 @@ struct LaunchParams {
 	// Per pixel (py * width + px): the time of the sample now being traced (motion blur: optix_raygen.h writes it), so that its shadow rays see moving geometry where its
 	// camera ray did (trace_shadow_ray). Null when the scene has no motion.
 	float* rayTimes;
+	// The shadow terminator offset (src/shared/shadow_terminator.h): two a pixel (py * width + px) - the triangle being shaded's point (a hash of its bits), its
+	// material's cutoff, its shading and facet normals (octahedral), then its lift to the round surface - written by __closesthit__triangle and read by
+	// trace_shadow_ray for a ray from that very point (shadow_terminator_origin). Null unless a material asks for it (`"float terminator"`).
+	float4* terminatorScratch;
 	// --adaptive (camera.adaptiveThreshold > 0): the samples the pixels actually took, summed (one atomic add a pixel), for the log. Null otherwise.
 	unsigned long long* adaptiveSamplesTaken;
 };

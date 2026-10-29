@@ -18,6 +18,8 @@
 #include "../shared/sampling.h"
 #include "../shared/ray_hash.h"
 #include "../shared/normal_map.h"   // triangle_dndu_dndv
+#include "../shared/shadow_terminator.h"
+#include "material_base.h"   // (the material's terminator_offset)
 #include <array>
 #include <memory>
 
@@ -259,6 +261,24 @@ class triangle : public hittable {
 			}
 			rec.dndu = vec3(dnu[0], dnu[1], dnu[2]);
 			rec.dndv = vec3(dnv[0], dnv[1], dnv[2]);
+		}
+
+		// The shadow terminator offset (shadow_terminator.h, Cycles'): the lift to the round surface the vertex normals describe, from which a shadow ray near the
+		// terminator starts - only for a material that asks for it (`"float terminator"`).
+		rec.terminator = 0.0;
+		if (mesh->has_normals() && mat && mat->terminator_offset > 0.0) {
+			const vec3 ng = dot(r.direction(), geom_normal) < 0.0 ? geom_normal : -geom_normal;   // (the facet's normal on the ray's side)
+			double V[3][3], N[3][3], g[3] = {ng.x(), ng.y(), ng.z()}, out[3];
+			for (int k = 0; k < 3; ++k) {
+				const point3 &pk = mesh->positions[idx[k]];
+				const vec3 &nk = mesh->normals[idx[k]];
+				V[k][0] = pk.x(), V[k][1] = pk.y(), V[k][2] = pk.z();
+				N[k][0] = nk.x(), N[k][1] = nk.y(), N[k][2] = nk.z();
+			}
+			shadow_terminator::lift(V, N, b0, b1, b2, g, out);
+			rec.terminator = mat->terminator_offset;
+			rec.terminator_lift = vec3(out[0], out[1], out[2]);
+			rec.terminator_ng = ng;
 		}
 
 		rec.mat = mat;

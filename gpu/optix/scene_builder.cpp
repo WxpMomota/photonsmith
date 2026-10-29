@@ -1521,6 +1521,11 @@ static bool build_loaded_pbrt_scene(
 	// replaces for why 1.0f, not a real distance, is deliberate there).
 	float focus_dist_world = 0.0f, defocus_angle_deg = 0.0f;
 	loaded_camera_focus_and_defocus(c, has_dof_override, aperture_override, focus_distance_override, focus_dist_world, defocus_angle_deg);
+	if (out_camera_extra) {   // (the aperture's shape: aperture_shape.h)
+		out_camera_extra->apertureBlades = c.apertureBlades;
+		out_camera_extra->apertureRotation = static_cast<float>(c.apertureRotation);
+		out_camera_extra->apertureRatio = static_cast<float>(c.apertureRatio);
+	}
 	// Camera motion blur (pbrt-v4's real ActiveTransform "StartTime"/
 	// "EndTime" idiom, c.isAnimated - see pbrt_flatten::Camera::isAnimated's
 	// own comment). Perspective-only, matching CPU's camera_is_animated

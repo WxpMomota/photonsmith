@@ -1085,6 +1085,10 @@ std::vector<FilmEvent> DataFilm::events() const {
 		const std::vector<physics::Impact> i = physics::impactsOf(p);
 		impacts.insert(impacts.end(), i.begin(), i.end());
 	}
+	if (!spec.rigids.empty()) {   // (the rigid-body world's hard landings)
+		const std::vector<physics::Impact> &i = rigid::runFor(spec.rigids, std::max(spec.length, spec.storyEnd) + 1.0)->impacts;
+		impacts.insert(impacts.end(), i.begin(), i.end());
+	}
 	for (const physics::Impact &i : impacts) {
 		FilmEvent e;
 		e.t = i.t;
@@ -1357,9 +1361,23 @@ std::string DataFilm::sceneAcross(double t) const {
 		if (tr.length <= 0.0 || tr.kind == Transition::Fade || std::abs(t - cut) > 0.5 * tr.length) continue;
 		std::string lookAt, camera;
 		cameraAt(t, lookAt, camera, static_cast<int>(t < cut ? k : k - 1));
-		return worldAt(toonLine(t) + (spec.shots.empty() ? scene.header : scene.headerBefore + lookAt + scene.headerBetween + camera + scene.headerAfter + "WorldBegin\n"), t);
+		return terminated(worldAt(toonLine(t) + (spec.shots.empty() ? scene.header : scene.headerBefore + lookAt + scene.headerBetween + camera + scene.headerAfter + "WorldBegin\n"), t));
 	}
 	return sceneAt(t);
+}
+
+std::string DataFilm::terminated(std::string text) const {
+	if (spec.terminator <= 0.0) return text;
+	char words[64];
+	std::snprintf(words, sizeof words, " \"float terminator\" [ %g ]", spec.terminator);
+	for (const std::string key : {"Material \"", "MakeNamedMaterial \""})
+		for (std::size_t at = text.find(key); at != std::string::npos; at = text.find(key, at + 1)) {
+			if (at > 0 && text[at - 1] != '\n' && text[at - 1] != ' ' && text[at - 1] != '\t') continue;   // (a statement: not the end of MakeNamedMaterial)
+			const std::size_t close = text.find('"', at + key.size());   // (after its type, or its name: the parameters' order is free)
+			if (close == std::string::npos) break;
+			text.insert(close + 1, words);
+		}
+	return text;
 }
 
 double DataFilm::acrossShotTime(double t) const {
@@ -1442,6 +1460,11 @@ std::string DataFilm::transformsAt(const std::string &name, double t) const {
 		const physics::Body body = physics::at(b, t);
 		out += "  Translate " + num(body.at.x) + " " + num(body.at.y) + " " + num(body.at.z) + "\n  Rotate " + num(body.spin * 180.0 / kPi) + " " + num(body.spinAxis.x) + " " +
 			   num(body.spinAxis.y) + " " + num(body.spinAxis.z) + "\n  Translate " + num(-b.from.x) + " " + num(-b.from.y) + " " + num(-b.from.z) + "\n";
+	}
+	for (std::size_t k = 0; k < spec.rigids.size(); ++k) {   // a body of the film's rigid-body world (rigid_world.h): where the world has it
+		if (spec.rigids[k].block != name) continue;
+		const std::vector<rigid::Pose> poses = rigid::posesAt(*rigid::runFor(spec.rigids, std::max(spec.length, spec.storyEnd) + 1.0), t);
+		if (k < poses.size()) out += rigid::transformOf(spec.rigids[k], poses[k], &DataFilm::num);
 	}
 	for (const auto &[block, p] : spec.topples) {
 		if (block != name) continue;
@@ -1605,6 +1628,8 @@ void DataFilm::cameraAt(double t, std::string &lookAt, std::string &camera, int 
 	}
 	camera = "Camera \"perspective\" \"float fov\" [ " + num(fov) + " ]";
 	if (lens > 0.0) camera += " \"float lensradius\" [ " + num(lens) + " ] \"float focaldistance\" [ " + num(focus > 0.0 ? focus : 1.0) + " ]";
+	if (lens > 0.0 && shot.blades >= 3) camera += " \"integer blades\" [ " + std::to_string(shot.blades) + " ] \"float bladesrotation\" [ " + num(shot.bladesRotation) + " ]";   // (aperture_shape.h)
+	if (lens > 0.0 && shot.apertureRatio != 1.0) camera += " \"float apertureratio\" [ " + num(shot.apertureRatio) + " ]";
 	camera += "\n";
 }
 

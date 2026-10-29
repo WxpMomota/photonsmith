@@ -421,14 +421,25 @@ std::string DataFilm::worldAt(const std::string &header, double t) const {
 	for (const Character &c : spec.characters) {   // the characters, as their kinds draw them
 		const CharacterKind &kind = characterKinds().at(c.kind);
 		if (!kind.text) continue;
+		const auto drawnAt = [&](double tc) {   // the character as its kind draws it at a time
+			CharacterMoment m = actingMoment(c, tc);
+			if (kind.trails) m.trail = trailOf(c, tc, m);
+			lockFeet(c, tc, m);
+			m.voice = music_cues::voiceAt(spec.key, c.name, tc, shotStarts(), shotNameList(), &m.mouth);   // (a recording's loudness and mouth shapes)
+			speakingAt(c, tc, m);
+			m.face = faces::faceAt(c.feelings, tc);
+			return motionOf(c, kind, tc, m);
+		};
 		const double tc = motion::heldTime(spec.stepping, c.name, t, spec.fps);   // (on twos: the moment of the frame it holds; film_motion.h)
-		CharacterMoment m = actingMoment(c, tc);
-		if (kind.trails) m.trail = trailOf(c, tc, m);
-		lockFeet(c, tc, m);
-		m.voice = music_cues::voiceAt(spec.key, c.name, tc, shotStarts(), shotNameList(), &m.mouth);   // (a recording's loudness and mouth shapes)
-		speakingAt(c, tc, m);
-		m.face = faces::faceAt(c.feelings, tc);
-		std::string text = motionOf(c, kind, tc, m);
+		std::string text = drawnAt(tc);
+		// a smear's multiples: copies of it back along its way on a dash (film_motion.h)
+		if (const motion::Smear *sm = motion::smearFor(spec.smears, c.name); sm && sm->multiples > 0)
+			for (const double u : motion::smearTimes([&](double w) {
+					 Vec3 at;
+					 momentOf(c, w, &at);
+					 return at;
+				 }, tc, kind.height * c.scale, sm->amount, spec.fps, sm->multiples))
+				text += drawnAt(u);
 		out += "# " + c.name + " (" + c.kind + ")\n" + shot_lighting::inLinkGroup(text, "cast/" + c.name);   // (light linking: a shot's `lighting ... only cast` - "cast" names every cast/ group; the ID passes)
 	}
 	out = shot_lighting::withLights(out, shotLightsAt(header, t));
@@ -683,6 +694,13 @@ std::string DataFilm::motionOf(const Character &c, const CharacterKind &kind, do
 			momentOf(c, u, &at);
 			return at;
 		}, t, kind.height * c.scale, squash));
+	// a smear frame on a dash: drawn out back along its way (film_motion.h)
+	if (const motion::Smear *sm = motion::smearFor(spec.smears, c.name); sm && sm->amount > 0.0)
+		text = motion::wrapped(text, motion::smearStretch([&](double u) {
+			Vec3 at;
+			momentOf(c, u, &at);
+			return at;
+		}, t, kind.height * c.scale, sm->amount, spec.fps));
 	return text;
 }
 

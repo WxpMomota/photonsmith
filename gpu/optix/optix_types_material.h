@@ -429,6 +429,8 @@ struct MaterialData {
 	int lightGroupPlus1 = 0;
 	// The bevel shader's radius (src/shared/bevel.h): the shading normal averaged over the surface within it, rounding the edges; 0: none.
 	float bevelRadius = 0.0f;
+	// The shadow terminator offset's cutoff (src/shared/shadow_terminator.h): a smooth-shaded triangle's shadow rays near the terminator start from its round surface; 0: off.
+	float terminatorOffset = 0.0f;
 	// Ray visibility (src/shared/pbrt_scene.h MaterialDecl): bit 1 hidden from camera rays (they pass through it), bit 2 casts no shadows; 0 (a zeroed MaterialData) seen by all.
 	int hidden = 0;
 };

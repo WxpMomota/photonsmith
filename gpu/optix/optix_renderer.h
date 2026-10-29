@@ -820,6 +820,7 @@ private:
 	const unsigned char* activePixelMaskHost_ = nullptr;  ///< See setActivePixelMask()
 	int lightGroupCount_ = 0, skyLightGroup_ = -1;        ///< See setLightGroups()
 	bool hasBevel_ = false;                               ///< A material of the uploaded scene has a bevel radius (src/shared/bevel.h): the wavefront renderer's bevel launch
+	bool hasTerminator_ = false;                          ///< A material asks for the shadow terminator offset (src/shared/shadow_terminator.h): the recursive renderer's LaunchParams::terminatorScratch
 
 	// Punctual (delta) lights: point/spot/distant. Separate from the area
 	// lights above - evaluated deterministically, not via the alias table.

@@ -170,6 +170,9 @@
     <ClCompile Include="unit\film_universe_tests.cpp">
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
+    <ClCompile Include="unit\film_blender3_tests.cpp">
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="unit\film_whole_tests.cpp">
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -247,6 +250,7 @@
     <ClCompile Include="unit\scene_lighting_tests.cpp" />
     <ClCompile Include="unit\light_link_tests.cpp" />
     <ClCompile Include="unit\bevel_tests.cpp" />
+    <ClCompile Include="unit\shadow_terminator_tests.cpp" />
     <ClCompile Include="unit\scene_projector_tests.cpp" />
     <ClCompile Include="unit\scene_mix_tests.cpp" />
     <ClCompile Include="unit\pbrt_handedness_tests.cpp" />

@@ -61,6 +61,10 @@ struct CameraConfig {
     // pbrt's left-handed horizontal axis (see camera::mirror_x, pbrt_flatten::Camera::leftHanded): the picture of this scene is the mirror of what the book-style basis of
     // lookfrom/lookat/up would draw. Set for a loaded pbrt perspective camera; what Live Preview's mouse and keys use to turn left and right the way the picture does.
     bool   left_handed = false;
+    // The aperture's shape (src/shared/aperture_shape.h): its blades (fewer than 3: round), their rotation in degrees and the anamorphic ratio - a pbrt Camera's
+    // "integer blades", "float bladesrotation", "float apertureratio".
+    int    aperture_blades = 0;
+    double aperture_rotation = 0.0, aperture_ratio = 1.0;
 };
 
 
@@ -351,6 +355,9 @@ namespace pbrt_scene_registry {
             d.camera.shutterOpen, d.camera.shutterClose
         };
         config.left_handed = d.camera.leftHanded && d.camera.type == "perspective";
+        config.aperture_blades = d.camera.apertureBlades;
+        config.aperture_rotation = d.camera.apertureRotation;
+        config.aperture_ratio = d.camera.apertureRatio;
         return config;
     }
 

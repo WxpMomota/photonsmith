@@ -423,6 +423,7 @@ inline void setupMaterialLookup(BuildCtx &c) {
 		MaterialData built = makeMaterial(m, em, out, bssrdfTableCache, measuredTableCache, imageTextureCache, alphaMaskTextureCache, scene.materials, materialIndexDepth, depth);
 		built.linkGroup = m.linkGroup;   // light linking (light_link.h)
 		built.bevelRadius = static_cast<float>(m.bevel);   // (rounded edges: bevel.h)
+		built.terminatorOffset = static_cast<float>(m.terminator);   // (round shadows on coarse smooth meshes: shadow_terminator.h)
 		built.hidden = (m.cameraVisible ? 0 : 1) | (m.castsShadow ? 0 : 2);   // (ray visibility)
 		if (em) built.notLit = ~em->illuminates, built.lightGroupPlus1 = em->lightGroup + 1;   // (and light groups: light_groups.h)
 		const int idx = static_cast<int>(out.materials.size());

@@ -437,4 +437,5 @@ __device__ __forceinline__ float cosine_pdf(const float3& direction, const float
 
 // Light sampling, NEE, and medium/shadow helpers - see that file's own
 // header comment for why it's split out.
+#include "terminator_device.h"   // the shadow terminator offset (trace_shadow_ray, __closesthit__triangle)
 #include "optix_device_helpers_lighting.h"

@@ -136,6 +136,77 @@ inline std::string cartoonLine(Spec &s, const std::string &verb, const std::stri
 		(verb == "squash" ? s.squash : s.jiggle).push_back(a);
 		return "";
 	}
+	if (verb == "smear") {   // smear [NAME] S [multiples N] (film_motion.h)
+		const std::vector<std::string> t = detail::tokens(line);
+		const char *usage = "`smear [NAME] S [multiples N]`: S frames' travel drawn out behind a dash, from 0 (none) to 3; N copies left along it, up to 4";
+		motion::Smear sm;
+		std::size_t i = 1;
+		if (i < t.size() && !number(t[i], sm.amount)) {
+			sm.who = t[i++];
+			if (std::none_of(s.characters.begin(), s.characters.end(), [&](const Character &c) { return c.name == sm.who; }))
+				return fail("`smear NAME ...` needs a character brought in before it with `character`");
+		}
+		if (i >= t.size() || !number(t[i++], sm.amount) || sm.amount < 0.0 || sm.amount > 3.0) return fail(usage);
+		if (i < t.size()) {
+			double n = 0.0;
+			if (t[i] != "multiples" || i + 2 != t.size() || !number(t[i + 1], n) || n < 0.0 || n > 4.0 || n != std::floor(n)) return fail(usage);
+			sm.multiples = static_cast<int>(n);
+		}
+		s.smears.push_back(sm);
+		return "";
+	}
+	if (verb == "rigid") {   // rigid BLOCK box W H D | sphere R  at X Y Z [turn DEG] [mass M] [start T] [velocity X Y Z] [spin X Y Z] [fixed] [bounce B] [friction F] (rigid_world.h)
+		const std::vector<std::string> t = detail::tokens(line);
+		const char *usage = "`rigid BLOCK box W H D | sphere R  at X Y Z [turn DEG] [mass M] [start T] [velocity X Y Z] [spin X Y Z] [fixed] [bounce B] [friction F]`";
+		rigid::BodyDef d;
+		if (t.size() < 3) return fail(usage);
+		d.block = t[1];
+		std::size_t i = 2;
+		const auto three = [&](Vec3 &v) {
+			if (i + 3 > t.size() || !number(t[i], v.x) || !number(t[i + 1], v.y) || !number(t[i + 2], v.z)) return false;
+			i += 3;
+			return true;
+		};
+		if (t[i] == "box") {
+			++i;
+			Vec3 size;
+			if (!three(size) || size.x <= 0.0 || size.y <= 0.0 || size.z <= 0.0) return fail(usage);
+			d.half = size * 0.5;
+		} else if (t[i] == "sphere") {
+			if (i + 1 >= t.size() || !number(t[i + 1], d.radius) || d.radius <= 0.0) return fail(usage);
+			d.sphere = true, i += 2;
+		} else {
+			return fail(usage);
+		}
+		if (i >= t.size() || t[i] != "at") return fail(usage);
+		++i;
+		if (!three(d.at)) return fail(usage);
+		while (i < t.size()) {
+			const std::string w = t[i++];
+			double v = 0.0;
+			if (w == "fixed") d.fixed = true;
+			else if (w == "velocity" || w == "spin") {
+				if (!three(w == "velocity" ? d.velocity : d.spin)) return fail(usage);
+			} else if ((w == "turn" || w == "mass" || w == "start" || w == "bounce" || w == "friction") && i < t.size() && number(t[i], v)) {
+				++i;
+				if ((w == "mass" && v <= 0.0) || (w == "bounce" && (v < 0.0 || v > 1.0)) || (w == "friction" && (v < 0.0 || v > 2.0)) || (w == "start" && v < 0.0)) return fail(usage);
+				(w == "turn" ? d.turn : w == "mass" ? d.mass : w == "start" ? d.start : w == "bounce" ? d.bounce : d.friction) = v;
+			} else {
+				return fail(usage);
+			}
+		}
+		if (d.start < 0.0 && (length(d.velocity) > 0.0 || length(d.spin) > 0.0)) d.start = 0.0;   // (thrown from the start)
+		s.rigids.push_back(d);
+		s.physicsLines.push_back({d.block, n});
+		return "";
+	}
+	if (verb == "terminator") {   // terminator C: every material of the frames rounds the shadows of coarse smooth meshes (shadow_terminator.h)
+		const std::vector<std::string> t = detail::tokens(line);
+		double c = 0.0;
+		if (t.size() != 2 || !number(t[1], c) || c < 0.0 || c > 1.0) return fail("`terminator C`: C from 0 (off) to 1 (0.1 the usual one, Cycles')");
+		s.terminator = c;
+		return "";
+	}
 	handled = false;
 	return "";
 }

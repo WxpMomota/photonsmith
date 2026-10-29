@@ -320,7 +320,7 @@ class DataFilm {
 	std::vector<Foot> feetAt(double t) const;
 	// The footfalls of every walk and the gestures' contacts (Film::events), panned and quietened from the camera at each moment.
 	std::vector<FilmEvent> events() const;
-	bool hasEvents() const { return !spec.characters.empty() || !spec.bounces.empty() || !spec.topples.empty(); }   // (props are handled by characters)
+	bool hasEvents() const { return !spec.characters.empty() || !spec.bounces.empty() || !spec.topples.empty() || !spec.rigids.empty(); }   // (props are handled by characters)
 
 	// ---- what the characters say ----
 	// What a character's lines are said in: its own `voice`, else the film's `voices`; "" for the babble voice.
@@ -367,7 +367,9 @@ class DataFilm {
 		return toon_look::tagOf(st);
 	}
 
-	std::string sceneAt(double t) const { return inCredits(t) ? creditsScene() : worldAt(headerAt(t), t); }
+	std::string sceneAt(double t) const { return inCredits(t) ? creditsScene() : terminated(worldAt(headerAt(t), t)); }
+	// A frame's text with the film's shadow terminator offset (`terminator`, shadow_terminator.h) on every one of its materials; as it is without one.
+	std::string terminated(std::string text) const;
 
 	// ---- how shots give way to each other ----
 	std::vector<Transition> transitions() const;

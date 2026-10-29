@@ -1,4 +1,5 @@
 #pragma once
+#include "aperture_device.h"   // the aperture's blades (the thin-lens camera)
 // wavefront_device_camera.h -- part 2 of 3 of wavefront_device_helpers.h (included by it, in order; not meant to be included on its own).
 
 // ============================================================================
@@ -145,6 +146,10 @@ __device__ __forceinline__ void wf_generate_primary_ray(
 		if (hasDOF) {
 			float rx = 2.0f * wf_rand(seed) - 1.0f, ry = 2.0f * wf_rand(seed) - 1.0f;
 			while (rx*rx + ry*ry >= 1.0f) { rx = 2.0f * wf_rand(seed) - 1.0f; ry = 2.0f * wf_rand(seed) - 1.0f; }
+			if (gpu_aperture_shaped(cam)) {   // (its blades' polygon: aperture_device.h)
+				const float a = wf_rand(seed), b = wf_rand(seed);
+				gpu_aperture_point(cam, a, b, rx, ry);
+			}
 			local_origin = rx * cam.localDefocusDiskU + ry * cam.localDefocusDiskV;
 		}
 		float3 local_direction = local_pixel_sample - local_origin;
@@ -213,6 +218,10 @@ __device__ __forceinline__ void wf_generate_primary_ray(
 			if (hasDOF) {
 				float rx = 2.0f * wf_rand(seed) - 1.0f, ry = 2.0f * wf_rand(seed) - 1.0f;
 				while (rx*rx + ry*ry >= 1.0f) { rx = 2.0f * wf_rand(seed) - 1.0f; ry = 2.0f * wf_rand(seed) - 1.0f; }
+				if (gpu_aperture_shaped(cam)) {   // (its blades' polygon: aperture_device.h)
+					const float a = wf_rand(seed), b = wf_rand(seed);
+					gpu_aperture_point(cam, a, b, rx, ry);
+				}
 				lens = rx * cam.defocus_disk_u + ry * cam.defocus_disk_v;
 			}
 			origin = cam.origin + lens;

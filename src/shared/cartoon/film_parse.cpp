@@ -667,6 +667,19 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 			if (s.shots.empty()) return fail("`" + verb + "` belongs to a shot: start one with `shot 0 NAME` first");
 			const std::vector<std::string> t = detail::tokens(line);
 			Shot &shot = s.shots.back();
+			if (verb == "aperture" && t.size() > 2) {   // aperture RADIUS [blades N] [rotation DEG] [ratio R]: a lens of N blades draws its bokeh as their polygon (aperture_shape.h)
+				const char *usage = "`aperture RADIUS [blades N] [rotation DEG] [ratio R]` (RADIUS 0 to 0.5 m; N 3 to 16 blades; R the anamorphic squeeze, 0.25 to 4)";
+				if (!number(t[1], shot.aperture) || shot.aperture < 0.0 || shot.aperture > 0.5 || t.size() % 2 != 0) return fail(usage);
+				for (std::size_t i = 2; i + 1 < t.size(); i += 2) {
+					double v = 0.0;
+					if (!number(t[i + 1], v)) return fail(usage);
+					if (t[i] == "blades" && v >= 3.0 && v <= 16.0 && v == std::floor(v)) shot.blades = static_cast<int>(v);
+					else if (t[i] == "rotation") shot.bladesRotation = v;
+					else if (t[i] == "ratio" && v >= 0.25 && v <= 4.0) shot.apertureRatio = v;
+					else return fail(usage);
+				}
+				continue;
+			}
 			if (verb == "handheld" || verb == "aperture") {
 				double v = verb == "handheld" ? 1.0 : 0.02;
 				if (t.size() > 2 || (t.size() == 2 && (!number(t[1], v) || v < 0.0 || v > (verb == "handheld" ? 4.0 : 0.5)))) return fail(verb == "handheld" ? "`handheld [AMOUNT]` (0 to 4)" : "`aperture RADIUS` (0 to 0.5 m)");

@@ -156,6 +156,8 @@ class material {
     int light_group = -1;
     // The bevel shader's radius (src/shared/bevel.h): the shading normal averaged over the surface within it, rounding the edges; 0: none.
     double bevel_radius = 0.0;
+    // The shadow terminator offset (src/shared/shadow_terminator.h, Cycles'): below this cosine a shadow ray leaves a smooth-shaded mesh from its round surface; 0: off.
+    double terminator_offset = 0.0;
     // Ray visibility (src/shared/pbrt_scene.h MaterialDecl): a shape the camera's rays pass through, and one that casts no shadows.
     bool camera_visible = true, casts_shadow = true;
 

@@ -348,16 +348,22 @@ bool OptiXRenderer::render(
 
 	// The transient device buffers of this render, freed however it ends: an early return or a throwing CUDA_CHECK below used to leak them (a Live Preview that fails
 	// on every frame lost a framebuffer a frame).
-	CUdeviceptr d_framebuffer = 0, d_statsBounceRays = 0, d_statsShadowRays = 0, d_rayTimes = 0, d_adaptiveTaken = 0;
+	CUdeviceptr d_framebuffer = 0, d_statsBounceRays = 0, d_statsShadowRays = 0, d_rayTimes = 0, d_adaptiveTaken = 0, d_terminator = 0;
 	struct FreeOnExit {
-		CUdeviceptr *buffers[5];
+		CUdeviceptr *buffers[6];
 		~FreeOnExit() {
 			for (CUdeviceptr *b : buffers)
 				if (*b) cudaFree(reinterpret_cast<void*>(*b));
 		}
-	} freeOnExit{{&d_framebuffer, &d_statsBounceRays, &d_statsShadowRays, &d_rayTimes, &d_adaptiveTaken}};
+	} freeOnExit{{&d_framebuffer, &d_statsBounceRays, &d_statsShadowRays, &d_rayTimes, &d_adaptiveTaken, &d_terminator}};
 	// Motion blur: a float a pixel for the time of the sample being traced, read by its shadow rays (LaunchParams::rayTimes)
 	if (gpuCam.motionBlurEnabled) CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_rayTimes), static_cast<size_t>(width) * height * sizeof(float)));
+	// The shadow terminator offset: two float4 a pixel for the triangle being shaded (LaunchParams::terminatorScratch), zeroed (no point matches a zero hash's cutoff 0)
+	if (hasTerminator_) {
+		const size_t bytes = static_cast<size_t>(width) * height * 2 * sizeof(float4);
+		CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_terminator), bytes));
+		CUDA_CHECK(cudaMemset(reinterpret_cast<void*>(d_terminator), 0, bytes));
+	}
 
 	// Allocate framebuffer on device
 	size_t fbSize = static_cast<size_t>(width) * height * sizeof(float3);
@@ -397,6 +403,7 @@ bool OptiXRenderer::render(
 	}
 
 	LaunchParams params = makeLaunchParams(width, height, samplesPerPixel, maxDepth, gpuCam, d_framebuffer, d_albedo, d_normal, d_statsBounceRays, d_statsShadowRays, d_rayTimes);
+	params.terminatorScratch = reinterpret_cast<float4*>(d_terminator);
 	// --adaptive: the samples the pixels took, for the log line below
 	if (gpuCam.adaptiveThreshold > 0.0f) {
 		CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_adaptiveTaken), sizeof(unsigned long long)));

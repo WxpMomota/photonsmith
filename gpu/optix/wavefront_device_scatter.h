@@ -1,6 +1,8 @@
 #pragma once
 // wavefront_device_scatter.h -- part 3 of 3 of wavefront_device_helpers.h (included by it, in order; not meant to be included on its own).
 
+#include "../../src/shared/shadow_terminator.h"   // wf_terminator_from
+
 // ============================================================================
 // Material-scatter finish + RGB->spectral uplift (moved from
 // wavefront_kernels.cu when that file was split into per-kernel-family .cu
@@ -26,6 +28,26 @@
 // argument can only be specified once per scope in one translation unit.
 __device__ __forceinline__ SampledSpectrum<kWFNWavelengths> wf_lift_rgb_to_spectrum(
 	float3 rgb, const SampledWavelengths<kWFNWavelengths>& swl, bool isIlluminant);
+
+// The shadow terminator offset (src/shared/shadow_terminator.h, Cycles'): where a shadow ray towards `dir` starts - `hit_point`, lifted by HitWorkItem::terminator
+// (xyz the lift, w the cutoff; 0 none) when it leaves near the terminator - its `tMax` shortened by as much as that moved it towards the target, and `offsetNormal`
+// (what wf_push_nee_shadow_ray nudges the origin along, to the light's side) the facet's normal, or once lifted the shading normal: the light may be just below the
+// facet's plane, and a nudge to that side would put the lifted point back under the surface.
+__device__ __forceinline__ float3 wf_terminator_from(const float3 &hit_point, const float3 &normal, const float3 &geomNormal, const float4 &terminator, const float3 &dir, float &tMax,
+													 float3 &offsetNormal) {
+	const float3 ng = dot(geomNormal, geomNormal) > 0.5f ? geomNormal : normal;
+	offsetNormal = ng;
+	if (!(terminator.w > 0.0f)) return hit_point;
+	const float3 L = normalize(dir);
+	const float nl = dot(normal, L);
+	if (nl <= 0.0f) return hit_point;   // (a transmitted shadow ray: left as it was)
+	const float amt = shadow_terminator::amount(nl, dot(ng, L), terminator.w);
+	if (amt <= 0.0f) return hit_point;
+	const float3 from = hit_point + amt * make_float3(terminator.x, terminator.y, terminator.z);
+	if (tMax < 1e29f) tMax = fmaxf(tMax - dot(from - hit_point, L), 0.0f);
+	offsetNormal = normal;
+	return from;
+}
 
 __device__ __forceinline__ void wf_finish_material_scatter(
 	MaterialType matType, float nfEta, int matIdx,
@@ -81,6 +103,9 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 	// (optix_types.h). 1e9f (unbounded) when not requested.
 	float maxComponentValue,
 	const float3& normal, const float3& geomNormalIn, const float3& hit_point,
+	// The shadow terminator offset (src/shared/shadow_terminator.h): HitWorkItem::terminator - the lift to the round surface of a smooth-shaded triangle and its
+	// material's cutoff (w; 0: none) - for wf_terminator_from() at the shadow rays below.
+	const float4& terminator,
 	// World-space surface tangent (dp/du) at this shading point - real
 	// per-shape value from the caller (see HitWorkItem::objDpdu's own
 	// comment), used ONLY by evalGlossyF's UV-aligned frame construction
@@ -801,8 +826,11 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 			// resolves occlusion, whenever this is a depth==1 hit whose
 			// originating x0 was GI-eligible; a no-op (false) for every other
 			// call (depth==0's own NEE, or GI disabled/ineligible this frame).
-			wf_push_nee_shadow_ray(shadowQueue, hit_point, (dot(geomNormalIn, geomNormalIn) > 0.5f ? geomNormalIn : normal), isPhase, shadow_eps,
-				raw_cos, to_light, max_dist - 0.002f, Ld, filterWeight, swl,
+			float tMaxArea = max_dist - 0.002f;
+			float3 offArea;   // (the nudge's normal: wf_terminator_from)
+			const float3 fromArea = wf_terminator_from(hit_point, normal, geomNormalIn, terminator, to_light, tMaxArea, offArea);
+			wf_push_nee_shadow_ray(shadowQueue, fromArea, offArea, isPhase, shadow_eps,
+				raw_cos, to_light, tMaxArea, Ld, filterWeight, swl,
 				pixelIndex, time, giCandidateEligible, wf_pcg(seed), 0ull, neeLightGroup);
 		}
 	}
@@ -879,8 +907,11 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 			// uses copysignf(shadow_eps, raw_cos) rather than always
 			// +shadow_eps, and why tMax is the unadjusted 1e30f sentinel here
 			// (unlike the area/punctual sites' max_dist/t_max - 0.002f).
-			wf_push_nee_shadow_ray(shadowQueue, hit_point, (dot(geomNormalIn, geomNormalIn) > 0.5f ? geomNormalIn : normal), isPhase, shadow_eps,
-				raw_cos, sky_dir, 1e30f, Ld, filterWeight, swl,
+			float tMaxSky = 1e30f;
+			float3 offSky;   // (the nudge's normal: wf_terminator_from)
+			const float3 fromSky = wf_terminator_from(hit_point, normal, geomNormalIn, terminator, sky_dir, tMaxSky, offSky);
+			wf_push_nee_shadow_ray(shadowQueue, fromSky, offSky, isPhase, shadow_eps,
+				raw_cos, sky_dir, tMaxSky, Ld, filterWeight, swl,
 				pixelIndex, time, giCandidateEligible, wf_pcg(seed), 0ull, d_wf_sky_light_group);
 		}
 	}
@@ -961,8 +992,11 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 		// wf_rand(seed)-consuming call between iterations to decorrelate them
 		// - mixing in pli keeps two lights on the same hit from getting
 		// identical ratio-tracking noise if they both cross the same medium.
-		wf_push_nee_shadow_ray(shadowQueue, hit_point, (dot(geomNormalIn, geomNormalIn) > 0.5f ? geomNormalIn : normal), isPhase, shadow_eps,
-			raw_cos, wi, t_max - 0.002f, Ld, filterWeight, swl,
+		float tMaxPunct = t_max - 0.002f;
+		float3 offPunct;   // (the nudge's normal: wf_terminator_from)
+		const float3 fromPunct = wf_terminator_from(hit_point, normal, geomNormalIn, terminator, wi, tMaxPunct, offPunct);
+		wf_push_nee_shadow_ray(shadowQueue, fromPunct, offPunct, isPhase, shadow_eps,
+			raw_cos, wi, tMaxPunct, Ld, filterWeight, swl,
 			pixelIndex, time, giCandidateEligible, wf_pcg(seed ^ (pli * 0x9E3779B9u)), punctualLights[pli].notShadowing, punctualLights[pli].lightGroupPlus1 - 1);
 	}
 

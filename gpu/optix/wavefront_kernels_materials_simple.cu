@@ -225,7 +225,7 @@ extern "C" __global__ void evaluate_materials_simple(
 
 	// Lambertian/Metal never transmit - h.etaScale passes through unchanged
 	// (see RayWorkItem::etaScale's own comment).
-	wf_finish_material_scatter(mat.type, matEta, h.materialIdx, h.linkGroup, (bool)h.any_nonspecular, glossyAlphaForNEE, glossyAlphaVForNEE, h.etaScale, h.filterWeight, maxComponentValue, normal, h.geomNormal, hit_point, h.objDpdu, seed,
+	wf_finish_material_scatter(mat.type, matEta, h.materialIdx, h.linkGroup, (bool)h.any_nonspecular, glossyAlphaForNEE, glossyAlphaVForNEE, h.etaScale, h.filterWeight, maxComponentValue, normal, h.geomNormal, hit_point, h.terminator, h.objDpdu, seed,
 		throughput, radiance, swl, attenuation, scattered_dir, is_specular, brdf_pdf_override,
 		phaseWo, phaseG,
 		h.pixelIndex, h.depth,

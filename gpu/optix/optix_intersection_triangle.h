@@ -166,6 +166,22 @@ extern "C" __global__ void __closesthit__triangle() {
 	const bool front_face = dot(ray_dir, shading_normal) < 0.0f;
 	const float3 final_normal = front_face ? shading_normal : -shading_normal;
 
+	// The shadow terminator offset (src/shared/shadow_terminator.h): where this point's shadow rays would start on the round surface the vertex normals describe,
+	// left for trace_shadow_ray (terminator_device.h) - only for a material that asks for it
+	if (params.terminatorScratch && mat.terminatorOffset > 0.0f && tri.hasNormals) {
+		float3 ng = normalize(cross(tri.p1 - tri.p0, tri.p2 - tri.p0));
+		float3 ngWorld = instBase >= 0 ? normalize(optixTransformNormalFromObjectToWorldSpace(ng)) : ng;
+		if (dot(ray_dir, ngWorld) > 0.0f) ng = -ng, ngWorld = -ngWorld;   // (the facet's normal on the ray's side)
+		const float V[3][3] = {{tri.p0.x, tri.p0.y, tri.p0.z}, {tri.p1.x, tri.p1.y, tri.p1.z}, {tri.p2.x, tri.p2.y, tri.p2.z}};
+		const float N[3][3] = {{tri.n0.x, tri.n0.y, tri.n0.z}, {tri.n1.x, tri.n1.y, tri.n1.z}, {tri.n2.x, tri.n2.y, tri.n2.z}};
+		const float g[3] = {ng.x, ng.y, ng.z};
+		float out[3];
+		shadow_terminator::lift(V, N, b0, b1, b2, g, out);
+		float3 lift = make_float3(out[0], out[1], out[2]);
+		if (instBase >= 0) lift = optixTransformVectorFromObjectToWorldSpace(lift);
+		terminator_record(hit_point, mat.terminatorOffset, final_normal, ngWorld, lift);
+	}
+
 	// Unpack payload from registers
 	float3 attenuation_in = make_float3(
 		__uint_as_float(optixGetPayload_0()),

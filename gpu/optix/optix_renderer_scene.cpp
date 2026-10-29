@@ -1488,6 +1488,7 @@ bool OptiXRenderer::buildScene(
 	uploadGeometryBuffers(in, st);
 	uploadLightBuffers(in, st);
 	hasBevel_ = std::any_of(materials.begin(), materials.end(), [](const MaterialData &m) { return m.bevelRadius > 0.0f; });   // (the wavefront renderer's bevel launch)
+	hasTerminator_ = std::any_of(materials.begin(), materials.end(), [](const MaterialData &m) { return m.terminatorOffset > 0.0f; });   // (LaunchParams::terminatorScratch)
 	if (!buildCustomAabbs(in, st)) return false;
 	buildGeometryGases(in, st);
 	buildInstanceGases(in, st);

@@ -161,6 +161,7 @@ struct HitWorkItem {
 	float3 hitPoint;
 	float3 normal;             // shading normal (outward)
 	float3 geomNormal;         // the geometric normal on the ray's side (zero = `normal`): what a spawned ray's origin is offset along, as in pbrt - a bump-mapped surface's shading normal can dip below the surface
+	float4 terminator;         // the shadow terminator offset (src/shared/shadow_terminator.h): a smooth-shaded triangle's lift to its round surface (xyz) and its material's cutoff (w); zero: none
 	float  t;                  // ray parameter at hit
 
 	// Material info

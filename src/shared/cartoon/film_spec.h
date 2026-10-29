@@ -26,6 +26,7 @@
 #include "film_marks.h"
 #include "film_cloth.h"
 #include "film_motion.h"
+#include "rigid_world.h"
 #include "film_particles.h"
 #include "film_paths.h"
 #include "film_acting.h"
@@ -114,6 +115,8 @@ struct Shot {
 	Vec3 flyAt;
 	std::vector<std::pair<double, std::string>> focus;   // who is in focus from when (the first from the shot's start)
 	double aperture = 0.0;
+	int blades = 0;                                        // (`aperture R blades N rotation D ratio A`: the lens's blades, aperture_shape.h; under 3 round)
+	double bladesRotation = 0.0, apertureRatio = 1.0;
 	cosmos::SpaceCam spaceCam;   // (`spacecam`) a journey in space (film_voyage.h)
 	shot_lighting::Lighting lighting;   // (`lighting`) key, fill and rim lights round the subject, from the camera
 	std::string lightOn;                // ... on this character's chest ("": what the camera looks at)
@@ -273,6 +276,7 @@ struct Spec {
 	std::vector<Character> characters;
 	// props with physics: the block they move, and the line that says so
 	std::vector<std::pair<std::string, physics::Bounce>> bounces;
+	std::vector<rigid::BodyDef> rigids;   // (`rigid`: one rigid-body world for all of them, rigid_world.h)
 	std::vector<std::pair<std::string, physics::Topple>> topples;
 	std::vector<std::pair<std::string, int>> physicsLines;
 	std::vector<speech::Line> lines;   // what the characters say (`say`)
@@ -429,6 +433,7 @@ struct Spec {
 	bool muteBirds = false;   // (`mute birds`: no birdsong, no eagles' cries, no geese - whatever flies in the picture)
 	bool draftMusic = true;   // (`music none`: no drafted score when there is no cues file)
 	toon_look::Style toon;    // the toon look (`toon`): written into every frame's header as its `# @rt-toon` line
+	double terminator = 0.0;  // the shadow terminator offset (`terminator`, shadow_terminator.h): written into every material of the frames; 0 none
 	std::string voices;       // what the characters' lines are said in unless a character says (`voices`): "" or "babble", "system", a word of a computer voice's name
 	bool actingWords = false; // `acting words`: each line brings the gesture and the expression its words ask for (film_acting.h), where the film gives none
 	// hands on the set and on each other (`touch`, `hold`, `hug`): reached for half a second before T0, held to T1, let go over half a second
@@ -476,6 +481,7 @@ struct Spec {
 	// the cartoon's ways of moving (film_motion.h): on twos (`animate`), squash and stretch (`squash`), follow-through (`jiggle`)
 	std::vector<motion::Stepping> stepping;
 	std::vector<motion::Amount> squash, jiggle;
+	std::vector<motion::Smear> smears;   // (`smear`: film_motion.h)
 };
 
 struct Parsed {

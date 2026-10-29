@@ -757,6 +757,10 @@ inline void flattenCamera(const pbrt_scene::Scene &scene, FlatScene &out) {
 			out.camera.vfov = 2.0 * std::atan(tanV) * 180.0 / 3.14159265358979323846;
 		}
 		out.camera.aperture = scene.cameraParams.getFloat("lensradius", 0.0) * 2.0;
+		// the aperture's shape (aperture_shape.h: Cycles' blades, rotation and ratio; our extension)
+		out.camera.apertureBlades = std::max(0, std::min(16, scene.cameraParams.getInt("blades", 0)));
+		out.camera.apertureRotation = scene.cameraParams.getFloat("bladesrotation", 0.0);
+		out.camera.apertureRatio = std::clamp(scene.cameraParams.getFloat("apertureratio", 1.0), 0.1, 10.0);
 		// pbrt-v4 spells this "focaldistance" for perspective/orthographic but
 		// "focusdistance" for realistic - reading both means a scene does not
 		// silently keep the 1e6 sentinel just because it used the other

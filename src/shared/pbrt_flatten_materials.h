@@ -1363,6 +1363,7 @@ inline void flattenOneMaterial(const pbrt_scene::Scene &scene, FlatScene &out,
 	m.linkGroup = md.linkGroup;
 	m.cameraVisible = md.cameraVisible, m.castsShadow = md.castsShadow;   // (ray visibility)
 	m.bevel = std::max(0.0, md.params.getFloat("bevel", 0.0));   // (rounded edges: bevel.h)
+	m.terminator = std::clamp(md.params.getFloat("terminator", 0.0), 0.0, 1.0);   // (round shadows on coarse smooth meshes: shadow_terminator.h)
 	m.name = md.name.empty() && md.linkedFrom >= 0 && static_cast<std::size_t>(md.linkedFrom) < scene.materials.size() ? scene.materials[static_cast<std::size_t>(md.linkedFrom)].name : md.name;
 	readMaterialBindings(scene, out, namedMaterialIndex, md, m);
 	readMaterialKindParams(scene, out, namedMaterialIndex, md, m);

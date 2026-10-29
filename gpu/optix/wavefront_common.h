@@ -53,6 +53,7 @@
 #include "../../src/shared/noise.h"
 #include "../../src/shared/ray_hash.h"   // pbrt-v4 stochastic alpha test hash - see wf_passes_alpha_cutout()
 #include "gpu_bump_map.h"                // grayscale "texture displacement" bump - see __closesthit__wf_triangle
+#include "../../src/shared/shadow_terminator.h"   // the shadow terminator offset - see __closesthit__wf_triangle
 
 // Wavefront launch params live in constant memory.
 extern "C" { __constant__ WavefrontLaunchParams wf_params; }
@@ -352,6 +353,7 @@ struct WfHitPayload {
 	// tangent_is_dpdu comment for the identical CPU-side reasoning.
 	float3 objDpdu;
 	float  uv_u, uv_v; // see HitWorkItem::uv_u/uv_v
+	float4 terminator; // see HitWorkItem::terminator (set by __raygen__wf_trace to zero before the trace, by __closesthit__wf_triangle when its material asks)
 };
 
 // transmittance <= 0.0f means fully occluded (subsumes the old plain `bool

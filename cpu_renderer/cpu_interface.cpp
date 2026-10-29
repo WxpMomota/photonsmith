@@ -245,6 +245,9 @@ static void applyCameraConfig(camera& cam, const CameraConfig& cc,
 	cam.background    = color(cc.bg_r, cc.bg_g, cc.bg_b);
 	cam.defocus_angle = cc.defocus_angle;  // 0 = no DOF blur
 	cam.focus_dist    = cc.focus_dist;
+	cam.aperture_blades = cc.aperture_blades;   // (the aperture's shape: aperture_shape.h)
+	cam.aperture_rotation = cc.aperture_rotation;
+	cam.aperture_ratio = cc.aperture_ratio;
 	cam.camera_is_animated = cc.animated;
 
 	if (cc.animated) {

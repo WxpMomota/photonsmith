@@ -226,6 +226,11 @@ struct GpuCameraParams {
 	float3 lower_left_offset;
 	float3 defocus_disk_u;  // Perspective DOF: disk basis vector (zero = disabled)
 	float3 defocus_disk_v;
+	// The aperture's shape (src/shared/aperture_shape.h, Cycles'): its blades (fewer than 3, as a zeroed camera has: round), their rotation in degrees, and the
+	// anamorphic ratio (0, a zeroed camera's, read as 1). gpu_lens_point().
+	int    apertureBlades;
+	float  apertureRotation;
+	float  apertureRatio;
 	float3 su, sv, sw;      // Spherical: world-space camera basis (right, up, forward);
 	                        // also reused by Realistic for its camera-to-world rotation
 	                        // (su=right, sv=up, sw=forward) - `origin` above doubles as

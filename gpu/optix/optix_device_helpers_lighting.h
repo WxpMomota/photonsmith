@@ -908,13 +908,17 @@ __device__ __forceinline__ ShadowRayState* shadow_state_from_payload() {
 // read it, not that the medium goes unattenuated for some other caller's
 // shadow ray that happens to cross the same sphere.
 __device__ __forceinline__ bool trace_shadow_ray(
-	const float3& origin,
+	const float3& origin_in,
 	const float3& direction,
 	float max_distance,
 	float* out_transmittance = nullptr,
 	float3* out_rgb = nullptr,
 	unsigned long long not_shadowing = 0ull   // shadow linking (light_link.h): a point, spot or distant light's PunctualLightGPU::notShadowing
 ) {
+	// The shadow terminator offset (terminator_device.h): from a smooth-shaded triangle near its terminator, the ray starts on the round surface instead - as much
+	// nearer the light as that moved it along the ray
+	const float3 origin = terminator_origin(origin_in, direction);
+	if (max_distance < 1e29f) max_distance = fmaxf(max_distance - dot(origin - origin_in, normalize(direction)), 0.0f);
 	// Pack shadow payload (bool: occluded, plus a running medium
 	// transmittance - see this function's own header comment above).
 	ShadowRayState shadow_state;
