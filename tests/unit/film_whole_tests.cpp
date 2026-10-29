@@ -5,6 +5,7 @@
 // built (RT_LAUNCHER=<path> names it; RT_REQUIRE_LAUNCHER=1 makes that a failure).
 #include <gtest/gtest.h>
 #include "fixture_skip.h"
+#include "test_parts.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -52,36 +53,53 @@ bool isFilmFile(const cartoon::Film &film) {
 
 }  // namespace
 
+// The films in test_parts.h's parts, so the Render tier's shards share them (one test of every film's baseline took 141 s of a shard, a quarter of the stills 126 s). The suite
+// is in the Render tier by its name (scripts/run_tests_parallel.ps1 $renderSuites). A part without a film passes at once.
+class FilmRenderTestParts : public ::testing::TestWithParam<int> {
+  protected:
+	// This part's films: every film the program has (the built-in ones and the film files), each in one part.
+	std::vector<const cartoon::Film *> films() const {
+		std::vector<const cartoon::Film *> out;
+		const std::vector<const cartoon::Film *> &all = cartoon::films();
+		for (std::size_t i = 0; i < all.size(); ++i)
+			if (test_parts::inPart(i, GetParam())) out.push_back(all[i]);
+		return out;
+	}
+};
+
 // Every film, shot by shot, is what the baseline recorded: a change to code the films share (the rig, the kit, a sky) that moves a film's scenes fails here, naming the film and
 // the shots. When a film is changed ON PURPOSE, record it again and look at what changed: `python scripts/anim/film.py baseline --write --exe x64/Release/ray_tracer.exe`.
-TEST(FilmRenderTest, EveryFilmsShotsAreWhatTheBaselineRecorded) {
+TEST_P(FilmRenderTestParts, EveryFilmsShotsAreWhatTheBaselineRecorded) {
 #ifndef _WIN32
 	GTEST_SKIP() << "the baseline is recorded on Windows: another platform's maths library differs in the last digits a scene's text keeps";
 #endif
+	const std::vector<const cartoon::Film *> mine = films();
+	if (mine.empty()) return;
 	const std::string launcher = findRayTracerLauncher();
 	if (launcher.empty()) GTEST_SKIP() << "ray_tracer was not found";
 	const std::filesystem::path baseline = std::filesystem::absolute("tests/data/film_baseline.txt");
 	if (!std::filesystem::exists(baseline)) RT_SKIP_MISSING_FIXTURE(baseline.string() << " is not next to the working directory");
-	const std::filesystem::path d = scratch("baseline");
-	const int rc = runLauncher(launcher, "--film-baseline \"" + baseline.string() + "\"", d / "out.txt");
+	const std::filesystem::path d = scratch("baseline" + std::to_string(GetParam()));
+	std::string keys;
+	for (const cartoon::Film *film : mine) keys += std::string(" ") + film->key;
+	const int rc = runLauncher(launcher, "--film-baseline \"" + baseline.string() + "\"" + keys, d / "out.txt");
 	const std::string out = slurpFile(d / "out.txt");
 	EXPECT_EQ(rc, 0) << "films that changed (kind, film, shot, name):\n" << out;
 	EXPECT_NE(out.find("the same ("), std::string::npos) << out;
 	std::size_t looked = 0;
 	if (const std::size_t at = out.find("("); at != std::string::npos) looked = std::strtoul(out.c_str() + at + 1, nullptr, 10);
-	EXPECT_GE(looked, 200u) << "every film's shots were looked at, the film files' too";
+	EXPECT_GE(looked, mine.size()) << "every film's shots were looked at:" << keys;
 }
 
 // Each film's still, rendered small: there is a picture - not black, not one flat colour, no NaN or infinity. (The film doctor looks harder - framing, brightness across cuts
 // - but by hand; this catches a film whose frames have gone black or empty, or a scene the renderer refuses, without anyone watching it.)
-// (In four slices, every fourth film each: the Render tier runs in shards, and one test of every film took two minutes.)
-static void checkStills(int slice, int slices) {
+TEST_P(FilmRenderTestParts, EveryFilmsStillRendersAPictureThatIsThere) {
+	const std::vector<const cartoon::Film *> mine = films();
+	if (mine.empty()) return;
 	const std::string launcher = findRayTracerLauncher();
 	if (launcher.empty()) GTEST_SKIP() << "ray_tracer was not found";
-	const std::filesystem::path d = scratch("stills" + std::to_string(slice));
-	int checked = 0, index = -1;
-	for (const cartoon::Film *film : cartoon::films()) {
-		if (++index % slices != slice) continue;
+	const std::filesystem::path d = scratch("stills" + std::to_string(GetParam()));
+	for (const cartoon::Film *film : mine) {
 		const std::filesystem::path out = d / (std::string(film->key) + ".exr"), log = d / (std::string(film->key) + ".log");
 		// (--preview: characters built coarser, which is most of a frame's making; 64 x 36 at 4 samples)
 		const int rc = runLauncher(launcher, "--cpu --preview --output \"" + out.string() + "\" --height 36 64 4 6 \"" + cartoon::cameraPathOf(*film) + "\"", log);
@@ -91,7 +109,6 @@ static void checkStills(int slice, int slices) {
 			ADD_FAILURE() << film->key << ": its still did not render (exit " << rc << "):\n" << slurpFile(log);
 			continue;
 		}
-		++checked;
 		double lo = 1e30, hi = 0.0, sum = 0.0;
 		int bad = 0;
 		for (std::size_t i = 0; i + 2 < rgb.size(); i += 3) {
@@ -107,12 +124,9 @@ static void checkStills(int slice, int slices) {
 		EXPECT_GT(hi - lo, 0.05 * hi) << film->key << ": its still is one flat colour (" << lo << " to " << hi << ")";
 		EXPECT_GT(sum / (w * h), 1e-4) << film->key << ": its still is all but black";
 	}
-	EXPECT_GE(checked, 5) << "the films were found and rendered";
 }
-TEST(FilmRenderTest, EveryFilmsStillRendersAPictureThatIsThere1) { checkStills(0, 4); }
-TEST(FilmRenderTest, EveryFilmsStillRendersAPictureThatIsThere2) { checkStills(1, 4); }
-TEST(FilmRenderTest, EveryFilmsStillRendersAPictureThatIsThere3) { checkStills(2, 4); }
-TEST(FilmRenderTest, EveryFilmsStillRendersAPictureThatIsThere4) { checkStills(3, 4); }
+INSTANTIATE_TEST_SUITE_P(Parts, FilmRenderTestParts, test_parts::all());
+
 
 // A film file's soundtrack, as the built-in films' are checked (CartoonSound.EveryFilmHasASoundtrackHeardFromStartToEnd): the same every time it is made, heard over its whole
 // length, never clipped, and at the loudness every soundtrack is brought to (-16 LUFS, cartoon_audio.h Mix::finish).

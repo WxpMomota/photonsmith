@@ -197,7 +197,7 @@ $gpuAndOversubscribingFilter = "*GPU*:*Gpu*:*gpu*:LivePreview*:WavefrontRenderTe
 # The CPU-render suites (see -Tier Render above), measured in a full serial run (October 2026, seconds in brackets): PbrtBackendAgreementTest [97], ChromaticMediaPerChannelTest [87],
 # BundledPbrtLightCoverageTest [72], PbrtReferencePackCpuTest [39], SceneBuilderRenderTest [23], PbrtReferenceTest [10], RenderIntegrationTest [8],
 # PbrtExampleSceneTest [6], SceneVolumeRenderTest [6]; FilmRenderTest (every film through the program: the baseline, stills, a video) added later. Parameterized suites carry a prefix ("Bundled/..."), hence the leading *. Anything that also matches the GPU filter stays in Slow.
-$renderSuites = "FilmRenderTest.*:PbrtBackendAgreementTest.*:ChromaticMediaPerChannelTest.*:*BundledPbrtLightCoverageTest.*:*PbrtReferencePackCpuTest.*:SceneBuilderRenderTest.*:PbrtReferenceTest.*:RenderIntegrationTest.*:*PbrtExampleSceneTest.*:SceneVolumeRenderTest.*"
+$renderSuites = "FilmRenderTest.*:*FilmRenderTestParts.*:PbrtBackendAgreementTest.*:ChromaticMediaPerChannelTest.*:*BundledPbrtLightCoverageTest.*:*PbrtReferencePackCpuTest.*:SceneBuilderRenderTest.*:PbrtReferenceTest.*:RenderIntegrationTest.*:*PbrtExampleSceneTest.*:SceneVolumeRenderTest.*"
 $renderFilter = "$renderSuites-$gpuAndOversubscribingFilter"
 $cheapExclusion = "${gpuAndOversubscribingFilter}:$renderSuites"
 
