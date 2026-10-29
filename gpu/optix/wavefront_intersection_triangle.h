@@ -303,7 +303,7 @@ extern "C" __global__ void __closesthit__wf_triangle() {
 		shadow_terminator::lift(V, N, b0, b1, b2, g, out);
 		float3 lift = make_float3(out[0], out[1], out[2]);
 		if (instBase >= 0) lift = optixTransformVectorFromObjectToWorldSpace(lift);
-		payload->terminator = make_float4(lift.x, lift.y, lift.z, terminatorCutoff);
+		payload->terminatorLift = dot(lift, front_face ? geom_normal : -geom_normal);   // (the lift is along the interpolated normal: kept as how far along the hit's normal)
 	}
 }
 

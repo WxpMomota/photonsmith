@@ -426,18 +426,28 @@ inline std::shared_ptr<const File> forFilm(const std::string &key) {
 }
 
 // A film's frame text at time t with its cameras file's change for the shot t falls in (the text as it is when the film has no file).
+// A frame's text with its seed in its look line when that look is an old film's (print_look.h `vintage`): its grain and dust change from frame to frame, whether the
+// cameras file or the scene's own header asked for it (t in hundredths of a second: a new seed every frame). A look line that gives its own seed keeps it.
+inline std::string withFrameSeed(std::string text, double t) {
+	const std::size_t at = text.find("# @rt-look"), world = text.find("WorldBegin");
+	if (at == std::string::npos || (world != std::string::npos && at > world)) return text;
+	std::size_t end = text.find('\n', at);
+	if (end == std::string::npos) end = text.size();
+	if (end > at && text[end - 1] == '\r') --end;
+	const std::string line = text.substr(at, end - at) + " ";
+	if (line.find("vintage") == std::string::npos || line.find(" seed ") != std::string::npos) return text;
+	return text.insert(end, " seed " + std::to_string(std::llround(std::max(0.0, t) * 100.0)));
+}
+
 inline std::string at(const std::string &key, const std::function<std::vector<double>()> &starts, const std::vector<std::string> &shotNames, double t, const std::string &text) {
 	const std::shared_ptr<const File> file = forFilm(key);
-	if (!file || file->empty()) return text;
+	if (!file || file->empty()) return withFrameSeed(text, t);
 	const std::vector<double> shotStarts = starts ? starts() : std::vector<double>();
 	int shot = 0;
 	for (std::size_t i = 0; i < shotStarts.size(); ++i)
 		if (t >= shotStarts[i]) shot = static_cast<int>(i);
 	const std::string name = shot < static_cast<int>(shotNames.size()) ? shotNames[static_cast<std::size_t>(shot)] : std::string();
-	Change c = changeFor(*file, shot, name);
-	// an old film's grain and dust change from frame to frame (print_look.h): the look is given the frame's seed (t in hundredths of a second: a new one every frame)
-	if (c.look.find("vintage") != std::string::npos) c.look += " seed " + std::to_string(std::llround(std::max(0.0, t) * 100.0));
-	return shot_cameras::apply(text, c);
+	return withFrameSeed(shot_cameras::apply(text, changeFor(*file, shot, name)), t);
 }
 
 }  // namespace shot_cameras

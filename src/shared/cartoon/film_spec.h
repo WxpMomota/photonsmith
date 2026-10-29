@@ -434,6 +434,7 @@ struct Spec {
 	bool draftMusic = true;   // (`music none`: no drafted score when there is no cues file)
 	toon_look::Style toon;    // the toon look (`toon`): written into every frame's header as its `# @rt-toon` line
 	double terminator = 0.0;  // the shadow terminator offset (`terminator`, shadow_terminator.h): written into every material of the frames; 0 none
+	std::string version;      // (not a line: a hash of the film file's text as read - what a simulation kept between frames is kept under, film_cloth.h)
 	std::string voices;       // what the characters' lines are said in unless a character says (`voices`): "" or "babble", "system", a word of a computer voice's name
 	bool actingWords = false; // `acting words`: each line brings the gesture and the expression its words ask for (film_acting.h), where the film gives none
 	// hands on the set and on each other (`touch`, `hold`, `hug`): reached for half a second before T0, held to T1, let go over half a second

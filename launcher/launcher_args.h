@@ -418,6 +418,9 @@ struct LaunchArgs {
 	// --ppm-only: write the picture as a PPM and no PNG beside it. A cartoon video's frame runs are started with it (the video turns each PPM into its numbered PNG itself and deletes the
 	// frame run's own PNG, so making one was a second encode of every frame); people have no use for it.
 	bool ppm_only = false;
+	// --defer-print: leave the look's print (halftone, watercolor, vintage: print_look.h) off the picture. A film's frames get it when the video denoises them over time (--temporal-
+	// denoise): it goes on after the denoising (film_temporal.h), which would otherwise average a vintage film's grain and dust away and blur its weave.
+	bool defer_print = false;
 	// --preview: a quick look at a film: its sculpted characters three times coarser (RAY_TRACER_FILM_PREVIEW, cartoon_lib.h previewCoarsening; set for the programs the
 	// video starts too), its frames in a folder of their own (frames-<key>-preview). With a small size, few samples and --draft: a whole film in minutes (film.py preview).
 	bool preview = false;
@@ -1004,6 +1007,9 @@ inline FlagResult handle_image_and_video_flag(const std::string& arg, int argc, 
 		}
 	} else if (arg == "--ppm-only") {
 		out.ppm_only = true;
+		consumed_args.insert(i);
+	} else if (arg == "--defer-print") {
+		out.defer_print = true;
 		consumed_args.insert(i);
 	} else if (arg == "--preview") {
 		out.preview = true;

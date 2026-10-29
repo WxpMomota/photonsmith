@@ -1678,7 +1678,7 @@ extern "C" __global__ void evaluate_materials(
 	// entry/exit surfaces) - see this function's own eventEta local comment.
 	// The radiance-mode eta^2 of a crossing goes into the throughput, not etaScale (see wavefront_kernels_materials_dielectric.cu).
 	attenuation = attenuation * (eventEta * eventEta);
-	wf_finish_material_scatter(effectiveMatType, matEta, h.materialIdx, h.linkGroup, (bool)h.any_nonspecular, glossyAlphaForNEE, glossyAlphaVForNEE, h.etaScale, h.filterWeight, maxComponentValue, normal, h.geomNormal, hit_point, h.terminator, h.objDpdu, seed,
+	wf_finish_material_scatter(effectiveMatType, matEta, h.materialIdx, h.linkGroup, (bool)h.any_nonspecular, glossyAlphaForNEE, glossyAlphaVForNEE, h.etaScale, h.filterWeight, maxComponentValue, normal, h.geomNormal, hit_point, h.terminatorLift, h.objDpdu, seed,
 		throughput, radiance, swl, attenuation, scattered_dir, is_specular, brdf_pdf_override,
 		phaseWo, phaseG,
 		h.pixelIndex, h.depth,

@@ -353,7 +353,7 @@ struct WfHitPayload {
 	// tangent_is_dpdu comment for the identical CPU-side reasoning.
 	float3 objDpdu;
 	float  uv_u, uv_v; // see HitWorkItem::uv_u/uv_v
-	float4 terminator; // see HitWorkItem::terminator (set by __raygen__wf_trace to zero before the trace, by __closesthit__wf_triangle when its material asks)
+	float  terminatorLift; // see HitWorkItem::terminatorLift (set by __raygen__wf_trace to zero before the trace, by __closesthit__wf_triangle when its material asks)
 };
 
 // transmittance <= 0.0f means fully occluded (subsumes the old plain `bool

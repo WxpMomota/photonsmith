@@ -1015,9 +1015,11 @@ inline int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
     }
     // --temporal-denoise: the finished frames denoised with their neighbours into frames/temporal, which the video is made from (film_temporal.h)
     std::filesystem::path assemble_from = paths.frames_dir;
-    if (const cartoon::Film *film = cartoon::forCameraPath(s.camera_path.c_str()); film && args.temporal_radius > 0 && converted == render_frame_count) {
-        std::cout << "\nDenoising the frames of " << film->name << " with the " << args.temporal_radius << " either side of each..." << std::endl;
-        const int made = film_temporal::apply(*film, paths.frames_dir, render_frame_count, args.temporal_radius);
+    // (its frames were rendered without the look's print, --defer-print: it goes on here, after the denoising - and with no denoising when frames are missing)
+    if (const cartoon::Film *film = cartoon::forCameraPath(s.camera_path.c_str()); film && args.temporal_radius > 0) {
+        const int radius = converted == render_frame_count ? args.temporal_radius : 0;
+        std::cout << "\nDenoising the frames of " << film->name << " with the " << radius << " either side of each..." << std::endl;
+        const int made = film_temporal::apply(*film, paths.frames_dir, render_frame_count, radius, args.look_words);
         std::cout << "Denoised " << made << " frame(s) (the others were already, from the same frames)." << std::endl;
         assemble_from = paths.frames_dir / film_temporal::kFolder;
     }

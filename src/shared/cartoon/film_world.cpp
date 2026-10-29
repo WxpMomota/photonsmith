@@ -730,7 +730,10 @@ std::string DataFilm::clothAt(double t) const {
 				return true;
 			};
 		}
-		out += cloth::text(spec.key.empty() ? std::string("film") : spec.key, cl, w, t);
+		// (kept between frames under the film's own text and its wind: an edited walk, cape or wind starts the cloth again rather than going on from what it was)
+		char wind[96];
+		std::snprintf(wind, sizeof wind, "@%g,%g,%g", w.wind.x, w.wind.y, w.wind.z);
+		out += cloth::text((spec.key.empty() ? std::string("film") : spec.key) + "@" + spec.version + wind, cl, w, t);
 	}
 	return out;
 }

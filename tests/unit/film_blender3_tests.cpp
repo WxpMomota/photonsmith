@@ -13,6 +13,7 @@
 #include "../../src/shared/aperture_shape.h"
 #include "../../src/shared/cartoon/cartoon_films.h"   // (the films themselves, which these tests reach into)
 #include "../../src/shared/cartoon/rigid_world.h"
+#include "../../launcher/film_temporal.h"   // (the print after a temporal denoise)
 
 namespace ff = cartoon::film_file;
 
@@ -119,6 +120,27 @@ TEST(FilmRigid, AFilmsRigidLineMovesItsBlockFromWhereTheSceneHasIt) {
 	ff::DataFilm bad;
 	EXPECT_NE(loadFilm("rigid_bad", "scene s.pbrt\nlength 3\nrigid b1 cone 1 at 0 0 0\n", bad), "");
 	EXPECT_NE(loadFilm("rigid_mass", "scene s.pbrt\nlength 3\nrigid b1 sphere 0.1 at 0 0 0 mass 0\n", bad), "");
+}
+
+// ---- an old film's seed, and its print after a temporal denoise ----
+
+TEST(FilmVintage, EveryFrameOfAnOldFilmHasItsOwnSeedWhereverItsLookLineComesFrom) {
+	namespace sc = cartoon::shot_cameras;
+	const std::string scene = "# @rt-look vintage 1\nLookAt 0 0 0  0 0 -1  0 1 0\nWorldBegin\n";
+	const std::string a = sc::withFrameSeed(scene, 1.0), b = sc::withFrameSeed(scene, 1.0417);
+	EXPECT_NE(a.find("# @rt-look vintage 1 seed 100\n"), std::string::npos) << a;
+	EXPECT_NE(a, b) << "the next frame another seed";
+	EXPECT_EQ(sc::withFrameSeed("# @rt-look vintage 1 seed 7\nWorldBegin\n", 3.0), "# @rt-look vintage 1 seed 7\nWorldBegin\n") << "a seed given is kept";
+	EXPECT_EQ(sc::withFrameSeed("# @rt-look bloom 0.2\nWorldBegin\n", 3.0), "# @rt-look bloom 0.2\nWorldBegin\n") << "no old film, no seed";
+	// the print the denoising puts on after it (--defer-print): the frame header's look, then the run's own words
+	cartoon::Film film{};
+	film.duration = 2.0;
+	film.headerAt = [&](double t) { return sc::withFrameSeed(scene, t); };
+	const print_look::Params p = film_temporal::printOf(film, 24, 48, "vintage-tone 0.2");
+	EXPECT_EQ(p.vintage, 1.0);
+	EXPECT_EQ(p.seed, 100);
+	EXPECT_EQ(p.vintageTone, 0.2);
+	EXPECT_FALSE(film_temporal::printOf(cartoon::Film{}, 0, 1, "").active());
 }
 
 // ---- the shadow terminator offset on every material ----

@@ -171,7 +171,7 @@ extern "C" __global__ void resolve_bssrdf_exit(
 		item.filterWeight,
 		maxComponentValue,
 		item.exitNormal, /*geomNormal=*/make_float3(0.0f, 0.0f, 0.0f), item.exitPos,
-		/*terminator=*/make_float4(0.0f, 0.0f, 0.0f, 0.0f),   // (a subsurface exit point: no lift)
+		/*terminatorLift=*/0.0f,   // (a subsurface exit point: no lift)
 		/*dpdu=*/make_float3(0.0f, 0.0f, 0.0f),  // never reaches glossy_isType - see glossyAlpha comment above
 		seed,
 		weightedThroughput, radiance, swl, attenuation, scattered_dir,

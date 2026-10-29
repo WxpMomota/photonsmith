@@ -6,7 +6,9 @@
 // object IDs that pick out each `cast/NAME`), not a render: seconds for a stretch of a few seconds, to check timing, arcs and spacing before rendering anything.
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <random>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -59,7 +61,9 @@ inline int run(int argc, char **argv) {
 		const std::size_t world = text.find("WorldBegin");
 		return world == std::string::npos ? text : header + text.substr(world + std::string("WorldBegin").size()) ;
 	};
-	const std::filesystem::path file = std::filesystem::temp_directory_path() / ("photonsmith_onion_" + std::to_string(std::rand()) + ".pbrt");
+	// (a name of its own: two sheets made at once must not rewrite each other's scene)
+	const std::filesystem::path file = std::filesystem::temp_directory_path() /
+		("photonsmith_onion_" + std::to_string(std::random_device{}()) + "_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".pbrt");
 	char id[64] = "";
 	const std::size_t n = static_cast<std::size_t>(w) * h;
 	std::vector<float> planes(n * 12);

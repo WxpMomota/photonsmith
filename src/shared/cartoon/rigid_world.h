@@ -173,9 +173,12 @@ inline bool nearby(const Body &a, const Body &b) {
 
 // The world worked out: every body's pose at each step from time 0, and the hard landings (for the soundtrack).
 struct Run {
-	double step = 1.0 / 480.0;
-	std::vector<std::vector<Pose>> poses;   // [step][body]
+	double step = 1.0 / 480.0;              // the simulation's step
+	int keepEvery = 4;                      // poses kept every this many steps (120 a second: a frame falls between two, as close as the eye can tell)
+	std::size_t bodies = 0;
+	std::vector<Pose> poses;                // [kept step * bodies + body]
 	std::vector<physics::Impact> impacts;
+	std::size_t kept() const { return bodies ? poses.size() / bodies : 0; }
 };
 
 inline Run simulate(const std::vector<BodyDef> &defs, double seconds, double ground = 0.0) {
@@ -203,12 +206,12 @@ inline Run simulate(const std::vector<BodyDef> &defs, double seconds, double gro
 	const double dt = run.step;
 	std::vector<char> pushed(defs.size(), 0);
 	std::vector<double> lastImpact(defs.size(), -1.0);
-	run.poses.reserve(static_cast<std::size_t>(steps));
+	run.bodies = bodies.size();
+	run.poses.reserve(static_cast<std::size_t>(steps / run.keepEvery + 1) * bodies.size());
 	for (int s = 0; s < steps; ++s) {
 		const double time = s * dt;
-		std::vector<Pose> now(bodies.size());
-		for (std::size_t i = 0; i < bodies.size(); ++i) now[i] = {bodies[i].x, bodies[i].q};
-		run.poses.push_back(std::move(now));
+		if (s % run.keepEvery == 0)
+			for (const Body &b : bodies) run.poses.push_back({b.x, b.q});
 		// pushes, and gravity on what is awake
 		for (std::size_t i = 0; i < bodies.size(); ++i) {
 			Body &b = bodies[i];
@@ -314,16 +317,19 @@ inline Run simulate(const std::vector<BodyDef> &defs, double seconds, double gro
 	return run;
 }
 
-// The poses at time t of a run (between its steps: the middle's place in a straight line, the turn the nearer one's).
+// The poses at time t of a run (between its kept steps: the middle's place in a straight line, the turn blended the short way round).
 inline std::vector<Pose> posesAt(const Run &run, double t) {
-	if (run.poses.empty()) return {};
-	const double s = std::clamp(t / run.step, 0.0, static_cast<double>(run.poses.size() - 1));
-	const std::size_t i = static_cast<std::size_t>(s), j = std::min(run.poses.size() - 1, i + 1);
+	const std::size_t kept = run.kept();
+	if (kept == 0) return {};
+	const double s = std::clamp(t / (run.step * run.keepEvery), 0.0, static_cast<double>(kept - 1));
+	const std::size_t i = static_cast<std::size_t>(s), j = std::min(kept - 1, i + 1);
 	const double f = s - static_cast<double>(i);
-	std::vector<Pose> out = run.poses[i];
-	for (std::size_t k = 0; k < out.size(); ++k) {
-		out[k].at = run.poses[i][k].at + (run.poses[j][k].at - run.poses[i][k].at) * f;
-		if (f > 0.5) out[k].q = run.poses[j][k].q;
+	std::vector<Pose> out(run.bodies);
+	for (std::size_t k = 0; k < run.bodies; ++k) {
+		const Pose &a = run.poses[i * run.bodies + k], &b = run.poses[j * run.bodies + k];
+		out[k].at = a.at + (b.at - a.at) * f;
+		const double sign = a.q.w * b.q.w + a.q.x * b.q.x + a.q.y * b.q.y + a.q.z * b.q.z < 0.0 ? -1.0 : 1.0;   // (the turn between them the short way round)
+		out[k].q = qnorm({a.q.w + (sign * b.q.w - a.q.w) * f, a.q.x + (sign * b.q.x - a.q.x) * f, a.q.y + (sign * b.q.y - a.q.y) * f, a.q.z + (sign * b.q.z - a.q.z) * f});
 	}
 	return out;
 }

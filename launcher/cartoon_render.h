@@ -55,6 +55,7 @@ inline std::vector<std::string> frameFlags(const LaunchArgs &args, const cartoon
 	// noisy at 500 samples for their pixels to stop, and cost what they did.
 	if (gpu && !args.adaptive_sampling && !args.no_adaptive) flags.push_back("--adaptive");
 	flags.push_back("--ppm-only");   // (the video makes the PNG of every frame itself: video_render.h, BackgroundPngConverter)
+	if (args.temporal_radius > 0) flags.push_back("--defer-print");   // (the look's print goes on after the frames are denoised over time: film_temporal.h)
 	return flags;
 }
 

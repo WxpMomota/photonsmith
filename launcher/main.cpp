@@ -821,7 +821,8 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
         if (!marks.empty() && !is_exr_output_path(out_path) && !marks_frame::apply(out_path, marks, problem))
             std::cerr << "WARNING: the cartoon marks could not be drawn (" << problem << ")." << std::endl;
         // and the picture on paper or film (the look's halftone, watercolor, vintage: src/shared/print_look.h), on the finished picture
-        if (render_opts.output.look.print.active() && !is_exr_output_path(out_path) && !marks_frame::print(out_path, render_opts.output.look.print, problem))
+        // (left for later with --defer-print: a film denoised over time gets it after the denoising, film_temporal.h)
+        if (render_opts.output.look.print.active() && !args.defer_print && !is_exr_output_path(out_path) && !marks_frame::print(out_path, render_opts.output.look.print, problem))
             std::cerr << "WARNING: the look's print (halftone, watercolor, vintage) could not be made (" << problem << ")." << std::endl;
     }
     if (render_result == 0 && !args.aovs) cutToScenePicture(args, scene_id, out_path);

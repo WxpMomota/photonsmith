@@ -22,6 +22,9 @@
 
 #include "cartoon_render.h"
 #include "film_captions.h"   // (its picture reading and writing)
+#include "marks_frame.h"     // (the print on a picture's file)
+#include "../src/shared/lens_look.h"
+#include "../src/shared/print_look.h"
 #include "../src/shared/cartoon/cartoons.h"
 
 namespace film_temporal {
@@ -96,9 +99,26 @@ inline std::string stampOf(const std::filesystem::path &p) {
 }
 }  // namespace detail
 
-// Denoises the `count` finished frames of `dir` into dir/temporal, with `radius` frames either side; returns how many it made (the others were made already from the same
-// frames). The folder then holds every frame the video is assembled from.
-inline int apply(const cartoon::Film &film, const std::filesystem::path &dir, int count, int radius) {
+// The look's print (print_look.h: halftone, watercolor, vintage) of frame `i` of `count`: its header's `# @rt-look` line (a film's cameras file writes one, with the frame's
+// seed) and then the run's own --look words. The frames were rendered without it (--defer-print) and get it here, after the denoising, which would average a vintage film's
+// grain and dust away.
+inline print_look::Params printOf(const cartoon::Film &film, int i, int count, const std::string &lookWords) {
+	lens_look::Look look;
+	if (film.headerAt) {
+		const std::string head = film.headerAt(film.duration * i / std::max(1, count));
+		const std::size_t at = head.find("# @rt-look");
+		if (at != std::string::npos) {
+			const std::size_t from = at + std::string("# @rt-look").size(), end = head.find('\n', from);
+			lens_look::parse(head.substr(from, end == std::string::npos ? std::string::npos : end - from), look);
+		}
+	}
+	if (!lookWords.empty()) lens_look::parse(lookWords, look);
+	return look.print;
+}
+
+// Denoises the `count` finished frames of `dir` into dir/temporal, with `radius` frames either side, and puts each frame's print on after (printOf); returns how many it made
+// (the others were made already from the same frames). The folder then holds every frame the video is assembled from.
+inline int apply(const cartoon::Film &film, const std::filesystem::path &dir, int count, int radius, const std::string &lookWords = std::string()) {
 	namespace fs = std::filesystem;
 	const fs::path out = dir / kFolder;
 	fs::create_directories(out);
@@ -132,14 +152,22 @@ inline int apply(const cartoon::Film &film, const std::filesystem::path &dir, in
 				sources += " " + std::to_string(j) + "=" + detail::stampOf(dir / cartoon_render::encName(j));
 			}
 		const fs::path target = out / cartoon_render::encName(i);
+		const print_look::Params print = printOf(film, i, count, lookWords);
+		if (print.active()) {   // (a changed print makes the frame again)
+			char words[160];
+			std::snprintf(words, sizeof words, " print %g %g %g %g %g %d", print.halftone, print.halftoneMix, print.watercolor, print.vintage, print.vintageTone, print.seed);
+			sources += words;
+		}
 		if (made.count(i) && made[i] == sources && fs::exists(target)) continue;
 		for (auto it = loaded.begin(); it != loaded.end();) it = it->first < i - radius ? loaded.erase(it) : std::next(it);
 		for (int j : used)
 			if (!loaded.count(j)) loaded[j] = load(dir / cartoon_render::encName(j));
-		// (a frame that cannot be read or written denoised goes in as it is: a hole stopped ffmpeg at it, and the video and its sound came out short)
+		// (a frame that cannot be read or written denoised goes in as it is - with its print, which it lacks: a hole stopped ffmpeg at it, and the video and its sound came out short)
 		const auto asItIs = [&] {
 			std::error_code copied;
 			fs::copy_file(dir / cartoon_render::encName(i), target, fs::copy_options::overwrite_existing, copied);
+			std::string why;
+			if (!copied && print.active()) marks_frame::print(target.string(), print, why);
 		};
 		const Frame *self = loaded[i].get();
 		if (!self) {
@@ -149,7 +177,13 @@ inline int apply(const cartoon::Film &film, const std::filesystem::path &dir, in
 		std::vector<const Frame *> neighbours;
 		for (int j : used)
 			if (j != i && loaded[j] && loaded[j]->w == self->w && loaded[j]->h == self->h) neighbours.push_back(loaded[j].get());
-		const std::vector<unsigned char> picture = denoise(*self, neighbours);
+		std::vector<unsigned char> picture = denoise(*self, neighbours);
+		if (print.active()) {   // the print, on the denoised picture
+			std::vector<float> shown(picture.size());
+			for (std::size_t k = 0; k < picture.size(); ++k) shown[k] = picture[k] / 255.0f;
+			print_look::apply(shown.data(), self->w, self->h, print);
+			for (std::size_t k = 0; k < picture.size(); ++k) picture[k] = static_cast<unsigned char>(std::lround(std::clamp(shown[k], 0.0f, 1.0f) * 255.0f));
+		}
 		const fs::path tmp = out / (cartoon_render::encName(i) + ".tmp.png");
 		if (!write_png(tmp.string().c_str(), self->w, self->h, picture.data())) {
 			asItIs();

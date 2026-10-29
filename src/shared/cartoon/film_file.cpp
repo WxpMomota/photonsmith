@@ -55,6 +55,7 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 	Parsed p = parse(text, filePath, castBefore.empty() ? nullptr : &castBefore);
 	if (!p.ok) return p.error;
 	spec = p.spec;
+	spec.version = std::to_string(std::hash<std::string>{}(text));
 	if (partIndex >= 0) {
 		spec.key = (parts.key.empty() ? detail::keyFromFileName(filePath) : parts.key) + "--" + std::to_string(partIndex + 1);
 		spec.name = parts.parts[static_cast<std::size_t>(partIndex)].name;
@@ -1370,14 +1371,24 @@ std::string DataFilm::terminated(std::string text) const {
 	if (spec.terminator <= 0.0) return text;
 	char words[64];
 	std::snprintf(words, sizeof words, " \"float terminator\" [ %g ]", spec.terminator);
-	for (const std::string key : {"Material \"", "MakeNamedMaterial \""})
-		for (std::size_t at = text.find(key); at != std::string::npos; at = text.find(key, at + 1)) {
-			if (at > 0 && text[at - 1] != '\n' && text[at - 1] != ' ' && text[at - 1] != '\t') continue;   // (a statement: not the end of MakeNamedMaterial)
-			const std::size_t close = text.find('"', at + key.size());   // (after its type, or its name: the parameters' order is free)
-			if (close == std::string::npos) break;
-			text.insert(close + 1, words);
-		}
-	return text;
+	// one pass, the text copied once (a frame is megabytes, with thousands of materials): after each `Material "TYPE"` and `MakeNamedMaterial "NAME"` - a statement, not the
+	// end of a longer word (NamedMaterial, MakeNamedMaterial's own `Material "`) - the words, the parameters' order being free
+	const std::string key = "Material \"";
+	std::string out;
+	out.reserve(text.size() + text.size() / 64);
+	std::size_t copied = 0;
+	for (std::size_t at = text.find(key); at != std::string::npos; at = text.find(key, at + 1)) {
+		const bool plain = at == 0 || text[at - 1] == '\n' || text[at - 1] == ' ' || text[at - 1] == '\t';
+		const bool made = at >= 9 && text.compare(at - 9, 9, "MakeNamed") == 0 && (at == 9 || text[at - 10] == '\n' || text[at - 10] == ' ' || text[at - 10] == '\t');
+		if (!plain && !made) continue;
+		const std::size_t close = text.find('"', at + key.size());   // (after its type, or its name)
+		if (close == std::string::npos) break;
+		out.append(text, copied, close + 1 - copied);
+		out += words;
+		copied = close + 1;
+	}
+	out.append(text, copied, std::string::npos);
+	return out;
 }
 
 double DataFilm::acrossShotTime(double t) const {
