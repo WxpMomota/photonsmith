@@ -89,6 +89,8 @@ TEST_P(FilmRenderTestParts, EveryFilmsShotsAreWhatTheBaselineRecorded) {
 	std::size_t looked = 0;
 	if (const std::size_t at = out.find("("); at != std::string::npos) looked = std::strtoul(out.c_str() + at + 1, nullptr, 10);
 	EXPECT_GE(looked, mine.size()) << "every film's shots were looked at:" << keys;
+	for (const cartoon::Film *film : mine)   // (the program says each film it looks at: "<key>...")
+		EXPECT_NE(out.find(std::string(film->key) + "..."), std::string::npos) << film->key << ": the program did not look at it:\n" << out;
 }
 
 // Each film's still, rendered small: there is a picture - not black, not one flat colour, no NaN or infinity. (The film doctor looks harder - framing, brightness across cuts

@@ -170,7 +170,11 @@ if ($Tier -eq "Split") {
 			# (how long each part took: the longer of the two is what a Split run waits for, so that is the one to speed up)
 			$partSeconds = ($child.Process.ExitTime - $child.Process.StartTime).TotalSeconds
 			Write-Host ("----- {0} ({1:N0} s) -----" -f $child.Name, $partSeconds) -ForegroundColor Cyan
-			Get-Content (Join-Path $splitLogDir "$($child.Name).log") | Select-Object -Last 12
+			# (its failing shards' lines - which name the failed tests - then its summary: the summary's end alone, with the slowest tests in it, no longer reached them)
+			$partLog = @(Get-Content (Join-Path $splitLogDir "$($child.Name).log"))
+			$tail = @($partLog | Select-Object -Last 12)
+			$partLog | Where-Object { $_ -match '^\[FAIL\]' -and $tail -notcontains $_ }
+			$tail
 		}
 		$renderExit = ($children | Where-Object Name -eq "Render").Process.ExitCode
 		$slowExit = ($children | Where-Object Name -eq "Slow").Process.ExitCode

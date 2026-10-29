@@ -1020,6 +1020,8 @@ int main(int argc, char** argv) {
 			if (std::string(argv[i]) == "--write") write = true;
 			else keys.push_back(argv[i]);
 		}
+		for (const std::string &key : keys)   // (a film this program does not have was left out without a word, and its shots were never compared)
+			if (!cartoon::find(key.c_str())) return std::cerr << "--film-baseline: no film \"" << key << "\"" << cartoon::whyNoFilm(key) << std::endl, EXIT_FAILURE;
 		std::string text;
 		{
 			std::ifstream in(file, std::ios::binary);
