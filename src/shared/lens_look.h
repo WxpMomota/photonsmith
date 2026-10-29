@@ -18,6 +18,9 @@
 // And god rays: `sunbeams S` streaks the light of the sun (or a lamp) out across the frame from where it is (sun_beams.h: Blender's compositor Sun Beams node), S how
 // much (0..2); `sunbeams-length L` how far (0..1 of the way to the source), `sunbeams-threshold T` the linear luminance that sends beams (1), `sunbeams-at X Y` where the
 // source is (0..1 across and down, outside the picture too; without it, the middle of the brightest light).
+//
+// And the picture on paper or film (print_look.h, made on the finished picture by the program that writes it): `halftone SIZE` (a comic's dots), `watercolor W`,
+// `vintage V` (an old film print; `vintage-tone`, and `seed`: the frame's, which a film writes).
 
 #include <algorithm>
 #include <cmath>
@@ -29,6 +32,7 @@
 #include <vector>
 
 #include "kuwahara.h"
+#include "print_look.h"
 #include "sun_beams.h"
 #include "ppm_text.h"
 
@@ -68,6 +72,9 @@ struct Look {
 	// `tonemap NAME`: the curve that turns the light into the picture's colours (tone_map.h: aces, agx, neutral, reinhard, none); empty: the render's own (--tonemap, aces).
 	// A film's choice (its cameras file's `tonemap`, shot_cameras.h); not applied here - the picture writers read it (a --tonemap given on the command line wins).
 	std::string tonemap;
+	// the picture printed or painted on paper, or shown from an old film (print_look.h: halftone, watercolor, vintage): read here, made by the program that writes the
+	// finished picture, last of all, on the picture as shown (not in apply below, which works on the light)
+	print_look::Params print;
 	bool graded() const {
 		for (int k = 0; k < 3; ++k)
 			if (lift[k] != 0.0 || gamma[k] != 1.0 || gain[k] != 1.0 || tint[k] != 1.0) return true;
@@ -148,8 +155,15 @@ inline std::string parse(const std::string &text, Look &out) {
 		else if (word == "sunbeams") out.sunbeams = std::clamp(v, 0.0, 2.0);
 		else if (word == "sunbeams-length") out.sunbeamsLength = std::clamp(v, 0.0, 1.0);
 		else if (word == "sunbeams-threshold") out.sunbeamsThreshold = std::clamp(v, 0.0, 1000.0);
+		else if (word == "halftone") out.print.halftone = std::clamp(v, 0.0, 60.0);
+		else if (word == "halftone-mix") out.print.halftoneMix = std::clamp(v, 0.0, 1.0);
+		else if (word == "watercolor" || word == "watercolour") out.print.watercolor = std::clamp(v, 0.0, 2.0);
+		else if (word == "vintage") out.print.vintage = std::clamp(v, 0.0, 2.0);
+		else if (word == "vintage-tone") out.print.vintageTone = std::clamp(v, 0.0, 1.0);
+		else if (word == "seed") out.print.seed = static_cast<int>(std::clamp(v, -1e9, 1e9));
 		else return "unknown word \"" + word + "\" (bloom, bloom-radius, flare, star, star-points, star-angle, star-length, star-threshold, vignette, warmth, saturation, lift, "
-					"gamma, gain, tint, tonemap, paint, paint-sharpness, paint-stretch, paint-smoothness, sunbeams, sunbeams-length, sunbeams-threshold, sunbeams-at)";
+					"gamma, gain, tint, tonemap, paint, paint-sharpness, paint-stretch, paint-smoothness, sunbeams, sunbeams-length, sunbeams-threshold, sunbeams-at, halftone, "
+					"halftone-mix, watercolor, vintage, vintage-tone, seed)";
 	}
 	return "";
 }

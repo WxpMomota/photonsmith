@@ -434,7 +434,10 @@ inline std::string at(const std::string &key, const std::function<std::vector<do
 	for (std::size_t i = 0; i < shotStarts.size(); ++i)
 		if (t >= shotStarts[i]) shot = static_cast<int>(i);
 	const std::string name = shot < static_cast<int>(shotNames.size()) ? shotNames[static_cast<std::size_t>(shot)] : std::string();
-	return shot_cameras::apply(text, changeFor(*file, shot, name));
+	Change c = changeFor(*file, shot, name);
+	// an old film's grain and dust change from frame to frame (print_look.h): the look is given the frame's seed (t in hundredths of a second: a new one every frame)
+	if (c.look.find("vintage") != std::string::npos) c.look += " seed " + std::to_string(std::llround(std::max(0.0, t) * 100.0));
+	return shot_cameras::apply(text, c);
 }
 
 }  // namespace shot_cameras

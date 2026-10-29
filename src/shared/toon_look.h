@@ -28,6 +28,11 @@
 // Different looks for the characters and the set (Blender's view layers in the compositor, through the object IDs: a film's characters are the `cast/...` groups):
 // `cel cast` bands the characters' light only, `cel set` the set's only; `paint SIZE` paints the picture (kuwahara.h, SIZE pixels at 1080) where `paint-on` says - the
 // set (the default), the cast or all - before the bands: painted sets and graphic characters, Arcane's and Spider-Verse's mix.
+// A rim of light, as a toon material's Fresnel band (Blender's Layer Weight into a ramp): `rim R` brightens a band `rim-width` pixels wide inside the outline, on the lit
+// side (`rim-angle DEG` names the side instead: the light's direction on the screen), `rim-shadow` of it on the other, in `rim-colour`, on `rim-on` (cast, set, all;
+// auto, the default: the film's characters when the scene has any, else everything - a far horizon has an outline too). And hatching in the shadows:
+// `hatch SPACING` draws ink lines (`hatch-style lines`), crossed in the deepest shadow (`cross`, the default), or a screentone's dots (`dots`), at `hatch-angle`, as
+// dark as `hatch-amount` - in the picture's plane, as a pen or a sheet of screentone draws them.
 // Set by a scene file's `# @rt-toon [bands N] [lines W] [ink COLOUR] [saturation S] [shadow S]` line (a film writes one into every frame: film_file.h `toon`), or by
 // --toon (the scene's style, or the default one). Off by default: a picture without it is the rendered one.
 
@@ -66,6 +71,14 @@ struct Style {
 	std::string celOn = "all";                  // where: all, cast (the film's characters) or set (the rest)
 	double paint = 0.0;                         // a painted layer: the strokes' size in pixels at 1080 (0: none), on `paintOn` (all, cast or set)
 	std::string paintOn = "set";
+	// a rim of light along the outline (the Layer Weight / Fresnel band of Blender's toon materials): how strong (0 none), how wide (pixels at 1080), its colour,
+	// the screen direction it comes from (degrees anticlockwise from the right; below 0: the lit side, found from the light), and how much of it the unlit side keeps
+	double rim = 0.0, rimWidth = 5.0, rimColour[3] = {1.0, 1.0, 1.0}, rimAngle = -1.0, rimShadow = 0.2;
+	std::string rimOn = "auto";                 // where: all, cast (the characters), set, or auto (the cast when the scene has one, else all)
+	// hatching in the shadows (pen hatching or a manga screentone in the dark bands): the lines' spacing in pixels at 1080 (0 none), their angle, lines, cross (a second
+	// set crossing the first in the deepest shadow) or dots, and how dark the ink is (0..1)
+	double hatch = 0.0, hatchAngle = 45.0, hatchAmount = 0.8;
+	std::string hatchStyle = "cross";
 	std::vector<float> castIds;                 // (not a word: the object IDs of the scene's cast/... groups, toon_frame.h fills them in)
 	// the shading's ramp: the picture's, and the materials' and objects' own
 	struct Ramp {
@@ -82,7 +95,7 @@ struct Style {
 	double highlight = 0.0;
 	double highlightColour[3] = {1.0, 1.0, 1.0};
 	std::vector<Ramp> ramps;                     // `material NAME ...` / `object NAME ...`
-	bool needsIds() const { return materials || objects || !ramps.empty() || celOn != "all" || (paint > 0.0 && paintOn != "all"); }
+	bool needsIds() const { return materials || objects || !ramps.empty() || celOn != "all" || (paint > 0.0 && paintOn != "all") || (rim > 0.0 && rimOn != "all"); }
 	// The picture's own ramp.
 	Ramp base() const {
 		Ramp r;
@@ -187,6 +200,36 @@ inline std::string parse(const std::string &words, Style &s) {
 		} else if (w == "paint-on") {
 			if (v != "all" && v != "cast" && v != "set") return "paint-on is all, cast (the characters) or set (the rest)";
 			s.paintOn = v;
+		} else if (w == "rim") {
+			if (!isNumber || x < 0 || x > 2) return "rim is how strong the rim of light is, from 0 (none) to 2";
+			s.rim = x;
+		} else if (w == "rim-width") {
+			if (!isNumber || x < 1 || x > 20) return "rim-width is in pixels (at 1080 high), from 1 to 20";
+			s.rimWidth = x;
+		} else if (w == "rim-colour" || w == "rim-color") {
+			if (!colourOf(v, s.rimColour)) return "rim-colour is a colour: #rrggbb or r,g,b from 0 to 1";
+		} else if (w == "rim-angle") {
+			if (v == "auto") s.rimAngle = -1.0;
+			else if (!isNumber || x < 0 || x >= 360) return "rim-angle is the light's direction on the screen in degrees (0 from the right, 90 from above), or auto";
+			else s.rimAngle = x;
+		} else if (w == "rim-shadow") {
+			if (!isNumber || x < 0 || x > 1) return "rim-shadow is how much rim the unlit side keeps, from 0 to 1";
+			s.rimShadow = x;
+		} else if (w == "rim-on") {
+			if (v != "all" && v != "cast" && v != "set" && v != "auto") return "rim-on is all, cast (the characters), set (the rest) or auto (the cast when there is one)";
+			s.rimOn = v;
+		} else if (w == "hatch") {
+			if (!isNumber || x < 0 || x > 40 || (x > 0 && x < 3)) return "hatch is the lines' spacing in pixels (at 1080 high), from 3 to 40 (0: none)";
+			s.hatch = x;
+		} else if (w == "hatch-angle") {
+			if (!isNumber || x < 0 || x >= 180) return "hatch-angle is in degrees, from 0 to 180";
+			s.hatchAngle = x;
+		} else if (w == "hatch-amount") {
+			if (!isNumber || x < 0 || x > 1) return "hatch-amount is how dark the hatching is, from 0 to 1";
+			s.hatchAmount = x;
+		} else if (w == "hatch-style") {
+			if (v != "lines" && v != "cross" && v != "dots") return "hatch-style is lines, cross or dots";
+			s.hatchStyle = v;
 		} else if (w == "boil") {
 			if (v != "on" && v != "off") return "boil is on or off";
 			s.boil = v == "on";
@@ -195,7 +238,7 @@ inline std::string parse(const std::string &words, Style &s) {
 			s.strokes.seed = static_cast<int>(x);
 		} else {
 			return "\"" + w + "\": the toon look takes bands, lines, ink, saturation, shadow, inner, materials, objects, line-depth, wobble, boil, seed, pen, pen-amount, ink-tint, edges, cavity, edge-width, cel, paint, paint-on, "
-					"shadow-tint, highlight, highlight-colour, material and object";
+					"rim, rim-width, rim-colour, rim-angle, rim-shadow, rim-on, hatch, hatch-angle, hatch-amount, hatch-style, shadow-tint, highlight, highlight-colour, material and object";
 		}
 	}
 	return std::string();
@@ -233,6 +276,13 @@ inline std::string tagOf(const Style &s) {
 		std::snprintf(buf, sizeof buf, " %s %.4f,%.4f,%.4f", word, linearToSrgb(c[0]), linearToSrgb(c[1]), linearToSrgb(c[2]));
 		return std::string(buf);
 	};
+	if (s.rim > 0.0) {
+		tag += numberWord("rim", s.rim) + numberWord("rim-width", s.rimWidth) + numberWord("rim-shadow", s.rimShadow);
+		if (s.rimAngle >= 0.0) tag += numberWord("rim-angle", s.rimAngle);
+		if (s.rimOn != "auto") tag += " rim-on " + s.rimOn;
+		if (s.rimColour[0] != 1.0 || s.rimColour[1] != 1.0 || s.rimColour[2] != 1.0) tag += colourWords("rim-colour", s.rimColour);
+	}
+	if (s.hatch > 0.0) tag += numberWord("hatch", s.hatch) + numberWord("hatch-angle", s.hatchAngle) + numberWord("hatch-amount", s.hatchAmount) + " hatch-style " + s.hatchStyle;
 	const auto rampWords = [&](const Style::Ramp &r, const Style::Ramp &over) {   // (the words that differ from `over`)
 		std::string t;
 		if (r.bands != over.bands) t += " bands " + std::to_string(r.bands);
@@ -276,6 +326,86 @@ inline double smoothstep(double a, double b, double x) {
 	return t * t * (3.0 - 2.0 * t);
 }
 inline double luminance(double r, double g, double b) { return 0.2126 * r + 0.7152 * g + 0.0722 * b; }
+
+// The rim of light (`rim`): a band `rimWidth` wide inside the outline - where a surface meets the background or something further off - brightened in `rimColour` (with a
+// little of the surface's own colour), as a toon material's Fresnel band is. All of it on the lit side (`level`: the light, 0..1 of the brightest; -1 where nothing is
+// shaded) or on the side `rimAngle` faces, `rimShadow` of it on the other. `ref` is the brightest light (the bands' reference), `albedo` the surfaces' colours.
+inline void rim(std::vector<float> &rgb, int w, int h, const std::vector<float> &depth, const std::vector<float> &cover, const std::vector<float> &albedo, const std::vector<float> &level,
+				const std::vector<unsigned char> &where, double ref, const Style &st) {
+	const std::size_t n = static_cast<std::size_t>(w) * h;
+	const auto covered = [&](std::size_t i) { return cover[i] > 0.5f && depth[i] > 0.0f; };
+	// the outline's pixels, and the way out of the shape there (towards the background or the far side), on the screen
+	std::vector<float> outX(n, 0.0f), outY(n, 0.0f);
+	std::vector<unsigned char> outline(n, 0);
+	for (int y = 1; y + 1 < h; ++y)
+		for (int x = 1; x + 1 < w; ++x) {
+			const std::size_t i = static_cast<std::size_t>(y) * w + x;
+			if (!covered(i)) continue;
+			const int off[4][2] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+			double ox = 0.0, oy = 0.0;
+			for (const auto &o : off) {
+				const std::size_t j = static_cast<std::size_t>(y + o[1]) * w + (x + o[0]);
+				if (!covered(j) || depth[j] > depth[i] * 1.08f) ox += o[0], oy += o[1];
+			}
+			const double len = std::hypot(ox, oy);
+			if (len <= 0.0) continue;
+			outline[i] = 1, outX[i] = static_cast<float>(ox / len), outY[i] = static_cast<float>(oy / len);
+		}
+	const double radius = std::max(1.0, st.rimWidth * h / 1080.0);
+	const int reach = static_cast<int>(std::ceil(radius)) + 1;
+	const double a = st.rimAngle * 3.14159265358979 / 180.0, lx = std::cos(a), ly = -std::sin(a);   // (rows go down)
+	for (int y = 0; y < h; ++y)
+		for (int x = 0; x < w; ++x) {
+			const std::size_t i = static_cast<std::size_t>(y) * w + x;
+			if (!covered(i) || level[i] < 0.0f || !where[i]) continue;
+			double best = 0.0, bx = 0.0, by = 0.0;   // (the nearest outline pixel of the same surface: how far in, and its way out)
+			for (int dy = -reach; dy <= reach; ++dy)
+				for (int dx = -reach; dx <= reach; ++dx) {
+					const int xx = x + dx, yy = y + dy;
+					if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+					const std::size_t j = static_cast<std::size_t>(yy) * w + xx;
+					if (!outline[j] || std::abs(depth[j] - depth[i]) > 0.05f * depth[i]) continue;
+					const double m = std::clamp(radius + 0.5 - std::sqrt(static_cast<double>(dx * dx + dy * dy)), 0.0, 1.0);
+					if (m > best) best = m, bx = outX[j], by = outY[j];
+				}
+			if (best <= 0.0) continue;
+			const double side = st.rimAngle >= 0.0 ? smoothstep(0.2, 0.7, bx * lx + by * ly) : smoothstep(0.35, 0.75, level[i]);
+			const double k = st.rim * best * (st.rimShadow + (1.0 - st.rimShadow) * side);
+			for (int c = 0; c < 3; ++c) rgb[3 * i + c] += static_cast<float>(k * st.rimColour[c] * (0.5 + 0.5 * albedo[3 * i + c]) * ref);
+		}
+}
+
+// Hatching in the shadows (`hatch`): ink lines `hatch` pixels apart (at 1080) at `hatchAngle` where the light (`level`, 0..1 of the brightest; -1 where nothing is
+// shaded) is in the darker bands, thicker as it darkens; `cross` adds a second set across them in the deepest shadow, `dots` is a screentone instead - dots on a turned
+// grid that grow as it darkens. Drawn in the picture's plane, as a pen or a sheet of screentone is.
+inline void hatch(std::vector<float> &rgb, int w, int h, const std::vector<float> &level, const Style &st) {
+	const double s = std::max(3.0, st.hatch * h / 1080.0);
+	const double a = st.hatchAngle * 3.14159265358979 / 180.0, ca = std::cos(a), sa = -std::sin(a);
+	const auto line = [&](double px, double py, double ux, double uy, double darkness) {   // one set of lines across (ux, uy), as wide as the shadow is dark
+		const double u = (px * ux + py * uy) / s, dist = std::abs(u - std::floor(u) - 0.5) * s, half = 0.5 * s * (0.12 + 0.38 * darkness);
+		return std::clamp(half + 0.5 - dist, 0.0, 1.0) * std::min(1.0, 2.0 * darkness);
+	};
+	for (int y = 0; y < h; ++y)
+		for (int x = 0; x < w; ++x) {
+			const std::size_t i = static_cast<std::size_t>(y) * w + x;
+			const double L = level[i];
+			if (L < 0.0) continue;
+			const double d1 = 1.0 - smoothstep(0.42, 0.62, L), d2 = 1.0 - smoothstep(0.18, 0.34, L);
+			if (d1 <= 0.0) continue;
+			const double px = x + 0.5, py = y + 0.5;
+			double cover = 0.0;
+			if (st.hatchStyle == "dots") {
+				const double u = (px * ca + py * sa) / s, v = (-px * sa + py * ca) / s;
+				const double fu = u - std::floor(u) - 0.5, fv = v - std::floor(v) - 0.5, dist = std::sqrt(fu * fu + fv * fv) * s;
+				cover = std::clamp(0.5 * s * std::sqrt(0.5 * d1 + 0.5 * d2) + 0.5 - dist, 0.0, 1.0) * std::min(1.0, 2.0 * d1);
+			} else {
+				cover = line(px, py, ca, sa, d1);
+				if (st.hatchStyle == "cross" && d2 > 0.0) cover = std::max(cover, line(px, py, -sa, ca, d2));
+			}
+			const double k = st.hatchAmount * cover;
+			for (int c = 0; c < 3; ++c) rgb[3 * i + c] = static_cast<float>(rgb[3 * i + c] + (st.ink[c] - rgb[3 * i + c]) * k);
+		}
+}
 }  // namespace detail
 
 // The look on a picture. `rgb`: w*h*3, linear. `planes`: aov_pass.h's ten, w*h each (albedo R G B, normal X Y Z, depth, u, v, coverage), and for the lines between
@@ -334,6 +464,8 @@ inline void apply(std::vector<float> &rgb, int w, int h, const std::vector<std::
 			}
 		}
 	std::vector<float> light(n * 3, 0.0f), lit;
+	std::vector<float> level(n, -1.0f);   // the smoothed light as a share of the brightest (the rim's lit side, the hatching's shadows); -1 where nothing is shaded
+	double lightRef = 0.0;
 	for (std::size_t i = 0; i < n; ++i)
 		if (shaded[i]) {
 			for (int c = 0; c < 3; ++c) light[3 * i + c] = rgb[3 * i + c] / albedo[3 * i + c];
@@ -377,6 +509,9 @@ inline void apply(std::vector<float> &rgb, int w, int h, const std::vector<std::
 		for (std::size_t i = 0; i < n; ++i)
 			if (shaded[i]) lit.push_back(static_cast<float>(detail::luminance(light[3 * i], light[3 * i + 1], light[3 * i + 2])));
 		const double ref = std::max(1e-6, percentile(0.95));
+		lightRef = ref;
+		for (std::size_t i = 0; i < n; ++i)
+			if (shaded[i]) level[i] = static_cast<float>(detail::luminance(light[3 * i], light[3 * i + 1], light[3 * i + 2]) / ref);
 		const double soft = 0.04;
 		// each pixel's ramp: its material's own, else its object's, else the picture's (the ID planes: a ramp's name hashed as they are, cryptomatte.h)
 		const Style::Ramp pictureRamp = st.base();
@@ -424,6 +559,14 @@ inline void apply(std::vector<float> &rgb, int w, int h, const std::vector<std::
 		const std::vector<float> *normal[3] = {&planes[3], &planes[4], &planes[5]};
 		cavity::apply(rgb, w, h, normal, depth, cover, st.cavity);
 	}
+	// ---- the rim of light and the hatching (under the lines) ----
+	if (st.rim > 0.0 && lightRef > 0.0) {
+		const std::string layer = st.rimOn != "auto" ? st.rimOn : st.castIds.empty() ? std::string("all") : std::string("cast");
+		std::vector<unsigned char> where(n);
+		for (std::size_t i = 0; i < n; ++i) where[i] = onLayer(layer, i);
+		detail::rim(rgb, w, h, depth, cover, albedo, level, where, lightRef, st);
+	}
+	if (st.hatch > 0.0) detail::hatch(rgb, w, h, level, st);
 	// ---- the lines ----
 	if (st.lines <= 0.0) return;
 	std::vector<float> edge(n, 0.0f), innerEdge(n, 0.0f);   // the silhouette's, and the lines inside a shape (the same map when they are as wide)

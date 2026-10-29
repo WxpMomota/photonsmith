@@ -249,3 +249,91 @@ TEST(LensLook, SunbeamsStreakALightsGlowAcrossThePictureFromWhereItIs) {
 	EXPECT_TRUE(placed.sunbeamsAt);
 	EXPECT_EQ(placed.sunbeamsX, 1.2);
 }
+
+// ---- the picture on paper or film (src/shared/print_look.h): halftone, watercolour, vintage ----
+
+TEST(PrintLook, ItsWordsAreTheLooksAndLeaveTheLightAlone) {
+	lens_look::Look look;
+	ASSERT_EQ(lens_look::parse("halftone 8 halftone-mix 0.7 watercolor 1.2 vintage 0.8 vintage-tone 0.3 seed 42", look), "");
+	EXPECT_EQ(look.print.halftone, 8.0);
+	EXPECT_EQ(look.print.halftoneMix, 0.7);
+	EXPECT_EQ(look.print.watercolor, 1.2);
+	EXPECT_EQ(look.print.vintage, 0.8);
+	EXPECT_EQ(look.print.vintageTone, 0.3);
+	EXPECT_EQ(look.print.seed, 42);
+	EXPECT_TRUE(look.print.active());
+	EXPECT_FALSE(look.active()) << "made on the finished picture, not on the light (lens_look::apply leaves it)";
+}
+
+TEST(PrintLook, AHalftonePrintsDotsThatCoverTheInksShare) {
+	const int w = 216, h = 216;   // (dots 8 pixels apart at `halftone 40`, 216 high)
+	print_look::Params p;
+	p.halftone = 40.0;
+	// white paper stays paper, black stays solid black (the line art)
+	std::vector<float> white = flat(w, h, 1.0f, 1.0f, 1.0f), black = flat(w, h, 0.0f, 0.0f, 0.0f);
+	print_look::apply(white.data(), w, h, p);
+	print_look::apply(black.data(), w, h, p);
+	EXPECT_GT(*std::min_element(white.begin(), white.end()), 0.9f);
+	EXPECT_LT(*std::max_element(black.begin(), black.end()), 0.01f);
+	// a mid blue: dots (nearly all pixels either ink or paper, not a flat tint), about as bright on average as it was
+	std::vector<float> blue = flat(w, h, 0.3f, 0.5f, 0.8f);
+	print_look::apply(blue.data(), w, h, p);
+	double mean[3] = {0, 0, 0};
+	int extremes = 0;
+	for (std::size_t i = 0; i < blue.size(); i += 3) {
+		for (int c = 0; c < 3; ++c) mean[c] += blue[i + c] / (static_cast<double>(w) * h);
+		extremes += blue[i] < 0.1f || blue[i] > 0.85f;
+	}
+	EXPECT_NEAR(mean[0], 0.3, 0.12);
+	EXPECT_NEAR(mean[2], 0.8, 0.12);
+	EXPECT_GT(mean[2], mean[0] + 0.25) << "still blue";
+	EXPECT_GT(extremes, w * h / 2) << "printed in dots";
+}
+
+TEST(PrintLook, AWatercolourPoolsPigmentAtEdgesOnPaper) {
+	const int w = 540, h = 540;   // (its sizes are pixels at 1080: half of them here)
+	std::vector<float> img = flat(w, h, 0.95f, 0.95f, 0.95f);
+	for (int y = 135; y < 405; ++y)   // a red square on white
+		for (int x = 135; x < 405; ++x) {
+			float *px = &img[(static_cast<std::size_t>(y) * w + x) * 3];
+			px[0] = 0.8f, px[1] = 0.25f, px[2] = 0.2f;
+		}
+	std::vector<float> out = img;
+	print_look::Params p;
+	p.watercolor = 1.0;
+	print_look::apply(out.data(), w, h, p);
+	EXPECT_NE(out, img);
+	const auto green = [&](int x, int y) { return out[(static_cast<std::size_t>(y) * w + x) * 3 + 1]; };
+	double edge = 0.0, middle = 0.0;
+	for (int y = 200; y < 340; ++y) edge += green(137, y) / 140.0, middle += green(270, y) / 140.0;
+	EXPECT_LT(edge, middle) << "darker where the wash ends";
+	double paper = 0.0;
+	for (int y = 0; y < 20; ++y) paper += out[(static_cast<std::size_t>(y) * w + 5) * 3] / 20.0;
+	EXPECT_GT(paper, 0.8) << "the paper stays light";
+}
+
+TEST(PrintLook, AnOldFilmChangesFromFrameToFrameButAFrameIsAlwaysTheSame) {
+	const int w = 120, h = 90;
+	const std::vector<float> img = flat(w, h, 0.5f, 0.5f, 0.5f);
+	print_look::Params p;
+	p.vintage = 1.0;
+	p.seed = 7;
+	std::vector<float> a = img, b = img, c = img;
+	print_look::apply(a.data(), w, h, p);
+	print_look::apply(b.data(), w, h, p);
+	p.seed = 8;
+	print_look::apply(c.data(), w, h, p);
+	EXPECT_EQ(a, b) << "the same frame";
+	EXPECT_NE(a, c) << "the next one's grain";
+	// toned: red above blue (sepia); the corners darker than the middle
+	double r = 0.0, bl = 0.0;
+	for (std::size_t i = 0; i < a.size(); i += 3) r += a[i], bl += a[i + 2];
+	EXPECT_GT(r, bl * 1.1);
+	const auto lum = [&](int x, int y) { const float *px = &a[(static_cast<std::size_t>(y) * w + x) * 3]; return px[0] + px[1] + px[2]; };
+	double corner = 0.0, middle = 0.0;
+	for (int k = 0; k < 4; ++k) corner += lum(k, k) / 4.0, middle += lum(w / 2 + k, h / 2) / 4.0;
+	EXPECT_LT(corner, middle);
+	std::vector<float> none = img;
+	print_look::apply(none.data(), w, h, print_look::Params());
+	EXPECT_EQ(none, img) << "off by default";
+}

@@ -401,3 +401,75 @@ TEST(ToonLook, CelOnTheCastOnlyAndAPaintedSetLeaveTheOtherLayerAlone) {
 	EXPECT_EQ(read.paint, 8.0);
 	EXPECT_NE(toon_look::tagOf(read).find("cel cast paint 8"), std::string::npos) << toon_look::tagOf(read);
 }
+
+// ---- a rim of light and hatching (Blender's toon materials: a Fresnel band into a ramp; hatched and screentoned shadows) ----
+
+TEST(ToonLook, ARimOfLightAlongTheOutlineOnTheLitSideOnly) {
+	const int w = 80, h = 80;
+	auto passes = flatPasses(w, h, 0.5f, 4.0f);
+	// a disc in front of the background (nothing hit outside it), lit from the left: the light falls off to the right
+	std::vector<float> rgb(static_cast<std::size_t>(w) * h * 3, 0.0f);
+	for (int y = 0; y < h; ++y)
+		for (int x = 0; x < w; ++x) {
+			const std::size_t i = static_cast<std::size_t>(y) * w + x;
+			const bool in = std::hypot(x + 0.5 - 40.0, y + 0.5 - 40.0) < 30.0;
+			passes[9][i] = in ? 1.0f : 0.0f;
+			if (!in) passes[6][i] = 0.0f;
+			const float light = in ? 0.5f * static_cast<float>(1.0 - (x - 10.0) / 70.0) : 0.0f;
+			for (int c = 0; c < 3; ++c) rgb[i * 3 + c] = light;
+		}
+	toon_look::Style st;
+	st.on = true, st.lines = 0.0, st.saturation = 1.0, st.cel = false;
+	std::vector<float> plain = rgb;
+	toon_look::apply(plain, w, h, passes, st);
+	st.rim = 1.0, st.rimWidth = 54.0;   // (4 pixels wide in this picture, 80 high: beyond the words' range, which is for real pictures)
+	std::vector<float> rimmed = rgb;
+	toon_look::apply(rimmed, w, h, passes, st);
+	const auto at = [&](const std::vector<float> &img, int x, int y) { return img[(static_cast<std::size_t>(y) * w + x) * 3]; };
+	EXPECT_GT(at(rimmed, 12, 40) - at(plain, 12, 40), 0.1) << "the lit side's outline catches the rim";
+	EXPECT_LT(at(rimmed, 67, 40) - at(plain, 67, 40), 0.5 * (at(rimmed, 12, 40) - at(plain, 12, 40))) << "the unlit side keeps only a little of it";
+	EXPECT_NEAR(at(rimmed, 40, 40), at(plain, 40, 40), 1e-5) << "the middle of the disc is not on the outline";
+	EXPECT_EQ(at(rimmed, 2, 2), 0.0f) << "nor is the background";
+	// `rim-angle` names the side: from the right, the right side's outline gets it
+	ASSERT_EQ(toon_look::parse("rim-angle 0", st), "");
+	std::vector<float> fromRight = rgb;
+	toon_look::apply(fromRight, w, h, passes, st);
+	EXPECT_GT(at(fromRight, 67, 40) - at(plain, 67, 40), at(fromRight, 12, 40) - at(plain, 12, 40));
+	EXPECT_NE(toon_look::tagOf(st).find("rim 1 rim-width 54 rim-shadow 0.2 rim-angle 0"), std::string::npos) << toon_look::tagOf(st);
+	EXPECT_NE(toon_look::parse("rim 3", st), "");
+	EXPECT_NE(toon_look::parse("rim-on everyone", st), "");
+}
+
+TEST(ToonLook, HatchingDarkensTheShadowsAndLeavesTheLightAlone) {
+	const int w = 200, h = 60;
+	auto passes = flatPasses(w, h, 0.5f, 3.0f);
+	std::vector<float> rgb(static_cast<std::size_t>(w) * h * 3);
+	for (int y = 0; y < h; ++y)
+		for (int x = 0; x < w; ++x)
+			for (int c = 0; c < 3; ++c) rgb[(static_cast<std::size_t>(y) * w + x) * 3 + c] = 0.5f * (x + 0.5f) / w;   // dark on the left, bright on the right
+	for (const char *style : {"lines", "cross", "dots"}) {
+		toon_look::Style st;
+		st.on = true, st.cel = false, st.lines = 0.0, st.saturation = 1.0, st.hatch = 108.0, st.hatchStyle = style;   // (10 pixels apart here)
+		std::vector<float> out = rgb;
+		toon_look::apply(out, w, h, passes, st);
+		double darkChange = 0.0, brightChange = 0.0;
+		int inked = 0;
+		for (int y = 0; y < h; ++y) {
+			for (int x = 0; x < 40; ++x) {
+				const std::size_t i = (static_cast<std::size_t>(y) * w + x) * 3;
+				darkChange += rgb[i] - out[i];
+				inked += out[i] < 0.5f * rgb[i];
+			}
+			for (int x = 160; x < w; ++x) brightChange += std::abs(rgb[(static_cast<std::size_t>(y) * w + x) * 3] - out[(static_cast<std::size_t>(y) * w + x) * 3]);
+		}
+		EXPECT_GT(darkChange, 1.0) << style << ": the shadow is hatched";
+		EXPECT_GT(inked, 100) << style << ": in ink, not a grey wash";
+		EXPECT_LT(inked, 40 * h * 9 / 10) << style << ": with paper between the strokes";
+		EXPECT_EQ(brightChange, 0.0) << style << ": the light is left alone";
+	}
+	toon_look::Style st;
+	ASSERT_EQ(toon_look::parse("hatch 8 hatch-style dots", st), "");
+	EXPECT_NE(toon_look::tagOf(st).find("hatch 8 hatch-angle 45 hatch-amount 0.8 hatch-style dots"), std::string::npos) << toon_look::tagOf(st);
+	EXPECT_NE(toon_look::parse("hatch 2", st), "");
+	EXPECT_NE(toon_look::parse("hatch-style zigzag", st), "");
+}
