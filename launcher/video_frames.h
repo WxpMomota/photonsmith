@@ -5,9 +5,11 @@
 // called "frames" (it used to be deleted whatever it held). A video that resumes keeps its frames, and the record of the frames that have their words (film_captions.h: without it
 // they would get them a second time), and renders again the frames that were copies of a neighbour (cartoon_render.h, fillMissingFrames).
 
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <thread>
 
 #include "cartoon_render.h"
 #include "film_captions.h"
@@ -34,11 +36,27 @@ inline bool isOurs(const std::filesystem::path &dir) {
 	return true;
 }
 
-// Empties `dir` (when it is ours: false, and nothing touched, when it is not) and marks it as ours. Throws std::filesystem::filesystem_error when the folder cannot be emptied or made.
-inline bool startAfresh(const std::filesystem::path &dir) {
+// Removes `dir` and everything in it, trying again for up to `patienceSeconds` while something holds a file in it. On Windows a picture that was just written is often opened for a
+// moment by something else - the virus scanner, the search indexer, Explorer's thumbnails, the GUI's frames strip - and a removal that meets it fails with "being used by another
+// process" (a video that was to start afresh over an old one failed so, 2026-10-28, with nothing holding the folder a second later). Each try removes what it can, so a later
+// one has less left. Throws the last std::filesystem::filesystem_error when the folder is still held after that.
+inline void removePatiently(const std::filesystem::path &dir, double patienceSeconds = 10.0) {
+	const auto until = std::chrono::steady_clock::now() + std::chrono::duration<double>(patienceSeconds);
+	for (;;) {
+		std::error_code ec;
+		std::filesystem::remove_all(dir, ec);
+		if (!ec) return;
+		if (std::chrono::steady_clock::now() >= until) throw std::filesystem::filesystem_error("remove_all", dir, ec);
+		std::this_thread::sleep_for(std::chrono::milliseconds(250));
+	}
+}
+
+// Empties `dir` (when it is ours: false, and nothing touched, when it is not) and marks it as ours. Throws std::filesystem::filesystem_error when the folder cannot be emptied or made
+// (removePatiently: after waiting for whatever held a file in it).
+inline bool startAfresh(const std::filesystem::path &dir, double patienceSeconds = 10.0) {
 	if (std::filesystem::exists(dir)) {
 		if (!isOurs(dir)) return false;
-		std::filesystem::remove_all(dir);
+		removePatiently(dir, patienceSeconds);
 	}
 	std::filesystem::create_directories(dir);
 	std::ofstream(dir / kMarker) << "The frames of a video being made by ray_tracer; this folder is emptied when the next video is made.\n";

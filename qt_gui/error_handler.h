@@ -247,6 +247,22 @@ inline bool textForReason(const render_events::Event &event, ReasonText &out) {
 		out.hint = QCoreApplication::translate("ErrorHandler", "If the scene came from a download, download it again; if it is your own file, check it for mistakes (the Log Output tab has the loader's own line).");
 		return true;
 	}
+	if (reason == QLatin1String("frames-folder-busy")) {
+		out.title = QCoreApplication::translate("ErrorHandler", "The old frames could not be cleared");
+		out.message = QCoreApplication::translate("ErrorHandler", "This video starts afresh, so the frames of the last one are removed first, but another program kept a file in their folder open "
+			"for more than 10 seconds:\n%1").arg(field("folder"));
+		out.hint = QCoreApplication::translate("ErrorHandler", "• Is another render or video still running? Wait for it, or stop it\n"
+			"• Close any window showing that folder or one of its pictures (Explorer, an image viewer)\n"
+			"• Then render again. Nothing was written to the output yet.");
+		return true;
+	}
+	if (reason == QLatin1String("frames-folder-not-ours")) {
+		out.title = QCoreApplication::translate("ErrorHandler", "The frames folder holds other files");
+		out.message = QCoreApplication::translate("ErrorHandler", "A video renders its frames into this folder and empties it first, but it holds files this program did not make, so it "
+			"was left alone:\n%1").arg(field("folder"));
+		out.hint = QCoreApplication::translate("ErrorHandler", "Move your files out of that folder, or choose an Output Path in another folder.");
+		return true;
+	}
 	return false;
 }
 

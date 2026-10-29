@@ -656,6 +656,35 @@ TEST(VideoFrames, AFreshVideoEmptiesOnlyAFramesFolderThisProgramMade) {
 	std::filesystem::remove_all(dir);
 }
 
+#ifdef _WIN32
+// A file of the old frames held open for a moment (a virus scanner, the indexer, a thumbnail) does not stop a video from starting afresh: the removal waits for it. Held for good,
+// it gives up after its patience and says why.
+TEST(VideoFrames, AFreshStartWaitsForAFileSomethingElseHoldsForAMoment) {
+	const std::filesystem::path dir = std::filesystem::temp_directory_path() / ("photonsmith_held_folder_test_" + std::to_string(GetCurrentProcessId()));
+	std::filesystem::remove_all(dir);
+	ASSERT_TRUE(video_frames::startAfresh(dir));
+	std::ofstream(dir / "enc_0000.png") << "x";
+	const auto hold = [&] { return CreateFileW((dir / "enc_0000.png").wstring().c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr); };   // (no sharing: as a scanner may)
+
+	HANDLE held = hold();
+	ASSERT_NE(held, INVALID_HANDLE_VALUE);
+	std::thread release([&] {
+		std::this_thread::sleep_for(std::chrono::milliseconds(700));
+		CloseHandle(held);
+	});
+	EXPECT_TRUE(video_frames::startAfresh(dir)) << "it waited for the file and then emptied the folder";
+	release.join();
+	EXPECT_FALSE(std::filesystem::exists(dir / "enc_0000.png"));
+
+	std::ofstream(dir / "enc_0000.png") << "x";
+	held = hold();
+	ASSERT_NE(held, INVALID_HANDLE_VALUE);
+	EXPECT_THROW(video_frames::startAfresh(dir, 0.5), std::filesystem::filesystem_error) << "held for longer than its patience";
+	CloseHandle(held);
+	std::filesystem::remove_all(dir);
+}
+#endif
+
 TEST(FilmCaptions, ACaptionFileGivesItsStylesLinesAndSettings) {
 	std::vector<std::string> problems;
 	const std::vector<cartoon::Caption> c = cartoon::caption_file::parse(

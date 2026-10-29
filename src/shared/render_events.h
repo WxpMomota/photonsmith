@@ -20,6 +20,8 @@
 //   scene-file-missing        file (as the scene names it), folder (where it goes), scene (id)   -- a scene that needs a download
 //   scene-load-failed         file, detail (the loader's sentence), scene                       -- the file is there but cannot be used
 //   scene-not-supported-on-gpu  scene                                                           -- the scene was never ported to this backend
+//   frames-folder-busy        folder, detail (the system's sentence)                           -- a video's old frames folder could not be emptied: a file in it is held
+//   frames-folder-not-ours    folder                                                           -- a video's frames folder holds someone's own files, so it is left alone
 //
 // Header-only and Qt-free, like the other shared headers; tests/unit/render_events_tests.cpp.
 

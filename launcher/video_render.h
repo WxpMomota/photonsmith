@@ -51,6 +51,7 @@ extern char** environ;
 #endif
 #include "src/external/image_writer.h"
 #include "src/TheRestOfYourLife/error_codes.h"
+#include "src/shared/render_events.h"   // the reason a video could not start, for the GUI's message
 #include "src/TheRestOfYourLife/thread_count.h"
 #include "src/shared/accelerator_override.h"
 #include "src/shared/exr_writer.h"
@@ -300,6 +301,8 @@ static int prepareVideoDirectories(const std::string &out_path, int render_frame
         } else if (!video_frames::startAfresh(frames_dir)) {
             std::cerr << "ERROR: " << frames_dir << " holds files this program did not make, so it is not emptied for the video's frames. Move them, or choose an output in another "
                          "folder." << std::endl;
+            render_events::emitError(ERR_FILE_WRITE_FAILED, "frames-folder-not-ours", "The frames folder holds files this program did not make, so it is not emptied.",
+                                     {{"folder", frames_dir.string()}});
             return ERR_FILE_WRITE_FAILED;
         }
         if (!signature.empty()) {
@@ -309,6 +312,8 @@ static int prepareVideoDirectories(const std::string &out_path, int render_frame
     } catch (const std::exception& e) {
         std::cerr << "ERROR: Failed to create frames directory: " << e.what() << std::endl;
         std::cerr << "       Another render may still be using " << frames_dir << " (a render that is still running, or workers it left behind): stop it and try again." << std::endl;
+        render_events::emitError(ERR_FILE_WRITE_FAILED, "frames-folder-busy", "The video's frames folder could not be emptied: another program held a file in it.",
+                                 {{"folder", frames_dir.string()}, {"detail", e.what()}});
         return ERR_FILE_WRITE_FAILED;
     }
 
