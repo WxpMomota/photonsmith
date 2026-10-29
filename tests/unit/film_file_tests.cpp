@@ -1373,3 +1373,66 @@ TEST(FilmCloth, ClothLinesAreReadAndACapeHangsFromItsCharactersShoulders) {
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 6\ncloth banner at 0 1 0\n", bad).find("cloth flag|curtain|sheet"), std::string::npos);
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 6\ncloth flag at 0 1 0 drop 3\n", bad).find("\"drop\""), std::string::npos) << "a flag is not dropped";
 }
+
+// ---- the cartoon's ways of moving (`animate`, `squash`, `jiggle`: film_motion.h) ----
+
+namespace {
+std::string characterText(const std::string &frame, const std::string &name) {   // a character's part of a frame (its "# NAME (KIND)" block, to the next one or the end)
+	const std::size_t at = frame.find("# " + name + " (");
+	if (at == std::string::npos) return std::string();
+	const std::size_t next = frame.find("\n# ", at + 3);
+	return frame.substr(at, next == std::string::npos ? std::string::npos : next - at);
+}
+}  // namespace
+
+TEST(FilmMotion, OnTwosACharacterHoldsEachPoseForTwoFrames) {
+	namespace mo = cartoon::motion;
+	const std::vector<mo::Stepping> twos = {{"", 2}};
+	EXPECT_DOUBLE_EQ(mo::heldTime(twos, "pip", 12.0 / 24.0, 24), 12.0 / 24.0);
+	EXPECT_DOUBLE_EQ(mo::heldTime(twos, "pip", 13.0 / 24.0 + 0.01, 24), 12.0 / 24.0) << "frame 13 shows frame 12's pose";
+	const std::vector<mo::Stepping> mixed = {{"", 2}, {"ann", 1}, {"pip", 3, 1.0, 2.0}};
+	EXPECT_DOUBLE_EQ(mo::heldTime(mixed, "ann", 13.0 / 24.0, 24), 13.0 / 24.0) << "a character's own `on ones` wins";
+	EXPECT_DOUBLE_EQ(mo::heldTime(mixed, "pip", 1.0 + 2.0 / 24.0, 24), 1.0) << "on threes from 1 s, counted from there";
+	EXPECT_DOUBLE_EQ(mo::heldTime(mixed, "pip", 3.0 + 1.0 / 24.0, 24), 3.0) << "and on twos again after";
+	EXPECT_DOUBLE_EQ(mo::heldTime({}, "pip", 0.77, 24), 0.77);
+
+	ff::DataFilm smooth, stepped;
+	const std::string film = "scene s.pbrt\nlength 6\ncharacter pip pip at 0 0 0\nwalk pip 0.5 1.0  0 -3\nshot 0 A\n key 0 1 5  0 1 0\n key 3 1 5  0 1 0\n";
+	ASSERT_EQ(loadFilm(film, smooth), "");
+	ASSERT_EQ(loadFilm(film + "animate on twos\n", stepped), "");
+	const double f12 = 36.0 / 24.0, f13 = 37.0 / 24.0;
+	EXPECT_NE(characterText(smooth.sceneAt(f12), "pip"), characterText(smooth.sceneAt(f13), "pip")) << "walking: a new pose every frame";
+	EXPECT_EQ(characterText(stepped.sceneAt(f12), "pip"), characterText(stepped.sceneAt(f13), "pip")) << "on twos: the pose held";
+	EXPECT_NE(stepped.sceneAt(f12).substr(0, stepped.sceneAt(f12).find("WorldBegin")), stepped.sceneAt(f13).substr(0, stepped.sceneAt(f13).find("WorldBegin")))
+		<< "while the camera still moves every frame";
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 6\nanimate on fives\n", bad).find("ones|twos|threes"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 6\nanimate nobody on twos\n", bad).find("needs a character"), std::string::npos);
+}
+
+TEST(FilmMotion, SquashAndStretchKeepTheVolumeAndJiggleSwingsTheAntennae) {
+	namespace mo = cartoon::motion;
+	// a fall that stops: stretched while falling, squashed just after landing
+	const auto fall = [](double u) { return cartoon::Vec3{0.0, u < 1.0 ? 2.0 * (1.0 - u * u) : 0.0, 0.0}; };
+	const cartoon::Mat4 falling = mo::squashStretch(fall, 0.9, 1.0, 1.0), landed = mo::squashStretch(fall, 1.08, 1.0, 1.0);
+	const auto det = [](const cartoon::Mat4 &m) {
+		return m[0] * (m[5] * m[10] - m[6] * m[9]) - m[1] * (m[4] * m[10] - m[6] * m[8]) + m[2] * (m[4] * m[9] - m[5] * m[8]);
+	};
+	EXPECT_NEAR(det(falling), 1.0, 1e-6) << "the volume kept";
+	EXPECT_NEAR(det(landed), 1.0, 1e-6);
+	EXPECT_GT(falling[5], 1.05) << "stretched along its fall";
+	EXPECT_LT(landed[5], 0.97) << "squashed as it lands";
+	EXPECT_EQ(mo::squashStretch(fall, 0.9, 1.0, 0.0), cartoon::identity()) << "off: nothing";
+
+	ff::DataFilm plain, lively;
+	const std::string film = "scene s.pbrt\nlength 6\ncharacter pip pip at 0 0 0\nwalk pip 0.5 1.2  0 -3\nshot 0 A\n key 0 1 5  0 1 0\n";
+	ASSERT_EQ(loadFilm(film, plain), "");
+	ASSERT_EQ(loadFilm(film + "squash 1\njiggle pip 1.5\n", lively), "");
+	const std::string a = characterText(plain.sceneAt(1.5), "pip"), b = characterText(lively.sceneAt(1.5), "pip");
+	EXPECT_EQ(a.find("squash and stretch"), std::string::npos);
+	EXPECT_NE(b.find("squash and stretch"), std::string::npos) << "walking: stretched along its way";
+	EXPECT_NE(a, b);
+	EXPECT_EQ(characterText(plain.sceneAt(1.5), "pip"), characterText(plain.sceneAt(1.5), "pip"));
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 6\nsquash 5\n", bad).find("from 0 (none) to 2"), std::string::npos);
+}

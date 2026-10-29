@@ -101,6 +101,41 @@ inline std::string cartoonLine(Spec &s, const std::string &verb, const std::stri
 		s.marks.push_back(mk);
 		return "";
 	}
+	if (verb == "animate") {   // animate [NAME] on ones|twos|threes [from T0 to T1] (film_motion.h)
+		const std::vector<std::string> t = detail::tokens(line);
+		const char *usage = "`animate [NAME] on ones|twos|threes [from T0 to T1]`";
+		motion::Stepping st;
+		std::size_t i = 1;
+		if (i < t.size() && t[i] != "on") {
+			st.who = t[i++];
+			if (std::none_of(s.characters.begin(), s.characters.end(), [&](const Character &c) { return c.name == st.who; }))
+				return fail("`animate NAME ...` needs a character brought in before it with `character`");
+		}
+		if (i + 1 >= t.size() || t[i] != "on") return fail(usage);
+		const std::string &every = t[i + 1];
+		st.every = every == "ones" ? 1 : every == "twos" ? 2 : every == "threes" ? 3 : every == "fours" ? 4 : 0;
+		if (st.every == 0) return fail(usage);
+		i += 2;
+		if (i < t.size()) {
+			if (i + 3 != t.size() || t[i] != "from" || t[i + 2] != "to" || !number(t[i + 1], st.t0) || !number(t[i + 3], st.t1) || !(st.t1 > st.t0)) return fail(usage);
+		}
+		s.stepping.push_back(st);
+		return "";
+	}
+	if (verb == "squash" || verb == "jiggle") {   // squash [NAME] S, jiggle [NAME] S (film_motion.h)
+		const std::vector<std::string> t = detail::tokens(line);
+		motion::Amount a;
+		const double most = verb == "squash" ? 2.0 : 3.0;
+		if (t.size() == 3) {
+			a.who = t[1];
+			if (std::none_of(s.characters.begin(), s.characters.end(), [&](const Character &c) { return c.name == a.who; }))
+				return fail("`" + verb + " NAME S` needs a character brought in before it with `character`");
+		}
+		if ((t.size() != 2 && t.size() != 3) || !number(t.back(), a.amount) || a.amount < 0.0 || a.amount > most)
+			return fail("`" + verb + " [NAME] S`: S from 0 (none) to " + (verb == "squash" ? std::string("2") : std::string("3")) + " (1 the usual)");
+		(verb == "squash" ? s.squash : s.jiggle).push_back(a);
+		return "";
+	}
 	handled = false;
 	return "";
 }

@@ -271,6 +271,8 @@ class DataFilm {
 	CharacterMoment actingMoment(const Character &c, double t) const;
 	// The frame's cloth (film_cloth.h: simulated up to t) and its cartoon marks' `# @rt-mark` lines (film_marks.h, through the camera of `header`).
 	std::string clothAt(double t) const;
+	// A character's scene text at t with the film's ways of moving (film_motion.h): its follow-through (m.jiggle, set here) and its squash and stretch.
+	std::string motionOf(const Character &c, const CharacterKind &kind, double t, CharacterMoment &m) const;
 	std::string marksAt(const std::string &header, double t) const;
 	// Where a character looks of itself while someone speaks (CharacterMoment::look): at the speaker, turning to them just after they begin and back a little after they end
 	// (the look moves smoothly from one speaker to the next); and while it speaks, at the nearest of those who listen. A `look` line is on top of this.

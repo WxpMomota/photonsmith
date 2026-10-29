@@ -48,6 +48,7 @@ struct Pose {
 	double smile = 0.3;           // -1 .. 1
 	double mouthOpen = 0.0;       // 0 .. 1
 	double earDroop = 0.0;        // -1 perked, 0 resting, 1 drooping
+	Vec3 earSwing;                // how far the ears' tips swing (world space; follow-through: a film's `jiggle`)
 	Vec3 handL = {0.0, 0.0, 0.0}, handR = {0.0, 0.0, 0.0};
 	double handWeightL = 0.0, handWeightR = 0.0;
 	double stepPhase = 0.0, stepAmount = 0.0;
@@ -254,7 +255,14 @@ inline std::string emitActor(const Character &c, const Pose &pose) {
 			const double d = clamp01(0.5 + 0.5 * pose.earDroop);   // 0 perked, 0.5 resting, 1 drooping
 			const Vec3 dir = normalize(lerp(lerp(radial + Vec3{0.0, 0.3, 0.0}, radial, clamp01(d * 2.0)), outward + radial * 0.3, clamp01(d * 2.0 - 1.0)));
 			const double len = 0.30;
-			const Vec3 a = transformPoint(headM, base), b = transformPoint(headM, base + dir * len);
+			const Vec3 a = transformPoint(headM, base);
+			Vec3 b = transformPoint(headM, base + dir * len);
+			if (length(pose.earSwing) > 1e-9) {   // (swung behind, the rod keeping its length)
+				const double reach = length(b - a);
+				const double most = 0.8 * reach;
+				const Vec3 swing = length(pose.earSwing) > most ? normalize(pose.earSwing) * most : pose.earSwing;
+				b = a + normalize(b + swing - a) * reach;
+			}
 			ears += rod(a, b, 0.052);
 			tips += emitMesh(P.earTip, mul(translate(b), scale(0.062)));
 		}

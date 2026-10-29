@@ -241,6 +241,7 @@ inline CharacterKind pipKind() {
 		placeOf(m.frame, p.pos, p.yaw);
 		p.blink = rig::blink(m.t, m.seed);
 		p.squash = actor::breathe(m.t);
+		p.earSwing = m.jiggle;   // (its antennae swing behind its head: film_motion.h `jiggle`)
 		pipFace(m.face, p);
 		speakWith(m, p.mouthOpen, p.smile);
 		reachWith(m, p.handL, p.handWeightL, p.handR, p.handWeightR);

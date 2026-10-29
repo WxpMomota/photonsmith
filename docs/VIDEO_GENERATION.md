@@ -833,6 +833,23 @@ flag flies in a 4 m/s breeze and a curtain stirs. A frame is a function of its t
 steps up to the frame. A process rendering frames in order keeps where it got to, so the next frame takes only the steps between, and a frame comes out the same in any
 order. A cloth renders as a smooth triangle mesh (with uv, ready for a texture), and a flag gets its pole.
 
+**Cartoon motion: `animate`, `squash`, `jiggle`.** (film_motion.h) Three of animation's principles, as Blender's animators get them:
+
+```
+animate on twos                     # every character holds each pose for two frames; the camera still moves every frame
+animate pip on threes from 10 to 14 # one character, for a while (ones, twos, threes, fours)
+squash 1                            # squash and stretch for every character (0 off, up to 2); `squash pip 1.5` for one
+jiggle pip 1.5                      # follow-through: Pip's antennae swing behind its head and settle (0 off, up to 3)
+```
+
+*On twos* is the hand-drawn feel (and Spider-Verse's), Blender's Stepped Interpolation modifier. A character, its face, its lip sync, its cape and the marks over it
+all keep the pose of the frame it holds, counted from the line's start; a character's own line wins over the film's. *Squash and stretch* deforms the whole character,
+keeping its volume. It stretches along the way it moves, more the faster it goes in its own heights a second (up to a third longer: a smear when it dashes). As it comes
+to rest, a bouncy spring on its body runs on past its stop and back: it squashes on landing and wobbles before it settles. A jump reads crouch, stretch up, round at
+the top, stretch down, squash. *Jiggle* hangs what dangles from a character's head (Pip's antennae) on a loose spring that follows the head and the bob of its walk.
+All three are off unless a film asks, so a film without them draws exactly as before. A frame is still a function of its time: the springs run over the second
+before it (rig::follow).
+
 **Weather and particles: `weather`, `particles`, `burst`.** (film_particles.h)
 
 ```

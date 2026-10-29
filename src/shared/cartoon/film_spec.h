@@ -25,6 +25,7 @@
 #include "film_faces.h"
 #include "film_marks.h"
 #include "film_cloth.h"
+#include "film_motion.h"
 #include "film_particles.h"
 #include "film_paths.h"
 #include "film_acting.h"
@@ -180,6 +181,7 @@ struct CharacterMoment {
 	bool airborne = false;   // in the air in a jump
 	double sit = 0.0;        // 0 standing .. 1 sitting, on a seat `seat` high
 	double seat = 0.0;
+	Vec3 jiggle;             // how far what dangles from its head swings behind it (story space; film_motion.h `jiggle`: zero when the film has none)
 };
 // A kind of character: its scene text (story space, as the toolkit writes it) and its feet at a moment, the point a camera and the film doctor look at (body space), and its walk's
 // step (rig::PathWalk's stride and first step).
@@ -469,6 +471,9 @@ struct Spec {
 	std::vector<film_marks::Mark> marks;
 	// cloth: flags, capes, sheets and curtains (`cloth`: film_cloth.h)
 	std::vector<cloth::Cloth> cloths;
+	// the cartoon's ways of moving (film_motion.h): on twos (`animate`), squash and stretch (`squash`), follow-through (`jiggle`)
+	std::vector<motion::Stepping> stepping;
+	std::vector<motion::Amount> squash, jiggle;
 };
 
 struct Parsed {

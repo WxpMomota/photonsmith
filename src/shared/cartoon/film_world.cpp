@@ -421,13 +421,15 @@ std::string DataFilm::worldAt(const std::string &header, double t) const {
 	for (const Character &c : spec.characters) {   // the characters, as their kinds draw them
 		const CharacterKind &kind = characterKinds().at(c.kind);
 		if (!kind.text) continue;
-		CharacterMoment m = actingMoment(c, t);
-		if (kind.trails) m.trail = trailOf(c, t, m);
-		lockFeet(c, t, m);
-		m.voice = music_cues::voiceAt(spec.key, c.name, t, shotStarts(), shotNameList(), &m.mouth);   // (a recording's loudness and mouth shapes)
-		speakingAt(c, t, m);
-		m.face = faces::faceAt(c.feelings, t);
-		out += "# " + c.name + " (" + c.kind + ")\n" + shot_lighting::inLinkGroup(kind.text(m), "cast/" + c.name);   // (light linking: a shot's `lighting ... only cast` - "cast" names every cast/ group; the ID passes)
+		const double tc = motion::heldTime(spec.stepping, c.name, t, spec.fps);   // (on twos: the moment of the frame it holds; film_motion.h)
+		CharacterMoment m = actingMoment(c, tc);
+		if (kind.trails) m.trail = trailOf(c, tc, m);
+		lockFeet(c, tc, m);
+		m.voice = music_cues::voiceAt(spec.key, c.name, tc, shotStarts(), shotNameList(), &m.mouth);   // (a recording's loudness and mouth shapes)
+		speakingAt(c, tc, m);
+		m.face = faces::faceAt(c.feelings, tc);
+		std::string text = motionOf(c, kind, tc, m);
+		out += "# " + c.name + " (" + c.kind + ")\n" + shot_lighting::inLinkGroup(text, "cast/" + c.name);   // (light linking: a shot's `lighting ... only cast` - "cast" names every cast/ group; the ID passes)
 	}
 	out = shot_lighting::withLights(out, shotLightsAt(header, t));
 	out = marksAt(header, t) + out;   // the cartoon marks over the frame (film_marks.h): its `# @rt-mark` lines, before everything (the launcher draws them after the render)
@@ -664,6 +666,26 @@ void DataFilm::thunder(audio::Mix &m) const {
 		});
 }
 
+std::string DataFilm::motionOf(const Character &c, const CharacterKind &kind, double t, CharacterMoment &m) const {
+	// follow-through: what dangles from its head lags the head (and its walk's bob) on a loose spring
+	const double jiggle = motion::amountFor(spec.jiggle, c.name);
+	if (jiggle > 0.0)
+		m.jiggle = motion::jiggleOf([&](double u) {
+			const CharacterMoment at = momentOf(c, u);
+			return transformPoint(at.frame, kind.head * c.scale) + Vec3{0.0, 0.03 * c.scale * std::cos(2.0 * kPi * at.steps), 0.0};
+		}, t, jiggle);
+	std::string text = kind.text(m);
+	// squash and stretch: the whole of it deformed along its motion and by its bouncy spring
+	const double squash = motion::amountFor(spec.squash, c.name);
+	if (squash > 0.0)
+		text = motion::wrapped(text, motion::squashStretch([&](double u) {
+			Vec3 at;
+			momentOf(c, u, &at);
+			return at;
+		}, t, kind.height * c.scale, squash));
+	return text;
+}
+
 std::string DataFilm::clothAt(double t) const {
 	std::string out;
 	for (const cloth::Cloth &cl : spec.cloths) {   // (film_cloth.h)
@@ -677,7 +699,7 @@ std::string DataFilm::clothAt(double t) const {
 			if (!who) continue;
 			const CharacterKind &kind = characterKinds().at(who->kind);
 			w.holdAt = [this, who, &kind, &cl](double when, int count, std::vector<Vec3> &held, std::vector<cloth::Sphere> &body) {
-				const CharacterMoment m = actingMoment(*who, std::max(0.0, when));
+				const CharacterMoment m = actingMoment(*who, std::max(0.0, motion::heldTime(spec.stepping, who->name, when, spec.fps)));
 				const double s = m.scale, shoulders = kind.chest.y + 0.45 * (kind.head.y - kind.chest.y), back = -0.85 * kind.radius;
 				const auto pbrt = [](Vec3 p) { return Vec3{-p.x, p.y, p.z}; };   // (story space to pbrt's)
 				held.clear(), body.clear();
@@ -703,7 +725,7 @@ std::string DataFilm::marksAt(const std::string &header, double t) const {
 		for (const Character &c : spec.characters) {
 			if (c.name != who) continue;
 			const CharacterKind &kind = characterKinds().at(c.kind);
-			const CharacterMoment m = actingMoment(c, when);
+			const CharacterMoment m = actingMoment(c, motion::heldTime(spec.stepping, c.name, when, spec.fps));
 			head = transformPoint(m.frame, kind.head * m.scale), top = transformPoint(m.frame, Vec3{0.0, kind.height, 0.0} * m.scale);
 			feet = transformPoint(m.frame, {0.0, 0.0, 0.0}), chest = transformPoint(m.frame, kind.chest * m.scale);
 			return true;
