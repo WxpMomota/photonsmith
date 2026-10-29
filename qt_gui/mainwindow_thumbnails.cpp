@@ -258,4 +258,4 @@ void MainWindow::updateGenerateThumbnailsButtonState() {
 		"multi-million-triangle mesh costs the same regardless of the thumbnail's own small size.\n"
 		"Use the pause/stop controls if a category turns out to take too long.")
 		: tr("Nothing to generate thumbnails for in the current view."));
-}
+}

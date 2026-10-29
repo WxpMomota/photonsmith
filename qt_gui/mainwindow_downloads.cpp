@@ -40,7 +40,7 @@
 // "Download missing files" (asset_downloader.h). The button appears under the scene info when the selected
 // scene is missing files this project hosts; clicking it asks, downloads with a cancellable progress dialog, and
 // re-checks the scene so the warning clears.
-// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
 
 void MainWindow::onDownloadMissingAssetsClicked() {
 	if (m_downloadablePack) startPackDownload(*m_downloadablePack, /*confirm=*/true);
@@ -204,4 +204,4 @@ void MainWindow::startPackDownload(const scene_packs::Pack &pack, bool confirm, 
 		});
 	onLogMessage(tr("Downloading \"%1\" (%2)…").arg(pack.title, QLocale().formattedDataSize(downloadBytes, 1)));
 	m_packDownloader->start(pack, root);
-}
+}

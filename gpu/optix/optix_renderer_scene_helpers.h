@@ -88,4 +88,4 @@ static void wf_upload_gpu_buf(const VecT& src, CUdeviceptr& dst) {
 	const size_t bytes = src.size() * sizeof(ElemT);
 	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dst), bytes));
 	CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(dst), src.data(), bytes, cudaMemcpyHostToDevice));
-}
+}

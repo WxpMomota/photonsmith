@@ -334,4 +334,4 @@ void MainWindow::rebuildDiagPane() {
 		m_diagTextEdit->moveCursor(QTextCursor::Start);
 	else
 		m_diagTextEdit->moveCursor(QTextCursor::End);
-}
+}

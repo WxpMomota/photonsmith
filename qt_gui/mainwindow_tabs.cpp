@@ -369,4 +369,4 @@ void MainWindow::createSettingsTab() {
 
 	m_tabWidget->addTab(scrollArea, tr("Settings"));
 }
-
+
