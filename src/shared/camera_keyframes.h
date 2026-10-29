@@ -23,6 +23,7 @@
 // The field of view and the lens are on the same curve when EVERY key gives them (a view that does not is the scene's own, so a path where only some keys say is
 // not mixed: those values are then left to the scene, and at() reports them as not given: fov 0, lensRadius -1, focus 0).
 
+#include "ease_curves.h"
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -48,6 +49,7 @@ struct Key {
 struct Path {
 	std::vector<Key> keys;
 	bool ease = true;
+	std::string curve = "smooth";   // (when it eases) the curve of each run between stops: ease_curves.h (`ease back` overshoots a stop and settles)
 };
 
 struct ParseResult {
@@ -106,10 +108,11 @@ inline ParseResult parse(const std::string& text) {
 			r.path.keys.clear();
 			return r;
 		};
-		if (word == "ease") {
-			int v = 1;
-			if (!(words >> v) || (v != 0 && v != 1)) return fail("'ease' is 0 or 1");
-			r.path.ease = v == 1;
+		if (word == "ease") {   // 0 or 1, or a curve (ease_curves.h)
+			std::string v;
+			if (!(words >> v) || (v != "0" && v != "1" && !ease_curves::known(v))) return fail("'ease' is 0, 1 or a curve: smooth, linear, in, out, back, elastic, bounce");
+			r.path.ease = v != "0";
+			if (ease_curves::known(v)) r.path.curve = v;
 		} else if (word == "key") {
 			Key k;
 			std::vector<std::string> tokens;
@@ -183,7 +186,8 @@ inline std::string toText(const Path& p) {
 	out.imbue(std::locale::classic());
 	out.precision(17);
 	out << "# A camera path: the camera goes through each key in turn (see src/shared/camera_keyframes.h).\n";
-	out << "ease " << (p.ease ? 1 : 0) << "\n";
+	if (p.ease && p.curve != "smooth") out << "ease " << p.curve << "\n";
+	else out << "ease " << (p.ease ? 1 : 0) << "\n";
 	for (const Key& k : p.keys) {
 		out << "key " << k.pos[0] << " " << k.pos[1] << " " << k.pos[2] << "  " << k.target[0] << " " << k.target[1] << " " << k.target[2];
 		if (k.fov > 0) out << "  " << k.fov;
@@ -277,14 +281,15 @@ inline Key at(const Path& path, double t, double durationSeconds = 0.0) {
 			for (std::size_t s = legFrom; s < legTo; ++s) legLength += length[s];
 			const double legTime = moving * legLength / total;
 			double f = legTime > 0.0 ? std::min(1.0, std::max(0.0, (now - legStartTime) / legTime)) : 1.0;
-			if (path.ease) f = f * f * (3.0 - 2.0 * f);   // smoothstep: each stop stays where it is
+			if (path.ease) f = ease_curves::at(path.curve, f);   // smooth by default: each stop stays where it is (back, elastic: past the stop and back)
 			double along = f * legLength;
 			std::size_t seg = legFrom;
 			while (seg + 1 < legTo && along > length[seg]) {
 				along -= length[seg];
 				++seg;
 			}
-			const double u = length[seg] > 1e-12 ? std::min(1.0, std::max(0.0, along / length[seg])) : 1.0;
+			// (a curve that goes past its stop runs on along the last piece of the path and comes back)
+			const double u = length[seg] > 1e-12 ? std::min(f > 1.0 ? 1.4 : 1.0, std::max(0.0, along / length[seg])) : 1.0;
 			Key out = splineAt(k, seg, u);
 			out.hold = 0.0;
 			return out;

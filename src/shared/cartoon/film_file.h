@@ -398,7 +398,7 @@ class DataFilm {
 		LineEnds &operator=(const LineEnds &) { return *this; }
 	};
 	mutable LineEnds lineEnds_;
-	double progress(const std::vector<Key> &keys, double t, int component) const;
+	double progress(const Anim &anim, double t, int component) const;
 	bool visible(const std::string &name, double t) const;
 	static std::string num(double v);
 	// The transforms of a block at t; with a shutter, a moving block's at the shutter's opening (StartTime) and closing (EndTime) - pbrt's object motion blur, which

@@ -1390,7 +1390,8 @@ std::string DataFilm::shotLightsAt(const std::string &header, double t) const {
 	return shot_lighting::lightsText(eye, target, shot.lighting);
 }
 
-double DataFilm::progress(const std::vector<Key> &keys, double t, int component) const {
+double DataFilm::progress(const Anim &anim, double t, int component) const {
+	const std::vector<Key> &keys = anim.keys;
 	if (keys.empty()) return 0.0;
 	if (t <= keys.front().t) return keys.front().v[component];
 	if (t >= keys.back().t) return keys.back().v[component];
@@ -1398,7 +1399,8 @@ double DataFilm::progress(const std::vector<Key> &keys, double t, int component)
 		if (t <= keys[i].t) {
 			const double span = keys[i].t - keys[i - 1].t;
 			double u = span > 0.0 ? (t - keys[i - 1].t) / span : 1.0;
-			if (spec.ease) u = u * u * (3.0 - 2.0 * u);
+			if (!anim.ease.empty()) u = ease_curves::at(anim.ease, u);   // (its own curve, else the film's: ease_curves.h)
+			else if (spec.ease) u = ease_curves::at(spec.easeCurve, u);
 			return keys[i - 1].v[component] + (keys[i].v[component] - keys[i - 1].v[component]) * u;
 		}
 	}
@@ -1450,12 +1452,12 @@ std::string DataFilm::transformsAt(const std::string &name, double t) const {
 	for (const Anim &a : spec.anims) {
 		if (a.name != name) continue;
 		if (a.kind == Kind::Move) {
-			out += "  Translate " + num(progress(a.keys, t, 0)) + " " + num(progress(a.keys, t, 1)) + " " + num(progress(a.keys, t, 2)) + "\n";
+			out += "  Translate " + num(progress(a, t, 0)) + " " + num(progress(a, t, 1)) + " " + num(progress(a, t, 2)) + "\n";
 		} else if (a.kind == Kind::Turn) {
-			out += "  Translate " + num(a.about[0]) + " " + num(a.about[1]) + " " + num(a.about[2]) + "\n  Rotate " + num(progress(a.keys, t, 0)) + " " + num(a.axis[0]) + " " + num(a.axis[1]) + " " +
+			out += "  Translate " + num(a.about[0]) + " " + num(a.about[1]) + " " + num(a.about[2]) + "\n  Rotate " + num(progress(a, t, 0)) + " " + num(a.axis[0]) + " " + num(a.axis[1]) + " " +
 				   num(a.axis[2]) + "\n  Translate " + num(-a.about[0]) + " " + num(-a.about[1]) + " " + num(-a.about[2]) + "\n";
 		} else if (a.kind == Kind::Grow) {
-			const double k = std::max(1e-6, progress(a.keys, t, 0));
+			const double k = std::max(1e-6, progress(a, t, 0));
 			out += "  Translate " + num(a.about[0]) + " " + num(a.about[1]) + " " + num(a.about[2]) + "\n  Scale " + num(k) + " " + num(k) + " " + num(k) + "\n  Translate " + num(-a.about[0]) + " " +
 				   num(-a.about[1]) + " " + num(-a.about[2]) + "\n";
 		}
@@ -1468,7 +1470,7 @@ std::string DataFilm::lightsScaled(const std::string &name, const std::string &b
 	bool any = false;
 	for (const Anim &a : spec.anims)
 		if (a.kind == Kind::Light && a.name == name) {
-			k *= std::max(0.0, progress(a.keys, t, 0));
+			k *= std::max(0.0, progress(a, t, 0));
 			any = true;
 		}
 	if (!any) return body;

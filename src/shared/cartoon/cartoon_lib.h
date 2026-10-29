@@ -15,6 +15,7 @@
 #include <utility>
 #include <vector>
 
+#include "../ease_curves.h"
 #include "cartoon_audio.h"
 
 namespace cartoon {
@@ -56,7 +57,7 @@ inline Vec3 lerp(Vec3 a, Vec3 b, double u) { return {lerp(a.x, b.x, u), lerp(a.y
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Easing and keyframe tracks
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
-enum class Ease { Linear, Smooth, In, Out, Back, Elastic };
+enum class Ease { Linear, Smooth, In, Out, Back, Elastic, Bounce };
 
 inline double applyEase(Ease e, double u) {
 	switch (e) {
@@ -72,6 +73,7 @@ inline double applyEase(Ease e, double u) {
 			if (u <= 0.0) return 0.0;
 			if (u >= 1.0) return 1.0;
 			return std::pow(2.0, -9.0 * u) * std::sin((u * 10.0 - 0.75) * (2.0 * kPi / 3.0)) + 1.0;
+		case Ease::Bounce: return ease_curves::at("bounce", u);
 	}
 	return u;
 }

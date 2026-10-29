@@ -77,6 +77,7 @@ struct Anim {
 	double axis[3] = {0.0, 1.0, 0.0};
 	std::vector<Key> keys;                               // Move: v = the offset; Turn: v[0] = degrees; Grow and Light: v[0] = the factor
 	std::vector<std::pair<double, double>> intervals;   // Show
+	std::string ease;                                    // its own curve (`ease back` on its line: ease_curves.h); "": the film's
 };
 
 // A shot's camera that follows a character (`follow NAME behind D up H side S fov F`).
@@ -263,6 +264,7 @@ struct Spec {
 	double length = 0.0, still = -1.0;
 	int fps = 24;
 	bool ease = true;
+	std::string easeCurve = "smooth";   // the film's motions' curve when they ease (`ease back`: ease_curves.h)
 	double shutter = 0.5;   // the share of a frame a moving block is blurred over (0: none)
 	double fadeOut = 0.0;   // seconds of a fade to black at the end
 	bool idle = true;       // the characters' idle life, and turning to whoever speaks (`idle off`)

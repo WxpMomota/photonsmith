@@ -111,7 +111,7 @@ in a shorter video).
 `--camera-keyframes FILE` replaces the named path with a route through places you choose. The file is plain text (`#` starts a comment):
 
 ```
-ease 1                      # 1 (the default): start and end gently; 0: the same pace from the first frame to the last
+ease 1                      # 1 (the default): start and end gently; 0: the same pace from the first frame to the last; or a curve: back, elastic, bounce, in, out
 key  0 2.5 8    0 1 0       # key px py pz tx ty tz: where the camera is, and what it looks at
 key  6 1.5 3    0 1 0  60   # ... and a 7th number: its vertical field of view, in degrees
 key  0 5 -4     0 1 0  35 0.1 9   # ... and the 8th and 9th: its lens radius and focus distance (0.1 blurs what is not 9 away)
@@ -505,7 +505,7 @@ length   12                        # seconds (required)
 fps      24                        # default 24
 still    6                         # the moment the scene list's picture shows (default: the middle)
 tags     emissive,dusk             # words from the scene list's tags (others are ignored)
-ease     1                         # 1: motions start and stop gently (the default); 0: even pace (wherever the line is)
+ease     1                         # 1: motions start and stop gently (the default); 0: even pace (wherever the line is); or a curve (below)
 
 shot 0 The windmill                # a camera shot from 0 s; the next shot is a hard cut
   key  0 3 14   0 2.5 0   38       # where the camera is, what it looks at, [fov [lensRadius focusDistance]], [hold S]
@@ -521,7 +521,7 @@ light lamp  0 0   4 0   8 1   12 1                         # the power of the li
 show  ghost 3 5   8 9                                      # NAME is in the scene only between these times
 ```
 
-Between two keys a value changes smoothly (evenly with `ease 0`); before the first it holds the first value and after the last the last. A shot with one `key` is a camera that stays; a film with
+Between two keys a value changes smoothly (evenly with `ease 0`; or by a cartoon curve, Blender's keyframe easing: `ease back` overshoots and settles, `ease elastic` springs past and back, `ease bounce` drops onto the value and bounces, `ease in` and `ease out` start or stop gently - for the whole film, for one `move`/`turn`/`grow` line with `move NAME ease back T X Y Z ...`, or for a shot's camera with `ease camera back`: src/shared/ease_curves.h); before the first it holds the first value and after the last the last. A shot with one `key` is a camera that stays; a film with
 no shots keeps the scene's own camera. Meshes and pictures the pbrt file names by a relative path are looked up beside the pbrt file. `ray_tracer --film-check FILE.film` loads a film file and its
 scene and says what it found or what is wrong, with the file and line; with no file it lists the films found in the scene folders and the files that were left out (a film with a problem is left out
 of the scene list, never half-loaded). A film made from a file has a video preset number of its own, `V` and a number from 1000 up worked out from its key, so it never changes when other films

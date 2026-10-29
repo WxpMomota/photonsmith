@@ -23,6 +23,8 @@
 #include "../../src/shared/gltf_skin.h"
 #include "../../src/shared/pbrt_discover.h"
 #include "../../src/shared/screen_marks.h"
+#include "../../src/shared/camera_keyframes.h"
+#include "../../src/shared/ease_curves.h"
 #include "../../launcher/process.h"   // (a speech engine for the real voices)
 
 namespace ff = cartoon::film_file;
@@ -846,7 +848,7 @@ TEST(FilmFile, EaseIsTheFilmsWhereverItIsAndEaseCameraAShots) {
 	EXPECT_TRUE(camera.spec.ease);
 	EXPECT_FALSE(camera.spec.shots[0].path.ease);
 	EXPECT_NE(ff::parse("scene s.pbrt\nlength 10\nease camera 0\n", "t.film").error.find("belongs to a shot"), std::string::npos);
-	EXPECT_NE(ff::parse("scene s.pbrt\nlength 10\nease 0.5\n", "t.film").error.find("`ease 1` or `ease 0`"), std::string::npos);
+	EXPECT_NE(ff::parse("scene s.pbrt\nlength 10\nease 0.5\n", "t.film").error.find("`ease 1`, `ease 0` or `ease CURVE`"), std::string::npos);
 	EXPECT_NE(ff::parse("scene s.pbrt\nlength 10\ncharacter ann person\nshot 0 A\n orbit ann radius 3 degrees 120 height 1.6\n ease camera 0\n", "t.film").error.find("for a shot of `key` lines"), std::string::npos);
 }
 
@@ -1435,4 +1437,32 @@ TEST(FilmMotion, SquashAndStretchKeepTheVolumeAndJiggleSwingsTheAntennae) {
 	EXPECT_EQ(characterText(plain.sceneAt(1.5), "pip"), characterText(plain.sceneAt(1.5), "pip"));
 	ff::DataFilm bad;
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 6\nsquash 5\n", bad).find("from 0 (none) to 2"), std::string::npos);
+}
+
+// ---- cartoon easing (`ease back|elastic|bounce`: ease_curves.h) ----
+
+TEST(FilmEase, BackOvershootsBounceDropsAndEveryCurveStartsAndEndsInPlace) {
+	for (const char *c : {"smooth", "linear", "in", "out", "back", "elastic", "bounce"}) {
+		EXPECT_NEAR(ease_curves::at(c, 0.0), 0.0, 1e-9) << c;
+		EXPECT_NEAR(ease_curves::at(c, 1.0), 1.0, 1e-9) << c;
+	}
+	EXPECT_GT(ease_curves::at("back", 0.8), 1.03) << "back goes past its end and settles";
+	EXPECT_GT(ease_curves::at("elastic", 0.15), 1.05);
+	EXPECT_NEAR(ease_curves::at("bounce", 1.0 / 2.75), 1.0, 1e-9) << "bounce reaches its end, then bounces";
+	EXPECT_LT(ease_curves::at("bounce", 1.5 / 2.75), 0.8);
+	for (double u = 0.0; u <= 1.0; u += 0.01) EXPECT_LE(ease_curves::at("bounce", u), 1.0 + 1e-9) << "never past it";
+
+	ff::DataFilm film, own;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 2\nease back\nmove fan 0 0 0 0  1 2 0 0\n", film), "");
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 2\nmove fan ease bounce 0 0 0 0  1 2 0 0\n", own), "");
+	EXPECT_NE(film.sceneAt(0.8).find("Translate 2.09"), std::string::npos) << "past its place at 0.8 s (2 x 1.0465)";
+	EXPECT_NE(own.sceneAt(1.0 / 2.75).find("Translate 2 "), std::string::npos) << "its own curve: there at a third of the way, then bouncing";
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 2\nease wobbly\n", bad).find("the curves"), std::string::npos);
+
+	camera_keyframes::ParseResult r = camera_keyframes::parse("ease back\nkey 0 0 0  0 0 1\nkey 10 0 0  10 0 1\n");
+	ASSERT_TRUE(r.ok) << r.error;
+	EXPECT_EQ(r.path.curve, "back");
+	EXPECT_NE(camera_keyframes::toText(r.path).find("ease back"), std::string::npos) << "written back as it was read";
+	EXPECT_GT(camera_keyframes::at(r.path, 0.8).pos[0], 10.0) << "the camera runs past its stop and comes back";
 }

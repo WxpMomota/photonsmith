@@ -209,11 +209,12 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 		} else if (verb == "still") {
 			if (w.size() != 2 || !number(w[1], s.still) || s.still < 0) return fail("still is a time in seconds");
 		} else if (verb == "ease") {   // the film's motions wherever the line is; `ease camera` a shot's camera path
-			double v = 1;
 			const bool camera = w.size() == 3 && w[1] == "camera";
-			if (w.size() != (camera ? 3u : 2u) || !number(w.back(), v) || (v != 0.0 && v != 1.0))
-				return fail("`ease 1` or `ease 0` (the film's motions), or in a shot `ease camera 1` or `ease camera 0` (its camera)");
-			if (!camera) s.ease = v != 0.0;
+			const std::string &v = w.back();
+			if (w.size() != (camera ? 3u : 2u) || (v != "0" && v != "1" && !ease_curves::known(v)))
+				return fail("`ease 1`, `ease 0` or `ease CURVE` (the film's motions), or in a shot `ease camera 1|0|CURVE` (its camera); the curves: smooth, linear, in, out, back, "
+							"elastic, bounce");
+			if (!camera) s.ease = v != "0", s.easeCurve = ease_curves::known(v) ? v : std::string("smooth");
 			else if (s.shots.empty()) return fail("`ease camera` belongs to a shot: start one with `shot 0 NAME` first");
 			else shotEase = "ease " + w.back() + "\n";
 		} else if (verb == "shutter") {
@@ -745,7 +746,13 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 			std::size_t i = 2;
 			const std::size_t group = verb == "move" ? 4 : 2;
 			a.kind = verb == "move" ? Kind::Move : verb == "turn" ? Kind::Turn : verb == "grow" ? Kind::Grow : verb == "light" ? Kind::Light : Kind::Show;
-			while (i < w.size() && (w[i] == "about" || w[i] == "axis")) {
+			while (i < w.size() && (w[i] == "about" || w[i] == "axis" || w[i] == "ease")) {
+				if (w[i] == "ease") {   // its own curve (ease_curves.h)
+					if (i + 1 >= w.size() || !ease_curves::known(w[i + 1])) return fail("`ease` on a line takes a curve: smooth, linear, in, out, back, elastic, bounce");
+					a.ease = w[i + 1];
+					i += 2;
+					continue;
+				}
 				if (a.kind != Kind::Turn && !(a.kind == Kind::Grow && w[i] == "about")) return fail("`" + w[i] + "` is not used by " + verb);
 				double *dst = w[i] == "about" ? a.about : a.axis;
 				if (i + 3 >= w.size()) return fail("`" + w[i] + "` needs three numbers");
