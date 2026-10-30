@@ -11,6 +11,7 @@
 #include <array>
 
 #include "cartoon_actor.h"
+#include "eye_model.h"
 #include "sdf_mesh.h"
 
 namespace cartoon {
@@ -26,6 +27,9 @@ struct Outfit {
 	Vec3 eyes = {0.20, 0.11, 0.05};
 	Vec3 lips = {0.58, 0.28, 0.26};
 	Vec3 blush = {0.88, 0.50, 0.45};
+	double skinLight = 0.0;   // how far light goes into the skin (skinMaterial; 0: painted)
+	bool realEyes = false;    // eyes with a clear cornea over the iris (eye_model.h) instead of painted ones
+	bool strandHair = false;  // hair of strands (film_hair.h) instead of the sculpted hair
 };
 
 struct HumanPose {
@@ -39,12 +43,14 @@ struct HumanPose {
 	double lookWeight = 0.0;
 	double blink = 0.0, eyeWide = 1.0, browRaise = 0.0, browTilt = 0.0;   // browTilt positive = worried
 	double smile = 0.3, mouthOpen = 0.0;
+	double pupil = 0.4;            // (real eyes) the pupil, a share of the iris (eye::pupilOf)
 	Vec3 handL = {0, 0, 0}, handR = {0, 0, 0};
 	double handWeightL = 0.0, handWeightR = 0.0;
 	bool keys = false;            // car keys in the right hand
 	bool bags = false;            // a grocery bag in each hand
 	bool feetHeld = false;        // the feet at `heldFoot` (world: left, right) instead of where the walk puts them - a foot held where it came down (rig::FootLock)
 	Vec3 heldFoot[2];
+	Vec3 footUp[2] = {{0.0, 1.0, 0.0}, {0.0, 1.0, 0.0}};   // the slope under each foot (world): its shoe tilted to it
 };
 
 constexpr double kHip = 0.92, kThigh = 0.45, kShin = 0.44, kTorso = 0.55, kHeadR = 0.122;
@@ -251,7 +257,7 @@ inline std::string emitHuman(const HumanPose &p, const Outfit &o = Outfit{}) {
 	const Parts &P = parts();
 	const Frames f = framesOf(p);
 	std::string out;
-	const std::string skin = diffuseMaterial(o.skin), hair = diffuseMaterial(o.hair), sweater = diffuseMaterial(o.sweater), rib = diffuseMaterial(o.sweater * 0.82);
+	const std::string skin = skinMaterial(o.skin, o.skinLight, 1.0, diffuseMaterial(o.skin)), hair = diffuseMaterial(o.hair), sweater = diffuseMaterial(o.sweater), rib = diffuseMaterial(o.sweater * 0.82);
 	const Arm arms[2] = {armOf(f, p, -1.0), armOf(f, p, 1.0)};
 
 	// ---- legs, hips and shoes ----
@@ -279,7 +285,9 @@ inline std::string emitHuman(const HumanPose &p, const Outfit &o = Outfit{}) {
 		// sneakers: a rounded upper and a white sole, pointing the way the person faces
 		std::string uppers, soles;
 		for (int s = 0; s < 2; ++s) {
-			const Mat4 shoe = mul(translate(ankle[s]), rotate({0, 1, 0}, -p.yaw), translate(0.045, -0.050, 0.0));
+			const Vec3 up = normalize(p.footUp[s]), axis = cross(Vec3{0.0, 1.0, 0.0}, up);
+			const Mat4 tilt = length(axis) > 1e-6 ? rotate(normalize(axis), std::acos(std::clamp(up.y, -1.0, 1.0)) * 180.0 / kPi) : identity();
+			const Mat4 shoe = mul(translate(ankle[s]), tilt, rotate({0, 1, 0}, -p.yaw), translate(0.045, -0.050, 0.0));
 			const Mat4 inv = invertAffine(shoe);
 			const auto upper = [&](Vec3 q) {
 				return sdf::smin(sdf::ellipsoid(q, mul(translate(Vec3{-0.004, -0.048, 0.0}), inv), {0.128, 0.058, 0.060}),
@@ -354,16 +362,17 @@ inline std::string emitHuman(const HumanPose &p, const Outfit &o = Outfit{}) {
 	// ---- the head ----
 	skinParts += emitMesh(P.head, f.head);
 	out += attr(skin, skinParts);
-	out += attr(hair, emitMesh(P.hair, f.head));
+	if (!o.strandHair) out += attr(hair, emitMesh(P.hair, f.head));
 	out += attr(diffuseMaterial(o.blush), emitMesh(P.blush, f.head));
 	// eyes in their sockets: the white, a dark ring, the iris with a warm glow low in it, the pupil, two catchlights; lids that rest a little lowered
 	{
 		std::string whites, limbals, irises, glows, pupils, sparks, lids, lashes, brows;
-		const double wide = std::max(0.5, p.eyeWide);
+		eye::Eyes real;   // (`eyes real`: eye_model.h)
+		const double wide = std::max(0.5, p.eyeWide), over = o.realEyes ? eye::kLidOver : 1.03;
 		for (double side : {-1.0, 1.0}) {
 			const Vec3 c = eyeCentreLocal(side);
 			const double R = kEyeR * std::min(1.12, wide);
-			whites += emitMesh(P.eyeball, mul(f.head, translate(c), scale(R)));
+			if (!o.realEyes) whites += emitMesh(P.eyeball, mul(f.head, translate(c), scale(R)));
 			Vec3 dir = {1.0, 0.0, side * 0.06};
 			if (p.lookWeight > 0.0) {
 				Vec3 d = normalize(transformPoint(invertAffine(f.head), p.look) - c);
@@ -372,19 +381,23 @@ inline std::string emitHuman(const HumanPose &p, const Outfit &o = Outfit{}) {
 			}
 			dir = normalize(dir);
 			const Mat4 eye = mul(f.head, alignY(c, dir), scale(R));
-			limbals += emitMesh(P.limbal, eye);
-			irises += emitMesh(P.iris, eye);
-			glows += emitMesh(P.glow, mul(f.head, alignY(c, normalize(dir - Vec3{0.0, 0.25, 0.0})), scale(R)));
-			pupils += emitMesh(P.pupil, eye);
-			const Vec3 s1 = normalize(dir + Vec3{0.0, 0.40, side * 0.18}), s2 = normalize(dir + Vec3{0.0, -0.30, -side * 0.22});
-			sparks += emitMesh(P.disc, mul(f.head, alignY(c + s1 * (R * 1.007), s1), scale(R * 0.17, R * 0.01, R * 0.17)));
-			sparks += emitMesh(P.disc, mul(f.head, alignY(c + s2 * (R * 1.007), s2), scale(R * 0.08, R * 0.01, R * 0.08)));
+			if (o.realEyes) {
+				real.add(eye, p.pupil);
+			} else {
+				limbals += emitMesh(P.limbal, eye);
+				irises += emitMesh(P.iris, eye);
+				glows += emitMesh(P.glow, mul(f.head, alignY(c, normalize(dir - Vec3{0.0, 0.25, 0.0})), scale(R)));
+				pupils += emitMesh(P.pupil, eye);
+				const Vec3 s1 = normalize(dir + Vec3{0.0, 0.40, side * 0.18}), s2 = normalize(dir + Vec3{0.0, -0.30, -side * 0.22});
+				sparks += emitMesh(P.disc, mul(f.head, alignY(c + s1 * (R * 1.007), s1), scale(R * 0.17, R * 0.01, R * 0.17)));
+				sparks += emitMesh(P.disc, mul(f.head, alignY(c + s2 * (R * 1.007), s2), scale(R * 0.08, R * 0.01, R * 0.08)));
+			}
 			// the upper lid rests a fifth of the way down (wide eyes lift it), the lower one a little up
 			const double up = clamp01(std::max(clamp01(p.blink), 0.30 - 0.40 * (wide - 1.0) + 0.10 * p.browTilt));
 			const double low = clamp01(std::max(0.35 * clamp01(p.blink), 0.10));
 			const auto lid = [&](double amount, double sign) {
 				const double psi = (180.0 - 180.0 * amount) * kPi / 180.0;
-				return emitMesh(P.cap, mul(f.head, alignY(c, Vec3{std::cos(psi), sign * std::sin(psi), 0.0}), scale(R * 1.03)));
+				return emitMesh(P.cap, mul(f.head, alignY(c, Vec3{std::cos(psi), sign * std::sin(psi), 0.0}), scale(R * over)));
 			};
 			lids += lid(up, 1.0);
 			lids += lid(low, -1.0);
@@ -395,7 +408,7 @@ inline std::string emitHuman(const HumanPose &p, const Outfit &o = Outfit{}) {
 				std::vector<Vec3> lash;
 				for (int k = 0; k <= 12; ++k) {
 					const double tt = kPi * (0.12 + 0.80 * k / 12.0);
-					lash.push_back(c + (u * std::cos(kPi - tt) + w * std::sin(tt)) * (R * 1.045));
+					lash.push_back(c + (u * std::cos(kPi - tt) + w * std::sin(tt)) * (R * (over + 0.015)));
 				}
 				lash.push_back(lash.back() + (u * 0.55 + Vec3{0.0, 0.45, 0.0} + w * 0.2) * (R * 0.22));
 				lashes += emitMesh(sdf::tubeMesh(lash, R * 0.055, 0.35, 6), f.head);
@@ -412,12 +425,16 @@ inline std::string emitHuman(const HumanPose &p, const Outfit &o = Outfit{}) {
 			}
 			brows += emitMesh(sdf::tubeMesh(arc, 0.0068, 0.50, 8), f.head);
 		}
-		out += attr(diffuseMaterial({0.95, 0.94, 0.92}), whites);
-		out += attr(diffuseMaterial(o.eyes * 0.4), limbals);
-		out += attr(diffuseMaterial(o.eyes), irises);
-		out += attr(diffuseMaterial(o.eyes * 2.0), glows);
-		out += attr(diffuseMaterial({0.015, 0.012, 0.01}), pupils);
-		out += attr(diffuseMaterial({1.0, 1.0, 1.0}), sparks);
+		if (o.realEyes) {
+			out += real.text(o.eyes);
+		} else {
+			out += attr(diffuseMaterial({0.95, 0.94, 0.92}), whites);
+			out += attr(diffuseMaterial(o.eyes * 0.4), limbals);
+			out += attr(diffuseMaterial(o.eyes), irises);
+			out += attr(diffuseMaterial(o.eyes * 2.0), glows);
+			out += attr(diffuseMaterial({0.015, 0.012, 0.01}), pupils);
+			out += attr(diffuseMaterial({1.0, 1.0, 1.0}), sparks);
+		}
 		out += attr(skin, lids);
 		out += attr(diffuseMaterial({0.06, 0.035, 0.025}), lashes);
 		out += attr(hair, brows);

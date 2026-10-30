@@ -34,8 +34,8 @@ struct Box {
 };
 
 struct Cloth {
-	std::string kind;          // flag, cape, sheet, curtain
-	std::string who;           // (a cape) whose shoulders it hangs from
+	std::string kind;          // flag, cape, sheet, curtain; worn: skirt, coat, scarf
+	std::string who;           // (a cape, a garment) who wears it
 	Vec3 at;                   // a flag's pole top, a sheet's centre, a curtain's rail's middle
 	double width = 1.2, height = 0.8;   // metres (a cape: across the shoulders and its length)
 	double facing = 0.0;       // degrees (a curtain: the way it faces, 0 +z; a sheet: its turn)
@@ -45,14 +45,18 @@ struct Cloth {
 	double stiffness = 0.5;    // 0..1: how much it resists folding (0 silk, 1 canvas)
 	double windScale = 1.0;    // how much the wind blows it
 	double ground = 0.0;       // the ground's height under it
+	double flare = 0.25;       // (a skirt, a coat) how far its hem stands out from where it is held, a share of its length
 	std::vector<Box> over;     // (a sheet) what it falls over
 	int line = 0;
 };
 
 inline const std::vector<std::string> &kinds() {
-	static const std::vector<std::string> k = {"flag", "cape", "sheet", "curtain"};
+	static const std::vector<std::string> k = {"flag", "cape", "sheet", "curtain", "skirt", "coat", "scarf"};
 	return k;
 }
+// Whether a kind is worn (held by a character: World::holdAt), and whether it closes round on itself (a skirt: its first and last columns are joined).
+inline bool worn(const std::string &kind) { return kind == "cape" || kind == "skirt" || kind == "coat" || kind == "scarf"; }
+inline bool ring(const std::string &kind) { return kind == "skirt"; }
 
 // What the world does to the cloth at a moment: where its held points are (pbrt's: a cape's along the character's shoulders) and the round bodies it must stay out of.
 struct Sphere {
@@ -90,7 +94,7 @@ inline int pointsAlong(double metres) { return std::clamp(static_cast<int>(std::
 // The cloth's rest shape and its first place: a grid of points, row 0 the held edge (a flag's along its pole, a cape's along the shoulders, a curtain's along its rail).
 inline State initial(const Cloth &c, const World &w) {
 	State s;
-	s.nx = pointsAlong(c.width), s.ny = pointsAlong(c.height);
+	s.nx = pointsAlong(ring(c.kind) ? kPi * c.width : c.kind == "coat" ? 0.85 * kPi * c.width : c.width), s.ny = pointsAlong(c.height);
 	if (c.kind == "flag") std::swap(s.nx, s.ny);   // (a flag: across is down the pole, down is out from it)
 	s.x.resize(static_cast<std::size_t>(s.nx) * s.ny);
 	s.invMass.assign(s.x.size(), 1.0);
@@ -99,15 +103,23 @@ inline State initial(const Cloth &c, const World &w) {
 	const Vec3 face{std::sin(a), 0.0, std::cos(a)};
 	std::vector<Vec3> held;
 	std::vector<Sphere> body;
-	if (c.kind == "cape" && w.holdAt) w.holdAt(kStart, s.nx, held, body);
+	if (worn(c.kind) && w.holdAt) w.holdAt(kStart, s.nx, held, body);
+	Vec3 mid{};
+	for (const Vec3 &h : held) mid = mid + h * (1.0 / std::max<std::size_t>(1, held.size()));
 	for (int j = 0; j < s.ny; ++j)
 		for (int i = 0; i < s.nx; ++i) {
 			const double u = static_cast<double>(i) / (s.nx - 1), v = static_cast<double>(j) / (s.ny - 1);
 			Vec3 p;
 			if (c.kind == "flag") {   // out from the pole along +x (the wind turns it), with a slight ripple (a sheet perfectly flat in the plane gravity pulls in never folds)
 				p = c.at + Vec3{v * c.width, -u * c.height, 0.03 * v * std::sin(5.0 * u + 1.0)};
-			} else if (c.kind == "cape") {
+			} else if (c.kind == "cape" || c.kind == "scarf") {
 				p = (held.empty() ? c.at : held[static_cast<std::size_t>(i)]) + Vec3{0.0, -v * c.height, 0.0};
+			} else if (c.kind == "skirt" || c.kind == "coat") {   // (hanging from the waist, its hem standing out a little)
+				const Vec3 top = held.empty() ? c.at : held[static_cast<std::size_t>(i)];
+				Vec3 out = top - mid;
+				out.y = 0.0;
+				out = length(out) > 1e-9 ? normalize(out) : Vec3{};
+				p = top + out * (c.flare * v * c.height) + Vec3{0.0, -v * c.height, 0.0};
 			} else if (c.kind == "sheet") {
 				p = c.at + side * ((u - 0.5) * c.width) + face * ((v - 0.5) * c.height);
 			} else {   // a curtain
@@ -117,7 +129,7 @@ inline State initial(const Cloth &c, const World &w) {
 		}
 	s.prev = s.x;
 	for (int i = 0; i < s.nx; ++i) {   // the held edge
-		if (c.kind == "flag" || c.kind == "cape" || c.kind == "curtain") s.invMass[static_cast<std::size_t>(i)] = 0.0;
+		if (c.kind == "flag" || worn(c.kind) || c.kind == "curtain") s.invMass[static_cast<std::size_t>(i)] = 0.0;
 	}
 	if (c.kind == "sheet")
 		for (double &m : s.invMass) m = 0.0;   // (held flat until it is let go)
@@ -128,7 +140,9 @@ inline State initial(const Cloth &c, const World &w) {
 inline std::vector<Link> linksOf(const Cloth &c, const State &s) {
 	std::vector<Link> out;
 	const double bend = std::pow(10.0, 1.0 - 4.0 * std::clamp(c.stiffness, 0.0, 1.0));   // (compliance: silk 10, canvas 0.001)
+	const bool closed = ring(c.kind);
 	const auto add = [&](int i0, int j0, int i1, int j1, double compliance) {
+		if (closed) i0 = (i0 + s.nx) % s.nx, i1 = (i1 + s.nx) % s.nx;   // (round the ring)
 		if (i0 >= s.nx || j0 >= s.ny || i1 < 0 || i1 >= s.nx || j1 < 0 || j1 >= s.ny) return;
 		const int a = j0 * s.nx + i0, b = j1 * s.nx + i1;
 		out.push_back({a, b, length(s.x[static_cast<std::size_t>(a)] - s.x[static_cast<std::size_t>(b)]), compliance});
@@ -149,7 +163,7 @@ inline void step(const Cloth &c, const World &w, const std::vector<Link> &links,
 		for (double &m : s.invMass) m = 1.0;
 	std::vector<Vec3> held;
 	std::vector<Sphere> body;
-	if (c.kind == "cape" && w.holdAt && w.holdAt(t, s.nx, held, body))
+	if (worn(c.kind) && w.holdAt && w.holdAt(t, s.nx, held, body))
 		for (int i = 0; i < s.nx; ++i) s.x[static_cast<std::size_t>(i)] = held[static_cast<std::size_t>(i)];
 	// the wind on each triangle (by how squarely it meets the air coming past it), gusting
 	std::vector<Vec3> force(s.x.size());
@@ -172,7 +186,8 @@ inline void step(const Cloth &c, const World &w, const std::vector<Link> &links,
 			}
 	}
 	// the points move (Verlet, a little air drag), the cloth weighing 0.2 kg a square metre
-	const double cellArea = (c.width / (s.nx - 1)) * (c.height / (s.ny - 1)), mass = std::max(1e-4, 0.2 * cellArea);
+	const double around = ring(c.kind) ? kPi * c.width : c.width;   // (a skirt's width is its waist's: its cloth goes round it)
+	const double cellArea = (around / (s.nx - 1)) * (c.height / (s.ny - 1)), mass = std::max(1e-4, 0.2 * cellArea);
 	for (std::size_t k = 0; k < s.x.size(); ++k) {
 		if (s.invMass[k] == 0.0) {
 			s.prev[k] = s.x[k];
@@ -266,9 +281,10 @@ inline std::string text(const std::string &film, const Cloth &c, const World &w,
 	char buf[128];
 	// smooth normals: each point's from the triangles round it
 	std::vector<Vec3> normal(s.x.size());
+	const bool closed = ring(c.kind);
 	for (int j = 0; j + 1 < s.ny; ++j)
-		for (int i = 0; i + 1 < s.nx; ++i) {
-			const int a = j * s.nx + i, b = a + 1, d = a + s.nx, e = d + 1;
+		for (int i = 0; i + (closed ? 0 : 1) < s.nx; ++i) {
+			const int a = j * s.nx + i, b = j * s.nx + (i + 1) % s.nx, d = a + s.nx, e = b + s.nx;
 			const Vec3 n = cross(s.x[static_cast<std::size_t>(b)] - s.x[static_cast<std::size_t>(a)], s.x[static_cast<std::size_t>(d)] - s.x[static_cast<std::size_t>(a)]);
 			for (int k : {a, b, d, e}) normal[static_cast<std::size_t>(k)] = normal[static_cast<std::size_t>(k)] + n;
 			std::snprintf(buf, sizeof buf, "%d %d %d %d %d %d ", a, d, b, b, d, e);

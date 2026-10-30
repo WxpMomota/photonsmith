@@ -363,6 +363,13 @@ inline std::string subsurfaceMaterial(Vec3 reflectance, Vec3 mfp, double roughne
 				  reflectance.z, roughness);
 	return buf;
 }
+// A character's skin that light goes into (a film's `skin-light`): the subsurface material showing `colour`, light going `depth` times a cartoon skin's way under it
+// (red furthest, blue least, as in skin) on a character `size` times a person's - so ears, fingers and a nose glow red with a light behind them and a face looks soft. Depth 0:
+// the plain painted skin `painted` (the kind's own material).
+inline Vec3 skinMfp(double depth, double size) { return Vec3{0.0042, 0.0017, 0.0010} * (depth * size); }
+inline std::string skinMaterial(Vec3 colour, double depth, double size, const std::string &painted) {
+	return depth > 0.0 ? subsurfaceMaterial(colour, skinMfp(depth, size), 0.35) : painted;
+}
 // A thin sheet that lets light through (a petal, a seed's fluff, a paper shade).
 inline std::string translucentMaterial(Vec3 reflectance, Vec3 transmittance) {
 	char buf[240];

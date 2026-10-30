@@ -2017,6 +2017,86 @@ same everywhere), always facing the camera and always the same size in the frame
 at `from` (a label's line drawing out from what it names, an orbit line drawing itself round) and away at `to`; the times are the story's. `compare` knows the Sun,
 the planets, Pluto, Ceres, the Moon, Io, Europa, Ganymede and Titan (true radii), and the film's own planets; it outlines each and staggers names that would overlap.
 
+### Characters, round 12 (2026-10-30)
+
+Ten things that make a film's characters look and move as in a feature film. The lines are read by film_parse_character.h (and `act` and `rigged` by film_parse.cpp).
+
+**Skin that light goes into: `skin-light [NAME] D`.** The skin of the person, Pip, the turtle - and a rigged model's materials named skin, body, face, head or hand - becomes pbrt's
+subsurface material (cartoon_lib.h `skinMaterial`): the colour it showed, with light travelling D times a cartoon skin's depth under it, red furthest and blue least (4.2, 1.7
+and 1.0 mm at 1, scaled with the character's size). Ears, fingers and a nose glow red with a light behind them and a face looks soft. 0 (the default) is the painted skin as
+before; 1 is the usual; up to 6. It is noisier than a painted skin: the films' adaptive sampling and denoiser take that out. CPU and both OptiX renderers.
+
+**Real eyes: `eyes [NAME] real|painted`.** (eye_model.h) An eye built as an eye is: a white ball with a hole where the iris shows; an iris of radial fibres in three zones (a
+warm collarette round the pupil, the iris's colour, a dark limbal ring) set back inside it; a pupil in front of the iris; and round them a clear wet shell, the ball's
+surface with the cornea bulging out of it - glass (n 1.376) that bends the iris as the eye turns and reflects the scene's own lights and sky as catchlights, so no painted
+spark is needed. The shell and the white cast no shadow (`"bool shadow" false`), so the iris is lit. The pupil opens in the dark (from the film's sky: a high sun 0.22 of the
+iris, night 0.58) and with surprise, fear and delight, and narrows with anger. For the person, Pip and the turtle; an eye smaller than about 1.5 cm across (a small turtle's)
+is thinner than the renderers' ray offset and loses its iris.
+
+**Faces on rigged models: morph targets.** (gltf_skin.h, face_morphs.h) A rigged model's morph targets (Blender's shape keys) are read with their names (the mesh's
+`extras.targetNames`), its own weights at rest, and clips that animate them. A film drives them as it drives a built-in face: blinks on its own, the feelings of `feel` lines
+and the mouth of `say` lines. They are found by the names the usual tools give them, in any case and after a prefix ("blendShape1.", "Face."): ARKit's 52 (Ready Player Me,
+Character Creator, VTuber models: eyeBlinkLeft, jawOpen, mouthSmileLeft, browInnerUp, mouthFunnel ...), Oculus's visemes (viseme_aa, viseme_PP ...), VRoid's (Fcl_EYE_Close,
+Fcl_MTH_A ... Fcl_ALL_Joy) and plain ones (blink, smile, A I U E O). A rigged model with a face now takes `feel` lines.
+
+The library has a rigged character with a face to try it: `rigged mira film_assets/library/mira.glb` (made by `scripts/make_rigged_face.py`: 21 ARKit face shapes, clips
+idle, walk, wave and twist).
+
+**Lip sync from the sounds.** (film_lipsync.h) A `say` line's mouth now takes the shape of each sound, not only each vowel. Each word is read into the fifteen visemes of
+Oculus's lip sync by English spelling rules (th, sh, ch, ph, wh, ck, ng, qu, a soft c and g, silent letters, a magic e, the vowel pairs, an r after a vowel) and a list of
+common words English does not spell as it says ("the", "one", "said", "would" ...). A letter of another script is its syllable's onset and vowel. The sounds share the time
+the word's syllables are spoken, and the mouth follows them with coarticulation (Cohen and Massaro): a t, k or n takes its neighbours' shape, the lips must meet for an m, b or
+p and touch the teeth for an f or a v, and the shapes lead the sound by 35 ms. The built-in faces get the open, wide and round of the blend, a face with viseme morphs the
+visemes themselves, one with A I U E O or ARKit's jaw and lips the nearest of those. A recording's mouth (a cues file's `sample ... by NAME`) is turned into visemes too.
+
+**Elbows that keep their volume: dual-quaternion skinning.** A rigged model is now skinned with dual quaternions (Kavan et al. 2007) instead of linear blending, so a
+twisted wrist and a bent elbow keep their volume instead of pinching to a "candy wrapper". `rigged ... skinning linear` brings back the old way (an auto-rigged model,
+below, blends linearly unless it says `skinning dq`: its blends are wide, and dual quaternions balloon a wide blend round a shoulder raised over the head).
+
+**Hair of strands: `hair [NAME] STYLE ...`.** (film_hair.h) Thousands of pbrt curves with pbrt's hair material (Marschner's model) on the person or Pip, in place of the
+sculpted hair: `short`, `bob`, `long`, `ponytail`, `curly` or `mop` (or `off`), with `length L` (metres), `density D` (a share of the style's 11,000 to 16,000 strands),
+`curl C`, `frizz F`, `clump C`, `colour C` (else the character's `hair` colour) and `width W`. Roots grow inside a hairline; a strand leaves the scalp, flows away from the
+crown (a parting sweeps a bob's, a long head's and a ponytail's front off the face), falls under gravity - the world's down, so a tilted head's hair still hangs - and lies
+over the skull; neighbours gather into clumps at their tips. A painted scalp in the hair's colour is under it. The tips trail where the head was 0.06 s before, more for long
+hair, so it swings when the head turns or nods and settles when it stops; the film's gusts blow it. About 10,000 curves cost a few seconds a frame on the GPU.
+
+**Clothes: `cloth skirt|coat|scarf on NAME ...`.** (film_cloth.h) Three more worn cloths beside the cape, simulated as it is: a skirt (a ring of cloth round the waist,
+its first and last columns joined; `width` is across the waist, `flare F` how far its hem stands out), coat tails (round the back and sides from the waist, open in front) and
+a scarf's end hanging from the front of the neck. Each is held where the body holds it at every step and pushed out of the chest, the hips and both legs (balls from the
+hips to each foot), so a skirt swings round a stride.
+
+**Feet on the ground: `footing [NAME] ground|flat`.** A character standing on uneven ground - a slope, a stair, a rock, the film's `terrain` - stands on the floor under it
+(its height snaps to it when the film is loaded), each foot on the floor under that foot, its hips down to the lower foot so that leg reaches it (the other knee bends; at
+most a third of its height), and the person's shoes tilted to the slope under them. A walk's planted feet already found the floor under them; now a standing character does
+too. `flat`, the default, keeps the old way.
+
+**Act it yourself on video: `act NAME FILE.face at T`.** (face_track.h, tools/video_to_acting) Film yourself acting (the whole body in the picture, facing the camera); the
+helper turns the video into `me.bvh`, the body as a motion capture for a `mocap` line, and `me.face`, the face as ARKit's 52 shapes over time, for an `act` line:
+
+```
+powershell -ExecutionPolicy Bypass -File scripts\setup_video_to_acting.ps1        # once: a Python environment with MediaPipe, OpenCV, NumPy and MediaPipe's two models
+%LOCALAPPDATA%\RayTracerActing\venv\Scripts\python.exe tools\video_to_acting\video_to_acting.py me.mp4 me --models %LOCALAPPDATA%\RayTracerActing
+```
+
+```
+rigged  mira  film_assets/library/mira.glb
+mocap   mira  me.bvh  at 2              # the body (a rigged character)
+act     mira  me.face at 2              # the face: a rigged model's ARKit morphs as they are
+act     ann   me.face at 2 amount 0.8   # ... or a built-in character's feelings and mouth (to T1, amount A: how much)
+```
+
+It runs on this computer with Google's MediaPipe (Apache 2.0): its pose landmarker's 33 points in metres become a skeleton named as Mixamo names bones (Hips, Spine, Spine1,
+Neck, Head, LeftArm ... RightFoot) in a T-pose of the actor's own bone lengths, each joint's turn found from the points (the hips and the chest from their four corners, the
+head from the ears and the nose, the limbs as the turn that takes the rest bone onto the bone), smoothed over five frames. The hips do not travel; walk the character with the
+film's `walk` lines. `video_to_acting.py --selftest OUT` writes a made-up capture (a wave and a nod, a blink, an "ah") without a video or MediaPipe.
+
+**A skeleton for a model with none: `rigged KIND FILE autorig`.** (auto_rig.h) An .obj or .ply (an object made from a photo, a sculpt), or a .glb with no skeleton and no
+clips, gets a humanoid skeleton fitted inside it when it is loaded: slices find its body's middle, its legs and its arms (out at the shoulders, a T or an A pose, or hanging
+at its sides down to the hand's tip). Its skin is weighted to the bones nearest it by its distance in each bone's thicknesses (so the side of the chest stays with the chest,
+not the arm hanging beside it), never to the other side's bones and the legs only below the hips. It gets the clips idle (a T pose's arms lowered), walk, wave and nod, and its
+bones have Mixamo's names, so `mocap` plays captures on it. It stands facing +z (glTF's front), y up. It is a guess, not a rigger's work: an odd pose, a long robe or a tail
+moves roughly. `autorig` on a rigged model fits a new skeleton anyway.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

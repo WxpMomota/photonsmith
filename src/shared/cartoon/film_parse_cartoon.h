@@ -2,7 +2,7 @@
 // film_parse_cartoon.h -- the cartoon lines of a film file (its grammar: film_parse.h): `mark` (cartoon marks over the frames: film_marks.h) and `cloth` (flags, capes,
 // sheets and curtains: film_cloth.h). parse() hands every line to cartoonLine() after the nature lines.
 
-#include "film_parse_nature.h"   // (and film_spec.h)
+#include "film_parse_character.h"   // (and film_parse_nature.h, film_spec.h)
 
 namespace cartoon {
 namespace film_file {
@@ -14,19 +14,22 @@ inline std::string cartoonLine(Spec &s, const std::string &verb, const std::stri
 	handled = true;
 	if (verb == "cloth") {   // cloth (film_cloth.h): cloth flag|curtain|sheet at X Y Z ..., cloth cape on NAME ...
 		const std::vector<std::string> t = detail::tokens(line);
-		const char *usage = "`cloth flag|curtain|sheet at X Y Z [size W H] ...` or `cloth cape on NAME [length L] [width W] ...`, with `colour C`, `stiff S` (0..1), `wind S`, "
-							"`ground Y`, a flag's `pole H`, a curtain's or a sheet's `facing D`, a sheet's `drop T` and `over X Y Z SX SY SZ`";
+		const char *usage = "`cloth flag|curtain|sheet at X Y Z [size W H] ...` or `cloth cape|skirt|coat|scarf on NAME [length L] [width W] ...`, with `colour C`, `stiff S` (0..1), "
+							"`wind S`, `ground Y`, a flag's `pole H`, a curtain's or a sheet's `facing D`, a sheet's `drop T` and `over X Y Z SX SY SZ`, a skirt's or a coat's `flare F`";
 		cloth::Cloth cl;
 		cl.line = n;
 		if (t.size() < 4 || std::find(cloth::kinds().begin(), cloth::kinds().end(), t[1]) == cloth::kinds().end()) return fail(usage);
 		cl.kind = t[1];
 		std::size_t i = 2;
-		if (cl.kind == "cape") {
+		if (cloth::worn(cl.kind)) {
 			if (t[2] != "on") return fail(usage);
 			cl.who = t[3];
 			if (std::none_of(s.characters.begin(), s.characters.end(), [&](const Character &c) { return c.name == cl.who; }))
-				return fail("a cape goes `on` a character brought in before it with `character`");
-			cl.width = 0.45, cl.height = 0.8, cl.colour = {0.45, 0.20, 0.62};
+				return fail("a " + cl.kind + " goes `on` a character brought in before it with `character`");
+			if (cl.kind == "cape") cl.width = 0.45, cl.height = 0.8, cl.colour = {0.45, 0.20, 0.62};
+			if (cl.kind == "skirt") cl.width = 0.30, cl.height = 0.45, cl.colour = {0.70, 0.18, 0.30}, cl.stiffness = 0.3;   // (width: across the waist)
+			if (cl.kind == "coat") cl.width = 0.32, cl.height = 0.55, cl.colour = {0.42, 0.30, 0.20}, cl.stiffness = 0.6, cl.flare = 0.12;
+			if (cl.kind == "scarf") cl.width = 0.16, cl.height = 0.55, cl.colour = {0.85, 0.20, 0.15}, cl.stiffness = 0.25;
 			i = 4;
 		} else {
 			double v[3];
@@ -48,7 +51,8 @@ inline std::string cartoonLine(Spec &s, const std::string &verb, const std::stri
 				return true;
 			};
 			if (w == "size" && numbers(2) && v[0] > 0.05 && v[1] > 0.05 && v[0] <= 20.0 && v[1] <= 20.0) cl.width = v[0], cl.height = v[1], i += 3;
-			else if ((w == "length" || w == "width") && cl.kind == "cape" && numbers(1) && v[0] > 0.05 && v[0] <= 5.0) (w == "length" ? cl.height : cl.width) = v[0], i += 2;
+			else if ((w == "length" || w == "width") && cloth::worn(cl.kind) && numbers(1) && v[0] > 0.05 && v[0] <= 5.0) (w == "length" ? cl.height : cl.width) = v[0], i += 2;
+			else if (w == "flare" && (cl.kind == "skirt" || cl.kind == "coat") && numbers(1) && v[0] >= 0.0 && v[0] <= 1.5) cl.flare = v[0], i += 2;
 			else if (w == "pole" && cl.kind == "flag" && numbers(1) && v[0] >= 0.0) cl.pole = v[0], i += 2;
 			else if (w == "facing" && numbers(1)) cl.facing = v[0], i += 2;
 			else if (w == "drop" && cl.kind == "sheet" && numbers(1)) cl.drop = v[0], i += 2;
@@ -244,8 +248,7 @@ inline std::string cartoonLine(Spec &s, const std::string &verb, const std::stri
 		s.terminator = c;
 		return "";
 	}
-	handled = false;
-	return "";
+	return characterLine(s, verb, line, n, handled);   // (round 12: film_parse_character.h)
 }
 
 }  // namespace film_file

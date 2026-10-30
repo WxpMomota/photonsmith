@@ -467,10 +467,15 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 			Spec::Rigged rg;
 			rg.line = n;
 			rg.dir = sources.back().dir;
-			if (t.size() < 3 || !detail::validKey(t[1])) return fail("`rigged KIND FILE.glb [height H] [stride S] [turn DEGREES] [walk CLIP] [idle CLIP] [run CLIP]` (KIND: lower-case letters, digits and '-')");
+			if (t.size() < 3 || !detail::validKey(t[1])) return fail("`rigged KIND FILE.glb [height H] [stride S] [turn DEGREES] [walk CLIP] [idle CLIP] [run CLIP] [skinning dq|linear] [autorig]` (KIND: lower-case letters, digits and '-')");
 			rg.kind = t[1];
 			rg.file = t[2];
 			for (std::size_t i = 3; i < t.size(); i += 2) {
+				if (t[i] == "autorig") {   // (a skeleton fitted to it: auto_rig.h)
+					rg.options.autoRig = true;
+					--i;
+					continue;
+				}
 				if (i + 1 >= t.size()) return fail("\"" + t[i] + "\" needs a value");
 				double v = 0.0;
 				if (t[i] == "height" || t[i] == "stride" || t[i] == "turn") {
@@ -478,8 +483,10 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 					(t[i] == "height" ? rg.options.height : t[i] == "stride" ? rg.options.stride : rg.options.turn) = v;
 				} else if (t[i] == "walk" || t[i] == "idle" || t[i] == "run") {
 					(t[i] == "walk" ? rg.options.walk : t[i] == "idle" ? rg.options.idle : rg.options.run) = detail::lowerWord(t[i + 1]);
+				} else if (t[i] == "skinning" && (t[i + 1] == "dq" || t[i + 1] == "linear")) {   // (dual quaternions, the default, or linear blending)
+					rg.options.linearSkin = t[i + 1] == "linear", rg.options.skinningGiven = true;
 				} else {
-					return fail("\"" + t[i] + "\": a rigged model takes height, stride, turn, walk, idle and run");
+					return fail("\"" + t[i] + "\": a rigged model takes height, stride, turn, walk, idle, run, skinning dq|linear and autorig");
 				}
 			}
 			s.rigged.push_back(rg);
@@ -507,6 +514,24 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 				++i;
 			}
 			s.mocaps.push_back(mc);
+		} else if (verb == "act") {   // a face's acting from a video (face_track.h; tools/video_to_acting)
+			const std::vector<std::string> t = detail::tokens(line);
+			const char *usage = "`act NAME FILE.face at T [to T1] [amount A]`";
+			Spec::FaceAct a;
+			a.line = n;
+			a.dir = sources.back().dir;
+			if (t.size() < 5 || t[3] != "at" || !number(t[4], a.at)) return fail(usage);
+			a.who = t[1], a.file = t[2];
+			if (std::none_of(s.characters.begin(), s.characters.end(), [&](const Character &c) { return c.name == a.who; }))
+				return fail("`act NAME ...` needs a character brought in before it with `character`");
+			for (std::size_t i = 5; i + 1 < t.size() + 1; i += 2) {
+				double v = 0.0;
+				if (i + 1 >= t.size() || !number(t[i + 1], v)) return fail(usage);
+				if (t[i] == "to" && v > a.at) a.to = v;
+				else if (t[i] == "amount" && v >= 0.0 && v <= 2.0) a.amount = v;
+				else return fail(usage);
+			}
+			s.faceActs.push_back(a);
 		} else if (verb == "title") {   // a title card over the opening
 			const std::vector<std::string> t = detail::tokens(line);
 			s.hasTitle = true;

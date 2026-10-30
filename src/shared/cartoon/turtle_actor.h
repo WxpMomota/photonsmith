@@ -11,6 +11,7 @@
 #include <array>
 
 #include "cartoon_actor.h"
+#include "eye_model.h"
 #include "sdf_mesh.h"
 
 namespace cartoon {
@@ -27,6 +28,8 @@ struct Look {
 	Vec3 iris = {0.20, 0.11, 0.05};
 	Vec3 brow = {0.13, 0.30, 0.10};
 	double scale = 1.0;
+	double skinLight = 0.0;   // how far light goes into its skin (skinMaterial; 0: painted)
+	bool realEyes = false;    // eyes with a clear cornea over the iris (eye_model.h) instead of painted ones
 };
 
 struct TurtlePose {
@@ -41,6 +44,7 @@ struct TurtlePose {
 	double blink = 0.0;           // 0 open, 1 shut
 	double squint = 0.0;          // 0 open, 1 the eyes narrowed to slits (the lids meet from above and below)
 	double eyeWide = 1.0;
+	double pupil = 0.4;           // (real eyes) the pupil, a share of the iris (eye::pupilOf)
 	double browL = 0.0, browR = 0.0;   // -1 worried (inner ends up) .. 1 cross (inner ends down)
 	double browRaise = 0.0;            // both brows up (surprise) or down
 	double smile = 0.15, mouthOpen = 0.0;
@@ -341,7 +345,7 @@ inline std::string emitTurtle(const TurtlePose &p, const Look &look = Look{}) {
 	const Frames f = framesOf(look, p);
 	std::string out;
 	// (matte materials: a glossy coat over a whole character leaves a grain the denoiser cannot take out at the films' sample counts; the eyes get painted catchlights)
-	const std::string skin = diffuseMaterial(look.skin);
+	const std::string skin = skinMaterial(look.skin, look.skinLight, 0.15 * look.scale, diffuseMaterial(look.skin));   // (a turtle is 13 cm long at scale 1)
 
 	// ---- the shell ----
 	out += attr(diffuseMaterial(look.shell), emitMesh(P.dome, mul(f.shell, translate(0.0, kPlastron, 0.0), scale(kHalfLength, kDomeHeight, kHalfWidth))));
@@ -380,10 +384,11 @@ inline std::string emitTurtle(const TurtlePose &p, const Look &look = Look{}) {
 	{
 		const double wide = std::max(0.4, p.eyeWide);
 		std::string whites, limbals, irises, glows, pupils, sparks, lids, brows;
+		eye::Eyes real;   // (`eyes real`: eye_model.h)
 		for (double side : {-1.0, 1.0}) {
 			const Vec3 c = eyeCentreLocal(side);
 			const double R = kEyeR * wide;
-			whites += emitMesh(P.eyeball, mul(n.head, translate(c), scale(R)));
+			if (!look.realEyes) whites += emitMesh(P.eyeball, mul(n.head, translate(c), scale(R)));
 			Vec3 dir = normalize({1.0, 0.04, side * 0.30});   // forward and a little out
 			if (p.lookWeight > 0.0) {
 				const Vec3 t = transformPoint(invertAffine(n.head), p.look);
@@ -393,14 +398,17 @@ inline std::string emitTurtle(const TurtlePose &p, const Look &look = Look{}) {
 			}
 			// a dark ring, a big iris with a warm glow low in it, the pupil, and two catchlights: a big one up and out, a small one down and in
 			const Mat4 eye = mul(n.head, alignY(c, dir), scale(R));
-			limbals += emitMesh(P.limbal, eye);
-			irises += emitMesh(P.iris, eye);
-			glows += emitMesh(P.glow, mul(n.head, alignY(c, normalize(dir - Vec3{0.0, 0.30, 0.0})), scale(R)));
-			pupils += emitMesh(P.pupil, eye);
-			const Vec3 upv = {0.0, 1.0, 0.0}, outv = {0.0, 0.0, side};
-			const Vec3 s1 = normalize(dir + upv * 0.50 + outv * 0.22), s2 = normalize(dir - upv * 0.42 - outv * 0.28);
-			sparks += emitMesh(P.disc, mul(n.head, alignY(c + s1 * (R * 1.007), s1), scale(R * 0.22, R * 0.012, R * 0.22)));
-			sparks += emitMesh(P.disc, mul(n.head, alignY(c + s2 * (R * 1.007), s2), scale(R * 0.10, R * 0.012, R * 0.10)));
+			if (look.realEyes) real.add(eye, p.pupil);
+			else limbals += emitMesh(P.limbal, eye);
+			if (!look.realEyes) {
+				irises += emitMesh(P.iris, eye);
+				glows += emitMesh(P.glow, mul(n.head, alignY(c, normalize(dir - Vec3{0.0, 0.30, 0.0})), scale(R)));
+				pupils += emitMesh(P.pupil, eye);
+				const Vec3 upv = {0.0, 1.0, 0.0}, outv = {0.0, 0.0, side};
+				const Vec3 s1 = normalize(dir + upv * 0.50 + outv * 0.22), s2 = normalize(dir - upv * 0.42 - outv * 0.28);
+				sparks += emitMesh(P.disc, mul(n.head, alignY(c + s1 * (R * 1.007), s1), scale(R * 0.22, R * 0.012, R * 0.22)));
+				sparks += emitMesh(P.disc, mul(n.head, alignY(c + s2 * (R * 1.007), s2), scale(R * 0.10, R * 0.012, R * 0.10)));
+			}
 			// lids: the upper one comes down with a blink or a squint, the lower one comes up with a squint
 			const Vec3 outward = normalize(Vec3{0.25, 0.0, side});
 			const double up = clamp01(std::max(p.blink, 0.62 * p.squint));
@@ -425,12 +433,16 @@ inline std::string emitTurtle(const TurtlePose &p, const Look &look = Look{}) {
 			}
 			brows += emitMesh(sdf::tubeMesh(arc, 0.0011, 0.5, 8), n.head);
 		}
-		out += attr(diffuseMaterial({0.95, 0.95, 0.93}), whites);
-		out += attr(diffuseMaterial(look.iris * 0.35), limbals);
-		out += attr(diffuseMaterial(look.iris), irises);
-		out += attr(diffuseMaterial(look.iris * 2.6), glows);
-		out += attr(diffuseMaterial({0.015, 0.012, 0.01}), pupils);
-		out += attr(diffuseMaterial({1.0, 1.0, 1.0}), sparks);
+		if (look.realEyes) {
+			out += real.text(look.iris);
+		} else {
+			out += attr(diffuseMaterial({0.95, 0.95, 0.93}), whites);
+			out += attr(diffuseMaterial(look.iris * 0.35), limbals);
+			out += attr(diffuseMaterial(look.iris), irises);
+			out += attr(diffuseMaterial(look.iris * 2.6), glows);
+			out += attr(diffuseMaterial({0.015, 0.012, 0.01}), pupils);
+			out += attr(diffuseMaterial({1.0, 1.0, 1.0}), sparks);
+		}
 		if (!lids.empty()) out += attr(skin, lids);
 		out += attr(diffuseMaterial(look.brow), brows);
 	}

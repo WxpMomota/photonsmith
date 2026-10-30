@@ -18,6 +18,7 @@
 // Parts are built once; a character with a pose is about 20 small meshes, so a scene can hold several.
 
 #include "cartoon_lib.h"
+#include "eye_model.h"
 
 namespace cartoon {
 namespace actor {
@@ -29,6 +30,9 @@ struct Character {
 	Vec3 cheek = {0.98, 0.52, 0.55};
 	Vec3 pupil = {0.07, 0.05, 0.08};
 	double scale = 1.0;                   // the whole character: a child 0.6, a parent 1.3
+	double skinLight = 0.0;               // how far light goes into its skin (skinMaterial; 0: painted)
+	bool realEyes = false;                // eyes with a clear cornea over the iris (eye_model.h) instead of painted ones
+	bool strandHair = false;              // hair of strands on its head (film_hair.h): no tuft
 };
 
 struct Pose {
@@ -43,6 +47,7 @@ struct Pose {
 	double lookWeight = 0.0;      // 0 the eyes look straight ahead, 1 they look at `look`
 	double blink = 0.0;
 	double eyeWide = 1.0;
+	double pupil = 0.4;           // (real eyes) the pupil, a share of the iris (eye::pupilOf)
 	double lidTilt = 0.0;         // -1 .. 1: positive slants the lids down towards the nose (angry), negative up towards it (sad)
 	double browRaiseL = 0.0, browRaiseR = 0.0, browTiltL = 0.0, browTiltR = 0.0;
 	double smile = 0.3;           // -1 .. 1
@@ -151,12 +156,19 @@ inline Vec3 footPlace(const Pose &pose, double side /* -1 left, +1 right */) {
 	return {0.05 + fwd, 0.055 + up, side * 0.15};
 }
 
+// Its head's frame (+x forward, +y up, +z right; the head a ball of kHeadR round its origin, a little wider and deeper).
+inline Mat4 headFrameOf(const Frames &fr, const Pose &pose) {
+	return mul(fr.neck, rotate({1, 0, 0}, pose.headRoll), rotate({0, 1, 0}, -pose.headYaw), rotate({0, 0, 1}, -pose.headPitch), translate(0.0, kHeadR * 0.80, 0.0));
+}
+inline Mat4 headFrameOf(const Character &c, const Pose &pose) { return headFrameOf(framesOf(c, pose), pose); }
+
 inline std::string emitActor(const Character &c, const Pose &pose) {
 	const Parts &P = parts();
 	std::string out;
 	const double S = c.scale;
-	const std::string skin = coated(c.skin, 0.30), belly = coated(c.belly, 0.35), feetMat = coated(c.feet, 0.30), cheekMat = coated(c.cheek, 0.6);
-	const std::string white = coated({0.97, 0.97, 0.95}, 0.08), pupilMat = coated(c.pupil, 0.04), lidMat = coated(c.skin, 0.30), dark = diffuseMaterial({0.10, 0.03, 0.04}), tongue = diffuseMaterial({0.85, 0.35, 0.40});
+	const std::string skin = skinMaterial(c.skin, c.skinLight, 0.8 * S, coated(c.skin, 0.30)), belly = skinMaterial(c.belly, c.skinLight, 0.8 * S, coated(c.belly, 0.35)),
+					  feetMat = coated(c.feet, 0.30), cheekMat = coated(c.cheek, 0.6);
+	const std::string white = coated({0.97, 0.97, 0.95}, 0.08), pupilMat = coated(c.pupil, 0.04), lidMat = skin, dark = diffuseMaterial({0.10, 0.03, 0.04}), tongue = diffuseMaterial({0.85, 0.35, 0.40});
 
 	// ---- the body frame: where the feet are, turned, lifted, leaned, squashed ----
 	const Frames fr = framesOf(c, pose);
@@ -168,8 +180,7 @@ inline std::string emitActor(const Character &c, const Pose &pose) {
 	out += attr(belly, emitMesh(P.head, mul(bodyM, translate(0.17, 0.27, 0.0), scale(0.17, 0.20, 0.17))));
 
 	// ---- the head ----
-	const Mat4 &neck = fr.neck;
-	const Mat4 headM = mul(neck, rotate({1, 0, 0}, pose.headRoll), rotate({0, 1, 0}, -pose.headYaw), rotate({0, 0, 1}, -pose.headPitch), translate(0.0, kHeadR * 0.80, 0.0));
+	const Mat4 headM = headFrameOf(fr, pose);
 	out += attr(skin, emitMesh(P.head, mul(headM, scale(kHeadR * 1.06, kHeadR, kHeadR * 1.04))));
 	// cheeks
 	std::string cheeks;
@@ -179,10 +190,11 @@ inline std::string emitActor(const Character &c, const Pose &pose) {
 	// ---- the eyes ----
 	const double wide = std::max(0.3, pose.eyeWide);
 	std::string whites, pupils, highlights, lids;
+	eye::Eyes real;   // (`eyes real`: eye_model.h)
 	for (double side : {-1.0, 1.0}) {   // -1 the actor's left eye (-z), +1 the right
 		const Vec3 eyeLocal = onHead(side * 21.0, 6.0, -0.060);
 		const double R = kEyeR * wide;
-		whites += emitMesh(P.eye, mul(headM, translate(eyeLocal), scale(R * 1.0)));
+		if (!c.realEyes) whites += emitMesh(P.eye, mul(headM, translate(eyeLocal), scale(R * 1.0)));
 		// the pupil points at the target (in the head's frame), within the eye's reach
 		Vec3 dir = {1.0, 0.0, 0.0};
 		if (pose.lookWeight > 0.0) {
@@ -196,9 +208,13 @@ inline std::string emitActor(const Character &c, const Pose &pose) {
 			if (std::abs(d.z) > reach) d.z = d.z > 0 ? reach : -reach;
 			dir = normalize(lerp(Vec3{1.0, 0.0, 0.0}, normalize(d), clamp01(pose.lookWeight)));
 		}
-		const Vec3 pupilC = eyeLocal + dir * (R * 0.62);
-		pupils += emitMesh(P.eye, mul(headM, translate(pupilC), scale(R * 0.52)));
-		highlights += emitMesh(P.eye, mul(headM, translate(pupilC + normalize(dir + Vec3{0.1, 0.55, -0.35 * side}) * (R * 0.30) + dir * (R * 0.18)), scale(R * 0.14)));
+		if (c.realEyes) {
+			real.add(mul(headM, alignY(eyeLocal, dir), scale(R)), pose.pupil);
+		} else {
+			const Vec3 pupilC = eyeLocal + dir * (R * 0.62);
+			pupils += emitMesh(P.eye, mul(headM, translate(pupilC), scale(R * 0.52)));
+			highlights += emitMesh(P.eye, mul(headM, translate(pupilC + normalize(dir + Vec3{0.1, 0.55, -0.35 * side}) * (R * 0.30) + dir * (R * 0.18)), scale(R * 0.14)));
+		}
 		// the upper lid: its pole swings from behind the eye (open) over the top (half) to the front (shut)
 		const double b = clamp01(pose.blink);
 		const double psi = (180.0 - 180.0 * b) * kPi / 180.0;
@@ -208,9 +224,13 @@ inline std::string emitActor(const Character &c, const Pose &pose) {
 		axis = normalize(axis + Vec3{0.0, 0.0, tilt * std::sin(psi) * 0.9});
 		if (b > 0.015) lids += emitMesh(P.lid, mul(headM, alignY(eyeLocal, axis), scale(R)));
 	}
-	out += attr(white, whites);
-	out += attr(pupilMat, pupils);
-	out += attr(white, highlights);
+	if (c.realEyes) {   // (its eyes' colour is its pupils': a dark one gives a warm brown iris)
+		out += real.text(c.pupil.x + c.pupil.y + c.pupil.z < 0.36 ? Vec3{0.30, 0.17, 0.07} : c.pupil, {0.97, 0.97, 0.95});
+	} else {
+		out += attr(white, whites);
+		out += attr(pupilMat, pupils);
+		out += attr(white, highlights);
+	}
 	if (!lids.empty()) out += attr(lidMat, lids);
 
 	// ---- the brows ----
@@ -274,7 +294,7 @@ inline std::string emitActor(const Character &c, const Pose &pose) {
 			tuft += rod(a, a + (b - a) * 0.5 + Vec3{0.0, 0.10, 0.0}, 0.012);
 			tuft += rod(a + (b - a) * 0.5 + Vec3{0.0, 0.10, 0.0}, b, 0.010);
 		}
-		out += attr(feetMat, tuft);
+		if (!c.strandHair) out += attr(feetMat, tuft);
 	}
 
 	// ---- the arms ----

@@ -10,12 +10,16 @@
 // +z (glTF's front); what its walk clip moves it forward is taken out (the film walks it), its bob kept. Its materials are the file's base colours and pictures (written
 // once to the film cache for pbrt to read), metal where the file says so. It has no face, so no `feel` lines; its hands are its own (no props).
 
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <memory>
 #include <mutex>
 
 #include "../gltf_skin.h"
+#include "../ply_mesh.h"
+#include "auto_rig.h"      // (a model with no skeleton: one fitted to it)
+#include "face_morphs.h"   // (its face: blinks, feelings and speech on its morph targets)
 #include "mocap_bvh.h"   // motion capture onto a rigged character (addMocapClip)
 
 namespace cartoon {
@@ -24,6 +28,9 @@ namespace film_file {
 struct RigOptions {
 	double height = 1.7, stride = 0.0, turn = 0.0;   // stride 0: 0.37 of its height
 	std::string walk, idle, run;                     // its clips by name ("": the first whose name has walk, idle, run)
+	bool linearSkin = false;                         // `skinning linear`: blend its joints' matrices (the default is dual quaternions: elbows and wrists keep their volume)
+	bool skinningGiven = false;                      // (a `skinning` word: else an auto-rigged model blends linearly - its blends are wide, and dual quaternions balloon them)
+	bool autoRig = false;                            // `autorig`: a skeleton fitted to it (auto_rig.h) even if it has one; a model with none (an .obj, a .ply) gets one anyway
 };
 
 namespace rigged {
@@ -35,6 +42,8 @@ struct Kept {
 	int walk = -1, idle = -1, run = -1;
 	std::vector<int> roots;              // the nodes whose forward travel is taken out (the skeleton's top joints, or the top nodes)
 	std::vector<std::string> pictures;   // the file's pictures, as files the renderer reads ("" when one could not be written)
+	face_morphs::Map face;               // its face's morphs by what they do (face_morphs.h)
+	bool autoRigged = false;             // (its skeleton fitted by auto_rig.h)
 };
 
 inline std::shared_ptr<const Kept> keep(const std::string &path, const RigOptions &o, std::string &why) {
@@ -45,19 +54,66 @@ inline std::shared_ptr<const Kept> keep(const std::string &path, const RigOption
 	}
 	const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
 	const std::filesystem::path dir = std::filesystem::path(path).parent_path();
-	gltf_skin::Result r = gltf_skin::load(bytes, [&dir](const std::string &uri, std::vector<unsigned char> &out) {
-		if (uri.find("..") != std::string::npos) return false;   // (beside the model only)
-		std::ifstream f(dir / uri, std::ios::binary);
-		if (!f) return false;
-		out.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
-		return true;
-	});
+	std::string ext = std::filesystem::path(path).extension().string();
+	for (char &ch : ext) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+	gltf_skin::Result r;
+	bool autoRigged = false;
+	if (ext == ".obj" || ext == ".ply") {   // (a mesh with no skeleton: one piece, a plain material, rigged below)
+		const ply_mesh::LoadResult m = ply_mesh::loadFile(path);
+		if (!m.ok) {
+			why = path + ": " + m.error;
+			return nullptr;
+		}
+		gltf_skin::Piece piece;
+		piece.positions.assign(m.mesh.positions.begin(), m.mesh.positions.end());
+		piece.uvs.assign(m.mesh.vertexCount() * 2, 0.0);
+		if (m.mesh.uvs.size() == m.mesh.vertexCount() * 2) piece.uvs.assign(m.mesh.uvs.begin(), m.mesh.uvs.end());
+		for (int i : m.mesh.indices) piece.indices.push_back(static_cast<uint32_t>(i));
+		piece.normals.assign(m.mesh.vertexCount() * 3, 0.0);
+		if (m.mesh.normals.size() == m.mesh.vertexCount() * 3) {
+			piece.normals.assign(m.mesh.normals.begin(), m.mesh.normals.end());
+		} else {   // (smooth normals from the triangles)
+			for (std::size_t t = 0; t + 2 < piece.indices.size(); t += 3) {
+				const double *a = &piece.positions[piece.indices[t] * 3], *b = &piece.positions[piece.indices[t + 1] * 3], *c = &piece.positions[piece.indices[t + 2] * 3];
+				const double u[3] = {b[0] - a[0], b[1] - a[1], b[2] - a[2]}, v[3] = {c[0] - a[0], c[1] - a[1], c[2] - a[2]};
+				const double n[3] = {u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]};
+				for (int k = 0; k < 3; ++k)
+					for (int e = 0; e < 3; ++e) piece.normals[piece.indices[t + static_cast<std::size_t>(k)] * 3 + static_cast<std::size_t>(e)] += n[e];
+			}
+		}
+		piece.node = 0;
+		r.rig.nodes.push_back({});
+		r.rig.order.push_back(0);
+		r.rig.pieces.push_back(std::move(piece));
+		gltf_import::Material plain;
+		plain.name = "body", plain.baseColor[0] = 0.75, plain.baseColor[1] = 0.72, plain.baseColor[2] = 0.68, plain.metallic = 0.0, plain.roughness = 0.8;
+		r.rig.materials.push_back(plain);
+		r.rig.pieces.back().material = 0;
+		r.ok = true;
+	} else {
+		r = gltf_skin::load(bytes, [&dir](const std::string &uri, std::vector<unsigned char> &out) {
+			if (uri.find("..") != std::string::npos) return false;   // (beside the model only)
+			std::ifstream f(dir / uri, std::ios::binary);
+			if (!f) return false;
+			out.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+			return true;
+		});
+	}
 	if (!r.ok) {
 		why = path + ": " + r.error;
 		return nullptr;
 	}
+	if (o.autoRig || (r.rig.skins.empty() && r.rig.clips.empty())) {   // (no skeleton and nothing that moves it: one fitted to it, auto_rig.h)
+		if (const std::string e = auto_rig::rig(r.rig); !e.empty()) {
+			why = path + ": " + e;
+			return nullptr;
+		}
+		autoRigged = true;
+	}
 	auto k = std::make_shared<Kept>();
+	k->autoRigged = autoRigged;
 	k->rig = std::move(r.rig);
+	k->face = face_morphs::mapOf(k->rig);
 	const auto find = [&](const std::string &asked, const char *word) {
 		if (!asked.empty()) return k->rig.clipNamed(asked);
 		for (std::size_t i = 0; i < k->rig.clips.size(); ++i)
@@ -108,7 +164,7 @@ inline std::shared_ptr<const Kept> kept(const std::string &path, const RigOption
 	static std::mutex lock;
 	static std::map<std::string, std::shared_ptr<const Kept>> all;
 	char key[160];
-	std::snprintf(key, sizeof key, "|%.4f|%s|%s|%s", o.height, o.walk.c_str(), o.idle.c_str(), o.run.c_str());
+	std::snprintf(key, sizeof key, "|%.4f|%s|%s|%s|%d", o.height, o.walk.c_str(), o.idle.c_str(), o.run.c_str(), o.autoRig ? 1 : 0);
 	const std::lock_guard<std::mutex> hold(lock);
 	const auto it = all.find(path + key);
 	if (it != all.end()) return it->second;
@@ -117,6 +173,13 @@ inline std::shared_ptr<const Kept> kept(const std::string &path, const RigOption
 	return k;
 }
 
+// Whether a material of the model is its skin, by its name (skin, body, face, head, hand: as Mixamo, VRoid and Ready Player Me name them).
+inline bool isSkin(std::string name) {
+	for (char &ch : name) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+	for (const char *w : {"skin", "body", "face", "head", "hand"})
+		if (name.find(w) != std::string::npos) return true;
+	return false;
+}
 // The model at a moment, as scene text (story space through the toolkit's emitMesh).
 inline std::string textOf(const Kept &k, const std::string &kind, const RigOptions &o, const CharacterMoment &m) {
 	const gltf_skin::Rig &rig = k.rig;
@@ -130,13 +193,22 @@ inline std::string textOf(const Kept &k, const std::string &kind, const RigOptio
 		pose[static_cast<std::size_t>(n)].t[0] = rig.nodes[static_cast<std::size_t>(n)].rest.t[0];
 		pose[static_cast<std::size_t>(n)].t[2] = rig.nodes[static_cast<std::size_t>(n)].rest.t[2];
 	}
+	// its face: the clips' own morph weights, then a blink, the feeling and the mouth on top (face_morphs.h)
+	std::vector<double> morphs = rig.morphRest;
+	if (k.idle >= 0 && m.going < 1.0) gltf_skin::applyMorphs(rig, rig.clips[static_cast<std::size_t>(k.idle)], m.t, morphs);
 	if (m.gestures)
 		for (const rig::Gesture &g : *m.gestures) {
 			const double w = rig::gestureWeight(g, m.t);
 			const int clip = rig.clipNamed(g.pose);
-			if (w > 0.0 && clip >= 0) gltf_skin::apply(rig, rig.clips[static_cast<std::size_t>(clip)], m.t - g.in0, pose, w, false);
+			if (w > 0.0 && clip >= 0) {
+				gltf_skin::apply(rig, rig.clips[static_cast<std::size_t>(clip)], m.t - g.in0, pose, w, false);
+				gltf_skin::applyMorphs(rig, rig.clips[static_cast<std::size_t>(clip)], m.t - g.in0, morphs, w, false);
+			}
 		}
-	const std::vector<gltf_skin::Posed> model = gltf_skin::posed(rig, pose);
+	if (!rig.morphs.empty()) face_morphs::weightsOf(k.face, face_morphs::controlsOf(m.face, m.faceShapes.empty() ? rig::blink(m.t, m.seed) : 0.0, m.mouth), morphs);
+	for (const auto &[name, w] : m.faceShapes)   // (`act`: a video's ARKit shapes onto the morphs of those names, as they are)
+		if (const int i = rig.morphNamed(name); i >= 0) morphs[static_cast<std::size_t>(i)] = std::max(morphs[static_cast<std::size_t>(i)], std::clamp(w, 0.0, 1.0));
+	const std::vector<gltf_skin::Posed> model = gltf_skin::posed(rig, pose, &morphs, o.skinningGiven ? !o.linearSkin : !k.autoRigged);
 	const Mat4 place = mul(m.frame, scale(m.scale, m.scale, m.scale), rotate({0, 1, 0}, o.turn));
 	std::string out;
 	std::map<int, std::string> textures;   // (the file's pictures named for this character: two of a kind in a frame do not share a name)
@@ -164,6 +236,13 @@ inline std::string textOf(const Kept &k, const std::string &kind, const RigOptio
 		else if (mat.metallic > 0.5) material = metalMaterial(colour, std::max(0.02, mat.roughness * 0.5));
 		else if (mat.roughness < 0.5) material = coated(colour, mat.roughness);
 		else material = diffuseMaterial(colour);
+		if (m.skinLight > 0.0 && isSkin(mat.name)) {   // (`skin-light`: its skin's materials, by their names, let light in)
+			const Vec3 mfp = skinMfp(m.skinLight, m.scale * o.height / 1.8);
+			char words[160];
+			std::snprintf(words, sizeof words, "\" \"rgb mfp\" [ %.5f %.5f %.5f ] \"float eta\" [ 1.33 ] \"float roughness\" [ 0.35 ]", mfp.x, mfp.y, mfp.z);
+			const auto tex = textures.find(mat.baseColorImage);
+			material = tex != textures.end() ? "Material \"subsurface\" \"texture reflectance\" \"" + tex->second + words : skinMaterial(colour, m.skinLight, m.scale * o.height / 1.8, material);
+		}
 		out += attr(material, emitMesh(mesh, place));
 	}
 	return out;
@@ -199,7 +278,7 @@ inline std::string addRiggedKind(const std::string &kind, const std::string &pat
 	c.stride = o.stride > 0.0 ? o.stride : 0.37 * h;
 	c.firstStep = 0.5;
 	c.scalable = true;
-	c.face = false;
+	c.face = k->face.any();   // (a face of morph targets takes `feel` lines)
 	for (std::size_t i = 0; i < k->rig.clips.size(); ++i)
 		if (static_cast<int>(i) != k->walk && static_cast<int>(i) != k->idle && static_cast<int>(i) != k->run) c.poses.push_back(k->rig.clips[i].name);
 	c.text = [k, kind, o](const CharacterMoment &m) { return rigged::textOf(*k, kind, o, m); };

@@ -533,16 +533,54 @@ std::string DataFilm::worldAt(const std::string &header, double t) const {
 	}
 	out += clothAt(t);   // cloth (film_cloth.h): simulated up to now
 	for (std::size_t k = 0; k < spec.mattes.size(); ++k) out += matte::textOf(spec.mattes[k], static_cast<int>(k));   // matte paintings behind the set (film_matte.h)
+	out += castAt(t);   // the characters, as their kinds draw them
+	out = shot_lighting::withLights(out, shotLightsAt(header, t));
+	out = marksAt(header, t) + out;   // the cartoon marks over the frame (film_marks.h): its `# @rt-mark` lines, before everything (the launcher draws them after the render)
+	return spec.space.on ? cosmos::withSpaceLook(space::recentred(out), spec.space.flare, spec.space.bloom) : out;   // (a floating origin for a film in space: film_space.h)
+}
+
+// The characters at a time, as their kinds draw them (each in its cast/NAME link group): their acting, voices, faces and looks, a smear's multiples.
+std::string DataFilm::castAt(double t) const {
+	std::string out;
+	double dark = 0.3;   // (how dark it is round them, for real eyes' pupils: from the sky's sun - high 0, night 1 - else a lit set's 0.3, space 0.5)
+	if (spec.hasSky) {
+		double el = 0.0, facing = 0.0;
+		dressing::sunAt(spec.sky, dressing::hourAt(spec.sky, t, spec.storyEnd), el, facing);
+		dark = smoothstep(25.0, -8.0, el);
+	} else if (spec.space.on) {
+		dark = 0.5;
+	}
+	const auto groomFor = [&](const Character &c) -> const hair::Groom * {   // (`hair`: its own line, else every character's; `off` none)
+		const hair::Groom *all = nullptr, *own = nullptr;
+		for (const hair::Groom &g : spec.grooms) {
+			if (g.who.empty()) all = &g;
+			else if (g.who == c.name) own = &g;
+		}
+		const hair::Groom *g = own ? own : all;
+		return g && g->style != "off" ? g : nullptr;
+	};
 	for (const Character &c : spec.characters) {   // the characters, as their kinds draw them
 		const CharacterKind &kind = characterKinds().at(c.kind);
 		if (!kind.text) continue;
+		const hair::Groom *groom = kind.headFrame ? groomFor(c) : nullptr;
 		const auto drawnAt = [&](double tc) {   // the character as its kind draws it at a time
 			CharacterMoment m = actingMoment(c, tc);
 			if (kind.trails) m.trail = trailOf(c, tc, m);
 			lockFeet(c, tc, m);
+			footOnGround(c, m);   // (`footing ground`)
 			m.voice = music_cues::voiceAt(spec.key, c.name, tc, shotStarts(), shotNameList(), &m.mouth);   // (a recording's loudness and mouth shapes)
 			speakingAt(c, tc, m);
 			m.face = faces::faceAt(c.feelings, tc);
+			for (const Spec::FaceAct &a : spec.faceActs)   // (a face's acting from a video: face_track.h)
+				if (a.who == c.name && a.track && tc >= a.at && tc <= a.to) {
+					const double fade = smoothstep(a.at, a.at + 0.2, tc) * (1.0 - smoothstep(a.to - 0.2, a.to, tc));
+					m.faceShapes = face_track::at(*a.track, tc - a.at, a.amount * fade);
+					m.face.add(face_track::faceOf(m.faceShapes), 1.0);
+					const speech::Mouth acted = face_track::mouthOf(m.faceShapes);
+					if (acted.open + acted.closed + acted.round > m.mouth.open + m.mouth.closed + m.mouth.round) m.mouth = acted;   // (a `say` line's mouth wins while it moves more)
+				}
+			m.skinLight = motion::amountFor(spec.skinLight, c.name), m.realEyes = motion::amountFor(spec.realEyes, c.name) > 0.5, m.dark = dark;   // (round 12)
+			m.strandHair = groom != nullptr;
 			std::string drawn = motionOf(c, kind, tc, m);
 			// clean cel shadows on its face: its materials' shading normals from a sphere round its head (`face-normals`, proxy_normal.h; pbrt's x)
 			const double faceBlend = motion::amountFor(spec.faceNormals, c.name);
@@ -552,6 +590,16 @@ std::string DataFilm::worldAt(const std::string &header, double t) const {
 				std::snprintf(words, sizeof words, " \"point3 normalcenter\" [ %.6g %.6g %.6g ] \"float normalradius\" [ %.6g ] \"float normalblend\" [ %.4g ]", -head.x, head.y, head.z,
 							  std::max(0.05, (kind.height - kind.head.y) * c.scale * m.scale), faceBlend);
 				drawn = withMaterialWords(drawn, words);
+			}
+			if (groom) {   // hair of strands (film_hair.h): on its head now, its tips trailing where the head was 0.06 s ago, bent by the gusts
+				CharacterMoment was = actingMoment(c, tc - 0.06);
+				lockFeet(c, tc - 0.06, was);
+				footOnGround(c, was);
+				const hair::Scalp scalp{kind.headFrame(m), kind.scalpCentre, kind.scalpRadii};
+				const Vec3 at = transformPoint(scalp.head, scalp.centre);
+				const auto own = c.colours.find("hair");
+				const Vec3 colour = groom->hasColour ? groom->colour : own != c.colours.end() ? own->second : Vec3{0.17, 0.09, 0.05};
+				drawn += hair::text(*groom, scalp, kind.headFrame(was), dressing::gustAt(spec.gusts, at.x, at.z, tc), colour, c.scale, m.seed);
 			}
 			return drawn;
 		};
@@ -567,9 +615,7 @@ std::string DataFilm::worldAt(const std::string &header, double t) const {
 				text += drawnAt(u);
 		out += "# " + c.name + " (" + c.kind + ")\n" + shot_lighting::inLinkGroup(text, "cast/" + c.name);   // (light linking: a shot's `lighting ... only cast` - "cast" names every cast/ group; the ID passes)
 	}
-	out = shot_lighting::withLights(out, shotLightsAt(header, t));
-	out = marksAt(header, t) + out;   // the cartoon marks over the frame (film_marks.h): its `# @rt-mark` lines, before everything (the launcher draws them after the render)
-	return spec.space.on ? cosmos::withSpaceLook(space::recentred(out), spec.space.flare, spec.space.bloom) : out;   // (a floating origin for a film in space: film_space.h)
+	return out;
 }
 
 void DataFilm::soundscape(audio::Mix &m) const {
@@ -1007,7 +1053,7 @@ std::string DataFilm::clothAt(double t) const {
 		cloth::World w;
 		// the film's wind (a flag with none flies in a breeze, a curtain stirs; a sheet and a cape feel only the air they move through)
 		w.wind = spec.wind.on ? spec.wind.dir() * spec.wind.speed : cl.kind == "flag" ? Vec3{4.0, 0.0, 0.0} : cl.kind == "curtain" ? Vec3{0.0, 0.0, 0.6} : Vec3{};
-		if (cl.kind == "cape") {
+		if (cloth::worn(cl.kind)) {
 			const Character *who = nullptr;
 			for (const Character &c : spec.characters)
 				if (c.name == cl.who) who = &c;
@@ -1018,12 +1064,33 @@ std::string DataFilm::clothAt(double t) const {
 				const double s = m.scale, shoulders = kind.chest.y + 0.45 * (kind.head.y - kind.chest.y), back = -0.85 * kind.radius;
 				const auto pbrt = [](Vec3 p) { return Vec3{-p.x, p.y, p.z}; };   // (story space to pbrt's)
 				held.clear(), body.clear();
+				const double waist = 0.70 * kind.chest.y, r = 0.5 * cl.width / std::max(1e-6, s);
 				for (int i = 0; i < count; ++i) {
-					const double across = 0.5 * cl.width * (1.0 - 2.0 * i / std::max(1, count - 1)) / std::max(1e-6, s);   // (its left (+x, body space) to its right)
-					held.push_back(pbrt(transformPoint(m.frame, Vec3{across, shoulders, back} * s)));
+					const double u = static_cast<double>(i) / std::max(1, count - 1);
+					if (cl.kind == "skirt" || cl.kind == "coat") {   // (round the waist: a skirt all the way, a coat from one side of the front round the back to the other)
+						const double a = cl.kind == "skirt" ? 2.0 * kPi * i / count : kPi * (0.18 + 1.64 * u);
+						held.push_back(pbrt(transformPoint(m.frame, Vec3{r * std::sin(a), waist, r * std::cos(a) * 0.8} * s)));
+					} else if (cl.kind == "scarf") {   // (an end of a scarf, hanging from round the neck at the front)
+						const Vec3 neck{0.06 + 0.10 * u, kind.chest.y + 0.62 * (kind.head.y - kind.chest.y), 0.55 * kind.radius - 0.03 * u};
+						held.push_back(pbrt(transformPoint(m.frame, neck * s)));
+					} else {
+						const double across = 0.5 * cl.width * (1.0 - 2.0 * u) / std::max(1e-6, s);   // (its left (+x, body space) to its right)
+						held.push_back(pbrt(transformPoint(m.frame, Vec3{across, shoulders, back} * s)));
+					}
 				}
 				body.push_back({pbrt(transformPoint(m.frame, Vec3{0.0, kind.chest.y, 0.0} * s)), 0.95 * kind.radius * s});
 				body.push_back({pbrt(transformPoint(m.frame, Vec3{0.0, 0.55 * kind.chest.y, 0.0} * s)), 0.9 * kind.radius * s});
+				if (cl.kind != "cape" && kind.feet) {   // (the legs: balls from the hips to each foot, so a skirt swings round them as they stride)
+					CharacterMoment withFeet = m;
+					lockFeet(*who, when, withFeet);
+					for (const Foot &f : kind.feet(withFeet)) {
+						const Vec3 hip = transformPoint(m.frame, Vec3{0.0, 0.52 * kind.chest.y, 0.0} * s);
+						for (int k = 0; k < 5; ++k) {
+							const double u = (k + 0.5) / 5.0;
+							body.push_back({pbrt(lerp(hip, f.at + Vec3{0.0, 0.08 * s, 0.0}, u)), (0.075 - 0.025 * u) * kind.height / 1.8 * s});
+						}
+					}
+				}
 				return true;
 			};
 		}

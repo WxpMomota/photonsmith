@@ -140,6 +140,11 @@ inline void idleEyes(const CharacterMoment &m, const Idle &i, Vec3 headLocal, Ve
 	look = base + i.gaze * (lookWeight > 0.0 ? 0.6 : 2.5) * m.scale;
 	lookWeight = std::max(lookWeight, 0.85);
 }
+// How wide real eyes' pupils are (eye_model.h): open in the dark and with surprise, fear or delight, narrowed by anger.
+inline double pupilFor(const CharacterMoment &m) {
+	const faces::Face &f = m.face;
+	return eye::pupilOf(m.dark, 2.5 * f.eyeWide + 0.4 * std::max(0.0, f.browTilt) + 0.3 * std::max(0.0, f.smile) - 0.8 * std::max(0.0, -f.browTilt));
+}
 // A part's colour from the moment's character line, if it gives one (`sweater red`).
 inline void colourFrom(const CharacterMoment &m, const char *part, Vec3 &colour) {
 	if (!m.colours) return;
@@ -273,13 +278,24 @@ inline CharacterKind pipKind() {
 	k.text = [pose](const CharacterMoment &m) {
 		actor::Character c;
 		c.scale = m.scale;
+		c.skinLight = m.skinLight, c.realEyes = m.realEyes;
 		colourFrom(m, "skin", c.skin);
 		colourFrom(m, "belly", c.belly);
 		colourFrom(m, "feet", c.feet);
 		colourFrom(m, "cheeks", c.cheek);
 		colourFrom(m, "eyes", c.pupil);
-		return actor::emitActor(c, pose(m));
+		actor::Pose pp = pose(m);
+		pp.pupil = pupilFor(m);
+		c.strandHair = m.strandHair;
+		return actor::emitActor(c, pp);
 	};
+	k.headFrame = [pose](const CharacterMoment &m) {
+		actor::Character c;
+		c.scale = m.scale;
+		return actor::headFrameOf(c, pose(m));
+	};
+	k.scalpCentre = {0.0, 0.0, 0.0};
+	k.scalpRadii = Vec3{1.06, 1.0, 1.04} * actor::kHeadR;
 	k.parts = {"skin", "belly", "feet", "cheeks", "eyes"};
 	k.handAt = [pose](const CharacterMoment &m, int s) {
 		actor::Character c;
@@ -410,6 +426,7 @@ inline CharacterKind personKind() {
 	};
 	k.text = [pose](const CharacterMoment &m) {
 		human::Outfit o;
+		o.skinLight = m.skinLight, o.realEyes = m.realEyes;
 		colourFrom(m, "skin", o.skin);
 		colourFrom(m, "hair", o.hair);
 		colourFrom(m, "sweater", o.sweater);
@@ -419,8 +436,15 @@ inline CharacterKind personKind() {
 		colourFrom(m, "eyes", o.eyes);
 		colourFrom(m, "lips", o.lips);
 		colourFrom(m, "cheeks", o.blush);
-		return human::emitHuman(pose(m), o);
+		human::HumanPose hp = pose(m);
+		hp.pupil = pupilFor(m);
+		hp.footUp[0] = m.footNormal[0], hp.footUp[1] = m.footNormal[1];
+		o.strandHair = m.strandHair;
+		return human::emitHuman(hp, o);
 	};
+	k.headFrame = [pose](const CharacterMoment &m) { return human::framesOf(pose(m)).head; };
+	k.scalpCentre = {-0.004, 0.030, 0.0};   // (the cranium of human_actor.h headShape)
+	k.scalpRadii = {0.128, 0.136, 0.122};
 	k.parts = {"skin", "hair", "sweater", "trousers", "shoes", "soles", "eyes", "lips", "cheeks"};
 	k.handAt = [pose](const CharacterMoment &m, int s) { return human::handOf(pose(m), s == 0 ? -1.0 : 1.0); };
 	k.carry = {0.20, 1.05, 0.35};
@@ -532,6 +556,7 @@ inline CharacterKind turtleKind() {
 	k.text = [pose](const CharacterMoment &m) {
 		turtle::Look look;
 		look.scale = m.scale;
+		look.skinLight = m.skinLight, look.realEyes = m.realEyes;
 		colourFrom(m, "skin", look.skin);
 		colourFrom(m, "shell", look.plate);
 		colourFrom(m, "seams", look.shell);
@@ -541,7 +566,9 @@ inline CharacterKind turtleKind() {
 		colourFrom(m, "cheeks", look.blush);
 		colourFrom(m, "eyes", look.iris);
 		colourFrom(m, "brows", look.brow);
-		return turtle::emitTurtle(pose(m), look);
+		turtle::TurtlePose tp = pose(m);
+		tp.pupil = pupilFor(m);
+		return turtle::emitTurtle(tp, look);
 	};
 	k.parts = {"skin", "shell", "seams", "rings", "rim", "belly", "cheeks", "eyes", "brows"};
 	k.handAt = [pose](const CharacterMoment &m, int s) {

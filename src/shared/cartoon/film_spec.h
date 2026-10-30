@@ -31,7 +31,9 @@
 #include "film_particles.h"
 #include "film_paths.h"
 #include "film_acting.h"
-#include "film_speech.h"
+#include "face_track.h"
+#include "film_hair.h"
+#include "film_lipsync.h"   // (and film_speech.h)
 #include "shot_lighting.h"
 #include "film_tts.h"
 #include "film_subjects.h"
@@ -194,6 +196,12 @@ struct CharacterMoment {
 	double sit = 0.0;        // 0 standing .. 1 sitting, on a seat `seat` high
 	double seat = 0.0;
 	Vec3 jiggle;             // how far what dangles from its head swings behind it (story space; film_motion.h `jiggle`: zero when the film has none)
+	double skinLight = 0.0;  // how far light goes into its skin (`skin-light`; 0: painted)
+	bool realEyes = false;   // eyes with a cornea over the iris (`eyes real`)
+	bool strandHair = false; // hair of strands on it (`hair`: film_hair.h) instead of its sculpted hair
+	Vec3 footNormal[4] = {{0.0, 1.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 1.0, 0.0}};   // (`footing ground`) the slope under each foot (story space)
+	face_track::Shapes faceShapes;   // (`act`) ARKit's face shapes from a video now: a rigged model's morphs by those names (its feelings and mouth are on m.face and m.mouth)
+	double dark = 0.3;       // how dark it is round it, 0 a sunny day .. 1 night (real eyes' pupils open in the dark)
 };
 // A kind of character: its scene text (story space, as the toolkit writes it) and its feet at a moment, the point a camera and the film doctor look at (body space), and its walk's
 // step (rig::PathWalk's stride and first step).
@@ -220,6 +228,9 @@ struct CharacterKind {
 	// its size on the floor and its height (scale 1): what is in its way when it finds its way, and how close another may come
 	double radius = 0.3, height = 1.8;
 	std::vector<std::string> parts;   // the parts whose colour a character line can set (`sweater red`)
+	// (for `hair`) its head's frame at a moment (+x forward, +y up, +z right; story space) and its skull as an ellipsoid in that frame; none: it takes no hair of strands
+	std::function<Mat4(const CharacterMoment &)> headFrame;
+	Vec3 scalpCentre, scalpRadii;
 };
 
 // A colour as a film file writes it: a name (the cartoon palette below), r,g,b from 0 to 1, or #rrggbb. False when it is none of those.
@@ -295,6 +306,15 @@ struct Spec {
 		int line = 0;
 	};
 	std::vector<Mocap> mocaps;
+	// a face's acting from a video (`act NAME FILE.face at T [to T1] [amount A]`: face_track.h), its track read when the film is loaded
+	struct FaceAct {
+		std::string who, file;
+		std::filesystem::path dir;
+		double at = 0.0, to = 1e30, amount = 1.0;
+		int line = 0;
+		std::shared_ptr<const face_track::Track> track;
+	};
+	std::vector<FaceAct> faceActs;
 	std::vector<matte::Matte> mattes;   // (`matte`: painted pictures projected behind the set, film_matte.h)
 	std::vector<std::pair<std::string, physics::Topple>> topples;
 	std::vector<std::pair<std::string, int>> physicsLines;
@@ -513,6 +533,10 @@ struct Spec {
 	std::vector<motion::Stepping> stepping;
 	std::vector<motion::Amount> squash, jiggle, anticipate;
 	std::vector<motion::Smear> smears;   // (`smear`: film_motion.h)
+	std::vector<motion::Amount> skinLight;     // (`skin-light [NAME] D`: light goes into a character's skin, cartoon_lib.h skinMaterial)
+	std::vector<motion::Amount> realEyes;      // (`eyes [NAME] real|painted`: 1 real eyes, eye_model.h)
+	std::vector<motion::Amount> footing;       // (`footing [NAME] ground|flat`: 1 its feet on the floor under each, its hips down to the lower one: DataFilm::footOnGround)
+	std::vector<hair::Groom> grooms;           // (`hair [NAME] STYLE ...`: hair of strands, film_hair.h)
 	std::vector<motion::Amount> faceNormals;   // (`face-normals [NAME] [B]`: a character's shading normals from a sphere round its head, proxy_normal.h)
 };
 

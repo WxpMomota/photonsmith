@@ -234,7 +234,17 @@
 //     cast     kid as pip-child  at 0 0 0.8                    # ... named `kid` in this film; anything more on the line is on top of the cast's
 //     rigged   bot models/bot.glb  height 1.6                  # a kind of character from a rigged glTF model with clips (film_rigged.h): idle, walk, run, and its gestures
 //                                                              # (`stride S`, `turn DEGREES`, `walk CLIP`, `idle CLIP`, `run CLIP`); a cast file can name its model the same way
+//                                                              # (`skinning dq|linear`; `autorig`: a skeleton fitted to it, auto_rig.h - an .obj or .ply gets one anyway)
 //     character  bo person  pitch -2  rate 0.9                 # (a voice for any character: semitones up from its kind's, and how fast it speaks)
+//
+// Characters as a feature film draws them (round 12: film_parse_character.h, and `act` here):
+//
+//     skin-light [NAME] 1                                      # light goes into the skin (subsurface): ears and fingers glow red with a light behind them
+//     eyes     [NAME] real                                     # a clear cornea over a fibred iris, pupils that open in the dark (eye_model.h)
+//     hair     [NAME] long  [length L] [density D] [curl C] [frizz F] [clump C] [colour C] [width W]   # strands (film_hair.h): short bob long ponytail curly mop, off
+//     footing  [NAME] ground                                   # each foot on the floor under it, tilted to it, the hips down to the lower one
+//     cloth    skirt|coat|scarf on NAME [length L] [width W] [flare F] [colour C] [stiff S]   # clothes that hang from the body and swing round the legs (film_cloth.h)
+//     act      NAME me.face at 2 [to T1] [amount A]            # a face acted from a video (face_track.h; tools/video_to_acting makes it, and the body's me.bvh)
 //
 // Real voices (film_tts.h) - lines said by the computer's own text-to-speech, offline, the mouth following the recording:
 //

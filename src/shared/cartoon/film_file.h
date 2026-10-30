@@ -194,6 +194,7 @@ class DataFilm {
 	std::string loadFile(const std::string &filePath);
 
 	std::vector<std::vector<speech::Syllable>> spoken;   // each line's syllables (spec.lines)
+	std::vector<std::vector<speech::lipsync::Phone>> phones;   // each line's sounds, for its lip sync (film_lipsync.h)
 
 	// `acting words`: each line's gesture and expression from its words (film_acting.h), timed by its syllables, added to its speaker where the film gives that character
 	// no gesture (or no expression) of its own during the line. A nod or a shake of the head is quick; the others are held to the line's end; an expression stays a little
@@ -277,6 +278,7 @@ class DataFilm {
 	std::string footprintsText(double t) const;
 	std::string overlaysAt(const std::string &header, double t, double nt) const;   // (round 11: an explainer's drawings, film_explain.h)
 	std::string aboardAt(const std::string &header, double t, double nt) const;     // (round 11: footprints, floating things, interiors, holograms, screens, drawings)
+	std::string castAt(double t) const;                                               // (the characters, as their kinds draw them)
 	std::string marksAt(const std::string &header, double t) const;
 	// Where a character looks of itself while someone speaks (CharacterMoment::look): at the speaker, turning to them just after they begin and back a little after they end
 	// (the look moves smoothly from one speaker to the next); and while it speaks, at the nearest of those who listen. A `look` line is on top of this.
@@ -313,6 +315,7 @@ class DataFilm {
 	CharacterMoment momentOf(const Character &c, double t, Vec3 *at = nullptr) const;
 	// Its feet held where they came down (CharacterMoment::lockedFeet), when its kind says where its gait puts them and it has walked.
 	void lockFeet(const Character &c, double t, CharacterMoment &m) const;
+	void footOnGround(const Character &c, CharacterMoment &m) const;   // (`footing ground`: round 12)
 	// How far a loose spring on the character's place lags it at t, in its body's space (CharacterMoment::trail).
 	Vec3 trailOf(const Character &c, double t, const CharacterMoment &m) const;
 	Vec3 chestOf(const Character &c, double t) const { return transformPoint(momentOf(c, t).frame, characterKinds().at(c.kind).chest * c.scale); }

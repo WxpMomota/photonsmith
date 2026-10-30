@@ -135,6 +135,15 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 		m.file = std::filesystem::absolute(file, ec).generic_string();
 		m.aspect = static_cast<double>(w) / h;
 	}
+	for (Spec::FaceAct &a : spec.faceActs) {   // the faces' acting from videos (face_track.h): beside the film, else in the library
+		std::filesystem::path file = std::filesystem::path(a.file).is_absolute() ? std::filesystem::path(a.file) : (a.dir.empty() ? base : a.dir) / a.file;
+		std::error_code ec;
+		if (!std::filesystem::exists(file, ec) && !std::filesystem::path(a.file).is_absolute())
+			if (const std::string lib = film_cache::asset("library/" + a.file); !lib.empty()) file = lib;
+		std::string why;
+		a.track = face_track::load(file.string(), why);
+		if (!a.track) return filePath + ":" + std::to_string(a.line) + ": " + why;
+	}
 	for (const Spec::Mocap &mc : spec.mocaps) {   // the motion captures its rigged characters play: a clip of the kind's rig, played as a gesture
 		std::filesystem::path file = std::filesystem::path(mc.file).is_absolute() ? std::filesystem::path(mc.file) : (mc.dir.empty() ? base : mc.dir) / mc.file;
 		std::error_code ec;
@@ -185,8 +194,15 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 		if (!character(l.who)) return filePath + ":" + std::to_string(l.line) + ": " + l.who + " says a line but is not brought in with `character`";
 	for (speech::Line &l : spec.lines)   // (a character's voice: its pitch and pace under each of its lines' own)
 		if (const Character *c = character(l.who)) l.pitch += c->pitch, l.rate *= c->rate;
+	for (const hair::Groom &g : spec.grooms)   // (`hair NAME ...`: a kind with a head to grow it on)
+		if (const Character *c = g.who.empty() ? nullptr : character(g.who); c && characterKinds().count(c->kind) && !characterKinds().at(c->kind).headFrame)
+			return filePath + ": " + g.who + " is a " + c->kind + ", which takes no hair of strands (a person and Pip do)";
 	spoken.clear();
-	for (const speech::Line &l : spec.lines) spoken.push_back(speech::syllablesOf(l));
+	phones.clear();
+	for (const speech::Line &l : spec.lines) {
+		spoken.push_back(speech::syllablesOf(l));
+		phones.push_back(speech::lipsync::phonesOf(l, spoken.back()));
+	}
 	if (spec.actingWords) actFromWords();
 	if (spec.hasSky || spec.space.on) leaveOutSkyLights();
 	for (const Spec::Prop &pr : spec.props)
@@ -385,7 +401,8 @@ std::string DataFilm::findWays() {
 
 void DataFilm::heightsOfWalks() {
 	terrains.clear();
-	const bool anyWalks = std::any_of(spec.characters.begin(), spec.characters.end(), [](const Character &c) { return !c.walks.empty(); });
+	const auto grounded = [this](const Character &c) { return motion::amountFor(spec.footing, c.name) > 0.5; };
+	const bool anyWalks = std::any_of(spec.characters.begin(), spec.characters.end(), [&](const Character &c) { return !c.walks.empty() || grounded(c); });
 	if (!anyWalks) return;
 	const pbrt_flatten::MeshResolver meshes = [](const std::string &path, std::vector<float> &positions, std::vector<int> &indices, std::vector<float> &uvs, std::vector<float> &normals) {
 		ply_mesh::LoadResult m = ply_mesh::loadFile(path);
@@ -403,6 +420,7 @@ void DataFilm::heightsOfWalks() {
 			for (const auto &[x, z] : w.points) x0 = std::min(x0, x), x1 = std::max(x1, x), z0 = std::min(z0, z), z1 = std::max(z1, z);
 		const double half = std::min(30.0, 0.5 * std::max(x1 - x0, z1 - z0) + 2.0);
 		auto terrain = std::make_shared<film_paths::Terrain>(film_paths::terrainOf(flat, 0.5 * (x0 + x1), 0.5 * (z0 + z1), half, 0.1, c.start[1]));
+		if (grounded(c)) c.start[1] = terrain->floorAt(c.start[0], c.start[2], c.start[1], std::max(0.6, stepOf(c)));   // (`footing ground`: it stands on the floor under it)
 		double y = c.start[1];
 		bool uneven = false;
 		const double step = stepOf(c);
@@ -421,7 +439,7 @@ void DataFilm::heightsOfWalks() {
 		}
 		for (const WalkLine &w : c.walks)
 			for (double h : w.heights) uneven = uneven || h != c.start[1];
-		if (uneven) terrains[c.name] = terrain;   // (its feet on the floor too)
+		if (uneven || grounded(c)) terrains[c.name] = terrain;   // (its feet on the floor too)
 	}
 }
 
@@ -1022,6 +1040,38 @@ void DataFilm::lockFeet(const Character &c, double t, CharacterMoment &m) const 
 	for (int s = 0; s < std::min(4, kind.footCount); ++s) m.lockedFeet[s] = rig::lockedFoot(k, s, t);
 }
 
+// `footing ground`: a character standing still has each foot on the floor under that foot (a walk's planted feet are already: lockFeet); its hips come down so the lower foot
+// reaches its floor (the higher leg bends), at most a third of its height; and each foot is tilted to the slope under it (CharacterMoment::footNormal).
+void DataFilm::footOnGround(const Character &c, CharacterMoment &m) const {
+	if (motion::amountFor(spec.footing, c.name) < 0.5 || m.airborne) return;
+	const CharacterKind &kind = characterKinds().at(c.kind);
+	const film_paths::Terrain *ground = terrainFor(c);
+	if (!ground || !kind.footAt) return;
+	const double bodyY = transformPoint(m.frame, {0.0, 0.0, 0.0}).y, step = stepOf(c);
+	const auto floor = [&](double x, double z) { return ground->floorAt(-x, z, bodyY, step); };   // (story space; the terrain is pbrt's)
+	const int feet = std::min(4, kind.footCount);
+	if (!m.feetLocked) {   // (standing: its feet where its stance puts them, each on the floor under it, as high above it as above the body's floor)
+		m.feetLocked = true;
+		for (int s = 0; s < feet; ++s) {
+			const Vec3 local = kind.footAt(m.steps, s) * m.scale, w = transformPoint(m.frame, local);
+			m.lockedFeet[s] = local + Vec3{0.0, floor(w.x, w.z) - bodyY, 0.0};
+		}
+	}
+	double lowest = bodyY;
+	for (int s = 0; s < feet; ++s) {
+		const Vec3 w = transformPoint(m.frame, m.lockedFeet[s]);
+		const double f = floor(w.x, w.z), d = 0.06 * m.scale;
+		lowest = std::min(lowest, f);
+		const double sx = (floor(w.x + d, w.z) - floor(w.x - d, w.z)) / (2.0 * d), sz = (floor(w.x, w.z + d) - floor(w.x, w.z - d)) / (2.0 * d);
+		m.footNormal[s] = normalize(Vec3{-std::clamp(sx, -1.5, 1.5), 1.0, -std::clamp(sz, -1.5, 1.5)});   // (a step's edge is not a slope: steeper than 56 degrees is taken as that)
+	}
+	const double drop = std::min(bodyY - lowest, kind.height * m.scale / 3.0);
+	if (drop > 1e-4) {   // (the body down to the lower foot's floor, the feet staying where they are)
+		m.frame = mul(translate(Vec3{0.0, -drop, 0.0}), m.frame);
+		for (int s = 0; s < feet; ++s) m.lockedFeet[s] = m.lockedFeet[s] + Vec3{0.0, drop, 0.0};
+	}
+}
+
 Vec3 DataFilm::trailOf(const Character &c, double t, const CharacterMoment &m) const {
 	static const rig::Spring loose{30.0, 5.0, 3.0, 1.0 / 240.0};
 	const Vec3 lag = rig::lag(loose, [this, &c](double u) {
@@ -1219,16 +1269,15 @@ double DataFilm::lineEnd(std::size_t i) const {
 void DataFilm::speakingAt(const Character &c, double t, CharacterMoment &m) const {
 	for (std::size_t i = 0; i < spec.lines.size(); ++i) {
 		if (spec.lines[i].who != c.name || t < spec.lines[i].t - 0.1 || t > lineEnd(i) + 0.1) continue;
-		speech::Mouth mouth = speech::mouthAt(spoken[i], t);
+		speech::Mouth mouth = speech::lipsync::mouthAt(phones[i], t);   // (each sound's shape, round 12: film_lipsync.h)
 		double loud = speech::loudnessAt(spoken[i], t);
 		if (const music_cues::Recording *r = recordingOf(i)) {
 			const std::size_t k = static_cast<std::size_t>(std::max(0.0, t - spec.lines[i].t) * 100.0);
 			mouth = k < r->mouth.size() ? r->mouth[k] : speech::Mouth();
 			loud = k < r->loudness.size() ? r->loudness[k] : 0.0;
+			speech::visemesFromShape(mouth);
 		}
-		m.mouth.open = std::max(m.mouth.open, mouth.open);
-		m.mouth.wide = std::max(m.mouth.wide, mouth.wide);
-		m.mouth.round = std::max(m.mouth.round, mouth.round);
+		if (mouth.open + mouth.closed + mouth.teeth > m.mouth.open + m.mouth.closed + m.mouth.teeth) m.mouth = mouth;   // (two lines at once: the one that moves the mouth more)
 		m.voice = std::max(m.voice, loud);
 	}
 }

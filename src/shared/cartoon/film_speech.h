@@ -8,6 +8,7 @@
 // and is higher for '!'.
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <string>
@@ -19,10 +20,58 @@
 namespace cartoon {
 namespace speech {
 
-// A mouth shape: how far open, how wide (an "ee") and how round (an "oo"), each 0..1.
+// The visemes: the mouth shapes speech is drawn with, the fifteen of Oculus's lip sync (Ready Player Me's faces have a morph for each: viseme_sil, viseme_PP ...).
+enum Viseme { kSil, kPP, kFF, kTH, kDD, kKK, kCH, kSS, kNN, kRR, kAA, kE, kI, kO, kU, kVisemes };
+inline const char *visemeName(int v) {
+	static const char *names[kVisemes] = {"sil", "PP", "FF", "TH", "DD", "kk", "CH", "SS", "nn", "RR", "aa", "E", "I", "O", "U"};
+	return v >= 0 && v < kVisemes ? names[v] : "";
+}
+// A mouth shape: how far open, how wide (an "ee") and how round (an "oo"), each 0..1; how far the lips are pressed shut (an m, b, p) and the lower lip is under the teeth
+// (an f, v); and how much of each viseme it is (summing to 1 while it speaks; all 0 when only the three numbers are known: a recording).
 struct Mouth {
 	double open = 0.0, wide = 0.0, round = 0.0;
+	double closed = 0.0, teeth = 0.0;
+	std::array<double, kVisemes> viseme{};
 };
+// What a viseme does to the three numbers (and the lips and teeth).
+inline Mouth visemeShape(int v) {
+	static const double table[kVisemes][5] = {
+		{0.0, 0.0, 0.0, 0.0, 0.0},     // sil
+		{0.0, 0.05, 0.0, 1.0, 0.0},    // PP: the lips pressed together
+		{0.12, 0.35, 0.0, 0.0, 1.0},   // FF: the lower lip under the teeth
+		{0.25, 0.30, 0.0, 0.0, 0.0},   // TH
+		{0.30, 0.35, 0.0, 0.0, 0.0},   // DD (t d l)
+		{0.35, 0.30, 0.0, 0.0, 0.0},   // kk (k g ng)
+		{0.25, 0.05, 0.60, 0.0, 0.0},  // CH (ch sh j)
+		{0.15, 0.70, 0.0, 0.0, 0.0},   // SS (s z)
+		{0.25, 0.30, 0.0, 0.0, 0.0},   // nn
+		{0.30, 0.0, 0.50, 0.0, 0.0},   // RR
+		{0.95, 0.45, 0.0, 0.0, 0.0},   // aa
+		{0.55, 0.80, 0.0, 0.0, 0.0},   // E
+		{0.30, 1.00, 0.0, 0.0, 0.0},   // I
+		{0.70, 0.0, 0.85, 0.0, 0.0},   // O
+		{0.35, 0.0, 1.00, 0.0, 0.0}};  // U
+	Mouth m;
+	if (v < 0 || v >= kVisemes) return m;
+	m.open = table[v][0], m.wide = table[v][1], m.round = table[v][2], m.closed = table[v][3], m.teeth = table[v][4];
+	m.viseme[static_cast<std::size_t>(v)] = 1.0;
+	return m;
+}
+// The visemes a mouth known only by its three numbers is most like (a recording's: speech::mouthsOf), for a face that is drawn with visemes.
+inline void visemesFromShape(Mouth &m) {
+	double sum = 0.0;
+	for (double w : m.viseme) sum += w;
+	if (sum > 0.0) return;
+	const double talk = std::min(1.0, m.open / 0.5);
+	m.viseme[kAA] = std::max(0.0, m.open - 0.5 * (m.wide + m.round));
+	m.viseme[kE] = m.wide * (1.0 - 0.5 * clamp01(m.open)), m.viseme[kI] = m.wide * 0.5 * (1.0 - clamp01(m.open));
+	m.viseme[kO] = m.round * clamp01(m.open / 0.6), m.viseme[kU] = m.round * (1.0 - clamp01(m.open / 0.6));
+	sum = 0.0;
+	for (double w : m.viseme) sum += w;
+	if (sum > 1e-9)
+		for (double &w : m.viseme) w *= talk / sum;
+	m.viseme[kSil] = 1.0 - talk;
+}
 
 // A line of dialogue: who says it, when, the words, how fast (1 the usual), its pitch moved by so many semitones, and whether it is captioned.
 struct Line {
@@ -38,6 +87,7 @@ struct Syllable {
 	double t0 = 0.0, t1 = 0.0;   // the voiced part (film time)
 	char vowel = 'a';            // a e i o u: its mouth shape and formants
 	char onset = 0;              // its first consonant (0: none): m b p close the lips first; s f z v x c h hiss; t k d g pop
+	int word = 0;                // which word of its line it is in (each letter of another script a word of its own: film_lipsync.h)
 	double stress = 1.0;         // the first syllable of a word is a little louder
 	double pitch = 0.0;          // semitones from the voice's own, from the intonation
 };
@@ -68,7 +118,8 @@ inline std::vector<Syllable> syllablesOf(const Line &line) {
 	double t = line.t;
 	const std::string &s = line.text;
 	std::size_t i = 0;
-	int sentence0 = 0;   // the first syllable of the sentence being read (its intonation)
+	int sentence0 = 0;
+	int words = 0;   // (Syllable::word)   // the first syllable of the sentence being read (its intonation)
 	const auto endSentence = [&](char mark) {
 		const int n = static_cast<int>(out.size()) - sentence0;
 		for (int k = 0; k < n; ++k) {
@@ -99,6 +150,7 @@ inline std::vector<Syllable> syllablesOf(const Line &line) {
 				y.t0 = t + 0.03 / rate;
 				y.t1 = y.t0 + 0.17 / rate;
 				t = y.t1 + 0.03 / rate;
+				y.word = words++;
 				out.push_back(y);
 			}
 			i += n;
@@ -135,9 +187,11 @@ inline std::vector<Syllable> syllablesOf(const Line &line) {
 				y.t0 = t + (0.02 + 0.03 * std::min(2.0, static_cast<double>(parts[k].first.size()))) / rate;
 				y.t1 = y.t0 + (0.12 + 0.025 * std::min(3.0, consonants)) / rate;
 				t = y.t1 + 0.02 / rate;
+				y.word = words;
 				out.push_back(y);
 			}
 			t += 0.05 / rate;   // between words
+			++words;
 			i = j;
 			continue;
 		}
