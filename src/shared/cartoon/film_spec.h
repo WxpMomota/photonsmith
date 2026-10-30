@@ -46,6 +46,11 @@
 #include "film_planets.h"
 #include "film_cosmos.h"
 #include "film_voyage.h"
+#include "film_battle.h"
+#include "film_zerog.h"
+#include "film_interior.h"
+#include "film_screens.h"
+#include "film_explain.h"
 #include "film_flowers.h"
 #include "film_geology.h"
 #include "film_soundscape.h"
@@ -441,6 +446,17 @@ struct Spec {
 	std::vector<cosmos::Ship> ships;
 	std::vector<cosmos::Astronaut> astronauts;
 	std::vector<cosmos::Descent> descents;
+	battle::Battle battle;   // (round 11: `laser`, `explode`, `shield`; film_battle.h)
+	// (round 11) `gravity G`: how strongly things fall (m/s^2: the Earth's 9.81, the Moon's 1.62, Mars's 3.71) - jumps hang longer, props and the rigid world fall slower, and
+	// a walk becomes a bouncing lope below 6; `footprints [NAME]`: the prints its feet leave where they come down, and the dust they kick up (none: no prints)
+	double gravity = 9.81;
+	std::vector<std::string> footprints;
+	std::vector<zerog::Blob> blobs;     // (round 11: `blob`, water floating with no weight; film_zerog.h)
+	std::vector<zerog::Drift> drifts;   // (`drift`: small things floating)
+	std::vector<interior::Interior> interiors;   // (`interior`: corridors, cockpits, airlocks, a ring station's floor; film_interior.h)
+	std::vector<screens::Hologram> holograms;   // (`hologram`, `screen`: film_screens.h)
+	std::vector<screens::Screen> screens;
+	explain::Overlays explain;   // (`label`, `orbitline`, `scalebar`, `compare`: an explainer's drawings; film_explain.h)
 	std::vector<ground::Track> tracks;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;

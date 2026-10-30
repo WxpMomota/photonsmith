@@ -1914,6 +1914,109 @@ thin cross on each of Crystal Heart's floating sparks.
 
 **A comic print, a watercolour, an old film: `halftone`, `watercolor`, `vintage`.** Look words made last of all, on the finished picture as it is shown (after the tone map, the toon look and the marks; `src/shared/print_look.h`). `look halftone 7` prints it as a comic book is printed: cyan, magenta, yellow and black dots, each ink on a screen at its own angle and its dots as big as its share, 7 pixels apart at 1080, on warm paper; the darkest black is solid, so ink lines stay lines (`halftone-mix M`, 0..1, lays it over the picture only partly). `look watercolor 1` (0..2) paints it in watercolour, after Bousseau et al.'s "Interactive watercolor rendering" (NPAR 2006): the colours bled softly, pigment pooled darker where a wash ends, its grains and uneven flow, the paper's tooth. `look vintage 1` (0..2) shows it as a worn 1930s print: grain, a flickering light, the frame weaving a pixel or two, dust and short-lived scratches, darker corners and a sepia tone (`vintage-tone T`, 0..1, 0.5); a film's frames each get their own `seed`, so the grain and the dust change from frame to frame and a frame rendered again is the same. A still (`# @rt-look` in a scene file, or `--look "vintage 1"`) has seed 0 unless it gives one. With `--temporal-denoise` the frames are rendered without these three (`--defer-print`) and get them after the denoising, which would otherwise average a vintage film's grain and dust away.
 
+### Space films, round 11 (2026-10-29)
+
+Ten more things for films set in space. Each line is read by film_parse_space.h; the feature's own file is named with it. A film with nothing but these lines can use
+`set void` (film_assets/library/void.set: a camera and nothing else) instead of a scene of its own.
+
+**Orbits, burns and thrusters: `orbit`, `burn`.** (film_orbits.h)
+
+```
+ship    sat   at 0 0 0  kind shuttle  size 60
+orbit   sat   around home  radius 1500  period 30            # `apoapsis A` (an ellipse), `incline`, `node`, `phase` (degrees), `backwards`
+orbit   sat   around home  radius 1500  period 30  to 600 at 12   # a transfer: down to a circle of 600 m, its first burn at 12 s
+burn    sat   20 22                                          # its engine also fires from 20 s to 22 s
+```
+
+A ship on an `orbit` goes round a planet (or a point, `around X Y Z`) by Kepler's laws: a circle at an even pace, an ellipse fastest at its nearest point, its nose
+along its way. `to R2 at T` is a Hohmann transfer: a burn at T, half a turn on the ellipse that touches both circles (its time from Kepler's third law), a second
+burn, then round the new circle. Going down, both burns slow it, so it first turns round to fire ahead - a flip by its thrusters: a quick push to start turning, a
+coast, a quick push to stop - and back again after. The engine's flame shows only while it burns (its sound follows it); small puffs of gas come from its thrusters
+whenever it starts or stops turning.
+
+**Space battles: `laser`, `shield`, `explode`.** (film_battle.h)
+
+```
+laser   a  at 1  to b  count 3 every 0.5  speed 300  colour red    # bolts from a's guns at b (or `to X Y Z`, or straight ahead)
+shield  b  radius 30  colour 0.35 0.7 1                             # stops bolts: a ripple of light where each strikes
+explode b  at 6  size 40                                            # a flash, a fireball, a shock ring, tumbling debris; b is gone after it
+```
+
+A bolt is a bright rod (a white core in its colour) aimed at where its target will be when it gets there; a strike sparks, or ripples a shield. Each sounds.
+
+**Alien and robot characters.** (film_aliens.h) Three new kinds for `character` and `cast`: `blob` (a jelly that hops, its eyes on stalks), `squid` (six tentacles
+trailing, the front two its arms) and `hoverbot` (a hovering robot with a screen for a face and noodle arms). They walk and `gesture` (`wave`, `point`, `cheer` ...) as people do.
+
+**The real night sky: `space ... stars real`, `sky ... stars real`.** (film_starsky.h)
+
+```
+space   stars real  constellations  date 1969-07-20     # the 9 096 stars of the Yale Bright Star Catalogue where they are; their figures; the planets that night
+sky     ... stars real                                  # a night on the ground: the real stars wheeling round the pole (its latitude, `day`)
+```
+
+`stars real` paints the Yale Bright Star Catalogue (to magnitude 6.5, each in its colour) instead of made-up stars, with fainter made-up ones below that, and turns
+the Milky Way to its true place. `constellations` draws the figures' lines faintly (d3-celestial's lines). `date YYYY-MM-DD` (1800 to 2050) puts the planets among the
+stars where they were that day (JPL's Keplerian elements) and the sun where it was, unless `sun B E` says otherwise. On the ground, the sky is turned for the film's
+latitude, day and hour, so Polaris stands over the north and the stars turn about it through the night. (Data: `film_assets/library/stars`; THIRD_PARTY_NOTICES.md.)
+
+**Weather on planets: `planet ... flow F storms N clouds C lightning L`.** (film_planets.h) A gas giant's bands drift east and west at their own paces (`flow`; jets
+alternating, fastest at the equator) and it has `storms` more ovals in its bands. A solid world's `clouds` (0 to 1) are a layer above its ground that drifts over it
+and shades it; `lightning` flickers in them on the night side.
+
+**Low gravity: `gravity`, `footprints`.** (film_spec.h, film_world.cpp)
+
+```
+gravity     1.62          # the Moon's (m/s^2; 9.81 by default): jumps hang longer, walks become a loping bound, thrown and dropped things fall slower
+footprints                # everyone leaves prints (or `footprints ann bob`); in low gravity each step kicks up a slow arc of dust
+```
+
+**Floating water and clutter: `blob`, `drift`.** (film_zerog.h)
+
+```
+blob   drop  at 0 1.4 2  size 0.05  move 0.02 0 0  split 4     # a ball of water ringing as a free drop rings (Rayleigh's modes); `split T`: into two
+blob   tear  on ann  grow 1 3                                   # a tear that cannot fall, growing on a character's face
+drift  junk  20  at 0 1.3 1  box 2 1.5 2  kind mixed            # crumbs, pens, tools: tumbling, bouncing off the box's walls
+```
+
+**Ship and station interiors: `interior`.** (film_interior.h)
+
+```
+interior  corridor  at 0 0 -10  facing 0  length 10       # hexagonal panels, ribs, light strips, blinking lights
+interior  cockpit   at 0 0 0                              # a great window onto space, glowing consoles, two seats
+interior  airlock   at 20 0 0  cycle 2                    # at 2 s: the inner door shuts, amber lights turn, the outer door opens in a puff of mist
+interior  ring      at 60 0 0  length 20                  # a ring station's floor curving up ahead and behind
+```
+
+`light R G B` tints their lamps; `seed N` changes the details.
+
+**Holograms and screens: `hologram`, `screen`.** (film_screens.h)
+
+```
+hologram  map    globe  at -0.45 0 1.2  size 0.7                         # also `ship` (`ship fighter`), `orbits`, `map`
+hologram  craft  ship   at 0.45 0 1.2   size 0.7  ship fighter  colour 1 0.6 0.2   # `spin DEG/s` (20), `flicker F` (1)
+screen    tv     at 1.9 1.5 1.4  show radar  size 0.8 0.6  facing -90  range 2000   # also bars, static, trace, `picture FILE`
+```
+
+A hologram is a picture of light over a projector, cut into thin slices that climb slowly (the scanlines: it is see-through between them), turning, flickering, now
+and then slipping sideways for a moment. A globe's land is brighter than its seas; `orbits` shows moons going round; `map` is a hilly land drawn in contour lines.
+A screen shows colour bars, static, a picture (beside the film, else in the library), a radar - its beam sweeping, the film's ships in `range` of `centre` as blips
+that glow as the beam passes and fade - or a heartbeat trace. What glows in them is no light to aim at (`"bool sampled" false`), so they cost a frame almost nothing; a
+hologram's lens is one small light that tints what is near. A screen does not show another camera's live picture: a frame is one render, with no second render inside it.
+
+**An explainer's drawings: `label`, `orbitline`, `scalebar`, `compare`.** (film_explain.h)
+
+```
+label      "Probe 1"  on probe  from 1.5 to 8  colour 0.5 0.9 1   # a card over a craft, planet, moon or character (or `at X Y Z`); `size S` (0.04 of the frame)
+orbitline  probe  dashed  from 2                                # the path a craft on an orbit, or a moon, will take, drawing itself out
+scalebar   2000  at 0 -1600 0  text "2,000 km"                 # a bar of that length across the frame, ticks at its ends, its length under it
+compare    Earth Mars Moon Jupiter  at 0 0 -3500  height 1200 from 6   # planets at their true sizes on one line, each named with its size
+```
+
+Drawn as a diagram is drawn over a picture: thin glowing lines and dark cards edged in colour, their words in Noto Sans (the program's own font, so they look the
+same everywhere), always facing the camera and always the same size in the frame however far off what they name is (worked out for each frame's camera). They pop up
+at `from` (a label's line drawing out from what it names, an orbit line drawing itself round) and away at `to`; the times are the story's. `compare` knows the Sun,
+the planets, Pluto, Ceres, the Moon, Io, Europa, Ganymede and Titan (true radii), and the film's own planets; it outlines each and staggers names that would overlap.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

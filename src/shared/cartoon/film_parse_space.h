@@ -9,24 +9,39 @@ namespace film_file {
 
 // Whether `verb` is a space line's.
 inline bool isSpaceVerb(const std::string &verb) {
-	static const std::vector<std::string> k = {"space", "planet", "moon", "nebula", "galaxy", "star", "blackhole", "comet", "asteroids", "remnant", "ship", "astronaut", "descent"};
+	static const std::vector<std::string> k = {"space", "planet", "moon", "nebula", "galaxy", "star", "blackhole", "comet", "asteroids", "remnant", "ship", "astronaut", "descent", "orbit", "burn", "laser", "explode", "shield", "gravity", "footprints", "blob", "drift", "interior", "hologram", "screen", "label", "orbitline", "scalebar", "compare"};
 	return std::find(k.begin(), k.end(), verb) != k.end();
+}
+// Whether an `orbit` line is a ship's (`orbit SHIP ...`: a ship named before it, or before any shot) rather than a shot's camera going round someone (film_parse.cpp).
+inline bool isShipOrbit(const Spec &s, const std::string &line) {
+	const std::vector<std::string> t = detail::tokens(line);
+	return s.shots.empty() || (t.size() > 1 && std::any_of(s.ships.begin(), s.ships.end(), [&](const cosmos::Ship &sh) { return sh.name == t[1]; }));
 }
 
 // A `space` line (film_space.h). "" or what is wrong with it.
 inline std::string spaceSetLine(Spec &s, const std::vector<std::string> &t) {
 	using detail::number;
 	const auto fail = [](const std::string &what) { return what; };
-	const std::string usage = "`space [stars S] [milkyway M] [sun BEARING ELEVATION] [sunsize DEGREES] [sunlight S] [sun off] [flare F] [bloom B] [planetshine S] [hum H] [seed N]`";
+	const std::string usage = "`space [stars S|real] [constellations] [date YYYY-MM-DD] [milkyway M] [sun BEARING ELEVATION] [sunsize DEGREES] [sunlight S] [sun off] [flare F] [bloom B] [planetshine S] [hum H] [seed N]`";
 	if (s.space.on) return fail("a film has one `space` line");
 	s.space.on = true;
+	bool sunGiven = false;
 	for (std::size_t i = 1; i < t.size();) {
 		double a = 0.0, b = 0.0;
-		if (t[i] == "sun" && i + 1 < t.size() && t[i + 1] == "off") {
+		if (t[i] == "stars" && i + 1 < t.size() && t[i + 1] == "real") {   // (film_starsky.h)
+			s.space.realStars = true;
+			i += 2;
+		} else if (t[i] == "constellations") {
+			s.space.constellations = true;
+			++i;
+		} else if (t[i] == "date" && i + 1 < t.size()) {
+			if (!starsky::parseDate(t[i + 1], s.space.jd)) return fail("\"date " + t[i + 1] + "\": a date from 1800 to 2050, YYYY-MM-DD (or YYYY-MM-DDTHH:MM) - " + usage);
+			i += 2;
+		} else if (t[i] == "sun" && i + 1 < t.size() && t[i + 1] == "off") {
 			s.space.sun = false;
 			i += 2;
 		} else if (t[i] == "sun" && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && b >= -90.0 && b <= 90.0) {
-			s.space.sunBearing = a, s.space.sunElevation = b;
+			s.space.sunBearing = a, s.space.sunElevation = b, sunGiven = true;
 			i += 3;
 		} else if (i + 1 < t.size() && number(t[i + 1], a)) {
 			if (t[i] == "stars" && a >= 0.0 && a <= 4.0) s.space.stars = a;
@@ -44,6 +59,13 @@ inline std::string spaceSetLine(Spec &s, const std::vector<std::string> &t) {
 			return fail("\"" + t[i] + "\": " + usage);
 		}
 	}
+	if (s.space.jd > 0.0 && !sunGiven) {   // (on a date, the sun where it was among the stars: the real sky's frame, film_starsky.h)
+		double ra = 0.0, dec = 0.0;
+		starsky::sunOn(s.space.jd, ra, dec);
+		const Vec3 d = starsky::Frame{}.world(ra, dec);
+		s.space.sunBearing = std::atan2(d.x, d.z) * 180.0 / kPi, s.space.sunElevation = std::asin(std::clamp(d.y, -1.0, 1.0)) * 180.0 / kPi;
+	}
+	if (s.space.constellations && !s.space.realStars) return fail("`constellations` are drawn between the real stars: `stars real` - " + usage);
 	return std::string();
 }
 
@@ -51,7 +73,7 @@ inline std::string spaceSetLine(Spec &s, const std::vector<std::string> &t) {
 inline std::string planetLine(Spec &s, const std::vector<std::string> &t) {
 	using detail::number;
 	const auto fail = [](const std::string &what) { return what; };
-	const std::string usage = "`planet NAME KIND at X Y Z radius R [tilt DEGREES] [spin SECONDS] [air S [colour blue|orange|white|green]] [cities S] [aurora S] [rings INNER OUTER [opacity S]] [seed N]` (rocky, desert, ice, ocean, gas or lava)";
+	const std::string usage = "`planet NAME KIND at X Y Z radius R [tilt DEGREES] [spin SECONDS] [air S [colour blue|orange|white|green]] [cities S] [aurora S] [rings INNER OUTER [opacity S]] [flow F] [storms N] [clouds C] [lightning L] [seed N]` (rocky, desert, ice, ocean, gas or lava)";
 	if (t.size() < 3) return fail(usage);
 	planets::Planet p;
 	p.name = t[1], p.kind = t[2];
@@ -80,7 +102,11 @@ inline std::string planetLine(Spec &s, const std::vector<std::string> &t) {
 			else if (t[i] == "cities" && a >= 0.0 && a <= 10.0) p.cities = a;
 			else if (t[i] == "aurora" && a >= 0.0 && a <= 10.0) p.aurora = a;
 			else if (t[i] == "opacity" && a >= 0.0 && a <= 3.0) p.ringOpacity = a;
-			else return fail("\"" + t[i] + "\": " + usage + " (radius 1 to 200000 m, air, cities and aurora 0 to 10)");
+			else if (t[i] == "flow" && a >= 0.0 && a <= 10.0 && p.kind == "gas") p.flow = a;   // (round 11: its weather, film_planets.h)
+			else if (t[i] == "storms" && a >= 0.0 && a <= 20.0 && p.kind == "gas") p.storms = static_cast<int>(a);
+			else if (t[i] == "clouds" && a > 0.0 && a <= 1.0 && p.kind != "gas") p.clouds = a;
+			else if (t[i] == "lightning" && a >= 0.0 && a <= 4.0) p.lightning = a;
+			else return fail("\"" + t[i] + "\": " + usage + " (radius 1 to 200000 m, air, cities and aurora 0 to 10; a gas giant's flow 0 to 10 and storms up to 20; clouds 0 to 1 over a solid world; lightning 0 to 4)");
 			i += 2;
 		} else {
 			return fail("\"" + t[i] + "\": " + usage);
@@ -388,6 +414,164 @@ inline std::string astronautLine(Spec &s, const std::vector<std::string> &t) {
 	return std::string();
 }
 
+// An `orbit` line (film_orbits.h): a ship named before it goes round a planet (or a point) instead of along its `move`. "" or what is wrong with it.
+inline std::string orbitLine(Spec &s, const std::vector<std::string> &t) {
+	using detail::number;
+	const std::string usage = cosmos::orbitUsage();
+	if (t.size() < 4 || t[2] != "around") return usage;
+	cosmos::Ship *ship = nullptr;
+	for (cosmos::Ship &sh : s.ships)
+		if (sh.name == t[1]) ship = &sh;
+	if (!ship) return "\"" + t[1] + "\": no ship of that name before it - " + usage;
+	cosmos::Orbit o;
+	o.on = true;
+	std::size_t i = 3;
+	Vec3 c;
+	if (i + 2 < t.size() && number(t[i], c.x) && number(t[i + 1], c.y) && number(t[i + 2], c.z)) {
+		o.centre = c, i += 3;
+	} else {
+		const auto it = std::find_if(s.planets.begin(), s.planets.end(), [&](const planets::Planet &p) { return p.name == t[i]; });
+		if (it == s.planets.end()) return "\"around " + t[i] + "\": no planet of that name before it - " + usage;
+		o.around = t[i], o.centre = it->at, ++i;
+	}
+	bool radius = false;
+	while (i < t.size()) {
+		double a = 0.0, b = 0.0;
+		if (t[i] == "backwards") {
+			o.backwards = true, ++i;
+		} else if (t[i] == "to" && i + 3 < t.size() && number(t[i + 1], a) && t[i + 2] == "at" && number(t[i + 3], b) && a > 0.0 && b >= 0.0) {
+			o.to = a, o.at = b, i += 4;
+		} else if (i + 1 < t.size() && number(t[i + 1], a)) {
+			if (t[i] == "radius" && a > 0.0) o.radius = a, radius = true;
+			else if (t[i] == "apoapsis" && a > 0.0) o.apo = a;
+			else if (t[i] == "period" && a >= 1.0 && a <= 100000.0) o.period = a;
+			else if (t[i] == "incline" && a >= -180.0 && a <= 180.0) o.incline = a;
+			else if (t[i] == "node") o.node = a;
+			else if (t[i] == "phase") o.phase = a;
+			else return "\"" + t[i] + "\": " + usage;
+			i += 2;
+		} else {
+			return "\"" + t[i] + "\": " + usage;
+		}
+	}
+	if (!radius) return "how far out (`radius R`): " + usage;
+	if (o.apo > 0.0 && o.apo <= o.radius) return "\"apoapsis\" must be beyond the radius: " + usage;
+	if (o.at >= 0.0 && o.apo > 0.0) return "a transfer (`to R2 at T`) only from a circle: " + usage;
+	ship->orbit = o;
+	return std::string();
+}
+
+// A `burn SHIP T0 T1` line: its engines fire from T0 to T1 (nature's time). "" or what is wrong with it.
+inline std::string burnLine(Spec &s, const std::vector<std::string> &t) {
+	const std::string usage = "`burn SHIP T0 T1` (a ship named before it; T1 after T0)";
+	double a = 0.0, b = 0.0;
+	if (t.size() != 4 || !detail::number(t[2], a) || !detail::number(t[3], b) || b <= a) return usage;
+	for (cosmos::Ship &sh : s.ships)
+		if (sh.name == t[1]) return sh.burns.push_back({a, b}), std::string();
+	return "\"" + t[1] + "\": no ship of that name before it - " + usage;
+}
+
+// A colour word or three numbers at t[i]: red, green, blue or R G B (0 to 1). How many words it took (0: not a colour).
+inline std::size_t colourAt(const std::vector<std::string> &t, std::size_t i, Vec3 &out) {
+	if (i >= t.size()) return 0;
+	if (t[i] == "red") return out = {1.0, 0.15, 0.1}, 1;
+	if (t[i] == "green") return out = {0.2, 1.0, 0.25}, 1;
+	if (t[i] == "blue") return out = {0.25, 0.5, 1.0}, 1;
+	Vec3 c;
+	if (i + 2 < t.size() && detail::number(t[i], c.x) && detail::number(t[i + 1], c.y) && detail::number(t[i + 2], c.z) && std::min({c.x, c.y, c.z}) >= 0.0 && std::max({c.x, c.y, c.z}) <= 1.0)
+		return out = c, 3;
+	return 0;
+}
+inline bool knownShip(const Spec &s, const std::string &name) {
+	return std::any_of(s.ships.begin(), s.ships.end(), [&](const cosmos::Ship &sh) { return sh.name == name; });
+}
+
+// A `laser` line (film_battle.h). "" or what is wrong with it.
+inline std::string laserLine(Spec &s, const std::vector<std::string> &t) {
+	using detail::number;
+	const std::string usage = battle::laserUsage();
+	if (t.size() < 4 || t[2] != "at") return usage;
+	battle::Laser l;
+	l.from = t[1];
+	if (!knownShip(s, l.from)) return "\"" + l.from + "\": no ship of that name before it - " + usage;
+	if (!number(t[3], l.at)) return "\"at " + t[3] + "\": " + usage;
+	for (std::size_t i = 4; i < t.size();) {
+		double a = 0.0;
+		Vec3 p;
+		if (t[i] == "to" && i + 3 < t.size() && number(t[i + 1], p.x) && number(t[i + 2], p.y) && number(t[i + 3], p.z)) {
+			l.toPoint = p, l.toIsPoint = true, i += 4;
+		} else if (t[i] == "to" && i + 1 < t.size()) {
+			if (!knownShip(s, t[i + 1])) return "\"to " + t[i + 1] + "\": no ship of that name before it - " + usage;
+			l.to = t[i + 1], i += 2;
+		} else if (t[i] == "colour") {
+			const std::size_t n = colourAt(t, i + 1, l.colour);
+			if (!n) return "\"colour\": " + usage;
+			i += 1 + n;
+		} else if (t[i] == "count" && i + 3 < t.size() && number(t[i + 1], a) && a >= 1.0 && a <= 50.0 && t[i + 2] == "every" && number(t[i + 3], l.every) && l.every > 0.0) {
+			l.count = static_cast<int>(a), i += 4;
+		} else if (t[i] == "speed" && i + 1 < t.size() && number(t[i + 1], a) && a > 0.0) {
+			l.speed = a, i += 2;
+		} else {
+			return "\"" + t[i] + "\": " + usage;
+		}
+	}
+	s.battle.lasers.push_back(l);
+	return std::string();
+}
+
+// An `explode` line (film_battle.h): a ship blown up (gone from then on), or a blast at a place. "" or what is wrong with it.
+inline std::string explodeLine(Spec &s, const std::vector<std::string> &t) {
+	using detail::number;
+	const std::string usage = battle::explodeUsage();
+	battle::Explosion e;
+	std::size_t i = 1;
+	Vec3 p;
+	if (t.size() > 3 && number(t[1], p.x) && number(t[2], p.y) && number(t[3], p.z)) {
+		e.at = p, i = 4;
+	} else if (t.size() > 1 && knownShip(s, t[1])) {
+		e.ship = t[1], i = 2;
+	} else {
+		return (t.size() > 1 ? "\"" + t[1] + "\": no ship of that name before it - " : std::string()) + usage;
+	}
+	bool when = false;
+	for (; i < t.size(); i += 2) {
+		double a = 0.0;
+		if (i + 1 >= t.size() || !number(t[i + 1], a)) return "\"" + t[i] + "\": " + usage;
+		if (t[i] == "at") e.t = a, when = true;
+		else if (t[i] == "size" && a > 0.0) e.size = a;
+		else if (t[i] == "seed") e.seed = static_cast<int>(a);
+		else return "\"" + t[i] + "\": " + usage;
+	}
+	if (!when) return "when (`at T`): " + usage;
+	e.seed += static_cast<int>(s.battle.explosions.size()) * 7;
+	s.battle.explosions.push_back(e);
+	for (cosmos::Ship &sh : s.ships)
+		if (sh.name == e.ship && (sh.goneAt < 0.0 || e.t < sh.goneAt)) sh.goneAt = e.t;
+	return std::string();
+}
+
+// A `shield` line (film_battle.h). "" or what is wrong with it.
+inline std::string shieldLine(Spec &s, const std::vector<std::string> &t) {
+	const std::string usage = battle::shieldUsage();
+	if (t.size() < 2 || !knownShip(s, t[1])) return (t.size() > 1 ? "\"" + t[1] + "\": no ship of that name before it - " : std::string()) + usage;
+	battle::Shield sh;
+	sh.ship = t[1];
+	for (std::size_t i = 2; i < t.size();) {
+		double a = 0.0;
+		if (t[i] == "radius" && i + 1 < t.size() && detail::number(t[i + 1], a) && a > 0.0) {
+			sh.radius = a, i += 2;
+		} else if (t[i] == "colour") {
+			const std::size_t n = colourAt(t, i + 1, sh.colour);
+			if (!n) return "\"colour\": " + usage;
+			i += 1 + n;
+		} else {
+			return "\"" + t[i] + "\": " + usage;
+		}
+	}
+	s.battle.shields.push_back(sh);
+	return std::string();
+}
+
 // One space line: what it says goes into `s`. "" or what is wrong with it.
 inline std::string spaceLine(Spec &s, const std::string &verb, const std::string &line) {
 	const std::vector<std::string> t = detail::tokens(line);
@@ -403,6 +587,247 @@ inline std::string spaceLine(Spec &s, const std::string &verb, const std::string
 	if (verb == "remnant") return remnantLine(s, t);
 	if (verb == "ship") return shipLine(s, t);
 	if (verb == "astronaut") return astronautLine(s, t);
+	if (verb == "orbit") return orbitLine(s, t);
+	if (verb == "burn") return burnLine(s, t);
+	if (verb == "label" || verb == "orbitline" || verb == "scalebar" || verb == "compare") {   // an explainer's drawings (film_explain.h)
+		const std::string usage = verb == "label" ? explain::labelUsage() : verb == "orbitline" ? explain::orbitLineUsage() : verb == "scalebar" ? explain::scaleBarUsage() : explain::compareUsage();
+		explain::Label l;
+		explain::OrbitLine o;
+		explain::ScaleBar b;
+		explain::Compare c;
+		std::size_t i = 2;
+		if (t.size() < 2) return usage;
+		if (verb == "label") l.text = t[1];
+		else if (verb == "orbitline") o.of = t[1];
+		else if (verb == "scalebar" && !(detail::number(t[1], b.length) && b.length > 0.0)) return usage;
+		else if (verb == "compare") {
+			for (i = 1; i < t.size() && t[i] != "at"; ++i) c.bodies.push_back(t[i]);
+			if (c.bodies.empty()) return usage;
+		}
+		bool placed = verb == "orbitline";
+		double from = 0.0, to = 1e9;
+		Vec3 colour{-1.0, -1.0, -1.0};
+		while (i < t.size()) {
+			Vec3 v;
+			double a = 0.0;
+			const bool three = i + 3 < t.size() && detail::number(t[i + 1], v.x) && detail::number(t[i + 2], v.y) && detail::number(t[i + 3], v.z);
+			if (t[i] == "at" && three && verb != "orbitline") {
+				l.at = b.at = c.at = v, placed = true, i += 4;
+			} else if (t[i] == "on" && verb == "label" && i + 1 < t.size()) {
+				l.on = t[i + 1], placed = true, i += 2;
+			} else if (t[i] == "colour" && three && std::min({v.x, v.y, v.z}) >= 0.0 && std::max({v.x, v.y, v.z}) <= 1.0) {
+				colour = v, i += 4;
+			} else if (t[i] == "dashed" && verb == "orbitline") {
+				o.dashed = true, ++i;
+			} else if (t[i] == "text" && verb == "scalebar" && i + 1 < t.size()) {
+				b.text = t[i + 1], i += 2;
+			} else if (i + 1 < t.size() && detail::number(t[i + 1], a)) {
+				if (t[i] == "from") from = a;
+				else if (t[i] == "to") to = a;
+				else if (t[i] == "size" && verb == "label" && a >= 0.01 && a <= 0.2) l.size = a;
+				else if (t[i] == "height" && verb == "compare" && a > 0.0) c.height = a;
+				else return "\"" + t[i] + "\": " + usage;
+				i += 2;
+			} else {
+				return "\"" + t[i] + "\": " + usage;
+			}
+		}
+		if (!placed) return (verb == "label" ? "what it names (`on NAME`) or where it is (`at X Y Z`): " : "where it is (`at X Y Z`): ") + usage;
+		if (to <= from) return "it must go (`to`) after it comes (`from`): " + usage;
+		if (verb == "label") {
+			l.from = from, l.to = to;
+			if (colour.x >= 0.0) l.colour = colour;
+			s.explain.labels.push_back(l);
+		} else if (verb == "orbitline") {
+			o.from = from, o.to = to;
+			if (colour.x >= 0.0) o.colour = colour;
+			s.explain.orbits.push_back(o);
+		} else if (verb == "scalebar") {
+			b.from = from, b.to = to;
+			if (colour.x >= 0.0) b.colour = colour;
+			s.explain.bars.push_back(b);
+		} else {
+			c.from = from, c.to = to;
+			if (colour.x >= 0.0) c.colour = colour;
+			s.explain.compares.push_back(c);
+		}
+		return std::string();
+	}
+	if (verb == "hologram") {   // (film_screens.h)
+		const std::string usage = screens::hologramUsage();
+		screens::Hologram h;
+		if (t.size() < 3 || std::find(screens::hologramKinds().begin(), screens::hologramKinds().end(), t[2]) == screens::hologramKinds().end()) return usage;
+		h.name = t[1], h.kind = t[2];
+		bool placed = false;
+		for (std::size_t i = 3; i < t.size();) {
+			Vec3 v;
+			double a = 0.0;
+			const bool three = i + 3 < t.size() && detail::number(t[i + 1], v.x) && detail::number(t[i + 2], v.y) && detail::number(t[i + 3], v.z);
+			if (t[i] == "at" && three) {
+				h.at = v, placed = true, i += 4;
+			} else if (t[i] == "colour" && three && std::min({v.x, v.y, v.z}) >= 0.0 && std::max({v.x, v.y, v.z}) <= 1.0) {
+				h.colour = v, i += 4;
+			} else if (t[i] == "ship" && i + 1 < t.size() && std::find(cosmos::shipKinds().begin(), cosmos::shipKinds().end(), t[i + 1]) != cosmos::shipKinds().end()) {
+				h.ship = t[i + 1], i += 2;
+			} else if (i + 1 < t.size() && detail::number(t[i + 1], a)) {
+				if (t[i] == "size" && a >= 0.05 && a <= 50.0) h.size = a;
+				else if (t[i] == "spin" && std::fabs(a) <= 720.0) h.spin = a;
+				else if (t[i] == "flicker" && a >= 0.0 && a <= 5.0) h.flicker = a;
+				else if (t[i] == "seed") h.seed = static_cast<int>(a);
+				else return "\"" + t[i] + "\": " + usage;
+				i += 2;
+			} else {
+				return "\"" + t[i] + "\": " + usage;
+			}
+		}
+		if (!placed) return "where its projector stands (`at X Y Z`): " + usage;
+		s.holograms.push_back(h);
+		return std::string();
+	}
+	if (verb == "screen") {   // (film_screens.h)
+		const std::string usage = screens::screenUsage();
+		screens::Screen sc;
+		if (t.size() < 2) return usage;
+		sc.name = t[1];
+		bool placed = false, shows = false;
+		for (std::size_t i = 2; i < t.size();) {
+			Vec3 v;
+			double a = 0.0, b = 0.0;
+			const bool three = i + 3 < t.size() && detail::number(t[i + 1], v.x) && detail::number(t[i + 2], v.y) && detail::number(t[i + 3], v.z);
+			if ((t[i] == "at" || t[i] == "centre") && three) {
+				if (t[i] == "at") sc.at = v, placed = true;
+				else sc.centre = v, sc.hasCentre = true;
+				i += 4;
+			} else if (t[i] == "show" && i + 1 < t.size() && std::find(screens::screenShows().begin(), screens::screenShows().end(), t[i + 1]) != screens::screenShows().end()) {
+				sc.show = t[i + 1], shows = true, i += 2;
+				if (sc.show == "picture") {
+					if (i >= t.size()) return "which picture (`show picture FILE`): " + usage;
+					sc.file = t[i++];
+				}
+			} else if (t[i] == "size" && i + 2 < t.size() && detail::number(t[i + 1], a) && detail::number(t[i + 2], b) && a > 0.01 && b > 0.01 && a <= 100.0 && b <= 100.0) {
+				sc.width = a, sc.height = b, i += 3;
+			} else if (i + 1 < t.size() && detail::number(t[i + 1], a)) {
+				if (t[i] == "facing") sc.facing = a;
+				else if (t[i] == "tilt" && std::fabs(a) <= 90.0) sc.tilt = a;
+				else if (t[i] == "bright" && a >= 0.0 && a <= 100.0) sc.bright = a;
+				else if (t[i] == "range" && a > 0.0) sc.range = a;
+				else if (t[i] == "seed") sc.seed = static_cast<int>(a);
+				else return "\"" + t[i] + "\": " + usage;
+				i += 2;
+			} else {
+				return "\"" + t[i] + "\": " + usage;
+			}
+		}
+		if (!placed) return "where it hangs (`at X Y Z`): " + usage;
+		if (!shows) return "what it shows (`show ...`): " + usage;
+		s.screens.push_back(sc);
+		return std::string();
+	}
+	if (verb == "interior") {   // (film_interior.h)
+		const std::string usage = interior::usage();
+		interior::Interior in;
+		if (t.size() < 2 || std::find(interior::kinds().begin(), interior::kinds().end(), t[1]) == interior::kinds().end()) return usage;
+		in.kind = t[1];
+		if (in.kind == "airlock") in.length = 3.0;
+		bool placed = false;
+		for (std::size_t i = 2; i < t.size();) {
+			Vec3 v;
+			double a = 0.0;
+			const bool three = i + 3 < t.size() && detail::number(t[i + 1], v.x) && detail::number(t[i + 2], v.y) && detail::number(t[i + 3], v.z);
+			if (t[i] == "at" && three) {
+				in.at = v, placed = true, i += 4;
+			} else if (t[i] == "light" && three && std::min({v.x, v.y, v.z}) >= 0.0 && std::max({v.x, v.y, v.z}) <= 1.0) {
+				in.light = v, i += 4;
+			} else if (i + 1 < t.size() && detail::number(t[i + 1], a)) {
+				if (t[i] == "facing") in.facing = a;
+				else if (t[i] == "length" && a >= 2.0 && a <= 200.0) in.length = a;
+				else if (t[i] == "cycle" && a >= 0.0 && in.kind == "airlock") in.cycle = a;
+				else if (t[i] == "seed") in.seed = static_cast<int>(a);
+				else return "\"" + t[i] + "\": " + usage;
+				i += 2;
+			} else {
+				return "\"" + t[i] + "\": " + usage;
+			}
+		}
+		if (!placed) return "where it stands (`at X Y Z`): " + usage;
+		s.interiors.push_back(in);
+		return std::string();
+	}
+	if (verb == "blob") {   // (film_zerog.h)
+		const std::string usage = zerog::blobUsage();
+		zerog::Blob b;
+		if (t.size() < 2) return usage;
+		b.name = t[1];
+		bool placed = false;
+		for (std::size_t i = 2; i < t.size();) {
+			Vec3 v;
+			double a = 0.0, c = 0.0;
+			const bool three = i + 3 < t.size() && detail::number(t[i + 1], v.x) && detail::number(t[i + 2], v.y) && detail::number(t[i + 3], v.z);
+			if ((t[i] == "at" || t[i] == "move") && three) {
+				(t[i] == "at" ? b.at : b.move) = v, placed = placed || t[i] == "at", i += 4;
+			} else if (t[i] == "on" && i + 1 < t.size()) {
+				b.on = t[i + 1], placed = true, i += 2;
+			} else if (t[i] == "grow" && i + 2 < t.size() && detail::number(t[i + 1], a) && detail::number(t[i + 2], c) && c > a) {
+				b.grow0 = a, b.grow1 = c, i += 3;
+			} else if (i + 1 < t.size() && detail::number(t[i + 1], a)) {
+				if (t[i] == "size" && a >= 0.002 && a <= 2.0) b.size = a;
+				else if (t[i] == "split" && a >= 0.0) b.split = a;
+				else if (t[i] == "seed") b.seed = static_cast<int>(a);
+				else return "\"" + t[i] + "\": " + usage;
+				i += 2;
+			} else {
+				return "\"" + t[i] + "\": " + usage;
+			}
+		}
+		if (!placed) return "where it is (`at X Y Z`, or `on CHARACTER`): " + usage;
+		s.blobs.push_back(b);
+		return std::string();
+	}
+	if (verb == "drift") {   // (film_zerog.h)
+		const std::string usage = zerog::driftUsage();
+		zerog::Drift d;
+		double n = 0.0;
+		if (t.size() < 3 || !detail::number(t[2], n) || n < 1.0 || n > 200.0) return usage;
+		d.name = t[1], d.count = static_cast<int>(n);
+		bool placed = false;
+		for (std::size_t i = 3; i < t.size();) {
+			Vec3 v;
+			double a = 0.0;
+			const bool three = i + 3 < t.size() && detail::number(t[i + 1], v.x) && detail::number(t[i + 2], v.y) && detail::number(t[i + 3], v.z);
+			if (t[i] == "at" && three) {
+				d.centre = v, placed = true, i += 4;
+			} else if (t[i] == "box" && three && std::min({v.x, v.y, v.z}) > 0.0) {
+				d.half = v * 0.5, i += 4;
+			} else if (t[i] == "kind" && i + 1 < t.size() && std::find(zerog::driftKinds().begin(), zerog::driftKinds().end(), t[i + 1]) != zerog::driftKinds().end()) {
+				d.kind = t[i + 1], i += 2;
+			} else if (i + 1 < t.size() && detail::number(t[i + 1], a)) {
+				if (t[i] == "size" && a > 0.0 && a <= 5.0) d.size = a;
+				else if (t[i] == "speed" && a >= 0.0 && a <= 10.0) d.speed = a;
+				else if (t[i] == "seed") d.seed = static_cast<int>(a);
+				else return "\"" + t[i] + "\": " + usage;
+				i += 2;
+			} else {
+				return "\"" + t[i] + "\": " + usage;
+			}
+		}
+		if (!placed) return "where they float (`at X Y Z`): " + usage;
+		s.drifts.push_back(d);
+		return std::string();
+	}
+	if (verb == "gravity") {   // `gravity G` (m/s^2; film_spec.h)
+		double g = 0.0;
+		if (t.size() != 2 || !detail::number(t[1], g) || g <= 0.0 || g > 30.0) return "`gravity G`: how strongly things fall, in m/s^2 (the Earth's 9.81, the Moon's 1.62, Mars's 3.71; above 0, up to 30)";
+		s.gravity = g;
+		return std::string();
+	}
+	if (verb == "footprints") {   // `footprints [NAME ...]`: everyone's, or these characters'
+		if (t.size() == 1) s.footprints.push_back("*");
+		for (std::size_t i = 1; i < t.size(); ++i) s.footprints.push_back(t[i]);
+		return std::string();
+	}
+	if (verb == "laser") return laserLine(s, t);
+	if (verb == "explode") return explodeLine(s, t);
+	if (verb == "shield") return shieldLine(s, t);
 	if (verb == "descent") {   // (film_voyage.h)
 		cosmos::Descent d;
 		const std::string e = cosmos::descentLine(t, d);

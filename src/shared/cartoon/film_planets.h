@@ -52,6 +52,10 @@ struct Planet {
 	double ringInner = 0.0, ringOuter = 0.0, ringOpacity = 1.0;   // its rings (in its radii; none when the outer is 0)
 	std::string around;   // (a moon) the body it goes round; its orbit's radius, its period (seconds of nature's time), where it starts on it, how its plane tips
 	double orbit = 0.0, period = 120.0, phase = 0.0, incline = 0.0;
+	// (round 11) its weather: a gas giant's bands flowing, each at its own pace (`flow F`, 0 still), more storms in its bands (`storms N`); a cloud layer over a solid
+	// world that drifts over its ground and shades it (`clouds C`, its cover 0 .. 1), lightning flickering in its clouds on the night side (`lightning L`)
+	double flow = 0.0, clouds = 0.0, lightning = 0.0;
+	int storms = 0;
 };
 inline const std::vector<std::string> &airColours() {
 	static const std::vector<std::string> k = {"blue", "orange", "white", "green"};
@@ -99,6 +103,14 @@ inline Vec3 surfaceAt(const Planet &p, Vec3 o, double &sea, double &glow) {
 		const double dx = std::acos(std::clamp(dot(normalize(Vec3{o.x, o.y, 0.0} + Vec3{1e-9, 0, 0}), normalize(Vec3{spotC.x, spotC.y, 0.0})), -1.0, 1.0)), dz = o.z - spotC.z;
 		const double spot = 1.0 - smoothstep(0.7, 1.0, std::hypot(dx / 0.22, dz / 0.09));
 		c = lerp(c, Vec3{0.72, 0.30, 0.18} * (0.85 + 0.3 * detail::fbm(o, 30.0, s + 3)), spot);
+		for (int k = 0; k < p.storms; ++k) {   // (`storms N`: white ovals and small brown ones in the bands, each with a collar of darker cloud)
+			const double lon = 2.0 * kPi * hash01(s + k, 51), z = 0.75 * (2.0 * hash01(s + k, 52) - 1.0), size = 0.03 + 0.05 * hash01(s + k, 53);
+			const double ox = std::atan2(o.y, o.x), d = std::remainder(ox - lon, 2.0 * kPi) * std::sqrt(std::max(0.0, 1.0 - z * z)), dz2 = o.z - z;
+			const double r = std::hypot(d / (2.2 * size), dz2 / size);
+			const Vec3 tint = hash01(s + k, 54) < 0.7 ? Vec3{0.95, 0.93, 0.88} : Vec3{0.55, 0.33, 0.2};
+			c = lerp(c, c * 0.75, smoothstep(0.8, 1.0, r) * (1.0 - smoothstep(1.0, 1.3, r)));   // (its dark collar)
+			c = lerp(c, tint * (0.9 + 0.2 * detail::fbm(o, 50.0, s + 60 + k)), 1.0 - smoothstep(0.6, 0.95, r));
+		}
 		return c * (0.9 + 0.2 * detail::fbm(o, 40.0, s + 4));
 	}
 	const double land = detail::fbm(o, 2.2, s + 5) + 0.35 * (detail::fbm(o, 9.0, s + 6) - 0.5);
@@ -142,8 +154,8 @@ inline Vec3 surfaceAt(const Planet &p, Vec3 o, double &sea, double &glow) {
 	}
 	c = lerp(c, Vec3{0.88, 0.9, 0.92}, cap);
 	if (cap > 0.5) sea = 0.0;
-	const Vec3 q{o.x, o.y, o.z * 2.2};   // (clouds stretched along the latitudes, in swirls)
-	const double cloud = smoothstep(0.52, 0.72, detail::fbm(normalize(q), 5.0, s + 13) + 0.25 * (detail::fbm(o, 20.0, s + 14) - 0.5));
+	const Vec3 q{o.x, o.y, o.z * 2.2};   // (clouds stretched along the latitudes, in swirls; none painted on when it has a cloud layer of its own: `clouds`)
+	const double cloud = p.clouds > 0.0 ? 0.0 : smoothstep(0.52, 0.72, detail::fbm(normalize(q), 5.0, s + 13) + 0.25 * (detail::fbm(o, 20.0, s + 14) - 0.5));
 	if (cloud > 0.0) sea *= 1.0 - cloud;
 	return lerp(c, Vec3{0.92, 0.93, 0.95}, 0.9 * cloud);
 }
@@ -168,7 +180,7 @@ struct Pictures {
 inline Pictures pictures(const std::string &film, const Planet &p) {
 	const int W = 2048, H = 1024;
 	Pictures out;
-	const std::string base = "planet_v2_" + p.kind + "_" + std::to_string(p.seed);
+	const std::string base = "planet_v2_" + p.kind + "_" + std::to_string(p.seed) + (p.storms > 0 ? "_s" + std::to_string(p.storms) : std::string()) + (p.clouds > 0.0 && p.kind == "ocean" ? std::string("_clear") : std::string());
 	out.colour = film_sky::picture(film, base + "_colour", W, H, [&](std::vector<float> &rgb) {
 		for (int j = 0; j < H; ++j)
 			for (int i = 0; i < W; ++i) {
@@ -451,6 +463,101 @@ inline std::string eclipseText(const std::string &film, const std::vector<Planet
 }
 
 // A planet at nature's time `nt`, as scene text.
+// ---- weather (round 11) ----
+// A sphere of radius r as a mesh in its own frame (z its pole, as pbrt's sphere), its uvs as pbrt's sphere's (u round from +x, v 1 at the north pole) so a planet's picture
+// lies on it as on the sphere; only the band of latitudes from `z0` to `z1` (the pole's -1 .. 1).
+inline Mesh sphereZone(double r, double z0, double z1, int segments, int rows) {
+	Mesh m;
+	const double t0 = std::acos(std::clamp(z1, -1.0, 1.0)), t1 = std::acos(std::clamp(z0, -1.0, 1.0));
+	for (int j = 0; j <= rows; ++j) {
+		const double theta = t0 + (t1 - t0) * j / rows;
+		for (int i = 0; i <= segments; ++i) {
+			const double phi = 2.0 * kPi * i / segments;
+			const Vec3 n{std::sin(theta) * std::cos(phi), std::sin(theta) * std::sin(phi), std::cos(theta)};
+			m.verts.push_back(n * r), m.normals.push_back(n), m.uvs.push_back({static_cast<double>(i) / segments, 1.0 - theta / kPi});
+		}
+	}
+	const int w = segments + 1;
+	for (int j = 0; j < rows; ++j)
+		for (int i = 0; i < segments; ++i) {
+			const int a = j * w + i;
+			m.tris.push_back({a, a + w, a + 1}), m.tris.push_back({a + 1, a + w, a + w + 1});
+		}
+	return m;
+}
+// How far a gas giant's band at latitude z (-1 .. 1) has drifted round from the rest of it by nature's time nt (degrees): jets alternating east and west, the fastest at
+// the equator, by `flow`.
+inline double bandDrift(const Planet &p, double z, double nt) {
+	const double lat = std::asin(std::clamp(z, -1.0, 1.0));
+	const double pace = 0.06 * std::cos(7.0 * lat) * (1.0 - 0.6 * std::abs(z)) + 0.04 * std::exp(-std::pow(lat / 0.15, 2.0));   // (a share of its spin)
+	return std::fmod(360.0 * p.flow * pace * nt / std::max(1.0, std::abs(p.spin)), 360.0);
+}
+// The cloud layer's picture (white where there is cloud: its alpha), painted once.
+inline std::string cloudPicture(const std::string &film, const Planet &p) {
+	const int W = 2048, H = 1024;
+	char name[96];
+	std::snprintf(name, sizeof name, "planet_v2_clouds_%d_%.2f", p.seed, p.clouds);
+	return film_sky::picture(film, name, W, H, [&](std::vector<float> &rgb) {
+		const int s = p.seed * 97;
+		for (int j = 0; j < H; ++j)
+			for (int i = 0; i < W; ++i) {
+				const Vec3 o = detail::dirOf(i, j, W, H), q{o.x, o.y, o.z * 2.2};   // (stretched along the latitudes, in swirls)
+				const double n = detail::fbm(normalize(q), 5.0, s + 13) + 0.25 * (detail::fbm(o, 20.0, s + 14) - 0.5) + 0.12 * (detail::fbm(o, 60.0, s + 15) - 0.5);
+				const float c = static_cast<float>(smoothstep(0.72 - 0.3 * p.clouds, 0.78 - 0.3 * p.clouds, n));
+				const std::size_t k = (static_cast<std::size_t>(j) * W + i) * 3;
+				rgb[k] = rgb[k + 1] = rgb[k + 2] = c;
+			}
+	});
+}
+// Its weather as scene text: the flowing bands of a gas giant (its sphere drawn in 24 zones of latitude, each turned by its band's drift), or its cloud layer (a shell 1.2%
+// above its ground, turning a little faster than the ground, shading it), and lightning on its night side.
+inline std::string weatherText(const std::string &film, const Planet &p, const std::string &colourPicture, double nt, Vec3 sunDir) {
+	std::string out;
+	if (p.kind == "gas" && p.flow > 0.0) {
+		out += "# its bands flowing (film_planets.h)\nAttributeBegin\n" + placement(p, nt) + "  Texture \"" + p.name + "_bands\" \"spectrum\" \"imagemap\" \"string filename\" [ \"" + colourPicture +
+			   "\" ]\n  Material \"diffuse\" \"texture reflectance\" \"" + p.name + "_bands\"\n";
+		const int zones = 24;
+		for (int k = 0; k < zones; ++k) {
+			const double z0 = -1.0 + 2.0 * k / zones, z1 = -1.0 + 2.0 * (k + 1) / zones;
+			char buf[96];
+			std::snprintf(buf, sizeof buf, "  AttributeBegin\n  Rotate %.4f 0 0 1\n", bandDrift(p, 0.5 * (z0 + z1), nt));
+			out += buf;
+			sphereZone(p.radius, z0, z1, 128, 6).appendPbrt(out, identity(), false);
+			out += "  AttributeEnd\n";
+		}
+		out += "AttributeEnd\n";
+	}
+	if (p.clouds > 0.0 && p.kind != "gas") {
+		Planet shell = p;
+		shell.spin = p.spin / 1.15;   // (the clouds go round a little faster than the ground under them)
+		const std::string pic = cloudPicture(film, p);
+		out += "# its clouds (film_planets.h)\nAttributeBegin\n" + placement(shell, nt) + "  Texture \"" + p.name + "_cloudcover\" \"float\" \"imagemap\" \"string filename\" [ \"" + pic +
+			   "\" ]\n  Material \"diffuse\" \"rgb reflectance\" [ 0.9 0.9 0.92 ]\n";
+		std::string mesh;
+		sphereZone(p.radius * 1.012, -1.0, 1.0, 256, 128).appendPbrt(mesh, identity(), false);
+		const std::string shape = "Shape \"trianglemesh\"";
+		const std::size_t at = mesh.find(shape);
+		if (at != std::string::npos) mesh.insert(at + shape.size(), " \"texture alpha\" \"" + p.name + "_cloudcover\"");
+		out += mesh + "AttributeEnd\n";
+	}
+	if (p.lightning > 0.0) {   // flashes in the clouds on its night side: a few at a time, each a fifth of a second, somewhere new every half second
+		const int slot = static_cast<int>(std::floor(nt * 2.0));
+		const Vec3 pole = poleOf(p), side = normalize(cross(pole, std::fabs(pole.y) < 0.9 ? Vec3{0.0, 1.0, 0.0} : Vec3{1.0, 0.0, 0.0})), other = cross(pole, side);
+		for (int k = 0; k < static_cast<int>(3 * std::min(4.0, p.lightning)); ++k) {
+			const int h = p.seed * 7919 + slot * 31 + k;
+			const double when = hash01(h, 1) * 0.5, now = nt - slot * 0.5;
+			if (now < when || now > when + 0.2) continue;
+			const double lat = std::asin(2.0 * hash01(h, 2) - 1.0) * 0.6, lon = 2.0 * kPi * hash01(h, 3);
+			const Vec3 d = normalize(pole * std::sin(lat) + (side * std::cos(lon) + other * std::sin(lon)) * std::cos(lat));
+			if (dot(d, sunDir) > -0.1) continue;   // (only where it is night)
+			const Vec3 c = p.at + d * (p.radius * 1.008);
+			const double flicker = (0.5 + 0.5 * std::sin((now - when) * 90.0 + k)) * p.lightning;
+			out += emissiveSphere({-c.x, c.y, c.z}, p.radius * 0.012, Vec3{0.75, 0.82, 1.0} * (40.0 * flicker));
+		}
+	}
+	return out;
+}
+
 inline std::string planetText(const std::string &film, const Planet &p, double nt, Vec3 sunDir = Vec3{0.0, 1.0, 0.0}) {
 	const Pictures pic = pictures(film, p);
 	std::string out = "# a planet (film_planets.h): " + p.name + "\nAttributeBegin\n" + placement(p, nt);
@@ -468,7 +575,9 @@ inline std::string planetText(const std::string &film, const Planet &p, double n
 	}
 	char buf[96];
 	std::snprintf(buf, sizeof buf, "  Shape \"sphere\" \"float radius\" [ %.4f ]\nAttributeEnd\n", p.radius);
-	return out + buf + airText(film, p) + auroraText(film, p, nt, sunDir) + ringsText(p, nt);
+	if (p.kind == "gas" && p.flow > 0.0) out = "# a planet (film_planets.h): " + p.name + "\n";   // (its sphere drawn by its flowing bands instead)
+	else out += buf;
+	return out + weatherText(film, p, pic.colour, nt, sunDir) + airText(film, p) + auroraText(film, p, nt, sunDir) + ringsText(p, nt);
 }
 
 }  // namespace planets

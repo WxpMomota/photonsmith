@@ -1,0 +1,12 @@
+# An empty stage (library/void.set): a camera and nothing else. A film set in space puts everything in it with its own lines.
+LookAt 0 0 0  0 0 -1  0 1 0
+Camera "perspective" "float fov" [ 45 ]
+Film "rgb" "integer xresolution" [ 1280 ] "integer yresolution" [ 720 ]
+WorldBegin
+# (the world: the film's own lines)
+# (the renderers want at least one thing in a scene: a speck far below, never seen)
+AttributeBegin
+  Material "diffuse" "rgb reflectance" [ 0 0 0 ]
+  Translate 0 -90000 0
+  Shape "sphere" "float radius" [ 0.01 ]
+AttributeEnd

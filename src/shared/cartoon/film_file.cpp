@@ -57,6 +57,14 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 	if (!p.ok) return p.error;
 	spec = p.spec;
 	spec.version = std::to_string(std::hash<std::string>{}(text));
+	for (auto &b : spec.bounces) b.second.gravity = spec.gravity;   // (the film's gravity on what falls and topples: `gravity`)
+	for (auto &tp : spec.topples) tp.second.gravity = spec.gravity;
+	for (const std::string &who : spec.footprints)   // (`footprints NAME`: a character of the film)
+		if (who != "*" && std::none_of(spec.characters.begin(), spec.characters.end(), [&](const Character &c) { return c.name == who; }))
+			return filePath + ": footprints of \"" + who + "\": no character of that name";
+	for (const zerog::Blob &b : spec.blobs)   // (`blob ... on NAME`: a character of the film)
+		if (!b.on.empty() && std::none_of(spec.characters.begin(), spec.characters.end(), [&](const Character &c) { return c.name == b.on; }))
+			return filePath + ": the blob " + b.name + " on \"" + b.on + "\": no character of that name";
 	if (partIndex >= 0) {
 		spec.key = (parts.key.empty() ? detail::keyFromFileName(filePath) : parts.key) + "--" + std::to_string(partIndex + 1);
 		spec.name = parts.parts[static_cast<std::size_t>(partIndex)].name;
@@ -93,6 +101,29 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 		if (const std::string e = addRiggedKind(own, file.string(), rg.options); !e.empty()) return filePath + ":" + std::to_string(rg.line) + ": " + e;
 		for (Character &c : spec.characters)
 			if (c.kind == rg.kind) c.kind = own;
+	}
+	for (const explain::Label &l : spec.explain.labels)   // what an explainer's drawings name: things of the film (film_explain.h)
+		if (!l.on.empty() && std::none_of(spec.ships.begin(), spec.ships.end(), [&](const cosmos::Ship &s) { return s.name == l.on; }) &&
+			std::none_of(spec.planets.begin(), spec.planets.end(), [&](const planets::Planet &p) { return p.name == l.on; }) &&
+			std::none_of(spec.characters.begin(), spec.characters.end(), [&](const Character &c) { return c.name == l.on; }))
+			return filePath + ": the label \"" + l.text + "\" on \"" + l.on + "\": no craft, planet, moon or character of that name";
+	for (const explain::OrbitLine &o : spec.explain.orbits)
+		if (std::none_of(spec.ships.begin(), spec.ships.end(), [&](const cosmos::Ship &s) { return s.name == o.of && s.orbit.on; }) &&
+			std::none_of(spec.planets.begin(), spec.planets.end(), [&](const planets::Planet &p) { return p.name == o.of && !p.around.empty(); }))
+			return filePath + ": the orbit line of \"" + o.of + "\": no craft on an orbit (`orbit`) and no moon of that name";
+	for (const explain::Compare &c : spec.explain.compares)
+		for (const std::string &name : c.bodies)
+			if (!explain::knownBody(name) && std::none_of(spec.planets.begin(), spec.planets.end(), [&](const planets::Planet &p) { return p.name == name; }))
+				return filePath + ": compare \"" + name + "\": " + explain::compareUsage();
+	for (screens::Screen &sc : spec.screens) {   // a screen's own picture (`show picture FILE`): beside the film file, else in the library
+		if (sc.show != "picture") continue;
+		std::filesystem::path file = std::filesystem::path(sc.file).is_absolute() ? std::filesystem::path(sc.file) : base / sc.file;
+		std::error_code ec;
+		if (!std::filesystem::exists(file, ec) && !std::filesystem::path(sc.file).is_absolute())
+			if (const std::string lib = film_cache::asset("library/" + sc.file); !lib.empty()) file = lib;
+		int w = 0, h = 0, comp = 0;
+		if (!stbi_info(file.string().c_str(), &w, &h, &comp) || w <= 0 || h <= 0) return filePath + ": the screen " + sc.name + "'s picture " + file.string() + " cannot be read";
+		sc.file = std::filesystem::absolute(file, ec).generic_string();
 	}
 	for (matte::Matte &m : spec.mattes) {   // the matte paintings' pictures: beside the film file, else in the library; their shapes as wide as they are
 		std::filesystem::path file = std::filesystem::path(m.file).is_absolute() ? std::filesystem::path(m.file) : base / m.file;
@@ -861,6 +892,7 @@ rig::PathWalk DataFilm::pathOf(const Character &c, std::size_t walk) const {
 	w.start = c.walks[walk].t0;
 	w.speed = c.walks[walk].speed;
 	w.stride = kind.stride * c.scale * (c.walks[walk].style == WalkLine::Run ? kRunStride : 1.0) * motion::gaitStride(c.walks[walk].gait);   // (a sneak's long steps, a tiptoe's short)
+	if (spec.gravity < 9.81) w.stride *= std::min(2.0, std::pow(9.81 / std::max(0.1, spec.gravity), 0.35));   // (low gravity: long bounding steps, `gravity`)
 	w.firstStep = kind.firstStep;
 	return w;
 }
@@ -1431,7 +1463,7 @@ std::shared_ptr<const rigid::Run> DataFilm::rigidRun() const {
 			if (kind.footAt) out.push_back(feet[0]), out.push_back(feet[1]);
 		}
 		return out;
-	});
+	}, spec.gravity);
 }
 
 std::string DataFilm::withMaterialWords(const std::string &text, const std::string &words) {

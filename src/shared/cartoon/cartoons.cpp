@@ -333,6 +333,7 @@ Registry &registry() {
 	static Registry *r = [] {
 		Registry *reg = new Registry();   // (lives as long as the program: films hand out pointers into it)
 		film_kinds::install();   // (before any film file is read: its characters are of these kinds)
+		film_kinds::aliens::install();   // (and the aliens and the robot: film_aliens.h)
 		for (const Film &f : kFilms) {
 			reg->made.push_back(withFilmFiles(f));
 			reg->all.push_back(&reg->made.back());

@@ -165,6 +165,26 @@
 //                                                               # `hum H`: the hum of space under its sounds (engines, breathing, blasts...)
 //     astronaut kim at 0 0 -6  tether ark  floaters 6  tumble 5    # someone floating in a spacesuit, tethered to a point or a ship, loose things round them
 //     descent  pod from 0 20000 -60000 to 0 0 -2000 start 0 land 30   # a craft coming down: re-entry's fire, `chutes`, retro-rockets, dust
+//     orbit    ark around home radius 9000 period 40 to 14000 at 12   # (round 11, film_orbits.h) a ship round a planet on Kepler's orbit (`apoapsis`,
+//                                                               # `incline`, `phase`), a transfer to another (`to R at T`): burns, a flip to slow, thruster puffs
+//     burn     ark 3 6                                         # its engines fire from 3 s to 6 s
+//     laser    red1 at 2 to ark  count 4 every 0.3  colour green   # (film_battle.h) bolts from a ship's guns to a ship or a place (`to X Y Z`)
+//     shield   ark  radius 40                                  # a bubble round a ship, seen only where a bolt strikes it: a ripple of light
+//     explode  red2 at 6                                       # a ship blown up (gone from then on) or a blast at a place: flash, fireball, ring, wreck
+//     gravity  1.62                                            # how strongly things fall (m/s^2): jumps hang, props fall slowly, a walk becomes a lope below 6
+//     footprints ann                                           # the prints a character's feet leave (all of them: no names); dust kicked on clean arcs below 6
+//     blob     drop at 0 1.4 -1  size 0.06  split 4            # (film_zerog.h) water floating with no weight, wobbling; `split T` into two; `on NAME`: a tear
+//     drift    junk 20 at 0 1.2 0  box 3 2 3  kind mixed        # small things floating in a box - crumbs, pens, tools - tumbling, bouncing off its walls
+//     hologram map globe at 0 1 2  size 0.6  colour 0.3 0.85 1   # (film_screens.h) a picture of light over a projector: globe, ship (`ship KIND`), orbits or map;
+//                                                              #   scanlines, a slow turn (`spin`), `flicker`
+//     screen tv at 0 1.5 3  show radar  size 1.6 0.9  facing 180   # (film_screens.h) bars, static, radar (the film's craft as blips: `centre`, `range`), trace,
+//                                                              #   or `picture FILE`; `tilt`, `bright`
+//     label "Voyager 1" on probe  from 2 to 9                    # (film_explain.h) an explainer's drawings: a card over a craft, planet, moon or character;
+//     orbitline probe dashed  from 3                           #   the path a craft or moon will take; a scale bar; planets side by side at their true sizes
+//     scalebar 1000 at 0 -50 400  text "1,000 km"
+//     compare Earth Mars Moon at 0 0 300  height 40
+//     interior cockpit at 0 0 0  facing 0                      # (film_interior.h) a corridor, a cockpit with a window onto space, an airlock (`cycle T`), a ring
+//                                                               # station's floor curving up out of sight
 //     closeup  size 16                                         # the ground close up (film_ground.h): ripples, drifts, pebbles, footprints, wet sand; `tracks from
 //                                                               # X Z to X Z [during T0 T1] [kind boots|paws|hooves]`: a trail of footprints made over its time
 //     caustics traced                                          # the net of light under water traced from the rippling surface (film_caustics.h);

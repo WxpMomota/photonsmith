@@ -24,6 +24,7 @@
 
 #include "cartoon_lib.h"
 #include "film_sky.h"
+#include "film_starsky.h"
 #include "nature_lib.h"
 
 namespace cartoon {
@@ -37,6 +38,10 @@ struct Space {
 	bool sun = true;
 	int seed = 1;
 	double flare = 0.0, bloom = 0.0, planetshine = 0.0, hum = 0.6;   // the light: the lens's flare and glow, the planets' light on what is near them; the hum of space (film_voyage.h)
+	// (round 11, film_starsky.h) `stars real`: the real stars (and the Milky Way where it really is) instead of painted ones; `constellations`: their figures drawn;
+	// `date`: the planets among them that day, and the sun where it was (a Julian date; 0 none)
+	bool realStars = false, constellations = false;
+	double jd = 0.0;
 };
 
 
@@ -90,8 +95,8 @@ inline Vec3 blackbody(double kelvin) {
 inline Vec3 galacticPole() { return normalize(Vec3{0.32, 0.62, -0.72}); }
 inline Vec3 galacticCentre() { return normalize(cross(galacticPole(), Vec3{0.0, 1.0, 0.0})); }
 // The Milky Way's glow in direction w (pbrt's, unit): its band, brightest towards its centre, with dark lanes and star clouds; 0 .. about 1.
-inline double milkyWayAt(Vec3 w, int seed) {
-	const Vec3 pole = galacticPole(), centre = galacticCentre(), side = cross(pole, centre);
+inline double milkyWayAt(Vec3 w, int seed, Vec3 pole = galacticPole(), Vec3 centre = galacticCentre()) {
+	const Vec3 side = cross(pole, centre);
 	const double b = std::asin(std::clamp(dot(w, pole), -1.0, 1.0)) * 180.0 / kPi;   // (galactic latitude)
 	const double l = std::atan2(dot(w, side), dot(w, centre));                          // (longitude, 0 at the centre)
 	const double toCentre = 0.5 + 0.5 * std::cos(l), width = 7.0 + 9.0 * toCentre;
@@ -105,8 +110,10 @@ inline double milkyWayAt(Vec3 w, int seed) {
 // The starfield as the sky's picture (an infinite light's equal-angle picture, film_sky.h's layout: row 0 straight up), written once into the film's cache.
 inline std::string starfieldPicture(const std::string &film, const Space &s) {
 	char name[96];
-	std::snprintf(name, sizeof name, "space_v4_%d_%.2f_%.2f_sun%d_%.2f_%.2f_%.3f_%.3f", s.seed, s.stars, s.milkyWay, s.sun ? 1 : 0, s.sunBearing, s.sunElevation, s.sunSize,
-				  s.sunStrength);
+	std::snprintf(name, sizeof name, "space_v4_%d_%.2f_%.2f_sun%d_%.2f_%.2f_%.3f_%.3f%s%s_%.1f", s.seed, s.stars, s.milkyWay, s.sun ? 1 : 0, s.sunBearing, s.sunElevation, s.sunSize,
+				  s.sunStrength, s.realStars ? "_real1" : "", s.constellations ? "_lines" : "", s.jd);
+	const starsky::Frame frame;   // (the real sky's: the celestial pole up, right ascension 0 at bearing 0)
+	const Vec3 mwPole = s.realStars ? starsky::galacticPole(frame) : galacticPole(), mwCentre = s.realStars ? starsky::galacticCentre(frame) : galacticCentre();
 	const int W = 4096, H = 2048;
 	return film_sky::picture(film, name, W, H, [&](std::vector<float> &rgb) {
 		// the pixel a direction falls in (film_sky::render's mapping: story space w = (-sin theta cos phi, cos theta, -sin theta sin phi); pbrt's x is story's -x)
@@ -124,7 +131,7 @@ inline std::string starfieldPicture(const std::string &film, const Space &s) {
 		for (int row = 0; row < H; ++row)
 			for (int col = 0; col < W; ++col) {
 				const Vec3 w = dirOf(row, col);
-				const double mw = s.milkyWay * milkyWayAt(w, s.seed) * 0.05;
+				const double mw = s.milkyWay * milkyWayAt(w, s.seed, mwPole, mwCentre) * 0.05;   // (dirOf: pbrt's)
 				const Vec3 c = Vec3{1.0, 0.93, 0.82} * mw + Vec3{0.0012, 0.0013, 0.0016};
 				const std::size_t q = (static_cast<std::size_t>(row) * W + col) * 3;
 				rgb[q] = static_cast<float>(c.x), rgb[q + 1] = static_cast<float>(c.y), rgb[q + 2] = static_cast<float>(c.z);
@@ -156,16 +163,19 @@ inline std::string starfieldPicture(const std::string &film, const Space &s) {
 					rgb[q] += static_cast<float>(c.x), rgb[q + 1] += static_cast<float>(c.y), rgb[q + 2] += static_cast<float>(c.z);
 				}
 		}
-		// the stars: magnitudes from -1 to 9, each fainter magnitude about 2.5 times as many; the faint ones crowding to the Milky Way
-		const int count = static_cast<int>(60000.0 * std::clamp(s.stars, 0.0, 4.0));
+		// the stars: magnitudes from -1 to 9, each fainter magnitude about 2.5 times as many; the faint ones crowding to the Milky Way. With the real stars, the catalogue's
+		// to 6.5 (film_starsky.h) and these only fainter than it, the dust of stars round them
+		if (s.realStars) starsky::paint(rgb, W, H, frame, s.stars, s.constellations, s.jd, pixelOf, [](double k) { return blackbody(k); });
+		const double faintest = s.realStars ? 6.5 : -1.0;
+		const int count = static_cast<int>((s.realStars ? 50000.0 : 60000.0) * std::clamp(s.stars, 0.0, 4.0));
 		for (int k = 0; k < count; ++k) {
 			const int h = s.seed * 1000003 + k;
-			const double mag = -1.0 + std::log(1.0 + hash01(h, 1) * (std::pow(2.5, 10.0) - 1.0)) / std::log(2.5);   // (-1 .. 9, most of them faint)
+			const double mag = faintest + std::log(1.0 + hash01(h, 1) * (std::pow(2.5, 9.0 - faintest) - 1.0)) / std::log(2.5);   // (-1 .. 9, most of them faint)
 			Vec3 w;
 			for (int tries = 0; tries < 8; ++tries) {   // (a direction, kept with a chance that grows towards the band for the faint ones)
 				const double z = 2.0 * hash01(h, 2 + tries * 3) - 1.0, a = 2.0 * kPi * hash01(h, 3 + tries * 3), r = std::sqrt(std::max(0.0, 1.0 - z * z));
 				w = {r * std::cos(a), z, r * std::sin(a)};
-				const double keep = 0.25 + 0.75 * std::min(1.0, 2.0 * milkyWayAt(w, s.seed)) * smoothstep(3.0, 7.0, mag) + (1.0 - smoothstep(3.0, 7.0, mag));
+				const double keep = 0.25 + 0.75 * std::min(1.0, 2.0 * milkyWayAt(w, s.seed, mwPole, mwCentre)) * smoothstep(3.0, 7.0, mag) + (1.0 - smoothstep(3.0, 7.0, mag));
 				if (hash01(h, 4 + tries * 3) < keep) break;
 			}
 			const double T = hash01(h, 30) < 0.08 ? 9000.0 + 21000.0 * hash01(h, 31) : 3000.0 + 4500.0 * std::pow(hash01(h, 32), 0.7);   // (a few hot blue-white ones)

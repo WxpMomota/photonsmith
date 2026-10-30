@@ -149,6 +149,7 @@ struct Sky {
 	int day = 172;   // (the longest day)
 	bool physical = false;   // the sky and the sun's light from the atmosphere itself (atmosphere.h), seen from `altitude` metres above the sea
 	double altitude = 0.0;
+	bool realStars = false;   // (`stars real`: the real stars at night, film_starsky.h)
 };
 // The sun's height above the horizon and its direction on the ground (a `facing`, degrees) at an hour.
 inline void sunAt(const Sky &s, double hour, double &elevation, double &facing) {
@@ -277,6 +278,17 @@ inline std::string skyText(const std::string &film, const Sky &s, double t, doub
 	// hour's own, smooth (it was scaled by the night's twentieths: the stars jumped at each step).
 	const double nf = (s.south + 180.0) * d2r, lat = s.latitude * d2r;
 	const Vec3 pole{std::sin(nf) * std::cos(lat), std::sin(lat), std::cos(nf) * std::cos(lat)};
+	if (s.realStars && fs.night > 0.0) {   // the real stars (film_starsky.h): the sky's pole up at the latitude, the equator's point on the meridian to the south and up, and the
+		// right ascension there when night began - the sun's (worked out from the day: 0 at the March equinox) plus the hours from noon
+		fs.realStars = true;
+		fs.starNorth = pole;
+		fs.starEquator = Vec3{-std::sin(nf), 0.0, -std::cos(nf)} * std::sin(lat) + Vec3{0.0, 1.0, 0.0} * std::cos(lat);
+		fs.starRA0 = std::fmod((s.day - 80) * 360.0 / 365.25 + 15.0 * (nightBegan(s) - 12.0) + 720.0, 360.0);
+		starsky::Frame frame;
+		frame.north = fs.starNorth, frame.equator = fs.starEquator, frame.ra0 = fs.starRA0;
+		const Vec3 g = starsky::galacticPole(frame);
+		fs.milkyPole = {-g.x, g.y, g.z};   // (the band where it really runs: story space, as the picture's)
+	}
 	std::snprintf(buf, sizeof buf, "AttributeBegin\n  Rotate %.4f %.5f %.5f %.5f\n", fs.night > 0.0 ? -15.0 * std::max(0.0, hour - nightBegan(s)) : 0.0, pole.x, pole.y, pole.z);
 	out += buf;
 	if (stormy > 0.0) {   // (the deck drifting: the sky turned a fifth of a degree a second)

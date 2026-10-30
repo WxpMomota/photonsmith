@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "film_cache.h"
+#include "film_starsky.h"
 #include "nature_lib.h"
 #include "../atmosphere.h"
 #include "../scene_sky.h"
@@ -55,6 +56,11 @@ struct Spec {
 	double milkyWay = 0.0;           // the band's brightness (night)
 	Vec3 milkyPole = {0.35, 0.45, -0.82};   // the band runs round the great circle about this direction
 	double stars = 0.0;              // the faint stars' brightness
+	// (round 11, film_starsky.h) the real stars instead of the faint painted ones: the sky's frame (pbrt's) - the celestial pole, the point of the equator on the meridian -
+	// and the right ascension on the meridian (degrees)
+	bool realStars = false;
+	Vec3 starNorth{0.0, 1.0, 0.0}, starEquator{0.0, 0.0, 1.0};
+	double starRA0 = 0.0;
 	double glow = 0.0;               // the halo round the sun
 	Vec3 glowColour = {1.0, 0.55, 0.25};
 	double afterglow = 0.0;          // the warm band along the horizon under the sun
@@ -153,7 +159,7 @@ inline Vec3 nightSky(const Spec &s, Vec3 w, int row, int col) {
 		band = (std::max)(0.0, band * core * (1.0 - 0.8 * dust));
 		c = c + lerp(Vec3{0.78, 0.84, 1.0}, Vec3{1.0, 0.90, 0.78}, clamp01(core - 0.8)) * (0.016 * s.milkyWay * band);
 	}
-	if (s.stars > 0.0) {   // (as many stars over the sky, and as much light from each, whatever the picture's size: a finer picture has smaller, brighter pixels)
+	if (s.stars > 0.0 && !s.realStars) {   // (as many stars over the sky, and as much light from each, whatever the picture's size: a finer picture has smaller, brighter pixels)
 		const double k = std::min(1.0, (2048.0 / s.width) * (2048.0 / s.width)), share = 0.0035 * k;   // (finer than 2048: fewer per pixel and brighter)
 		const double h = hash01(row * 7919 + col, 404);
 		if (h > 1.0 - share) {
@@ -196,6 +202,10 @@ inline std::string fileName(const Spec &s) {
 	}
 	if (s.shafts > 0.0) {
 		std::snprintf(b, sizeof b, "|s%.3f %.3f %.3f %.3f", s.shafts, s.shaftColour.x, s.shaftColour.y, s.shaftColour.z);
+		key += b;
+	}
+	if (s.realStars) {
+		std::snprintf(b, sizeof b, "|real%.4f %.4f %.4f %.4f %.4f %.4f %.2f", s.starNorth.x, s.starNorth.y, s.starNorth.z, s.starEquator.x, s.starEquator.y, s.starEquator.z, s.starRA0);
 		key += b;
 	}
 	if (s.rainbow > 0.0) {
@@ -369,6 +379,20 @@ inline std::vector<float> render(const Spec &s) {
 			px[1] = static_cast<float>(c.y);
 			px[2] = static_cast<float>(c.z);
 		}
+	}
+	if (s.realStars && s.night > 0.0) {   // the real stars, as bright as the night is dark (film_starsky.h), on the sky's frame; turned through the night by its light's Rotate
+		starsky::Frame frame;
+		frame.north = s.starNorth, frame.equator = s.starEquator, frame.ra0 = s.starRA0;
+		const auto pixelOf = [&](Vec3 p, int &row, int &col) {   // (a pbrt direction's pixel: this picture's mapping, story x = -pbrt x)
+			const double theta = std::acos(std::clamp(p.y, -1.0, 1.0));
+			double phi = std::atan2(-p.z, p.x);
+			if (phi < 0.0) phi += 2.0 * kPi;
+			row = (std::min)(H - 1, static_cast<int>(theta / kPi * H)), col = (std::min)(W - 1, static_cast<int>(phi / (2.0 * kPi) * W));
+		};
+		const auto colourOf = [](double k) {   // (a star's colour from its temperature, roughly: deep orange, white, blue-white)
+			return k < 6000.0 ? lerp(Vec3{1.0, 0.62, 0.35}, Vec3{1.0, 0.95, 0.9}, clamp01((k - 3000.0) / 3000.0)) : lerp(Vec3{1.0, 0.95, 0.9}, Vec3{0.72, 0.82, 1.0}, clamp01((k - 6000.0) / 6000.0));
+		};
+		starsky::paint(rgb, W, H, frame, 0.05 * s.night * (std::max)(0.0, s.nightBrightness), false, 0.0, pixelOf, colourOf);
 	}
 	return rgb;
 }

@@ -27,6 +27,7 @@ struct Bounce {
 	Vec3 from, velocity;
 	double start = 0.0, radius = 0.1;
 	double restitution = 0.55, grip = 0.85, rolling = 1.2, ground = 0.0, settleHeight = 0.004;
+	double gravity = kGravity;   // (the film's: `gravity`, a moon's 1.62)
 };
 // Where it is at a time: its centre, its velocity, how far it has turned about `spinAxis` (radians, rolling without slipping on the ground and spinning as it flies), and
 // whether it has stopped.
@@ -57,19 +58,19 @@ inline std::vector<Flight> flights(const Bounce &b, std::vector<Impact> *impacts
 	double t = b.start;
 	for (int n = 0; n < 64; ++n) {
 		// y(s) = x.y + v.y s - g s^2 / 2 = floor: the later root
-		const double a = 0.5 * kGravity, bq = -v.y, c = floor - x.y;
+		const double a = 0.5 * b.gravity, bq = -v.y, c = floor - x.y;
 		const double disc = bq * bq - 4.0 * a * c;
 		if (disc < 0.0) break;   // (below the ground already: nothing to do)
 		const double s = (-bq + std::sqrt(disc)) / (2.0 * a);
 		out.push_back({t, x, v, s});
-		const Vec3 landX = x + v * s + Vec3{0.0, -0.5 * kGravity * s * s, 0.0};
-		const double into = -(v.y - kGravity * s);
+		const Vec3 landX = x + v * s + Vec3{0.0, -0.5 * b.gravity * s * s, 0.0};
+		const double into = -(v.y - b.gravity * s);
 		if (impacts) impacts->push_back({t + s, Vec3{landX.x, b.ground, landX.z}, into});
 		t += s;
 		x = Vec3{landX.x, floor, landX.z};
 		const double up = into * b.restitution;
 		v = Vec3{v.x * b.grip, up, v.z * b.grip};
-		if (up * up / (2.0 * kGravity) < b.settleHeight) {
+		if (up * up / (2.0 * b.gravity) < b.settleHeight) {
 			v.y = 0.0;
 			out.push_back({t, x, v, -1.0});   // rolling from here
 			return out;
@@ -102,8 +103,8 @@ inline Body at(const Bounce &b, double t) {
 		}
 		if (t <= f.t0 + f.duration || i + 1 == phases.size()) {
 			const double s = std::min(t - f.t0, f.duration);
-			body.at = f.x0 + f.v0 * s + Vec3{0.0, -0.5 * kGravity * s * s, 0.0};
-			body.velocity = f.v0 + Vec3{0.0, -kGravity * s, 0.0};
+			body.at = f.x0 + f.v0 * s + Vec3{0.0, -0.5 * b.gravity * s * s, 0.0};
+			body.velocity = f.v0 + Vec3{0.0, -b.gravity * s, 0.0};
 			body.spin = turned + speed * s / b.radius;   // (spinning in the air as it rolled on the ground: the grip keeps it turning)
 			return body;
 		}
@@ -123,6 +124,7 @@ struct Topple {
 	double start = 0.0;
 	Vec3 pivot, axis{0.0, 0.0, 1.0};
 	double height = 1.0, depth = 0.1, push = 30.0, lean = 0.0;
+	double gravity = kGravity;
 };
 // How far over it is at t (degrees, 0 standing .. 90 lying), and when it lands (`landed`, < 0 when it does not).
 inline double angleOf(const Topple &p, double t, double *landed = nullptr) {
@@ -134,7 +136,7 @@ inline double angleOf(const Topple &p, double t, double *landed = nullptr) {
 	if (t <= p.start) return p.lean;
 	const double dt = 1.0 / 960.0;
 	for (double s = 0.0; s < t - p.start; s += dt) {
-		const double alpha = kGravity * r * std::sin(theta - tilt) / inertia;
+		const double alpha = p.gravity * r * std::sin(theta - tilt) / inertia;
 		omega += alpha * dt;
 		theta += omega * dt;
 		if (theta >= 0.5 * kPi) {

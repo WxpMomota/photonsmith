@@ -3,6 +3,119 @@
 
 #include "film_file.h"
 
+#define STB_TRUETYPE_IMPLEMENTATION
+#define STBTT_STATIC   // (its functions static to this file: the launcher has its own copy)
+#include "../../external/stb_truetype.h"
+
+namespace cartoon {
+namespace explain {
+
+namespace {
+// The font a label's words are set in, read once: Noto Sans SC, which comes with the program (qt_gui/fonts; its Latin and its Chinese letters), so a label looks the same on
+// every machine; else the system's Arial. Null when there is neither (the labels are then drawn without their cards).
+const stbtt_fontinfo *labelFont() {
+	static std::vector<unsigned char> data;
+	static stbtt_fontinfo info{};
+	static const bool ok = [] {
+		namespace fs = std::filesystem;
+		std::vector<fs::path> tries;
+		if (const std::string own = film_cache::asset("fonts/NotoSansSC-Regular.ttf"); !own.empty()) tries.push_back(own);
+		for (const char *d : {"qt_gui/fonts", "../qt_gui/fonts", "../../qt_gui/fonts", "fonts"}) tries.push_back(fs::path(d) / "NotoSansSC-Regular.ttf");
+#if defined(_WIN32)
+		tries.push_back(fs::path(pbrt_asset_check::environmentValue("WINDIR").empty() ? "C:/Windows" : pbrt_asset_check::environmentValue("WINDIR")) / "Fonts/arial.ttf");
+#elif defined(__APPLE__)
+		tries.push_back("/System/Library/Fonts/Supplemental/Arial.ttf");
+		tries.push_back("/Library/Fonts/Arial.ttf");
+#else
+		tries.push_back("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");
+#endif
+		std::error_code ec;
+		for (const fs::path &p : tries) {
+			if (!fs::exists(p, ec)) continue;
+			std::ifstream f(p, std::ios::binary);
+			data.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+			if (!data.empty() && stbtt_InitFont(&info, data.data(), stbtt_GetFontOffsetForIndex(data.data(), 0))) return true;
+		}
+		std::cerr << "WARNING: no font for the films' labels (qt_gui/fonts/NotoSansSC-Regular.ttf): they are drawn without their words." << std::endl;
+		return false;
+	}();
+	return ok ? &info : nullptr;
+}
+std::vector<int> codePointsOf(const std::string &s) {   // (UTF-8; a broken byte is skipped)
+	std::vector<int> out;
+	for (std::size_t i = 0; i < s.size();) {
+		const unsigned char c = static_cast<unsigned char>(s[i]);
+		const int n = c < 0x80 ? 0 : (c >> 5) == 6 ? 1 : (c >> 4) == 14 ? 2 : (c >> 3) == 30 ? 3 : -1;
+		if (n < 0 || i + static_cast<std::size_t>(n) >= s.size() + (n == 0 ? 1u : 0u)) {
+			++i;
+			continue;
+		}
+		int cp = n == 0 ? c : c & (0x3F >> n);
+		for (int k = 1; k <= n; ++k) cp = (cp << 6) | (static_cast<unsigned char>(s[i + static_cast<std::size_t>(k)]) & 0x3F);
+		out.push_back(cp);
+		i += static_cast<std::size_t>(n) + 1;
+	}
+	return out;
+}
+}  // namespace
+
+std::string cardPicture(const std::string &film, const std::string &text, Vec3 colour, double &aspect) {
+	const stbtt_fontinfo *font = labelFont();
+	if (!font) return std::string();
+	const std::vector<int> cps = codePointsOf(text);
+	const float px = 56.0f, scale = stbtt_ScaleForPixelHeight(font, px);
+	int ascent = 0, descent = 0, gapUnused = 0;
+	stbtt_GetFontVMetrics(font, &ascent, &descent, &gapUnused);
+	double width = 0.0;
+	for (std::size_t k = 0; k < cps.size(); ++k) {
+		int advance = 0, bearing = 0;
+		stbtt_GetCodepointHMetrics(font, cps[k], &advance, &bearing);
+		width += advance * scale + (k + 1 < cps.size() ? stbtt_GetCodepointKernAdvance(font, cps[k], cps[k + 1]) * scale : 0.0);
+	}
+	const int pad = 26, border = 3;
+	const int W = static_cast<int>(std::ceil(width)) + 2 * pad, H = static_cast<int>(std::ceil((ascent - descent) * scale)) + 2 * pad - 12;
+	aspect = static_cast<double>(W) / H;
+	std::uint64_t h = 1469598103934665603ull;   // (the picture's name: FNV-1a of the words and the colour)
+	char tint[64];
+	std::snprintf(tint, sizeof tint, "|%.3f,%.3f,%.3f", colour.x, colour.y, colour.z);
+	for (const char c : text + tint) h = (h ^ static_cast<unsigned char>(c)) * 1099511628211ull;
+	char name[48];
+	std::snprintf(name, sizeof name, "label_%016llx", static_cast<unsigned long long>(h));
+	return film_sky::picture(film, name, W, H, [&](std::vector<float> &rgb) {
+		std::vector<float> ink(static_cast<std::size_t>(W) * H, 0.0f);
+		double x = pad;
+		const int baseline = pad - 6 + static_cast<int>(std::lround(ascent * scale));
+		for (std::size_t k = 0; k < cps.size(); ++k) {
+			int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+			const float shift = static_cast<float>(x - std::floor(x));
+			stbtt_GetCodepointBitmapBoxSubpixel(font, cps[k], scale, scale, shift, 0.0f, &x0, &y0, &x1, &y1);
+			const int gw = x1 - x0, gh = y1 - y0;
+			if (gw > 0 && gh > 0) {
+				std::vector<unsigned char> glyph(static_cast<std::size_t>(gw) * gh);
+				stbtt_MakeCodepointBitmapSubpixel(font, glyph.data(), gw, gh, gw, scale, scale, shift, 0.0f, cps[k]);
+				for (int gy = 0; gy < gh; ++gy)
+					for (int gx = 0; gx < gw; ++gx) {
+						const int X = static_cast<int>(std::floor(x)) + x0 + gx, Y = baseline + y0 + gy;
+						if (X >= 0 && X < W && Y >= 0 && Y < H) ink[static_cast<std::size_t>(Y) * W + X] = std::max(ink[static_cast<std::size_t>(Y) * W + X], glyph[static_cast<std::size_t>(gy) * gw + gx] / 255.0f);
+					}
+			}
+			int advance = 0, bearing = 0;
+			stbtt_GetCodepointHMetrics(font, cps[k], &advance, &bearing);
+			x += advance * scale + (k + 1 < cps.size() ? stbtt_GetCodepointKernAdvance(font, cps[k], cps[k + 1]) * scale : 0.0);
+		}
+		const float back[3] = {0.012f, 0.016f, 0.03f}, edge[3] = {static_cast<float>(colour.x), static_cast<float>(colour.y), static_cast<float>(colour.z)};
+		for (int y = 0; y < H; ++y)
+			for (int xx = 0; xx < W; ++xx) {
+				const bool rim = xx < border || y < border || xx >= W - border || y >= H - border;
+				const float a = ink[static_cast<std::size_t>(y) * W + xx];
+				for (int c = 0; c < 3; ++c) rgb[(static_cast<std::size_t>(y) * W + xx) * 3 + c] = rim ? edge[c] : back[c] + (0.95f - back[c]) * a;
+			}
+	});
+}
+
+}  // namespace explain
+}  // namespace cartoon
+
 namespace cartoon {
 namespace film_file {
 
@@ -147,6 +260,7 @@ static std::string universeText(const Spec &spec, const std::string &header, dou
 		out += cosmos::astronautText(a, nt, a.tethered ? &to : nullptr);
 	}
 	for (const cosmos::Ship &sh : spec.ships) out += cosmos::shipText(sh, nt);   // (film_voyage.h)
+	if (!spec.battle.empty()) out += battle::battleText(spec.battle, spec.ships, nt);   // (film_battle.h)
 	for (const cosmos::Descent &d : spec.descents) out += cosmos::descentText(d, nt);
 	for (const cosmos::Remnant &m : spec.remnants) out += cosmos::remnantText(film, m, nt);   // (film_cosmos.h)
 	for (const cosmos::Belt &b : spec.belts) out += cosmos::beltText(b, nt);
@@ -284,7 +398,7 @@ std::string DataFilm::worldAt(const std::string &header, double t) const {
 		const std::size_t camera = out.find("Camera \"");
 		if (camera != std::string::npos) out = out.substr(0, camera) + nature::mistBeforeCamera(m) + out.substr(camera) + nature::mistBoundary(m);
 	}
-	out += universeText(spec, header, t, nt);   // (round 10: space and what is in it)
+	out += universeText(spec, header, t, nt) + aboardAt(header, t, nt);   // (round 10: space and what is in it; round 11: what is aboard, footprints, drawings)
 	if (!spec.planets.empty()) {   // planets and their moons, each where it is now (film_planets.h); an eclipse when one covers the sun
 		const std::string film = spec.key.empty() ? std::string("film") : spec.key;
 		for (std::size_t i = 0; i < spec.planets.size(); ++i) {
@@ -482,6 +596,7 @@ void DataFilm::soundscape(audio::Mix &m) const {
 			if (spec.shots[k].spaceCam.kind == cosmos::SpaceCam::Hyperspace) s.jumps.push_back({spec.shots[k].start, k + 1 < spec.shots.size() ? spec.shots[k + 1].start : spec.length});
 		cosmos::spaceSound(m, ears, s);
 		cosmos::descentSound(m, ears, spec.descents, s.natureAt);
+		if (!spec.battle.empty()) battle::battleSound(m, ears, spec.battle, spec.ships, s.natureAt);   // (film_battle.h)
 	}
 	for (std::size_t i = 0; i < spec.tornadoes.size(); ++i) {   // a tornado's roar, from its foot, as strong as it is
 		const wind::Tornado &k = spec.tornadoes[i];
@@ -688,6 +803,167 @@ void DataFilm::thunder(audio::Mix &m) const {
 		});
 }
 
+// ---- footprints and the dust of steps (round 11, `footprints`) ----
+namespace {
+struct Footfall {
+	double t = 0.0;
+	Vec3 at, forward;   // story space
+	double size = 1.0;  // (the character's height)
+};
+}  // namespace
+// Round 11's things in a frame at film time t (nature's `nt`): footprints, floating water and clutter (film_zerog.h), interiors (film_interior.h), holograms and
+// screens (film_screens.h) and an explainer's drawings (film_explain.h).
+std::string DataFilm::aboardAt(const std::string &header, double t, double nt) const {
+	std::string out;
+	out += footprintsText(t);   // (round 11: `footprints`)
+	for (const zerog::Blob &b : spec.blobs) {   // water floating with no weight, and tears held on faces (film_zerog.h)
+		if (b.on.empty()) {
+			out += zerog::blobText(b, nt);
+			continue;
+		}
+		for (const Character &c : spec.characters)
+			if (c.name == b.on) {
+				const CharacterKind &kind = characterKinds().at(c.kind);
+				const CharacterMoment m = momentOf(c, t);
+				const Vec3 eye = transformPoint(m.frame, (kind.head + Vec3{0.035, 0.0, 0.09}) * c.scale);   // (beside its eye, on the front of its face; story space)
+				const Vec3 face{-eye.x, eye.y, eye.z};
+				out += zerog::blobText(b, t, &face);
+			}
+	}
+	for (const zerog::Drift &d : spec.drifts) out += zerog::driftText(d, nt);
+	for (const interior::Interior &in : spec.interiors) out += interior::interiorText(in, nt);   // (film_interior.h)
+	for (const screens::Hologram &h : spec.holograms) out += screens::hologramText(h, nt);   // (film_screens.h)
+	for (const screens::Screen &sc : spec.screens) out += screens::screenText(sc, nt, spec.key.empty() ? std::string("film") : spec.key, spec.ships);
+	if (spec.explain.any()) out += overlaysAt(header, t, nt);
+	return out;
+}
+
+std::string DataFilm::overlaysAt(const std::string &header, double t, double nt) const {
+	explain::View v;
+	film_subjects::cameraOf(header, v.eye, v.target, v.fov);
+	const std::string film = spec.key.empty() ? std::string("film") : spec.key;
+	std::string out;
+	for (const explain::Label &l : spec.explain.labels) {   // what each names: where its middle is now and how far its top is above that (pbrt's)
+		Vec3 at = l.at;
+		double radius = 0.0;
+		bool found = l.on.empty();
+		for (const cosmos::Ship &s : spec.ships)
+			if (!found && s.name == l.on) {
+				if (s.goneAt >= 0.0 && nt > s.goneAt) break;
+				at = screens::shipWhere(s, nt), radius = 0.35 * s.size, found = true;
+			}
+		for (std::size_t i = 0; i < spec.planets.size() && !found; ++i)
+			if (spec.planets[i].name == l.on) at = planets::centreAt(spec.planets, i, nt), radius = spec.planets[i].radius, found = true;
+		for (const Character &c : spec.characters)
+			if (!found && c.name == l.on) {
+				const Vec3 head = transformPoint(momentOf(c, t).frame, characterKinds().at(c.kind).head * c.scale);
+				at = {-head.x, head.y, head.z}, radius = 0.35 * c.scale, found = true;
+			}
+		if (found) out += explain::labelText(l, t, at, radius, v, film);
+	}
+	for (const explain::OrbitLine &o : spec.explain.orbits) {
+		std::vector<Vec3> path;
+		for (const cosmos::Ship &s : spec.ships)
+			if (s.name == o.of && s.orbit.on) path = explain::orbitPath(s.orbit, nt);
+		for (std::size_t i = 0; i < spec.planets.size(); ++i) {   // a moon: its loop round where what it goes round is now
+			const planets::Planet &p = spec.planets[i];
+			if (p.name != o.of || p.around.empty()) continue;
+			std::size_t parent = i;
+			for (std::size_t k = 0; k < spec.planets.size(); ++k)
+				if (spec.planets[k].name == p.around) parent = k;
+			const Vec3 now = planets::centreAt(spec.planets, parent, nt);
+			for (int k = 0; k <= 160; ++k) {
+				const double at = nt + p.period * k / 160.0;
+				path.push_back(now + planets::centreAt(spec.planets, i, at) - planets::centreAt(spec.planets, parent, at));
+			}
+		}
+		out += explain::orbitLineText(o, t, path, v);
+	}
+	for (const explain::ScaleBar &b : spec.explain.bars) out += explain::scaleBarText(b, t, v, film);
+	for (const explain::Compare &c : spec.explain.compares) {
+		std::vector<explain::LinedUp> bodies;
+		for (const std::string &name : c.bodies) {
+			explain::LinedUp b;
+			b.name = name;
+			if (const explain::Body *k = explain::knownBody(name)) {
+				b.name = k->name, b.radius = k->radiusKm, b.colour = k->colour, b.shines = b.name == "Sun", b.size = explain::detail::grouped(2.0 * k->radiusKm) + " km";
+			} else {
+				for (const planets::Planet &p : spec.planets)
+					if (p.name == name) {
+						static const std::map<std::string, Vec3> tint = {{"rocky", {0.55, 0.5, 0.45}}, {"desert", {0.8, 0.6, 0.35}}, {"ice", {0.8, 0.88, 0.95}},
+																		{"ocean", {0.25, 0.45, 0.85}}, {"gas", {0.85, 0.72, 0.55}}, {"lava", {0.6, 0.25, 0.1}}};
+						b.radius = p.radius, b.colour = tint.count(p.kind) ? tint.at(p.kind) : Vec3{0.6, 0.6, 0.6}, b.size = explain::detail::grouped(2.0 * p.radius);
+					}
+			}
+			bodies.push_back(b);
+		}
+		out += explain::compareText(c, t, bodies, v, film);
+	}
+	return out;
+}
+
+std::string DataFilm::footprintsText(double t) const {
+	if (spec.footprints.empty()) return std::string();
+	// every footfall of the film, worked out once (a foot coming down: not down a moment before, down now), sampled 30 times a second
+	static std::mutex lock;
+	static std::map<std::string, std::shared_ptr<const std::vector<Footfall>>> cache;
+	std::shared_ptr<const std::vector<Footfall>> falls;
+	{
+		const std::lock_guard<std::mutex> hold(lock);
+		std::shared_ptr<const std::vector<Footfall>> &slot = cache[spec.key + "#" + spec.version];
+		if (!slot) {
+			auto all = std::make_shared<std::vector<Footfall>>();
+			const double end = std::max(spec.length, spec.storyEnd);
+			for (const Character &c : spec.characters) {
+				if (std::find(spec.footprints.begin(), spec.footprints.end(), std::string("*")) == spec.footprints.end() &&
+					std::find(spec.footprints.begin(), spec.footprints.end(), c.name) == spec.footprints.end())
+					continue;
+				const CharacterKind &kind = characterKinds().at(c.kind);
+				if (!kind.feet) continue;
+				std::vector<char> down;
+				for (double u = 0.0; u <= end; u += 1.0 / 30.0) {
+					CharacterMoment m = momentOf(c, u);
+					lockFeet(c, u, m);
+					const std::vector<Foot> feet = kind.feet(m);
+					down.resize(feet.size(), 1);
+					for (std::size_t k = 0; k < feet.size(); ++k) {
+						if (feet[k].planted && !down[k] && m.moving) {
+							Footfall f;
+							f.t = u, f.at = feet[k].at, f.size = kind.height * c.scale;
+							f.forward = normalize(transformPoint(m.frame, Vec3{0.0, 0.0, 1.0}) - transformPoint(m.frame, Vec3{0.0, 0.0, 0.0}));
+							all->push_back(f);
+						}
+						down[k] = feet[k].planted;
+					}
+				}
+			}
+			slot = all;
+		}
+		falls = slot;
+	}
+	std::string out = "# footprints (film_world.cpp)\n";
+	const double g = std::max(0.1, spec.gravity);
+	for (std::size_t i = 0; i < falls->size(); ++i) {
+		const Footfall &f = (*falls)[i];
+		if (f.t > t) continue;
+		// the print: a dark hollow the shape of a sole, along the way it walked
+		const double len = 0.16 * f.size, wid = 0.065 * f.size, yaw = std::atan2(f.forward.x, f.forward.z) * 180.0 / kPi;
+		out += attr(diffuseMaterial({0.07, 0.068, 0.065}), emitMesh(uvSphere(1.0, 16, 6), mul(translate(f.at.x, f.at.y + 0.001, f.at.z), rotate({0.0, 1.0, 0.0}, yaw), scale(wid, 0.004, len))));
+		// the dust it kicked up: grains thrown out and up, flying on clean arcs with no air to hold them, back down where they fall (only under a low gravity: an airless world)
+		const double since = t - f.t, flight = 2.0 * 0.9 / g;
+		if (g >= 6.0 || since > flight) continue;
+		for (int k = 0; k < 12; ++k) {
+			const int h = static_cast<int>(i) * 31 + k;
+			const double a = 2.0 * kPi * hash01(h, 1), up = 0.4 + 0.5 * hash01(h, 2), out_ = 0.2 + 0.5 * hash01(h, 3);
+			const Vec3 v = (Vec3{std::cos(a), 0.0, std::sin(a)} * out_ + f.forward * 0.3 + Vec3{0.0, up, 0.0}) * std::sqrt(f.size / 1.8);
+			const double s = std::min(since, 2.0 * v.y / g);
+			const Vec3 p = f.at + v * s + Vec3{0.0, -0.5 * g * s * s, 0.0};
+			out += attr(diffuseMaterial({0.5, 0.48, 0.45}), emitMesh(uvSphere(0.008 * f.size, 6, 3), translate(p.x, std::max(f.at.y, p.y), p.z)));
+		}
+	}
+	return out;
+}
+
 std::string DataFilm::motionOf(const Character &c, const CharacterKind &kind, double t, CharacterMoment &m) const {
 	// follow-through: what dangles from its head lags the head (and its walk's bob) on a loose spring
 	const double jiggle = motion::amountFor(spec.jiggle, c.name);
@@ -707,6 +983,11 @@ std::string DataFilm::motionOf(const Character &c, const CharacterKind &kind, do
 		}, t, kind.height * c.scale, squash));
 	// its walk's personality: a sneak's lean, a strut's sway, a skip's hops (film_motion.h gaitPose)
 	if (m.gait != motion::Gait::Plain) text = motion::wrapped(text, motion::gaitPose(m.gait, m.frame, m.steps, m.going, kind.height * c.scale));
+	// low gravity: a walk becomes a lope, each step a bound that lifts it clear of the ground and floats it down (`gravity`)
+	if (spec.gravity < 6.0 && m.going > 0.0 && !m.airborne) {
+		const double bound = std::min(0.3, 0.05 * (9.81 / std::max(0.1, spec.gravity) - 1.0)) * kind.height * c.scale * m.going * std::abs(std::sin(kPi * m.steps));
+		text = motion::wrapped(text, translate(0.0, bound, 0.0));
+	}
 	// anticipation and settle: wound up before a start or a turn, overshooting after a stop (film_motion.h)
 	if (const double ant = motion::amountFor(spec.anticipate, c.name); ant > 0.0)
 		text = motion::wrapped(text, motion::anticipation([&](double u) { return momentOf(c, u).frame; }, t, kind.height * c.scale, ant));

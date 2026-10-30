@@ -195,7 +195,7 @@ struct Kinematic {
 	}
 };
 
-inline Run simulate(const std::vector<BodyDef> &defs, double seconds, double ground = 0.0, const std::vector<Kinematic> *movers = nullptr) {
+inline Run simulate(const std::vector<BodyDef> &defs, double seconds, double ground = 0.0, const std::vector<Kinematic> *movers = nullptr, double gravity = physics::kGravity) {
 	using namespace detail;
 	Run run;
 	// the movers, as fixed balls at the end of the list whose place and velocity are set every step
@@ -251,7 +251,7 @@ inline Run simulate(const std::vector<BodyDef> &defs, double seconds, double gro
 				b.v = b.def->velocity;
 				b.w = b.def->spin * (kPi / 180.0);
 			}
-			if (b.awake) b.v.y -= physics::kGravity * dt;
+			if (b.awake) b.v.y -= gravity * dt;   // (the film's: `gravity`)
 		}
 		// contacts: an awake body with the ground, with everything near it
 		std::vector<Contact> contacts;
@@ -367,10 +367,10 @@ inline std::vector<Pose> posesAt(const Run &run, double t) {
 // A film's world, worked out once in this process (by what its bodies are) for `seconds`.
 // movers (if given) are made only when the world is first worked out under moversKey (what they follow: a film's characters - the film's text says them).
 inline std::shared_ptr<const Run> runFor(const std::vector<BodyDef> &defs, double seconds, const std::string &moversKey = std::string(),
-										  const std::function<std::vector<Kinematic>()> &movers = nullptr) {
+										  const std::function<std::vector<Kinematic>()> &movers = nullptr, double gravity = physics::kGravity) {
 	std::ostringstream key;
 	key.precision(9);
-	key << seconds << '#' << moversKey;
+	key << seconds << '#' << moversKey << "#g" << gravity;
 	for (const BodyDef &d : defs)
 		key << '|' << d.block << ' ' << d.sphere << ' ' << d.half.x << ' ' << d.half.y << ' ' << d.half.z << ' ' << d.radius << ' ' << d.at.x << ' ' << d.at.y << ' ' << d.at.z << ' '
 			<< d.turn << ' ' << d.mass << ' ' << d.start << ' ' << d.velocity.x << ' ' << d.velocity.y << ' ' << d.velocity.z << ' ' << d.spin.x << ' ' << d.spin.y << ' ' << d.spin.z
@@ -381,7 +381,7 @@ inline std::shared_ptr<const Run> runFor(const std::vector<BodyDef> &defs, doubl
 	std::shared_ptr<const Run> &slot = cache[key.str()];
 	if (!slot) {
 		const std::vector<Kinematic> m = movers ? movers() : std::vector<Kinematic>();
-		slot = std::make_shared<const Run>(simulate(defs, seconds, 0.0, m.empty() ? nullptr : &m));
+		slot = std::make_shared<const Run>(simulate(defs, seconds, 0.0, m.empty() ? nullptr : &m, gravity));
 	}
 	return slot;
 }

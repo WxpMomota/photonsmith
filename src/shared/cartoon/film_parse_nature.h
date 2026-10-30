@@ -711,12 +711,16 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 			return h <= 24.0;   // (24:59 is not a time of day)
 		};
 		if (t.size() < 3 || !hour(t[1], s.sky.from) || !hour(t[2], s.sky.to))
-			return fail("`sky FROM TO [south DEGREES] [latitude L] [day N] [haze H] [physical] [altitude A]`: times of day as 18:30 or 18.5");
+			return fail("`sky FROM TO [south DEGREES] [latitude L] [day N] [haze H] [physical] [altitude A] [stars real]`: times of day as 18:30 or 18.5");
 		for (std::size_t i = 3; i < t.size(); i += 2) {
 			double v = 0.0;
 			if (t[i] == "physical") {   // (a word on its own: the sky from the atmosphere itself, atmosphere.h)
 				s.sky.physical = true;
 				--i;
+				continue;
+			}
+			if (t[i] == "stars" && i + 1 < t.size() && t[i + 1] == "real") {   // (the real stars at night: film_starsky.h)
+				s.sky.realStars = true;
 				continue;
 			}
 			if (i + 1 >= t.size() || !number(t[i + 1], v)) return fail("a sky takes south, latitude, day, haze and altitude, each with a number, and physical");
@@ -905,7 +909,7 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		return iceLine(s, verb, line);
 	} else if (verb == "wind" || verb == "tornado") {   // the wind (film_wind.h)
 		return windLine(s, verb, line);
-	} else if (isSpaceVerb(verb)) {   // the universe (film_parse_space.h)
+	} else if (isSpaceVerb(verb) && !(verb == "orbit" && !isShipOrbit(s, line))) {   // the universe (film_parse_space.h); `orbit WHO ...` in a shot is the camera's
 		return spaceLine(s, verb, line);
 	} else if (verb == "closeup" || verb == "tracks") {   // the ground close up (film_ground.h)
 		return groundLine(s, verb, line);

@@ -273,6 +273,10 @@ class DataFilm {
 	std::string clothAt(double t) const;
 	// A character's scene text at t with the film's ways of moving (film_motion.h): its follow-through (m.jiggle, set here) and its squash and stretch.
 	std::string motionOf(const Character &c, const CharacterKind &kind, double t, CharacterMoment &m) const;
+	// (round 11, `footprints`) the prints the characters' feet have left by t, and the dust their last steps kicked up (film_world.cpp)
+	std::string footprintsText(double t) const;
+	std::string overlaysAt(const std::string &header, double t, double nt) const;   // (round 11: an explainer's drawings, film_explain.h)
+	std::string aboardAt(const std::string &header, double t, double nt) const;     // (round 11: footprints, floating things, interiors, holograms, screens, drawings)
 	std::string marksAt(const std::string &header, double t) const;
 	// Where a character looks of itself while someone speaks (CharacterMoment::look): at the speaker, turning to them just after they begin and back a little after they end
 	// (the look moves smoothly from one speaker to the next); and while it speaks, at the nearest of those who listen. A `look` line is on top of this.
@@ -297,7 +301,7 @@ class DataFilm {
 	// Where a walk, a run or a jump leaves a character (story space; its height the floor's there).
 	Vec3 endOf(const Character &c, std::size_t walk) const;
 	static constexpr double kRunStride = 1.6;   // a run's gait, and so its stride, is this much wider than a walk's
-	static double flightOf(const WalkLine &w) { return 2.0 * std::sqrt(2.0 * w.height / 9.81); }   // (a jump's time in the air)
+	double flightOf(const WalkLine &w) const { return 2.0 * std::sqrt(2.0 * w.height / std::max(0.05, spec.gravity)); }   // (a jump's time in the air, under the film's gravity)
 	// A character's walks, runs and jumps one after another: each starts when the one before has ended (its way's length at its pace, or a jump's flight). One that started
 	// sooner was put off until the other ended and then went on as if it had left on time - the walker jumped ahead and its footsteps were heard twice. A crowd's walks are
 	// made, not written: the next is put off until it can start instead.

@@ -22,6 +22,7 @@
 #include "../camera_keyframes.h"
 #include "cartoon_lib.h"
 #include "film_cosmos.h"
+#include "film_orbits.h"
 #include "film_planets.h"
 #include "film_soundscape.h"
 
@@ -42,6 +43,9 @@ struct Ship {
 	bool lights = true;
 	Vec3 colour{0.85, 0.86, 0.88};
 	int seed = 1;
+	Orbit orbit;   // (`orbit`: going round a planet instead of along `move`; film_orbits.h)
+	std::vector<std::pair<double, double>> burns;   // (`burn SHIP T0 T1`: its engines fire from T0 to T1, nature's time)
+	double goneAt = -1.0;   // (`explode`: blown up at this nature's time, gone after it; film_battle.h)
 };
 inline const std::vector<std::string> &shipKinds() {
 	static const std::vector<std::string> k = {"shuttle", "fighter", "freighter", "station", "wheel"};
@@ -86,7 +90,7 @@ inline ShipPart pod(double x0, double x1, double r, double y, double z, const st
 	return p;
 }
 // The parts of a craft (a unit long) at nature's time `nt`: what spins spins.
-inline std::vector<ShipPart> shipParts(const Ship &s, double nt, bool enginesOn) {
+inline std::vector<ShipPart> shipParts(const Ship &s, double nt, double burning = 1.0) {
 	std::vector<ShipPart> out;
 	const std::string hull = diffuseMaterial(s.colour), dark = diffuseMaterial({0.12, 0.12, 0.13}), glass = metalMaterial({0.05, 0.06, 0.08}, 0.05),
 					  metal = metalMaterial({0.6, 0.6, 0.62}, 0.25), panels = metalMaterial({0.08, 0.12, 0.3}, 0.1);
@@ -101,7 +105,7 @@ inline std::vector<ShipPart> shipParts(const Ship &s, double nt, bool enginesOn)
 		out.push_back(p);
 	};
 	const double flicker = 0.85 + 0.15 * std::sin(nt * 37.0 + s.seed) * std::sin(nt * 23.0);
-	const Vec3 flame = Vec3{0.55, 0.75, 1.0} * (6.0 * flicker);
+	const Vec3 flame = Vec3{0.55, 0.75, 1.0} * (6.0 * flicker * std::clamp(burning, 0.0, 1.0));
 	std::vector<Vec3> engines;
 	double wing = 0.4;   // (half its span: where the running lights go)
 	if (s.kind == "shuttle") {
@@ -154,7 +158,7 @@ inline std::vector<ShipPart> shipParts(const Ship &s, double nt, bool enginesOn)
 		out.push_back(pod(-0.12, 0.12, 0.06, 0.0, 0.0, metal));
 		wing = 0.5;
 	}
-	if (enginesOn)
+	if (burning > 0.02)
 		for (const Vec3 &e : engines) glow(e, s.kind == "freighter" ? 0.032 : 0.028, flame);
 	if (s.lights) {
 		glow({-0.1, 0.0, -wing}, 0.008, Vec3{1.0, 0.05, 0.03} * 5.0);
@@ -165,20 +169,67 @@ inline std::vector<ShipPart> shipParts(const Ship &s, double nt, bool enginesOn)
 }
 // Where a craft is at nature's time `nt` (pbrt's) and its frame there: the story-space transform of its unit-long parts.
 inline Mat4 shipPlacement(const Ship &s, double nt) {
-	const Vec3 at = s.at + s.move * nt;
+	Vec3 at = s.at + s.move * nt, way = s.move;
+	double flip = 0.0;
+	if (s.orbit.on) {   // (round its orbit, nose along its way - turned round to fire ahead for a burn that slows it: film_orbits.h)
+		const OrbitState o = orbitState(s.orbit, nt);
+		at = o.at, way = o.velocity, flip = o.flip;
+	}
 	double yaw = s.heading * kPi / 180.0, pitch = s.pitch * kPi / 180.0;
-	if (length(s.move) > 1e-9) {
-		const Vec3 f = normalize(Vec3{-s.move.x, s.move.y, s.move.z});   // (story space)
+	if (length(way) > 1e-9) {
+		const Vec3 f = normalize(Vec3{-way.x, way.y, way.z});   // (story space)
 		yaw = std::atan2(-f.z, f.x), pitch = std::asin(std::clamp(f.y, -1.0, 1.0));
 	}
-	return mul(translate(-at.x, at.y, at.z), rotate({0.0, 1.0, 0.0}, yaw * 180.0 / kPi), rotate({0.0, 0.0, 1.0}, pitch * 180.0 / kPi), scale(s.size, s.size, s.size));
+	return mul(translate(-at.x, at.y, at.z), rotate({0.0, 1.0, 0.0}, yaw * 180.0 / kPi + 180.0 * flipTurn(flip)), rotate({0.0, 0.0, 1.0}, pitch * 180.0 / kPi),
+			   scale(s.size, s.size, s.size));
+}
+// How hard a craft's main engines fire at nature's time `nt` (0 .. 1): `engines on|off`, else its `burn` lines and its orbit's burns, else while it moves along `move`.
+inline double shipBurning(const Ship &s, double nt) {
+	if (s.goneAt >= 0.0 && nt >= s.goneAt) return 0.0;
+	if (s.engines >= 0) return s.engines == 1 ? 1.0 : 0.0;
+	double b = s.orbit.on ? orbitState(s.orbit, nt).burn : (length(s.move) > 1e-9 && s.burns.empty() ? 1.0 : 0.0);
+	for (const auto &[t0, t1] : s.burns) b = std::max(b, smoothstep(t0 - 0.3, t0, nt) * (1.0 - smoothstep(t1, t1 + 0.3, nt)));
+	return b;
+}
+// How hard its attitude thrusters fire at nature's time `nt` (0 .. 1) and which way they push (story space, unit; the way its turn is being sped up): they puff when its
+// turning changes - starting or stopping a turn, a flip before a burn - and not while it turns steadily (an orbit's slow turn is its momentum's).
+inline double shipThrusters(const Ship &s, double nt, Vec3 &push) {
+	const double d = 0.15;
+	const auto nose = [&](double t) {
+		const Mat4 m = shipPlacement(s, t);
+		return normalize(transformPoint(m, {1.0, 0.0, 0.0}) - transformPoint(m, {0.0, 0.0, 0.0}));
+	};
+	const auto spin = [&](double t) {   // (its turning: the axis it turns about, as long as radians a second)
+		const Vec3 n = nose(t);
+		return cross(n, (nose(t + d) - nose(t - d)) * (1.0 / (2.0 * d)));
+	};
+	const Vec3 change = (spin(nt + d) - spin(nt - d)) * (1.0 / (2.0 * d));   // (how its turning changes: nothing while it turns steadily)
+	const double amount = length(change);   // (radians a second, a second: a flip's start is some 4)
+	if (amount < 0.15 || (s.goneAt >= 0.0 && nt >= s.goneAt)) return 0.0;
+	const Vec3 swing = cross(change, nose(nt));   // (the way its nose is being pushed)
+	push = length(swing) > 1e-9 ? normalize(swing) : Vec3{0.0, 1.0, 0.0};
+	return std::clamp((amount - 0.15) / 0.5, 0.0, 1.0);
 }
 // A craft at nature's time `nt` as scene text.
 inline std::string shipText(const Ship &s, double nt) {
-	const bool enginesOn = s.engines == 1 || (s.engines < 0 && length(s.move) > 1e-9);
+	if (s.goneAt >= 0.0 && nt >= s.goneAt) return std::string();   // (blown up)
+	const double burning = shipBurning(s, nt);
 	const Mat4 M = shipPlacement(s, nt);
 	std::string out = "# a " + s.kind + " (film_cosmos.h): " + s.name + "\n";
-	for (const ShipPart &p : shipParts(s, nt, enginesOn)) out += attr(p.material, emitMesh(p.mesh, mul(M, p.place)), p.lit ? &p.light : nullptr);
+	for (const ShipPart &p : shipParts(s, nt, burning)) out += attr(p.material, emitMesh(p.mesh, mul(M, p.place)), p.lit ? &p.light : nullptr);
+	Vec3 push;
+	if (const double rcs = shipThrusters(s, nt, push); rcs > 0.0) {   // its thrusters: white puffs from its nose and tail, the nose's against the push and the tail's with it
+		const Vec3 noseAt = transformPoint(M, {0.38, 0.0, 0.0}), tailAt = transformPoint(M, {-0.38, 0.0, 0.0});
+		out += "# its attitude thrusters (film_orbits.h)\n";
+		for (int end = 0; end < 2; ++end)
+			for (int k = 0; k < 3; ++k) {
+				const double r = s.size * (0.022 + 0.02 * k) * (0.6 + 0.4 * rcs), shimmer = 0.85 + 0.15 * std::sin(nt * 41.0 + k * 2.0 + end);
+				const Vec3 p = (end == 0 ? noseAt - push * (s.size * (0.04 + 0.06 * k)) : tailAt + push * (s.size * (0.04 + 0.06 * k)));
+				out += attr(diffuseMaterial({0.85, 0.87, 0.9}), emitMesh(uvSphere(r * shimmer, 10, 5), translate(p.x, p.y, p.z)), nullptr);
+				const Vec3 glow = Vec3{0.9, 0.92, 1.0} * (0.35 * rcs / (1.0 + k));
+				out += emissiveSphere(p, r * 0.5, glow);
+			}
+	}
 	return out;
 }
 
@@ -464,12 +515,23 @@ inline void spaceSound(audio::Mix &m, const soundscape::Ears &ears, const SpaceS
 	}
 	for (std::size_t i = 0; i < s.ships.size(); ++i) {   // engines
 		const Ship &sh = s.ships[i];
-		if (!(sh.engines == 1 || (sh.engines < 0 && length(sh.move) > 1e-9))) continue;
 		const std::vector<std::vector<float>> burn = soundscape::roar(30.0, 260.0, 0.6, 2201u + static_cast<unsigned>(i));
 		int k = 0;
 		for (double t = 0.0; t < T; t += 0.3, ++k) {
+			const double b = shipBurning(sh, nature(t));
+			if (b < 0.02) continue;
 			const Vec3 p = transformPoint(shipPlacement(sh, nature(t)), {0.0, 0.0, 0.0});
-			heard(m, ears, t, {-p.x, p.y, p.z}, burn[static_cast<std::size_t>(k) % burn.size()], 0.6, 2.0 * sh.size);
+			heard(m, ears, t, {-p.x, p.y, p.z}, burn[static_cast<std::size_t>(k) % burn.size()], 0.6 * b, 2.0 * sh.size);
+		}
+		bool puffing = false;   // its attitude thrusters: a short hiss as each puff begins (film_orbits.h)
+		for (double t = 0.0; t < T; t += 0.05) {
+			Vec3 push;
+			const bool now = shipThrusters(sh, nature(t), push) > 0.1;
+			if (now && !puffing) {
+				const Vec3 p = transformPoint(shipPlacement(sh, nature(t)), {0.0, 0.0, 0.0});
+				heard(m, ears, t, {-p.x, p.y, p.z}, audio::noiseBurst(0.35, 0.01, 0.25, 1500.0, 7000.0, 2251u + static_cast<unsigned>(i * 13 + static_cast<int>(t))), 0.25, 2.0 * sh.size);
+			}
+			puffing = now;
 		}
 	}
 	for (std::size_t i = 0; i < s.astronauts.size(); ++i) {   // breathing in the helmet, a radio's blip, near them

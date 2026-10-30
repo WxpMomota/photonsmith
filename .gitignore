@@ -478,6 +478,8 @@ total.txt
 # The backend parity sweep's known gaps (scripts/backend_parity.py reads it; docs/BACKEND_SUPPORT.md): data, not a stray log - without it a fresh clone reports every known gap
 # as a failure.
 !scripts/backend_parity_known_gaps.txt
+# The films' star catalogue and constellation figures (film_starsky.h): data, not stray logs.
+!pbrt_scenes/film_assets/library/stars/*.txt
 # SIL Open Font License text bundled with qt_gui/fonts/NotoSansSC-Regular.ttf -
 # the OFL requires this file to ship alongside the font it licenses, not a
 # stray log the *.txt rule above was meant to catch.
