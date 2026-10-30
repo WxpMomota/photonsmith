@@ -1000,6 +1000,10 @@ inline void readPrincipledAndDielectricParams(FlatScene &out, pbrt_scene::Materi
 
 // A conductor's (or coated conductor's) complex IOR: a named metal, explicit RGB eta/k, or pbrt's copper default.
 inline void readConductorParams(FlatScene &out, pbrt_scene::MaterialDecl &md, Material &m) {
+	if (m.kind == MaterialKind::Conductor) {   // (a thin film on it: see Material::filmThickness)
+		m.filmThickness = std::max(0.0, md.params.getFloat("filmthickness", 0.0));
+		m.filmEta = std::max(1.0, md.params.getFloat("filmeta", 1.33));
+	}
 	// Conductor OR CoatedConductor: pbrt describes a conductor's complex
 	// IOR via "spectrum eta"/"spectrum k" bound to a NAMED spectrum
 	// ("metal-Ag-eta"/"metal-Ag-k", etc.), not the plain floats/RGB

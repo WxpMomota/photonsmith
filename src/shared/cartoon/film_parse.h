@@ -126,7 +126,8 @@
 //     flowers  poppies 3000  in -20 -20 20 20  bloom 2 10       # poppies, daisies, lupins or sunflowers (turning to the sun), opening each in its own time; `close T0 T1`
 //     flock    starlings 300  at 0 80 -200  radius 40           # animals (film_wildlife.h): starlings or fish (flocking round `at`), geese (`from X Y Z to X Y Z`, in
 //                                                               # a V), butterflies (`in X0 Z0 X1 Z1`); `speed S`, `during T0 T1`, `seed N`; on a terrain Y is above it
-//     herd     deer 12  from -200 0  to 200 -150  speed 1.1     # deer, horses or wolves (rigged: film_animals.h) walking over the land, grazing now and then;
+//     herd     deer 12  from -200 0  to 200 -150  speed 1.1     # deer, horses, wolves, lions, zebras, giraffes, elephants, bears or foxes (rigged: film_animals.h)
+//                                                              # walking over the land, grazing now and then;
 //                                                               # `flee T` (they bolt and gallop away), `start T`, `seed N`; `flock eagles` circle a thermal
 //     aurora   green  brightness 1.2  during 4 30               # the sky's spectacles (film_skyfx.h): curtains of light (green, red or violet; `facing D`, `distance M`),
 //     lightning 5  at 0 -3000  radius 2000  during 2 20         # strikes with their flash and thunder (`base H`, `seed N`), shooting stars (`meteors COUNT`), and
@@ -148,6 +149,17 @@
 //     fire     at 0 0 -4  size 1.2                              # fire (film_fire.h): flames (glowing volumes, flickering, a light among them, sparks) with smoke above;
 //     lava     from 120 -300  width 6                           # lava creeping down the land from a vent; a volcano raised in the land (`volcano at X Z [height H]
 //     herd     deer 12 from 0 0 to 100 0  fur 1                # fur on a herd, `feathers A` on eagles and geese (film_fur.h): strands over the body
+//     herd     zebras 30 from 0 0 to 80 0  coat zebra  hero 1  young 4  name grazers   # real animals (round 13): a coat's pattern (film_coats.h), real fur on
+//                                                               # the first N (`hero`), young following their mothers; also rabbits, penguins, snakes
+//     hunt     pride grazers at 6  stalk 3  catch               # a hunt between two named herds: the stalk, the charge, the prey scattering, a catch
+//     flight   eagles 1  from 0 12 0  to 60 3 -20  at 2         # birds taking off from a perch, flying and landing on another (eagles or geese)
+//     baitball 0 6 -10  count 500  strike 4  hunter sharks      # life under the sea (film_sealife.h): a bait ball split by sharks or dolphins;
+//     reeffish 40  in -6 1 -14 6 4 4                            # reef fish in their colours; `jellyfish N in X0 Y0 Z0 X1 Y1 Z1 [glow G]`;
+//                                                               # `seaturtles N at X Y Z [radius R]`
+//     insects  bees 3  in -0.1 0.05 -0.1 0.1 0.12 0.1           # the small world (film_macro.h): bees, dragonflies (blurred wings), beetles
+//     dew      400  in -0.25 -0.25 0.25 0.25                    # (iridescent: a thin film); dewy grass; use with a close `key` and a lens
+//     night    eyeshine 1  flash 1                              # night (film_night.h): eyes shining back, a flash; `cameratrap [ir] [name W]
+//     shimmer  0.004                                            # [clock HH:MM] [date D] [temp C]`: a trail camera's picture; heat shimmer
 //     space    stars 1  milkyway 1  sun 60 15                   # the universe (film_space.h, round 10): a set in space - the stars all round, the Milky Way, the sun a
 //                                                               # glowing ball at a bearing and an elevation; no sky, no air
 //     planet   home ocean  at 0 0 -20000  radius 6000           # a planet (film_planets.h): rocky, desert, ice, ocean, gas or lava; `tilt`, `spin SECONDS`

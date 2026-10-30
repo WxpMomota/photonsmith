@@ -715,7 +715,7 @@ extern "C" __global__ void evaluate_materials(
 		const bool c_rej = !c_sample.scattered;
 		if (c_rej && c_dist.EffectivelySmooth()) { scattered = false; break; }
 		float3 c_F = c_rej ? make_float3(0.0f, 0.0f, 0.0f)
-		                   : FrConductorRGB(c_sample.wm_dot_wi, mat.eta_c.x, mat.eta_c.y, mat.eta_c.z, mat.k_c.x, mat.k_c.y, mat.k_c.z);
+		                   : FrConductorRGB(c_sample.wm_dot_wi, mat.eta_c.x, mat.eta_c.y, mat.eta_c.z, mat.k_c.x, mat.k_c.y, mat.k_c.z, mat.filmThickness, mat.filmEta);
 		scattered_dir = c_rej ? cn : normalize(c_sample.wo_x*ctan + c_sample.wo_y*cbitan + c_sample.wo_z*cn);
 		scattered   = true;
 

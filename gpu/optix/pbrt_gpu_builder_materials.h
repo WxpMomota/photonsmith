@@ -875,6 +875,8 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 			d.eta_c = make_float3(1.0f, 1.0f, 1.0f);
 			d.k_c = reflectanceToConductorK(d.albedo);
 		}
+		d.filmThickness = static_cast<float>(m.filmThickness);
+		d.filmEta = static_cast<float>(m.filmEta);
 		// Real independent u/v roughness (matches pbrt_cpu_builder.h's
 		// identical Conductor branch) - d.roughness (set generically
 		// from m.roughness above) is overridden to the u-axis value

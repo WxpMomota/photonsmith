@@ -8,6 +8,13 @@ ball-parade|1|be82b9a4eec4a8ce|The row of balls
 candle|1|8782ad171cbdf69c|Portrait of the flame
 candle|2|ff22690a18254670|Macro on the wax and drips
 candle|3|cf24a271002c7d81|Pull back as it dies
+cosmic-voyage|1|364aeb65ef109b6f|Falling into the galaxy
+cosmic-voyage|2|d24c7fc80e6a753a|Through the pillars
+cosmic-voyage|3|92440dfa6155b2f7|Round the star
+cosmic-voyage|4|6930187b8e8516d8|Round the giant
+cosmic-voyage|5|13601d6bac40c899|Through the rocks
+cosmic-voyage|6|84daf6d7d9652aa2|Round the black hole
+cosmic-voyage|7|1b2bc100a10fb0d2|The star dies
 crystal-heart|1|94d37b9df886c275|The still lake
 crystal-heart|2|df4de173c36571d2|Among the spires
 crystal-heart|3|61d19d2019afef5d|First light
@@ -109,12 +116,12 @@ seasons-wood|2|f407c4181788cb1b|Following the sun
 seasons-wood|3|3bfda804fc31d0ea|The wood turns
 seasons-wood|4|0f00e7ee91d07386|Leaves fall
 seasons-wood|5|2e36074a635f9ad0|Winter
-swell-breaks|1|d499d1e91dde39af|Open water
-swell-breaks|2|9e95a4d04b656205|The breakers
-swell-breaks|3|1856db972b93c3e9|A wave
-swell-breaks|4|f336573dbfab9c0c|Evening clouds
-swell-breaks|5|2918b0ec2d354bfd|Sundown
-swell-breaks|6|52d77521084164bb|Twilight
+swell-breaks|1|4b667b6789e61858|Open water
+swell-breaks|2|a7e87cb18ff7ffce|The breakers
+swell-breaks|3|687d235671a97619|A wave
+swell-breaks|4|ea68d647d4bed278|Evening clouds
+swell-breaks|5|43b70accf39e54dc|Sundown
+swell-breaks|6|1b6ccb6b292be91e|Twilight
 tengwang|1|3d618bae54b680fe|Black, a bell, the sea of clouds
 tengwang|2|a751585f9b81859f|The river comes out of the mountains
 tengwang|3|5f3089b2ce6e50a2|The Gan River and Hongzhou
@@ -174,12 +181,12 @@ tengwang|56|21295a040b8948c5|The stars over the river
 tengwang|57|3abaf4d1273dc735|The manuscript
 tengwang|58|5d65f8a567c7b102|Dawn
 tengwang|59|d5560262f6b0c819|The title
-thunder-plains|1|0456aa1c941168e2|The plain
-thunder-plains|2|8ba099edea85363d|Wheeling
-thunder-plains|3|2e7ff5696819e0ab|The storm comes
-thunder-plains|4|da9d10888dc9bd91|The herd
-thunder-plains|5|0b86ad2002c93ffe|They bolt
-thunder-plains|6|e3cc9787eb2622f0|The rain
+thunder-plains|1|51feb2ccb34cdb26|The plain
+thunder-plains|2|290bf02e3e088729|Wheeling
+thunder-plains|3|f23e55ca2005b28b|The storm comes
+thunder-plains|4|803532b362f87da3|The herd
+thunder-plains|5|9f2b4d9897dab7ec|They bolt
+thunder-plains|6|93851da0afc0db80|The rain
 turtle-escape|1|cffe5681acb9d1b4|Wide on the room
 turtle-escape|2|32e0e1985fa12972|The plant
 turtle-escape|3|3b8ffe27735f87dd|The thermometer
@@ -254,9 +261,17 @@ turtle-escape|71|6f2de973fa2e5ff3|Behind the sofa
 turtle-escape|72|38f2667aa655d8db|Turtle?
 turtle-escape|73|36c6346b2f446b99|The tub
 turtle-escape|74|6585bd4d22b77349|Black
-valley-of-mists|1|b47708caf3445256|Above the mists
-valley-of-mists|2|9e7bd92a02eafb5f|First light
-valley-of-mists|3|718953ced18439e3|Geese
-valley-of-mists|4|a9f6d077eefbc9ca|The mists lift
-valley-of-mists|5|5e494d3f54c446db|The valley floor
-valley-of-mists|6|c7cba330d7e35743|Morning
+valley-of-mists|1|b6ed3c83bf4c20d2|Above the mists
+valley-of-mists|2|70aa75521f916d71|First light
+valley-of-mists|3|7255ac9b3f76cff7|Geese
+valley-of-mists|4|975d65553031c0cd|The mists lift
+valley-of-mists|5|545358b7d9b5ff00|The valley floor
+valley-of-mists|6|9cfc7e32e7c2857b|Morning
+worlds-beyond|1|9f2e49ebbcd613c6|Into the night
+worlds-beyond|2|c4496f48cb100f81|Past the fire
+worlds-beyond|3|ca9dd28c22e01e3d|The comet goes by
+worlds-beyond|4|5054694141512158|The station turns
+worlds-beyond|5|71f1f9f934b9bd81|On his tail
+worlds-beyond|6|c199dd04841ebc11|The cruiser
+worlds-beyond|7|f31e72b1a3d2e26e|Hyperspace
+worlds-beyond|8|2d77a01c90033514|Home at last

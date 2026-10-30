@@ -535,7 +535,7 @@ TEST(FilmAnimals, RiggedAnimalsWalkWithoutSlidingGrazeAndBoltAndEaglesCircle) {
 	const std::string sky = wildlife::flockText(film.spec.flocks[0], 5.0, ground.get(), birds);
 	EXPECT_NE(sky.find("anim_eagles_"), std::string::npos);
 	ff::DataFilm bad;
-	EXPECT_NE(loadNature("animals_bad", "scene s.pbrt\nlength 4\nherd lions 5 from 0 0 to 10 0\n", bad).find("deer, horses or wolves"), std::string::npos);
+	EXPECT_NE(loadNature("animals_bad", "scene s.pbrt\nlength 4\nherd unicorns 5 from 0 0 to 10 0\n", bad).find("penguins or snakes"), std::string::npos);
 }
 
 // ---- the sky's spectacles ------------------------------------------------------------------------------------------------------------------------------------------------------

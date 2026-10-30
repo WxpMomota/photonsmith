@@ -655,6 +655,9 @@ struct Material {
 	bool hasConductorPreset = false;
 	double conductorEta[3] = {0.0, 0.0, 0.0};
 	double conductorK[3] = {0.0, 0.0, 0.0};
+	// Conductor only: a thin film on it ("float filmthickness" nanometres, 0 none; "float filmeta", 1.33) - its interference colours (fresnel.h FrThinFilm).
+	// This renderer's own: pbrt-v4 has no such parameter and draws the bare metal.
+	double filmThickness = 0.0, filmEta = 1.33;
 
 	// CoatedConductor only. roughness_u/roughness_v/ior above are the COAT's (pbrt: interface.uroughness/
 	// vroughness/roughness and interface.eta). The base conductor has its own roughness (pbrt:

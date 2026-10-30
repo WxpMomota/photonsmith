@@ -525,7 +525,7 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 		const MaterialData& fm = materials[matIdx];
 		float fr = 0.0f, fg = 0.0f, fb = 0.0f;
 		if (matType == MaterialType::Conductor) {
-			ConductorBxDF<float> bx{ fm.eta_c.x, fm.eta_c.y, fm.eta_c.z, fm.k_c.x, fm.k_c.y, fm.k_c.z, glossy_alpha, glossy_alpha_v };
+			ConductorBxDF<float> bx{ fm.eta_c.x, fm.eta_c.y, fm.eta_c.z, fm.k_c.x, fm.k_c.y, fm.k_c.z, glossy_alpha, glossy_alpha_v, fm.filmThickness, fm.filmEta };
 			bx.f(glossy_wi_x, glossy_wi_y, glossy_wi_z, wo_x, wo_y, wo_z, fr, fg, fb);
 			outPdf = bx.pdf(glossy_wi_x, glossy_wi_y, glossy_wi_z, wo_x, wo_y, wo_z);
 			// Blend to the SAME mixture pdf the scatter path uses for its own

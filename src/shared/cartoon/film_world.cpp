@@ -475,7 +475,7 @@ std::string DataFilm::worldAt(const std::string &header, double t) const {
 			for (const skyfx::Meteors &m : spec.meteors) out += skyfx::meteorText(m, t, eye);
 		}
 	}
-	if (!spec.flocks.empty() || !spec.herds.empty()) {   // animals (film_wildlife.h): each kind's poses once
+	if (!spec.flocks.empty() || !spec.herds.empty() || !spec.flights.empty()) {   // animals (film_wildlife.h): each kind's poses once
 		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
 		std::vector<std::string> written;
 		const auto first = [&](const std::string &kind) {
@@ -484,9 +484,27 @@ std::string DataFilm::worldAt(const std::string &header, double t) const {
 			return true;
 		};
 		animals::Poses poses;   // (the rigged kinds' poses this frame uses: film_animals.h)
+		poses.eyeshine = spec.night.eyeshine;
 		for (const wildlife::Flock &f : spec.flocks)
 			if (t >= f.t0 && t <= f.t1) out += wildlife::flockText(f, f.kind == "eagles" || f.kind == "geese" ? nt : t, ground.get(), poses, first(f.kind));
-		for (const wildlife::Herd &h : spec.herds) out += wildlife::herdText(h, nt, ground.get(), poses);
+		for (const wildlife::Herd &h : spec.herds) out += wildlife::herdText(h, nt, ground.get(), poses, spec.herds, spec.hunts, spec.seas.empty() ? -1e30 : spec.seas[0].level);
+		for (const wildlife::Flight &f : spec.flights) out += wildlife::flightText(f, nt, poses);
+	}
+	if (spec.sealife.any()) {   // life under the sea (film_sealife.h)
+		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
+		const auto groundAt = [&](double x, double z) { return ground && ground->inside(x, z) ? ground->heightAt(x, z) : (ground ? spec.terrain.y : 0.0); };
+		out += sealife::text(sealife::lifted(spec.sealife, groundAt), nt);
+	}
+	if (spec.night.flashNow() > 0.0) {   // a camera's flash (film_night.h)
+		Vec3 eye, target;
+		double fov = 40.0;
+		film_subjects::cameraOf(header, eye, target, fov);
+		out += night::flashText(spec.night, eye, target);
+	}
+	if (spec.macro.any()) {   // the small world close up (film_macro.h)
+		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
+		const auto groundAt = [&](double x, double z) { return ground && ground->inside(x, z) ? ground->heightAt(x, z) : (ground ? spec.terrain.y : 0.0); };
+		out += macro::text(spec.macro, nt, groundAt);
 	}
 	if (!spec.geysers.empty() || !spec.rockfalls.empty() || !spec.avalanches.empty()) {   // the land in action (film_geology.h)
 		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
@@ -536,6 +554,7 @@ std::string DataFilm::worldAt(const std::string &header, double t) const {
 	out += castAt(t);   // the characters, as their kinds draw them
 	out = shot_lighting::withLights(out, shotLightsAt(header, t));
 	out = marksAt(header, t) + out;   // the cartoon marks over the frame (film_marks.h): its `# @rt-mark` lines, before everything (the launcher draws them after the render)
+	out = night::withLook(out, spec.night, t);   // (a trail camera's look, heat shimmer: film_night.h)
 	return spec.space.on ? cosmos::withSpaceLook(space::recentred(out), spec.space.flare, spec.space.bloom) : out;   // (a floating origin for a film in space: film_space.h)
 }
 
@@ -748,12 +767,13 @@ void DataFilm::soundscape(audio::Mix &m) const {
 			}
 		}
 	}
-	// animals: hoofbeats at each footfall of a herd's gait; wolves howling while they stand; eagles crying
+	// animals: hoofbeats at each footfall of a herd's gait; a standing herd's calls (a lion's roar, a wolf's howl...: soundscape::callOf); eagles crying; geese honking
 	for (std::size_t hi = 0; hi < spec.herds.size(); ++hi) {
 		const wildlife::Herd &h = spec.herds[hi];
 		const animals::Species *sp = animals::species(h.kind);
 		if (!sp) continue;
 		const bool wolves = h.kind == "wolves";
+		const ss::Call call = ss::callOf(h.kind, static_cast<unsigned>(971 + hi * 37));
 		const double gain = h.kind == "horses" ? 0.3 : wolves ? 0.05 : 0.15, f = h.kind == "horses" ? 85.0 : wolves ? 230.0 : 140.0;
 		for (int i = 0; i < std::min(h.count, 40); ++i) {
 			std::string lastClip;
@@ -770,13 +790,24 @@ void DataFilm::soundscape(audio::Mix &m) const {
 									  gain * (0.85 + 0.3 * audio::unit(step + 5u)), 5.0);
 						}
 				}
-				if (wolves && a.going.paused && i % 3 == 0) {   // (a wolf standing howls now and then)
-					const double every = 21.0 + 8.0 * audio::unit(static_cast<unsigned>(951 + i)), when = std::fmod(t + every * audio::unit(static_cast<unsigned>(961 + i)), every);
-					if (when < 0.02) ss::place(m, ears, t, a.at + Vec3{0.0, 0.7, 0.0}, ss::howl(static_cast<unsigned>(971 + i)), 0.4, 60.0);
+				if (call.every > 0.0 && a.going.paused && i % 3 == 0) {   // (one in three standing calls now and then)
+					const double every = call.every * (0.85 + 0.35 * audio::unit(static_cast<unsigned>(951 + i))), when = std::fmod(t + every * audio::unit(static_cast<unsigned>(961 + i)), every);
+					if (when < 0.02) ss::place(m, ears, t, a.at + Vec3{0.0, 0.7 * sp->length, 0.0}, wolves ? ss::howl(static_cast<unsigned>(971 + i)) : call.sound, call.gain, call.within);
 				}
 				lastClip = a.clip, lastCycles = a.cycles;
 			}
 		}
+	}
+	for (const wildlife::Flight &f : spec.flights) {   // a flight's birds calling as they go: geese honking, an eagle's cry
+		if (spec.muteBirds) continue;
+		const animals::Species *sp = animals::species(f.kind);
+		const double v = sp && f.speed <= 0.0 ? sp->walkSpeed : f.speed, D = length(f.to - f.from), T1 = f.at + 1.5 + D / std::max(0.1, v);
+		for (int i = 0; i < f.count; ++i)
+			for (double t = f.at + 0.3 + 0.4 * i + 2.0 * audio::unit(static_cast<unsigned>(1101 + i)); t < std::min(T, T1); t += 2.5 + 3.0 * audio::unit(static_cast<unsigned>(1111 + i) + static_cast<unsigned>(t))) {
+				const double u = std::clamp((t - f.at) / std::max(0.1, T1 - f.at), 0.0, 1.0);
+				const Vec3 at = f.from + (f.to - f.from) * u + Vec3{0.0, 4.0 * std::min(30.0, 0.12 * D) * u * (1.0 - u), 0.0};
+				ss::place(m, ears, t, at, f.kind == "geese" ? ss::honk(static_cast<unsigned>(1121 + i * 13) + static_cast<unsigned>(t)) : ss::eagleCry(), f.kind == "geese" ? 0.25 : 0.35, 60.0);
+			}
 	}
 	for (const wildlife::Flock &f : spec.flocks) {
 		if (f.kind != "eagles" || spec.muteBirds) continue;
@@ -876,7 +907,7 @@ std::string DataFilm::aboardAt(const std::string &header, double t, double nt) c
 	for (const interior::Interior &in : spec.interiors) out += interior::interiorText(in, nt);   // (film_interior.h)
 	for (const screens::Hologram &h : spec.holograms) out += screens::hologramText(h, nt);   // (film_screens.h)
 	for (const screens::Screen &sc : spec.screens) out += screens::screenText(sc, nt, spec.key.empty() ? std::string("film") : spec.key, spec.ships);
-	if (spec.explain.any()) out += overlaysAt(header, t, nt);
+	if (spec.explain.any() || spec.night.trap) out += overlaysAt(header, t, nt);
 	return out;
 }
 
@@ -922,6 +953,7 @@ std::string DataFilm::overlaysAt(const std::string &header, double t, double nt)
 		out += explain::orbitLineText(o, t, path, v);
 	}
 	for (const explain::ScaleBar &b : spec.explain.bars) out += explain::scaleBarText(b, t, v, film);
+	out += night::stampText(spec.night, t, v, film);   // (a trail camera's strip: film_night.h)
 	for (const explain::Compare &c : spec.explain.compares) {
 		std::vector<explain::LinedUp> bodies;
 		for (const std::string &name : c.bodies) {

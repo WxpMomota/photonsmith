@@ -80,7 +80,11 @@ struct Look {
 			if (lift[k] != 0.0 || gamma[k] != 1.0 || gain[k] != 1.0 || tint[k] != 1.0) return true;
 		return false;
 	}
-	bool active() const { return paint > 0.0 || sunbeams > 0.0 || bloom > 0.0 || flare > 0.0 || star > 0.0 || vignette > 0.0 || warmth != 0.0 || saturation != 1.0 || graded(); }
+	// Heat shimmer (`shimmer A`, at `shimmer-time T` seconds): the air over hot ground bending the light - what a long lens sees across a plain at midday. The picture is
+	// pushed about by a field of rising, wavering ripples, A (a share of the picture's height: 0.002 a light shimmer, 0.006 a strong one) at the bottom of the frame where
+	// the hot air is, fading to nothing two thirds of the way up. A film writes its time into each frame's look line, so the ripples move from frame to frame.
+	double shimmer = 0.0, shimmerTime = 0.0;
+	bool active() const { return shimmer > 0.0 || paint > 0.0 || sunbeams > 0.0 || bloom > 0.0 || flare > 0.0 || star > 0.0 || vignette > 0.0 || warmth != 0.0 || saturation != 1.0 || graded(); }
 };
 
 // Values that were set (a flag, a scene line) override `base`; a negative bloom/vignette or a saturation below 0 means "not given" in `given`.
@@ -152,6 +156,8 @@ inline std::string parse(const std::string &text, Look &out) {
 		else if (word == "star-length") out.starLength = std::clamp(v, 0.005, 0.5);
 		else if (word == "star-threshold") out.starThreshold = std::clamp(v, 0.0, 1000.0);
 		else if (word == "vignette") out.vignette = std::clamp(v, 0.0, 1.0);
+		else if (word == "shimmer") out.shimmer = std::clamp(v, 0.0, 0.05);
+		else if (word == "shimmer-time") out.shimmerTime = v;
 		else if (word == "warmth") out.warmth = std::clamp(v, -1.0, 1.0);
 		else if (word == "saturation") out.saturation = std::clamp(v, 0.0, 3.0);
 		else if (word == "paint") out.paint = std::clamp(v, 0.0, 40.0);
@@ -279,6 +285,24 @@ inline void apply(float *rgb, int w, int h, const Look &look) {
 	const std::size_t n = static_cast<std::size_t>(w) * static_cast<std::size_t>(h);
 	for (std::size_t i = 0; i < n * 3; ++i)
 		if (!std::isfinite(rgb[i])) rgb[i] = 0.0f;
+
+	if (look.shimmer > 0.0) {   // heat shimmer first: it is in the air, in front of the lens (see Look::shimmer)
+		const std::vector<float> src(rgb, rgb + n * 3);
+		const double T = look.shimmerTime, A = look.shimmer * h;
+		for (int y = 0; y < h; ++y) {
+			const double v = (y + 0.5) / h, heat = std::clamp((v - 0.33) / 0.67, 0.0, 1.0);
+			if (heat <= 0.0) continue;
+			for (int x = 0; x < w; ++x) {
+				const double u = (x + 0.5) / h;   // (both in picture heights, so the ripples are round whatever the frame's shape)
+				const double rise = v * 60.0 + T * 7.0;   // (the ripples climb as the warm air does)
+				const double dx = 0.6 * std::sin(rise + 3.0 * std::sin(u * 11.0 + T * 1.7)) + 0.4 * std::sin(2.3 * rise - u * 23.0 + T * 3.1);
+				const double dy = 0.5 * std::sin(1.7 * rise + u * 17.0 - T * 2.3);
+				double c[3];
+				detail::sample(src, w, h, x + 0.5 + A * heat * heat * dx, y + 0.5 + 0.4 * A * heat * heat * dy, c);
+				for (int k = 0; k < 3; ++k) rgb[(static_cast<std::size_t>(y) * static_cast<std::size_t>(w) + static_cast<std::size_t>(x)) * 3 + k] = static_cast<float>(c[k]);
+			}
+		}
+	}
 
 	if (look.paint > 0.0) {   // the painting first: the lens and the grade go over it (sizes are given at a picture 1080 high)
 		const double scale = h / 1080.0;

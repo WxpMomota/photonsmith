@@ -2097,6 +2097,90 @@ not the arm hanging beside it), never to the other side's bones and the legs onl
 bones have Mixamo's names, so `mocap` plays captures on it. It stands facing +z (glTF's front), y up. It is a guess, not a rigger's work: an odd pose, a long robe or a tail
 moves roughly. `autorig` on a rigged model fits a new skeleton anyway.
 
+### Real animals, round 13 (2026-10-30)
+
+Ten things for nature films about real animals. The lines are read by film_parse_nature.h; the animals are the rigged models `scripts/make_rigged_animals.py` writes into
+`pbrt_scenes/film_assets/library/animals/`.
+
+**More species.** Lions (a mane), zebras, giraffes (ossicones, the long neck), elephants (trunk, tusks, big ears, pillar legs), bears, foxes (a bushy tail with a white tip),
+rabbits (they hop), penguins (they waddle) and snakes (an S-curve sliding along), beside deer, horses and wolves: `herd KIND COUNT from X Z to X Z`. Each has its strides,
+the speeds where it changes gait and its flight speed (film_animals.h `species`).
+
+**Coat patterns: `herd ... coat PATTERN`.** (film_coats.h) A zebra's stripes and a giraffe's patches grow by reaction-diffusion (Gray-Scott: stripes when it spreads one way
+faster than the other, spots otherwise) and a giraffe's network is a Voronoi pattern; tiger, cheetah, leopard, `shade` (darker above, pale below: countershading) and plain.
+Each animal of a herd has its own variant of the pattern. The picture is painted once into the film's cache and wrapped round the model by its uvs. Zebras and giraffes have
+theirs without being asked.
+
+**Hero fur: `herd ... hero N`.** The first N animals of a herd get fur of real strands (pbrt curves in the hair material) over their coats, coloured from the pattern, for
+close-ups (`herofur A` how much); the rest of the herd keeps the cheap ribbons of `fur`.
+
+**Gaits.** Walk, trot and gallop for the four-legged kinds, with each kind's own swing; a bounding gallop for the cats and dogs, hopping for rabbits, a waddle, a slither;
+animals lean into their turns.
+
+**Behaviour: `hunt PREDATORS PREY at T [stalk S] [catch]`, `herd ... young N`, `herd ... name N`.** Two named herds: the predators creep up for `stalk` seconds (3), unseen,
+then charge - a burst faster than the prey's flight, tiring after 8 s; the prey take fright as the charge comes (or when a stalker is within 8 m) and scatter, swerving.
+With `catch` the first animal a predator reaches falls on its side and the pride gathers at it. `young N`: young ones following their mothers at half their size.
+
+**Animals and water.** On a film with `water`, an animal in the water throws spray from its legs (more and higher the faster it goes) and leaves foam rings widening behind
+it; out of the water it is wet for six seconds - its coat darker and glossy, drops falling - and shakes itself, flinging a ring of spray.
+
+**Birds that really fly: `flight eagles|geese COUNT from X Y Z to X Y Z at T [speed S]`.** Perched at `from`, wings folded and looking round; they take off one after
+another with hard wingbeats, fly an arc (flapping as they climb, gliding as they come down), flare to land - the body up, wings high and beating back - and perch at `to`.
+
+**Life under the sea.** (film_sealife.h)
+
+```
+baitball   0 9 -6  count 500  radius 2.2  strike 4  strike 9  hunter sharks   # or dolphins
+reeffish   40 in -4 0.5 -2 4 3 4
+jellyfish  8 in -5 7 -10 5 12 -2  glow 1.5
+seaturtles 2 at 0 7 -4  radius 5
+```
+
+A bait ball is hundreds of silver fish milling round its middle; at each `strike` a hunter dashes through it on a line (reaching the middle at that time) and the fish near
+its path burst away from it, then drift back. Reef fish circle homes of their own in reef colours (yellow and blue tangs, an orange clownfish with white bands, a grey with
+dark stripes). Jellyfish pulse - a quick contraction of the bell, a slow relaxing - rising a little with each pulse; the bell lets the light through and its rim glows without
+lighting anything. Sea turtles fly on their front flippers round a circle. On a terrain every height is above the ground there.
+
+**The small world: `insects`, `dew`, and thin-film iridescence.** (film_macro.h)
+
+```
+dew        400 in -0.25 -0.25 0.25 0.25
+insects    bees 2 in -0.12 0.06 -0.12 0.12 0.12 0.05
+insects    dragonflies 1 in -0.2 0.12 -0.2 0.2 0.18 0
+insects    beetles 2 in -0.06 0 -0.06 0.06 0 0.06  film 380
+shot 0 A
+  key 0 0.06 0.35   0 0.05 0   35 0.004 0.35   # close, with a lens 4 mm across focused at 35 cm: a shallow depth of field
+```
+
+Sizes are real (a bee 1.3 cm). Bees and dragonflies hover, then dart to the next point. Their wings beat far faster than a frame, so each wing is drawn as the fan it sweeps,
+with an alpha picture: see-through where the wing passes fast, densest at the ends of the stroke where it turns; the renderers' stochastic alpha test makes it partly
+transparent. Beetles walk on six legs in two tripods. Dew is blades of grass bent over with drops of water (glass, index 1.33) along them and at their tips.
+
+Beetles' shells, a dragonfly's body and the wings are iridescent: the renderer's conductor takes a thin film, `Material "conductor" ... "float filmthickness" [ NM ]
+"float filmeta" [ 1.56 ]` (fresnel.h `FrThinFilm`): the light reflected at the film's top and at its foot interferes (Airy's sum over the trips across the film, per
+polarisation), so the colour depends on the film's thickness and changes with the angle it is seen at, as a beetle's, a soap film's or an oil slick's does. Each channel
+is the mean of three wavelengths across its band. With no film it is the bare conductor exactly. CPU, both OptiX renderers and SPPM; pbrt-v4 has no such parameter (it
+draws the bare metal), and Metal does not yet.
+
+**Night and the long lens: `night`, `cameratrap`, `shimmer`, and animal calls.** (film_night.h)
+
+```
+night      eyeshine 1  flash 1
+cameratrap ir  name CAM 03  clock 02:14  date 2026-10-30  temp -2
+shimmer    0.004
+```
+
+`eyeshine`: the animals' pupils glow back at the camera in their kind's colour (the tapetum behind the retina: green-gold for cats and dogs, yellow for deer, blue-green for
+horses, orange for bears, a rabbit's red), a glow that lights nothing. The models' eyes have an iris and a pupil of their kind's shape: a horizontal bar for the grazers, a
+vertical slit for a fox, round for the rest. `flash`: a light on the camera. `cameratrap`: a trail camera's picture - its flash, a darker edge, and the strip along the foot
+of the frame (its name, the date, the clock running on from `clock`, the temperature) on a card in front of the lens; `ir` its infrared night look, grey with a green cast.
+`shimmer A`: heat shimmer, the picture wavering as hot air rises off the ground (lens_look.h `shimmer`, A a share of the picture's height, strongest at the foot of the
+frame); the film writes each frame's time into its look line so the ripples move.
+
+Animals call (film_soundscape.h): a standing herd's callers now and then - a lion's roar (a moaning rise, the roar, the grunts), an elephant's trumpet over a low rumble, a
+wolf's howl, a bear's growl, a fox's bark, a zebra's or a penguin's bray, a horse's whinny, a deer's bark - from a small synthesised voice (a buzz through two formants,
+roughened for a growl), placed where the animal is; geese honk and eagles cry as a flight goes.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

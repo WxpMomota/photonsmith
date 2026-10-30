@@ -441,6 +441,9 @@ struct MaterialData {
 	float proxyBlend = 0.0f;
 	// Ray visibility (src/shared/pbrt_scene.h MaterialDecl): bit 1 hidden from camera rays (they pass through it), bit 2 casts no shadows; 0 (a zeroed MaterialData) seen by all.
 	int hidden = 0;
+	// Conductor: a thin film on it (nanometres, 0 none) and its index - the interference colours (fresnel.h FrThinFilm; pbrt_flatten Material::filmThickness).
+	float filmThickness = 0.0f;
+	float filmEta = 1.33f;
 };
 
 // A lamp that also reflects (pbrt-v4: an AreaLightSource keeps the shape's Material, default diffuse 0.5). The builder (pbrt_gpu_builder_materials.h makeMaterial) stores a flat

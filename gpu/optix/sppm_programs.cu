@@ -638,7 +638,7 @@ static __device__ __forceinline__ float3 sppm_bsdf_f(
 			float alpha_x = mat.remapRoughness ? sqrtf(mat.fuzz) : mat.fuzz;
 			float alpha_y = ResolveAnisotropicAlphaV(mat.roughnessV, mat.fuzz, mat.remapRoughness);
 			ConductorBxDF<float> bx{ mat.eta_c.x, mat.eta_c.y, mat.eta_c.z,
-			                          mat.k_c.x, mat.k_c.y, mat.k_c.z, alpha_x, alpha_y };
+			                          mat.k_c.x, mat.k_c.y, mat.k_c.z, alpha_x, alpha_y, mat.filmThickness, mat.filmEta };
 			bx.f(bxdf_wi_x, bxdf_wi_y, bxdf_wi_z, bxdf_wo_x, bxdf_wo_y, bxdf_wo_z, fr, fg, fb);
 		} else {
 			RoughMetalBxDF<float> bx{ mat.albedo.x, mat.albedo.y, mat.albedo.z, alpha, alpha };
@@ -723,7 +723,7 @@ static __device__ __forceinline__ bool sppm_sample_delta_material(
 		float G1_wi  = dist.G1(wi_x, wi_y, wi_z);
 		float G_wowi = dist.G(wo_x, wo_y, wo_z, wi_x, wi_y, wi_z);
 		float weight = (G1_wi > 1e-8f) ? G_wowi / G1_wi : 0.0f;
-		float3 F = FrConductorRGB(c_dot, mat.eta_c.x, mat.eta_c.y, mat.eta_c.z, mat.k_c.x, mat.k_c.y, mat.k_c.z);
+		float3 F = FrConductorRGB(c_dot, mat.eta_c.x, mat.eta_c.y, mat.eta_c.z, mat.k_c.x, mat.k_c.y, mat.k_c.z, mat.filmThickness, mat.filmEta);
 		out_atten = make_float3(F.x * weight, F.y * weight, F.z * weight);
 		out_dir   = normalize(wo_x*tan_v + wo_y*bitan + wo_z*n);
 		return true;

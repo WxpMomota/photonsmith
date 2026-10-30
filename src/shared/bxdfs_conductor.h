@@ -149,6 +149,19 @@ struct ConductorBxDF {
 	T k_r,   k_g,   k_b;   // extinction coefficient per channel
 	T alpha_x;               // GGX alpha (u-direction)
 	T alpha_y;               // GGX alpha (v-direction, set equal for isotropic)
+	T film_nm = T(0);        // a thin film on it (nanometres; 0: none) and the film's index: its colours (fresnel.h FrThinFilm)
+	T film_eta = T(1.33);
+
+	// The Fresnel reflectance at cos_theta (to the microfacet's normal): the bare metal's, or with a film the interference's.
+	CPU_GPU void fresnel(T cos_theta, T& fr, T& fg, T& fb) const {
+		if (film_nm > T(0)) {
+			FrThinFilmRGB(cos_theta, film_nm, film_eta, eta_r, eta_g, eta_b, k_r, k_g, k_b, fr, fg, fb);
+			return;
+		}
+		fr = FrComplex(cos_theta, eta_r, k_r);
+		fg = FrComplex(cos_theta, eta_g, k_g);
+		fb = FrComplex(cos_theta, eta_b, k_b);
+	}
 
 	CPU_GPU BxDFSampleResult<T> sample_local(
 		T wi_x, T wi_y, T wi_z,
@@ -172,9 +185,8 @@ struct ConductorBxDF {
 		T w  = (G1 > T(1e-8)) ? G / G1 : T(0);
 
 		res.wo_x = wo_x; res.wo_y = wo_y; res.wo_z = wo_z;
-		res.r = FrComplex(dot_wi_wm, eta_r, k_r) * w;
-		res.g = FrComplex(dot_wi_wm, eta_g, k_g) * w;
-		res.b = FrComplex(dot_wi_wm, eta_b, k_b) * w;
+		fresnel(dot_wi_wm, res.r, res.g, res.b);
+		res.r *= w; res.g *= w; res.b *= w;
 		res.is_specular = true;
 		res.valid = true;
 		return res;
@@ -203,9 +215,8 @@ struct ConductorBxDF {
 		T G = dist.G(wo_x, wo_y, wo_z, wi_x, wi_y, wi_z);
 		T dot_wi_wm = wi_x*hx + wi_y*hy + wi_z*hz;
 		T val = D * G / (T(4) * wi_z * wo_z);
-		fr = FrComplex(dot_wi_wm, eta_r, k_r) * val;
-		fg = FrComplex(dot_wi_wm, eta_g, k_g) * val;
-		fb = FrComplex(dot_wi_wm, eta_b, k_b) * val;
+		fresnel(dot_wi_wm, fr, fg, fb);
+		fr *= val; fg *= val; fb *= val;
 	}
 
 	// pdf(wi, wo) -- VNDF sampling density for the same queried wo.

@@ -63,6 +63,9 @@
 #include "film_terrain.h"
 #include "film_underwater.h"
 #include "film_wildlife.h"
+#include "film_sealife.h"
+#include "film_macro.h"
+#include "film_night.h"
 #include "film_water.h"
 #include "music_cues.h"
 #include "prop_physics.h"
@@ -370,6 +373,8 @@ struct Spec {
 	// animals (`flock`, `herd`)
 	std::vector<wildlife::Flock> flocks;
 	std::vector<wildlife::Herd> herds;
+	std::vector<wildlife::Hunt> hunts;   // (`hunt PREDATORS PREY at T ...`: round 13)
+	std::vector<wildlife::Flight> flights;   // (`flight KIND COUNT from X Y Z to X Y Z at T ...`: round 13)
 	// the sky's spectacles (`aurora`, `lightning`, `meteors`, `rainbow`)
 	std::vector<skyfx::Aurora> auroras;
 	std::vector<skyfx::Lightning> lightnings;
@@ -432,6 +437,9 @@ struct Spec {
 	underwater::Water underwater;
 	std::vector<underwater::Kelp> kelps;
 	std::vector<underwater::Coral> corals;
+	sealife::Life sealife;   // (`baitball`, `reeffish`, `jellyfish`, `seaturtles`: round 13, film_sealife.h)
+	macro::World macro;      // (`insects`, `dew`: the small world close up, round 13, film_macro.h)
+	night::Night night;      // (`night`, `cameratrap`, `shimmer`: night shots and the long lens, round 13, film_night.h)
 	// fire, lava and smoke (`fire`, `lava`, `volcano`, `wildfire`)
 	std::vector<fire::Fire> fires;
 	std::vector<fire::Lava> lavas;
