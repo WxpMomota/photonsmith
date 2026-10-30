@@ -383,7 +383,7 @@ struct WorkerProcess : cartoon_render::WorkerHandle {
 // handed to `png_converter` in frame order, and a resumed video's finished frames are not rendered again. Returns the number of frames that are rendered.
 // With `only`, just the frames it flags are rendered; `across` renders the other side of the film's dissolves and wipes (Film::sceneAcross) instead of its own frames.
 inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, const cartoon::Film &film, const std::filesystem::path &frames_dir, int render_frame_count,
-                               BackgroundPngConverter &png_converter, const std::vector<char> *only = nullptr, bool across = false) {
+                               BackgroundPngConverter &png_converter, const std::vector<char> *only = nullptr, bool across = false, int *firstError = nullptr) {
     const bool use_gpu = s.use_gpu;
     const int image_width = s.image_width, image_height = s.image_height, samples_per_pixel = s.samples_per_pixel, max_ray_depth = s.max_ray_depth;
     // how many frames to keep in flight follows the frame's size, its samples and the graphics card's free memory (RunPolicy::framesInFlight), unless the user chose
@@ -468,6 +468,7 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
             }
             if (const auto it = sceneSecondsOf.find(frame); it != sceneSecondsOf.end()) sceneSeconds = it->second;
             if (rc == 0 && !kept.count(frame)) frameSecondsTotal += seconds, sceneSecondsTotal += sceneSeconds, ++timedFrames;
+            if (rc != 0 && firstError && *firstError == 0) *firstError = rc;   // (what the run reports when no frame came out: the renderer's own reason)
         }
         std::ostringstream line;
         line << "\n[" << ++reported << "/" << render_frame_count << "] Rendering " << frame_file(frame).filename().string() << " (" << film.name << " at " << std::fixed << std::setprecision(2)
@@ -632,7 +633,7 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
     const double path_lookat_x = start.at_x, path_lookat_y = start.at_y, path_lookat_z = start.at_z;
 
     auto video_start_time = std::chrono::high_resolution_clock::now();
-    int successful_frames = 0;
+    int successful_frames = 0, first_frame_error = 0;
     const RunPolicy run_policy = RunPolicy::from(args);
     if (run_policy.smart) smart_power::start();   // (--smart-power: watch the computer from before the first frame; the workers and frame runs read what it finds)
 
@@ -687,7 +688,7 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
     if (farmed) {
         farmCartoonFrames(budgeted, s, *cartoon_film, frames_dir, render_frame_count, nullptr, false, "frames");
         successful_frames = cartoon_render::countFrames(frames_dir, render_frame_count);
-    } else if (cartoon_film) successful_frames = renderCartoonFrames(budgeted, s, *cartoon_film, frames_dir, render_frame_count, png_converter);
+    } else if (cartoon_film) successful_frames = renderCartoonFrames(budgeted, s, *cartoon_film, frames_dir, render_frame_count, png_converter, nullptr, false, &first_frame_error);
 
     // Render each frame with animated camera position
     for (int frame = 0; frame < (cartoon_film ? 0 : render_frame_count); ++frame) {
@@ -828,6 +829,7 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
             std::cout << " ✓ (" << (frame_duration.count() / 1000.0) << "s)" << std::endl;
         } else {
             std::cerr << " ✗ FAILED (error code: " << render_result << ")" << std::endl;
+            if (first_frame_error == 0) first_frame_error = render_result;
         }
     }
 
@@ -842,7 +844,7 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
 
     if (successful_frames == 0) {
         std::cerr << "ERROR: No frames rendered successfully!" << std::endl;
-        return ERR_FILE_WRITE_FAILED;
+        return first_frame_error != 0 ? first_frame_error : ERR_FILE_WRITE_FAILED;   // (the first frame's own error: a GPU that failed is not a file that could not be written)
     }
     if (successful_frames < render_frame_count && !cartoon_film) {   // (a film fills its holes, and says below how many frames failed: a draft's are left out on purpose)
         std::cout << "WARNING: " << (render_frame_count - successful_frames) << " of " << render_frame_count
