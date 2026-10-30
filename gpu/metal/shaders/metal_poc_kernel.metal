@@ -155,7 +155,7 @@ kernel void primaryRayKernel(
     // integrator (src/shared/adaptive_sampling.h's own
     // pixel_convergence::has_converged(), camera.h's render loop): once
     // a pixel's own running per-sample LUMINANCE estimate is confident
-    // enough (relative standard error below kAdaptiveThreshold) that
+    // enough (its noise on the screen below uniforms.adaptiveThreshold) that
     // more samples wouldn't change its mean much, stop early instead of
     // spending this pixel's full samplesPerPixel budget on it - a
     // genuinely converged sky/shadow/matte-wall region needs far fewer
@@ -269,11 +269,8 @@ kernel void primaryRayKernel(
         // Adaptive-sampling convergence check - see this kernel's own
         // opening comment. Welford's online update (matching
         // VarianceEstimator::Add()'s own formula exactly) on THIS
-        // sample's own luminance, then the same has_converged() test the
-        // CPU integrator uses: sample variance (M2/(n-1), undefined
-        // below n=2, hence the `> 1u` guard) turned into a standard
-        // error, compared against the running mean - relative, so scale-
-        // invariant regardless of this scene's own absolute brightness.
+        // sample's own luminance, then the same convergence rule the CPU
+        // integrator and both OptiX renderers use (pixelConverged below).
         if (uniforms.adaptiveSampling != 0u) {
             float lum = 0.2126 * radiance.x + 0.7152 * radiance.y + 0.0722 * radiance.z;
             convergedCount += 1;
@@ -281,24 +278,12 @@ kernel void primaryRayKernel(
             convergedMean += delta / float(convergedCount);
             float delta2 = lum - convergedMean;
             convergedM2 += delta * delta2;
-            if (convergedCount >= kAdaptiveMinSamples) {
-                bool blackConverged = convergedMean < kAdaptiveBlackFloor;
-                bool relativeConverged = false;
-                if (!blackConverged && convergedCount > 1u) {
-                    float variance = convergedM2 / float(convergedCount - 1u);
-                    float standardError = sqrt(variance / float(convergedCount));
-                    relativeConverged = (standardError / convergedMean) < uniforms.adaptiveThreshold;
-                }
-                if (blackConverged || relativeConverged) {
-                    // weightSum/accumColor already reflect only the
-                    // samples actually taken through this break (both
-                    // accumulated once per completed iteration above,
-                    // never for one that hasn't run yet) - no separate
-                    // "how many samples ran" count needed for the
-                    // normalization below, unlike before this function
-                    // divided by a plain actualSamples/sample-count.
-                    converged = true;
-                }
+            // The rule is src/shared/pixel_convergence_rule.h's, as on the CPU and in both OptiX renderers (pixelConverged): the pixel's noise in the exposed picture against a threshold in display
+            // units, and a pixel that stays black stops after 128 samples. (It used to be the relative standard error, which asked a dim pixel in fog for thousands of samples.)
+            if (convergedCount >= kAdaptiveMinSamples && pixelConverged(convergedCount, convergedMean, convergedM2, uniforms.adaptiveThreshold, uniforms.adaptiveExposure)) {
+                // weightSum/accumColor already reflect only the samples actually taken through this break (both accumulated once per completed iteration above, never for one that
+                // hasn't run yet) - no separate "how many samples ran" count needed for the normalization below.
+                converged = true;
             }
         }
         ++s;

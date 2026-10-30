@@ -104,7 +104,7 @@ struct MetalPocApp : PbrtSceneLoader {
     // rarely (caustics, light seen through glass - a rough-glass-fog sphere under a small lamp read ~10x too dark and kept black dots at any
     // sample count).
     bool adaptiveSamplingRequested = false;
-    float adaptiveThresholdValue = 0.01f;
+    float adaptiveThresholdValue = 0.003f;   // display units (pixel_convergence_rule.h): under one level of 255, as RenderOptions::adaptive_threshold
     // Skips buildScene()'s own hardcoded demo room lights (sun/fill/area/
     // projection/goniometric) when set - RenderOptions::isolate_pbrt_lighting's
     // own doc comment for the full "why" (section 197's C9 finding).
