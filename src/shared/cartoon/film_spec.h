@@ -64,6 +64,8 @@
 #include "film_underwater.h"
 #include "film_wildlife.h"
 #include "film_sealife.h"
+#include "film_seabed.h"
+#include "film_undersea.h"
 #include "film_macro.h"
 #include "film_night.h"
 #include "film_water.h"
@@ -119,6 +121,7 @@ struct Shot {
 		double fov = 0.0;
 	} move;
 	double handheld = 0.0;
+	bool waterline = false;   // (round 14 `waterline`: under the sea, the camera floats at the surface, half above it: film_undersea.h)
 	// (`fly`) a drone's flight over waypoints (pbrt's x z), a height above the land (smoothed so it does not bob over every rise), looking ahead and down or at a point
 	std::vector<std::pair<double, double>> fly;
 	double flyHeight = 60.0, flyFov = 0.0;
@@ -440,6 +443,13 @@ struct Spec {
 	sealife::Life sealife;   // (`baitball`, `reeffish`, `jellyfish`, `seaturtles`: round 13, film_sealife.h)
 	macro::World macro;      // (`insects`, `dew`: the small world close up, round 13, film_macro.h)
 	night::Night night;      // (`night`, `cameratrap`, `shimmer`: night shots and the long lens, round 13, film_night.h)
+	// under the sea, round 14: the water's flow (`current`), its bubbles and layers (`bubbles`, `halocline`: film_undersea.h), the deep's animals, the octopus and cuttlefish,
+	// the open water's swimmers (`deepsea`, `octopus`, `cuttlefish`, `swimmers`: film_deepsea.h), and the seabed's life and places (`seabed`, `wreck`, `arch`, `cenote`,
+	// `reefwall`: film_seabed.h)
+	underwater::Current current;
+	undersea::Sea undersea;
+	deepsea::Life deep;
+	seabed::World seabed;
 	// fire, lava and smoke (`fire`, `lava`, `volcano`, `wildfire`)
 	std::vector<fire::Fire> fires;
 	std::vector<fire::Lava> lavas;

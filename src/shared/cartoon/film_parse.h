@@ -160,6 +160,16 @@
 //     dew      400  in -0.25 -0.25 0.25 0.25                    # (iridescent: a thin film); dewy grass; use with a close `key` and a lens
 //     night    eyeshine 1  flash 1                              # night (film_night.h): eyes shining back, a flash; `cameratrap [ir] [name W]
 //     shimmer  0.004                                            # [clock HH:MM] [date D] [temp C]`: a trail camera's picture; heat shimmer
+//     underwater  lamp 1  ripples                               # under the sea, round 14: a diver's lamp, rippled sand; looking up, Snell's window
+//     waterline                                                 # (a shot's word: its camera floats at the surface, half above it, drops on its dome)
+//     current  0.3 toward 90  surge 6                           # the water's flow (film_undersea.h): kelp, grass, snow, bubbles, fish all in it
+//     bubbles  stream 2 0 -6  rate 8                            # bubbles rising (Boyle's law): `breath X Y Z [every P]`, `net X Z at T`, `ring X Y Z at T`
+//     halocline -9                                              # a boundary between two waters: it shimmers, and mirrors at a glancing look
+//     deepsea  lanternfish 60  in -4 2 -8 4 4 -3                # the deep (film_deepsea.h): anglerfish, lanternfish, combjellies, siphonophores; `deepsea sparks`
+//     octopus  0 0 -3  toward 90  hide 6  jet 12  ink 11.8      # an octopus crawling, hiding, jetting off, inking; `cuttlefish N at X Y Z`
+//     swimmers mantas 2  at 0 6 -12  radius 8                   # mantas, eaglerays, stingrays (`rise T`), sealions, penguins, otters
+//     seabed   anemones 6  in -3 -6 3 -3                        # life on the seabed (film_seabed.h): anemones, seagrass, starfish, urchins, crabs, gardeneels
+//     wreck    0 -20  toward 60  length 28  list 18             # places: a wreck, `arch X Z`, `cenote X Z [radius R] [depth D]`, `reefwall X Z [length L] [height H]`
 //     space    stars 1  milkyway 1  sun 60 15                   # the universe (film_space.h, round 10): a set in space - the stars all round, the Milky Way, the sun a
 //                                                               # glowing ball at a bearing and an elevation; no sky, no air
 //     planet   home ocean  at 0 0 -20000  radius 6000           # a planet (film_planets.h): rocky, desert, ice, ocean, gas or lava; `tilt`, `spin SECONDS`

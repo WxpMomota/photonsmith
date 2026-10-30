@@ -271,32 +271,61 @@ static std::string universeText(const Spec &spec, const std::string &header, dou
 	return out;
 }
 
-std::string DataFilm::worldAt(const std::string &header, double t) const {
-	std::string out = film_camera::exposed(header, exposureAt(t));
-	const double nt = natureAt(t);   // (nature's time: the clouds, the water, the aurora, the wind, the animals; `timelapse`, `slowmo`)
-	if (spec.hasUnderwater) {   // under the sea (film_underwater.h): the water round the camera, the light coming down through it, what drifts and grows in it
-		Vec3 eye, target;
-		double fov = 40.0;
-		film_subjects::cameraOf(header, eye, target, fov);
-		const std::size_t camera = out.find("Camera \"");
-		if (camera != std::string::npos) out = out.substr(0, camera) + underwater::beforeCamera(spec.underwater) + out.substr(camera) + underwater::boundary(Vec3{eye.x, spec.seas[0].level - 3000.0, eye.z}, 3000.0);   // (a sphere so big its top is the surface: the water below it, the sun down through its depth)
-		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
-		const double floorY = spec.seas[0].level - 15.0;
-		const auto groundAt = [&](double x, double z) { return ground && ground->inside(x, z) ? ground->heightAt(x, z) : (ground ? spec.terrain.y : floorY); };
-		const std::string film = spec.key.empty() ? std::string("film") : spec.key;
-		if (!ground) {   // (no terrain: a plain sandy floor 15 m down)
-			char buf[320];
-			std::snprintf(buf, sizeof buf, "AttributeBegin\n  Material \"diffuse\" \"rgb reflectance\" [ 0.5 0.44 0.32 ]\n  Shape \"trianglemesh\" \"integer indices\" [ 0 1 2 0 2 3 ] \"point3 P\" [ -2000 %.3f -2000  2000 %.3f -2000  2000 %.3f 2000  -2000 %.3f 2000 ]\nAttributeEnd\n",
-						  floorY, floorY, floorY, floorY);
-			out += buf;
-		}
-		const double bedDepth = spec.tracedCaustics ? std::max(0.0, spec.seas[0].level - groundAt(-eye.x, eye.z)) : -1.0;   // (`caustics traced`: the net for the bed under the camera)
-		out += underwater::causticText(film, nt, -eye.x, eye.z, groundAt, bedDepth);
-		out += underwater::shaftsText(film, nt, Vec3{-eye.x, eye.y, eye.z}, spec.seas[0].level, bedDepth);
-		out += underwater::snowText(t, eye);
-		for (const underwater::Kelp &k : spec.kelps) out += underwater::kelpText(k, nt, groundAt);
-		for (const underwater::Coral &c : spec.corals) out += underwater::coralText(c, groundAt);
+// Under the sea (film_underwater.h, round 14's film_undersea.h, film_deepsea.h, film_seabed.h): the water round the camera - the camera in it, or at its surface half above
+// it, or above it - the light coming down through it and the mirror beyond Snell's window, what drifts, grows, swims and bubbles in it, and the seabed's places. `out` is the
+// frame so far (its Camera line: the water's medium goes before it); the look's words for a camera at the waterline are added last of all (worldAt).
+static std::string underTheSea(const Spec &spec, std::string out, const std::string &header, double t, double nt) {
+	Vec3 eye, target;
+	double fov = 40.0;
+	film_subjects::cameraOf(header, eye, target, fov);
+	const Vec3 eyeP{-eye.x, eye.y, eye.z}, targetP{-target.x, target.y, target.z};   // (pbrt's)
+	const water::Sea &sea = spec.seas[0];
+	const undersea::Waterline wl = undersea::waterlineOf(sea, nt, eyeP);
+	const std::size_t camera = out.find("Camera \"");
+	if (camera != std::string::npos) {   // (a sphere so big its top is the surface - or, at the waterline, the plane through the lens where the line crosses its dome: the water below it)
+		const Vec3 centre = wl.where == undersea::Waterline::At ? undersea::waterlineCentre(eyeP, targetP, wl.elevation, 3000.0) : Vec3{eye.x, sea.level - 3000.0, eye.z};
+		out = out.substr(0, camera) + underwater::beforeCamera(spec.underwater, wl.where == undersea::Waterline::Under) + out.substr(camera) + underwater::boundary(centre, 3000.0);
 	}
+	const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
+	const double floorY = sea.level - 15.0;
+	const auto groundAt = [&](double x, double z) { return ground && ground->inside(x, z) ? ground->heightAt(x, z) : (ground ? spec.terrain.y : floorY); };
+	const std::string film = spec.key.empty() ? std::string("film") : spec.key;
+	if (!ground) {   // (no terrain: a plain sandy floor 15 m down)
+		char buf[320];
+		std::snprintf(buf, sizeof buf, "AttributeBegin\n  Material \"diffuse\" \"rgb reflectance\" [ 0.5 0.44 0.32 ]\n  Shape \"trianglemesh\" \"integer indices\" [ 0 1 2 0 2 3 ] \"point3 P\" [ -2000 %.3f -2000  2000 %.3f -2000  2000 %.3f 2000  -2000 %.3f 2000 ]\nAttributeEnd\n",
+					  floorY, floorY, floorY, floorY);
+		out += buf;
+	}
+	const double bedDepth = spec.tracedCaustics ? std::max(0.0, sea.level - groundAt(-eye.x, eye.z)) : -1.0;   // (`caustics traced`: the net for the bed under the camera)
+	out += underwater::causticText(film, nt, -eye.x, eye.z, groundAt, bedDepth, spec.underwater.ripples, sea.level - groundAt(-eye.x, eye.z));
+	out += underwater::shaftsText(film, nt, eyeP, sea.level, bedDepth);
+	const Vec3 flow = spec.current.velocity(nt), drift = spec.current.drift(nt);
+	if (wl.where != undersea::Waterline::Above) {
+		out += underwater::snowText(t, eye, drift, wl.where == undersea::Waterline::At ? wl.surface : 1e30);
+		out += undersea::windowText(sea, nt, eyeP);   // (round 14: the mirror beyond Snell's window)
+	}
+	if (spec.underwater.lamp > 0.0) out += undersea::lampText(spec.underwater.lamp, eyeP, targetP) + undersea::backscatterText(t, eye, drift);
+	for (const underwater::Kelp &k : spec.kelps) out += underwater::kelpText(k, nt, groundAt, flow);
+	for (const underwater::Coral &c : spec.corals) out += underwater::coralText(c, groundAt);
+	out += undersea::text(undersea::lifted(spec.undersea, groundAt), nt, sea.level, spec.current, eyeP);
+	out += deepsea::text(film, deepsea::lifted(spec.deep, groundAt), nt, sea.level, spec.current);
+	out += seabed::text(film, spec.seabed, nt, groundAt, flow, eyeP);
+	return out;
+}
+// How much more `exposure auto` opens up for a camera under the water, by its depth (film_undersea.h depthExposure); 1 for any other.
+static double underTheSeaExposure(const Spec &spec, const std::string &header) {
+	if (!spec.hasUnderwater || !spec.exposureAuto || spec.seas.empty()) return 1.0;
+	Vec3 eye, target;
+	double fov = 40.0;
+	if (!film_subjects::cameraOf(header, eye, target, fov)) return 1.0;
+	return undersea::depthExposure(spec.underwater, spec.seas[0].level - eye.y);
+}
+
+std::string DataFilm::worldAt(const std::string &given, double t) const {
+	const double nt = natureAt(t);   // (nature's time: the clouds, the water, the aurora, the wind, the animals; `timelapse`, `slowmo`)
+	const std::string header = spec.hasUnderwater ? undersea::floated(given, spec.seas[0], nt, !spec.shots.empty() && spec.shots[shotAt(t)].waterline) : given;   // (a camera at the surface floats on it: film_undersea.h)
+	std::string out = film_camera::exposed(header, exposureAt(t) * underTheSeaExposure(spec, header));
+	if (spec.hasUnderwater) out = underTheSea(spec, out, header, t, nt);   // under the sea: the water round the camera, the light coming down through it, what lives in it
 	if (!spec.fires.empty() || !spec.lavas.empty() || !spec.volcanoes.empty() || !spec.wildfires.empty()) {   // fire, lava and smoke (film_fire.h)
 		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
 		const auto groundAt = [&](double x, double z) { return ground && ground->inside(x, z) ? ground->heightAt(x, z) : (ground ? spec.terrain.y : 0.0); };
@@ -455,6 +484,7 @@ std::string DataFilm::worldAt(const std::string &header, double t) const {
 		const double aspect = 16.0 / 9.0, hfov = 2.0 * std::atan(std::tan(fov * kPi / 360.0) * aspect) * 180.0 / kPi;   // (a film's fov is its shorter side's)
 		for (water::Sea sea : spec.seas) {
 			sea.glow = sea.glow * (1.0 / std::max(1.0, exposureAt(t)));   // (living light as bright on the screen however far the night camera has opened up)
+			if (spec.hasUnderwater && undersea::waterlineOf(sea, nt, {-eye.x, eye.y, eye.z}).where == undersea::Waterline::At) sea.holeX = -eye.x, sea.holeZ = eye.z, sea.holeR = 1.5;   // (clear of a lens at the waterline)
 			out += water::seaText(sea, nt, eye, target, hfov, ground.get(), spec.swell.on ? &spec.swell : nullptr);
 		}
 		if (spec.swell.on && ground) out += surf::shallowsCausticText(spec.key.empty() ? std::string("film") : spec.key, nt, -eye.x, eye.z, *ground, spec.seas[0].level, spec.tracedCaustics);
@@ -493,7 +523,7 @@ std::string DataFilm::worldAt(const std::string &header, double t) const {
 	if (spec.sealife.any()) {   // life under the sea (film_sealife.h)
 		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
 		const auto groundAt = [&](double x, double z) { return ground && ground->inside(x, z) ? ground->heightAt(x, z) : (ground ? spec.terrain.y : 0.0); };
-		out += sealife::text(sealife::lifted(spec.sealife, groundAt), nt);
+		out += sealife::text(sealife::lifted(spec.sealife, groundAt), nt, spec.current.velocity(nt), spec.current.drift(nt));
 	}
 	if (spec.night.flashNow() > 0.0) {   // a camera's flash (film_night.h)
 		Vec3 eye, target;
@@ -555,6 +585,13 @@ std::string DataFilm::worldAt(const std::string &header, double t) const {
 	out = shot_lighting::withLights(out, shotLightsAt(header, t));
 	out = marksAt(header, t) + out;   // the cartoon marks over the frame (film_marks.h): its `# @rt-mark` lines, before everything (the launcher draws them after the render)
 	out = night::withLook(out, spec.night, t);   // (a trail camera's look, heat shimmer: film_night.h)
+	if (spec.hasUnderwater) {   // a camera at the waterline: the line across its dome and the drops above it (film_undersea.h)
+		Vec3 eye, target;
+		double fov = 40.0;
+		film_subjects::cameraOf(header, eye, target, fov);
+		const undersea::Waterline wl = undersea::waterlineOf(spec.seas[0], nt, {-eye.x, eye.y, eye.z});
+		if (wl.where == undersea::Waterline::At) out = night::withWords(out, undersea::waterlineLook({-eye.x, eye.y, eye.z}, {-target.x, target.y, target.z}, fov, wl.elevation, t));
+	}
 	return spec.space.on ? cosmos::withSpaceLook(space::recentred(out), spec.space.flare, spec.space.bloom) : out;   // (a floating origin for a film in space: film_space.h)
 }
 
@@ -637,7 +674,7 @@ void DataFilm::soundscape(audio::Mix &m) const {
 	const bool eagles = std::any_of(spec.flocks.begin(), spec.flocks.end(), [](const wildlife::Flock &f) { return f.kind == "eagles"; });
 	if (spec.falls.empty() && spec.fires.empty() && spec.lavas.empty() && spec.volcanoes.empty() && spec.wildfires.empty() && !spec.swell.on && spec.herds.empty() && !eagles &&
 		spec.forests.empty() && spec.geysers.empty() && spec.rockfalls.empty() && spec.avalanches.empty() && spec.quakes.empty() && spec.whales.empty() && spec.pods.empty() && spec.glaciers.empty() && spec.tornadoes.empty() &&
-		!spec.space.on && spec.ships.empty() && spec.astronauts.empty() && spec.descents.empty())
+		!spec.space.on && spec.ships.empty() && spec.astronauts.empty() && spec.descents.empty() && spec.undersea.breaths.empty() && spec.undersea.streams.empty())
 		return;
 	namespace ss = soundscape;
 	const ss::Ears ears = ss::earsOf(m.seconds(), [this](double t, Vec3 &eye, Vec3 &target) {
@@ -682,6 +719,22 @@ void DataFilm::soundscape(audio::Mix &m) const {
 			for (int k = 0; k < 40; ++k) (natureAt(0.5 * (lo + hi)) < ntv ? lo : hi) = 0.5 * (lo + hi);
 			return hi;
 		});
+	// under the sea (film_undersea.h): a diver breathing - the regulator's hiss, then the burble of the breath going out - and the bubbles of a stream
+	for (std::size_t i = 0; i < spec.undersea.breaths.size(); ++i) {
+		const undersea::Breath &b = spec.undersea.breaths[i];
+		const Vec3 at = b.at + Vec3{0.0, groundAt(b.at.x, b.at.z), 0.0};
+		for (double t0 = 0.0; t0 < T; t0 += std::max(1.5, b.every)) {
+			const unsigned seed = 2101u + static_cast<unsigned>(i * 977 + t0 * 10.0);
+			ss::place(m, ears, t0 + 0.05 * b.every, at, audio::noiseBurst(0.35 * b.every, 0.1, 0.25 * b.every, 2200.0, 6500.0, seed), 0.35, 30.0);
+			for (int k = 0; k < 9; ++k) ss::place(m, ears, t0 + 0.4 * b.every + 0.13 * k, at, ss::bubble(seed + 3u * static_cast<unsigned>(k)), 0.5, 30.0);
+		}
+	}
+	for (std::size_t i = 0; i < spec.undersea.streams.size(); ++i) {
+		const undersea::Stream &st = spec.undersea.streams[i];
+		const Vec3 at = st.at + Vec3{0.0, groundAt(st.at.x, st.at.z), 0.0};
+		for (double t0 = std::max(0.0, st.t0); t0 < std::min(T, st.t1); t0 += 0.15 + 0.6 * audio::unit(2301u + static_cast<unsigned>(t0 * 100.0) + static_cast<unsigned>(i)))
+			ss::place(m, ears, t0, at, ss::bubble(2401u + static_cast<unsigned>(t0 * 100.0)), 0.25 * std::min(2.0, std::sqrt(st.rate / 6.0)), 20.0);
+	}
 	// waterfalls: a roar from the pool at the foot of each
 	for (std::size_t i = 0; i < spec.falls.size(); ++i) {
 		const water::Fall &f = spec.falls[i];

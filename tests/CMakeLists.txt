@@ -294,6 +294,7 @@ add_executable(unit_tests
     unit/film_space11_tests.cpp
     unit/film_character12_tests.cpp
     unit/film_animals13_tests.cpp
+    unit/film_undersea14_tests.cpp
     unit/film_whole_tests.cpp
     unit/toon_look_tests.cpp
     unit/height_fog_tests.cpp

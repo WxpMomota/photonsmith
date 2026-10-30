@@ -206,14 +206,15 @@ inline std::string ballText(const BaitBall &b, double t) {
 	}
 	return out;
 }
-// Reef fish at t: each circling a home of its own, in its colour.
-inline std::string reefText(const Reef &r, double t) {
+// Reef fish at t: each circling a home of its own, in its colour; in a current (`flow`, pbrt's metres a second: round 14) they hold station, facing into it.
+inline std::string reefText(const Reef &r, double t, const Vec3 &flow = Vec3{0.0, 0.0, 0.0}) {
 	std::string out = "# reef fish (film_sealife.h)\n";
 	for (int i = 0; i < r.count; ++i) {
 		const Vec3 home{r.lo.x + (r.hi.x - r.lo.x) * hash01(i, r.seed + 1), r.lo.y + (r.hi.y - r.lo.y) * hash01(i, r.seed + 2), r.lo.z + (r.hi.z - r.lo.z) * hash01(i, r.seed + 3)};
 		const double R = 0.3 + 0.9 * hash01(i, r.seed + 4), w = (0.25 + 0.3 * hash01(i, r.seed + 5)) * (hash01(i, r.seed + 6) < 0.5 ? -1.0 : 1.0), a = w * t + 6.2832 * hash01(i, r.seed + 7);
 		const Vec3 p = home + Vec3{R * std::cos(a), 0.15 * std::sin(1.3 * a), R * std::sin(a)};
-		const Vec3 fwd{-std::sin(a) * w, 0.0, std::cos(a) * w};
+		Vec3 fwd{-std::sin(a) * w, 0.0, std::cos(a) * w};
+		if (length(flow) > 1e-6) fwd = lerp(normalize(fwd), normalize(flow * -1.0), std::min(0.85, 3.0 * length(flow)));
 		const int c = static_cast<int>(hash01(i, r.seed + 8) * 6.0) % 6;
 		const int pose = static_cast<int>(std::floor((t * 3.0 + hash01(i, r.seed + 9)) * detail::kPoses)) % detail::kPoses;
 		out += nature::placeObject("sea_reef_" + std::to_string(c) + "_" + std::to_string(pose), mul(translate(detail::story(p)), detail::facingOf(detail::story(fwd)), scale(0.8 + 0.5 * hash01(i, r.seed + 10))));
@@ -221,7 +222,8 @@ inline std::string reefText(const Reef &r, double t) {
 	return out;
 }
 // Jellyfish at t (see the top): each pulsing every 1.2 to 2 s, rising a little with each pulse and sinking slowly between them.
-inline std::string jellyText(const Jellies &j, double t) {
+// `drift` (pbrt's, round 14): how far the current has carried the water by t - the jellyfish go with it.
+inline std::string jellyText(const Jellies &j, double t, const Vec3 &drift = Vec3{0.0, 0.0, 0.0}) {
 	std::string out = "# jellyfish (film_sealife.h)\n";
 	for (int i = 0; i < j.count; ++i) {
 		const int s = j.seed * 89 + i;
@@ -229,7 +231,7 @@ inline std::string jellyText(const Jellies &j, double t) {
 		const double squeeze = ph < 0.3 ? std::sin(kPi * ph / 0.3) : 0.0;   // (the bell's quick contraction, then a slow relaxing)
 		const double size = 0.15 + 0.2 * hash01(s, 3);
 		const double rise = 0.08 * size * std::floor(t / period) + 0.08 * size * smoothstep(0.0, 0.4, ph) - 0.01 * t;
-		const Vec3 at{j.lo.x + (j.hi.x - j.lo.x) * hash01(s, 4), j.lo.y + (j.hi.y - j.lo.y) * hash01(s, 5) + rise, j.lo.z + (j.hi.z - j.lo.z) * hash01(s, 6)};
+		const Vec3 at = Vec3{j.lo.x + (j.hi.x - j.lo.x) * hash01(s, 4), j.lo.y + (j.hi.y - j.lo.y) * hash01(s, 5) + rise, j.lo.z + (j.hi.z - j.lo.z) * hash01(s, 6)} + drift;
 		const double wide = 1.0 - 0.28 * squeeze, tall = 1.0 + 0.2 * squeeze;
 		Mesh bell = lathe({{0.0, 0.62 * tall}, {0.45 * wide, 0.55 * tall}, {0.85 * wide, 0.32 * tall}, {1.0 * wide, 0.05}, {0.92 * wide, -0.02}, {0.8 * wide, 0.06}, {0.0, 0.25 * tall}}, 24);
 		const Mat4 place = mul(translate(detail::story(at)), rotate({1, 0, 0}, 8.0 * std::sin(0.3 * t + s)), scale(size));
@@ -302,15 +304,15 @@ inline Life lifted(Life life, const std::function<double(double, double)> &groun
 	}
 	return life;
 }
-// All of a film's sea life at t.
-inline std::string text(const Life &life, double t) {
+// All of a film's sea life at t (in the current's `flow` and `drift`: film_underwater.h Current).
+inline std::string text(const Life &life, double t, const Vec3 &flow = Vec3{0.0, 0.0, 0.0}, const Vec3 &drift = Vec3{0.0, 0.0, 0.0}) {
 	if (!life.any()) return std::string();
 	bool sharks = false;
 	for (const BaitBall &b : life.balls) sharks = sharks || b.hunter != "dolphins";
 	std::string out = detail::objects(!life.balls.empty(), sharks, !life.reefs.empty());
 	for (const BaitBall &b : life.balls) out += ballText(b, t);
-	for (const Reef &r : life.reefs) out += reefText(r, t);
-	for (const Jellies &j : life.jellies) out += jellyText(j, t);
+	for (const Reef &r : life.reefs) out += reefText(r, t, flow);
+	for (const Jellies &j : life.jellies) out += jellyText(j, t, drift);
 	for (const Turtles &tu : life.turtles) out += turtleText(tu, t);
 	return out;
 }

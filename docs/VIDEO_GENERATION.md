@@ -2181,6 +2181,93 @@ Animals call (film_soundscape.h): a standing herd's callers now and then - a lio
 wolf's howl, a bear's growl, a fox's bark, a zebra's or a penguin's bray, a horse's whinny, a deer's bark - from a small synthesised voice (a buzz through two formants,
 roughened for a growl), placed where the animal is; geese honk and eagles cry as a flight goes.
 
+### Under the sea, round 14 (2026-10-30)
+
+Ten things for films under the water (with `water` and `underwater`). Heights of what is placed on these lines are above the seabed - a terrain's ground, or the plain
+sandy floor 15 m under the surface when there is none (the camera's keys are as ever: above a terrain's ground, else in the world).
+
+**The surface from below.** (film_undersea.h) Looking up from under the water, the whole sky is squeezed into a circle overhead - Snell's window, 48.6 degrees from straight
+up - and beyond it the surface is a mirror of what is under it (total internal reflection). The mirror is laid just under the sea's thin surface wherever the line of sight
+meets a wave past the critical angle, each wave at its own slope, so the window's edge ripples and wobbles; it casts no shadows (ray visibility), so the sun still comes down
+through it. Nothing to write: every underwater frame has it.
+
+**Half above, half below: `waterline`.** A shot's word (`shot 4 Over and under` then `waterline`): its camera floats at the surface, a dome port half in the water. The air
+above and the water below are split where the waves stand on the dome, so the line rocks up and down the picture as they go by; the lens look draws its meniscus - a dark,
+wavering edge with a bright one over it - and drops of water running slowly down the dome above it (`lens_look.h` `waterline Y`, `drops D`, `drops-time T`). Any camera
+put within 0.6 m of the surface floats on it too.
+
+**Depth and light: `underwater ... lamp L ripples`, `halocline Y`, `exposure auto`.** The water takes red first, then orange and yellow, as the light comes down through it
+(it always did); `exposure auto` now opens up as the camera goes down, and the painted caustics fade out on a bed deeper than 10 m and are gone below 35 m. `lamp L` puts a
+diver's lamp on the camera (a warm spot a little to the side of the lens): the colours the depth took come back close to it, and specks in the water glint in its beam
+(backscatter) - with a lamp the exposure opens up only a little. `ripples`: the sand of the seabed in ripples. `halocline Y [strength S]`: the boundary between two waters
+at height Y (in the world), a slowly heaving sheet that bends the light a little and mirrors at a glancing look.
+
+```
+underwater clarity 1.5  colour blue  lamp 0.8  ripples
+exposure   auto
+halocline  -9
+```
+
+**The deep: `deepsea KIND N in X0 Y0 Z0 X1 Y1 Z1`, `deepsea sparks`.** (film_deepsea.h) Anglerfish hang nearly still, a gape of needle teeth under the lure on their rod,
+glowing blue-white (a small light: it lights its own face); lanternfish swim in loose schools, rows of blue lights along their bellies; comb jellies drift, rainbows running
+down their eight comb rows (thin-film conductors, round 13's iridescence - they need light, a lamp, to show); siphonophores trail tens of metres of stem, swimming bells at
+the head, glowing faintly blue all along. `deepsea sparks`: the water lights up blue behind the animals of the deep as they swim. The deep's own lights light nothing (they
+are never sampled), so a film 300 m down is dark but for them and the lamp.
+
+```
+terrain    dunes  size 400  height 1  y -300  far off
+deepsea    lanternfish 60  in -4 2 -8 4 4 -3
+deepsea    anglerfish 2  in -1 1 -3 1 1.5 -2
+deepsea    sparks
+```
+
+**The octopus and the cuttlefish: `octopus X Y Z [toward A] [size S] [jet T]... [ink T]... [hide T]`, `cuttlefish N at X Y Z [radius R]`.** An octopus crawls over the
+seabed on its arms, each reaching and pulling in its own time, the tips curling. `hide T`: it stops, curls its arms in, its skin turns the colour of the sand and rises in
+bumps. `jet T`: it blanches and shoots off backwards, mantle first, arms streaming behind, and settles again. `ink T`: a dark cloud left where it was, spreading, rising a
+little and drifting with the current (an absorbing grid medium: on the CPU, a frame with it loses the water round the camera - render it on the GPU). Cuttlefish hover,
+the fin round the mantle rippling in waves, dark bands passing over their backs.
+
+**Animals that fly through water: `swimmers mantas|eaglerays|stingrays|sealions|penguins|otters N at X Y Z [radius R] [rise T]`.** Mantas fly slowly on wings 4 m across,
+dark above, white below; eagle rays are smaller and quicker, white-spotted, with long tails. Stingrays lie buried in the sand until `rise T`, then lift off in a cloud of
+sand and glide away, their rims rippling. Sea lions loop and roll; penguins rocket past on beating wings with trails of bubbles from their feathers; otters float on their
+backs at the surface (whatever Y says), turning right over now and then.
+
+**Bubbles: `bubbles stream X Y Z [rate R] [size S] [during T0 T1]`, `bubbles breath X Y Z [every P]`, `bubbles net X Z at T [radius R] [depth D]`, `bubbles ring X Y Z at
+T`.** (film_undersea.h) Each bubble rises at the speed its size gives it (a few millimetres at about a quarter of a metre a second, zigzagging; the big ones as flattened caps
+that rock, faster), grows as the pressure falls on the way up (Boyle's law), drifts with the current and is gone at the surface. They are air in water - a dielectric of eta
+1/1.333, so they mirror silver at their edges - and cast no shadows. A stream comes from a vent or a crack; a breath is a diver's, a burst every P seconds of a few big caps
+and a cloud of small bubbles (heard: the regulator's hiss, then the burble); a net is a humpback's spiral curtain, blown over 10 s; a ring rises and widens. Under the water
+the sea is heard as a reef - a low hush, the crackle of snapping shrimp and a burble now and then - not as waves (`ambience reef`).
+
+**Life on the seabed: `seabed anemones|seagrass|starfish|urchins|crabs|gardeneels N in X0 Z0 X1 Z1`.** (film_seabed.h) Anemones crowned with a hundred swaying tentacles,
+clownfish living in them, darting out and ducking back in; seagrass meadows (N clumps) bending with the current; starfish and urchins on the sand; crabs walking sideways in
+short dashes, claws up; garden eels standing out of their holes facing into the current - sinking back in as the camera comes within a few metres.
+
+**One current for everything: `current SPEED toward A [surge P]`.** (film_underwater.h Current) The water's flow, SPEED metres a second towards A degrees: kelp, seagrass and
+anemone tentacles lean with it, the marine snow, the jellyfish and the bubbles drift in it, ink is carried by it, and reef fish turn to hold station against it. `surge P`
+swings it back and forth every P seconds (as much as SPEED each way) about a slow onward drift - the push and pull near a shore.
+
+```
+current  0.25 toward 90  surge 6
+seabed   anemones 6  in -3 -6 3 -3
+seabed   gardeneels 60  in 4 -8 10 -2
+```
+
+**Places to film: `wreck X Z [toward A] [length L] [list D]`, `arch X Z [toward A] [size S]`, `cenote X Z [radius R] [depth D]`, `reefwall X Z [toward A] [length L]
+[height H]`.** (film_seabed.h; each made once as a PLY file) A sunken ship, its rusted hull open where the deck rotted away, ribs and portholes, a fallen mast, settled on
+its side and grown over with corals. A rock arch with holes in its roof the sun shines down through. A cenote: a cavern in the rock, flooded, open to the sky through a round
+hole at the surface - one beam of sunlight down to its floor D below (with a `halocline` half way down), roots hanging from the opening. A reef wall rising sheer from the
+floor, crowded with sea fans and sponges: with a deep floor (a terrain far down), a drop-off into the blue.
+
+```
+wreck     0 -20  toward 60  length 28  list 18
+arch      -25 5  toward 90  size 1.2
+cenote    0 40  radius 10  depth 18
+reefwall  25 0  toward -90  length 30  height 16
+```
+
+Metal (the Mac) does not draw the comb jellies' thin films yet.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

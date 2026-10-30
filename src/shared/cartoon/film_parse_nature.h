@@ -4,6 +4,7 @@
 // land in action, slow motion, time-lapse and exposure. parse() hands every line to natureLine() first.
 
 #include "film_parse_space.h"   // (and film_spec.h)
+#include "film_parse_sea.h"
 
 namespace cartoon {
 namespace film_file {
@@ -1089,15 +1090,8 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 			}
 		}
 		s.fog.on = true;
-	} else if (verb == "underwater") {
-		const std::vector<std::string> t = detail::tokens(line);
-		for (std::size_t i = 1; i < t.size(); i += 2) {
-			double v = 0.0;
-			if (i + 1 < t.size() && t[i] == "clarity" && number(t[i + 1], v) && v > 0.05 && v <= 10.0) s.underwater.clarity = v;
-			else if (i + 1 < t.size() && t[i] == "colour" && std::find(underwater::colours().begin(), underwater::colours().end(), t[i + 1]) != underwater::colours().end()) s.underwater.colour = t[i + 1];
-			else return fail("`underwater [clarity C] [colour blue|green|teal]`: the camera is under the film's `water` (clarity 1 a clear sea, 2 tropical, 0.5 murky)");
-		}
-		s.hasUnderwater = true;
+	} else if (underseaVerb(verb)) {   // under the sea: the water, its flow, bubbles, the deep, the seabed and its places (film_parse_sea.h)
+		return underseaLine(s, verb, line);
 	} else if (verb == "kelp" || verb == "coral") {
 		const std::vector<std::string> t = detail::tokens(line);
 		underwater::Kelp kp;

@@ -73,8 +73,8 @@ inline std::string lookWords(const Night &n, double t) {
 	}
 	return out;
 }
-inline std::string withLook(std::string scene, const Night &n, double t) {
-	const std::string words = lookWords(n, t);
+// `words` added to the scene's look line (one made when it has none); the scene as it was for none.
+inline std::string withWords(std::string scene, const std::string &words) {
 	if (words.empty()) return scene;
 	const std::size_t look = scene.find("# @rt-look");
 	if (look == std::string::npos) return "# @rt-look" + words + "\n" + scene;
@@ -83,6 +83,7 @@ inline std::string withLook(std::string scene, const Night &n, double t) {
 	if (end > look && scene[end - 1] == '\r') --end;
 	return scene.insert(end, words);
 }
+inline std::string withLook(std::string scene, const Night &n, double t) { return withWords(std::move(scene), lookWords(n, t)); }
 
 }  // namespace night
 }  // namespace cartoon
