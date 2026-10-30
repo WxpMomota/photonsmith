@@ -379,7 +379,7 @@ class DataFilm {
 	std::string terminated(std::string text) const;
 	// `text` with `words` (pbrt parameters) added to every Material and MakeNamedMaterial statement in it.
 	static std::string withMaterialWords(const std::string &text, const std::string &words);
-	// The film's rigid-body world (igid, rigid_world.h), with its characters' bodies and feet pushing what is in their way.
+	// The film's rigid-body world (rigid, rigid_world.h), with its characters' bodies and feet pushing what is in their way.
 	std::shared_ptr<const rigid::Run> rigidRun() const;
 
 	// ---- how shots give way to each other ----
