@@ -454,6 +454,9 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
     if (timeout > 0) std::cout << " (a frame that takes more than " << timeout << " s is stopped and tried once more)";
     std::cout << "." << std::endl;
     int reported = resumed;
+    // what the count runs to: the frames finished before (a resume) and the ones this run renders - not every frame of the film, which a draft (one in N) or an `only` mask
+    // never renders, so the GUI's bar, its "k of N frames" and its estimate (they read these lines) would stop at a quarter of the way for a 1-in-4 draft
+    const int reportTotal = resumed + toRender;
     const auto wasKept = [&](int frame) {
         std::lock_guard<std::mutex> hold(keptLock);
         return kept.count(frame) > 0;
@@ -471,7 +474,7 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
             if (rc != 0 && firstError && *firstError == 0) *firstError = rc;   // (what the run reports when no frame came out: the renderer's own reason)
         }
         std::ostringstream line;
-        line << "\n[" << ++reported << "/" << render_frame_count << "] Rendering " << frame_file(frame).filename().string() << " (" << film.name << " at " << std::fixed << std::setprecision(2)
+        line << "\n[" << ++reported << "/" << reportTotal << "] Rendering " << frame_file(frame).filename().string() << " (" << film.name << " at " << std::fixed << std::setprecision(2)
              << film.duration * frame / std::max(1, render_frame_count) << " s)...";
         if (rc == 0 && wasKept(frame)) line << " unchanged, kept";
         else if (rc == 0) {
