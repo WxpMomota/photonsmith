@@ -49,6 +49,7 @@ std::filesystem::path freshDir(const std::string &name) {
 }
 
 std::string loadFilm(const std::string &name, const std::string &filmText, ff::DataFilm &film) {
+	cartoon::film_kinds::install();   // (the person kind: installed when the film registry is first built, which a test run on its own may not have done)
 	const std::filesystem::path d = freshDir(name);
 	std::ofstream(d / "s.pbrt", std::ios::binary) << kGround;
 	std::ofstream(d / (name + ".film"), std::ios::binary) << filmText;

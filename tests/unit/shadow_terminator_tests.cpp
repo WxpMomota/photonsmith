@@ -17,7 +17,7 @@
 namespace {
 
 // A UV sphere of radius 1 with `seg` x `rings` faces and its radial vertex normals, lit by a low sun from the side; `terminator` its material's cutoff.
-std::string sphere(int seg, int rings, double terminator) {
+std::string sphereText(int seg, int rings, double terminator) {
 	std::ostringstream p, n, idx;
 	for (int r = 0; r <= rings; ++r)
 		for (int s = 0; s < seg; ++s) {
@@ -74,9 +74,9 @@ int notches(const std::vector<float> &coarse, const std::vector<float> &round) {
 
 void checkNotches(const char *backend, const std::string &tag) {
 	std::vector<float> round, plain, fixed;
-	ASSERT_TRUE(render(sphere(64, 32, 0.0), tag + "_round", backend, round)) << tag;
-	ASSERT_TRUE(render(sphere(20, 10, 0.0), tag + "_plain", backend, plain)) << tag;
-	ASSERT_TRUE(render(sphere(20, 10, 0.1), tag + "_fixed", backend, fixed)) << tag;
+	ASSERT_TRUE(render(sphereText(64, 32, 0.0), tag + "_round", backend, round)) << tag;
+	ASSERT_TRUE(render(sphereText(20, 10, 0.0), tag + "_plain", backend, plain)) << tag;
+	ASSERT_TRUE(render(sphereText(20, 10, 0.1), tag + "_fixed", backend, fixed)) << tag;
 	EXPECT_GE(notches(plain, round), 5) << tag << ": a coarse sphere's shadow has notches where the next facet hides the light";
 	EXPECT_LE(notches(fixed, round), 1) << tag << ": with the offset its shadow rays start from the round surface and they go";
 }
