@@ -236,6 +236,7 @@ struct Uniforms {
     PackedFloat3 pbrtSkyColor{0, 0, 0};
     PackedFloat3 fogBoundCenter{0, 0, 0};   // see the shader's copy
     float fogBoundRadius = 0.0f;
+    float adaptiveExposure = 1.0f;   // see the shader's copy
 };
 
 // AreaLightData/buildPowerLightSampler now live in metal_poc_host_math.h

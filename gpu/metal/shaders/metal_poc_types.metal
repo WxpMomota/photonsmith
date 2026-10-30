@@ -366,6 +366,9 @@ struct Uniforms {
     // world, radius 0 = the fog fills all of space (the pbrt default for a camera medium).
     packed_float3 fogBoundCenter;
     float fogBoundRadius;
+    // --exposure: the flat multiplier the picture gets, which decides how visible a pixel's noise is to the adaptive-sampling rule (pixelConverged below). adaptiveThreshold is that rule's noise
+    // in display units.
+    float adaptiveExposure;
 };
 
 // Blinn/pbrt-v4's own smooth cone falloff: 0 outside the outer cone, 1
@@ -565,6 +568,20 @@ constant float kDirectionalLightMaxDistance = 10.0f;
 constant float kAdaptiveThreshold = 0.01f;
 constant float kAdaptiveBlackFloor = 1e-4f;
 constant uint kAdaptiveMinSamples = 16u;
+constant uint kAdaptiveBlackSamples = 128u;
+
+// When a pixel has enough samples: the rule the CPU and both OptiX renderers apply (src/shared/pixel_convergence_rule.h, `converged()`, which has the reasons). `count` samples with Welford
+// running mean `mean` and sum of squared deviations `m2` of the pixel's luminance. Its standard error is carried to display values through a gamma-2.2 response, so `threshold` is a noise in
+// display units (the default 0.003 is under one level of 255): a dim pixel may keep more noise relative to its mean than a bright one, as the eye sees it. A pixel darker than 1e-4 counts as
+// converged black once it has 128 samples.
+inline bool pixelConverged(uint count, float mean, float m2, float threshold, float exposure) {
+    if (count < 2u) return false;
+    const float L = mean * exposure;
+    if (L < kAdaptiveBlackFloor) return count >= kAdaptiveBlackSamples;
+    const float standardError = sqrt(max(m2, 0.0f) / float(count - 1u) / float(count));
+    const float displayNoise = standardError * exposure / 2.2f * pow(L, 1.0f / 2.2f - 1.0f);
+    return displayNoise < threshold;
+}
 
 // This scene's own room bounds (see metal_poc.mm's own floor/ceiling/
 // wall addQuad() calls) - an explicit, documented scene-specific

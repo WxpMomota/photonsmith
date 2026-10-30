@@ -946,6 +946,7 @@ bool MetalPocApp::dsFillUniforms(DispatchState& s, int argc, const char** argv) 
     // A/B render, not assumed.
     uniforms.adaptiveSampling = adaptiveSamplingRequested ? 1u : 0u;
     uniforms.adaptiveThreshold = adaptiveThresholdValue;
+    uniforms.adaptiveExposure = exposureValue;
     uniforms.pbrtEnvMapWidth = pbrtEnvMapWidth;
     uniforms.pbrtEnvMapHeight = pbrtEnvMapHeight;
     uniforms.envMapWidth = envMapWidth;

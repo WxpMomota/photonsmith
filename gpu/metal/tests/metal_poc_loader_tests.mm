@@ -102,7 +102,14 @@ int main() {
                 if (expected != got) { std::fprintf(stderr, "FAIL: %s: %s: the inventory says %d, the loader built %d\n", name.c_str(), what, expected, got); ++g_failures; }
             };
             same("triangles", inv.triangles, triangles);
-            same("spheres (an instanced sphere is written out per placement)", inv.spheres + inv.instancedSpheres, (int)l->spheres.size());
+            // (the interface sphere that holds the camera medium is not a shape on Metal: the fog is clipped to it, Uniforms::fogBoundRadius)
+            int cameraFogSpheres = 0;
+            if (result.scene.cameraMediumBound[3] > 0.0)
+                for (const pbrt_flatten::Sphere& sp : result.scene.spheres)
+                    if (std::fabs(sp.radius - result.scene.cameraMediumBound[3]) <= 1e-9 * std::max(1.0, sp.radius) && std::fabs(sp.center[0] - result.scene.cameraMediumBound[0]) <= 1e-9 * std::max(1.0, std::fabs(sp.center[0])) &&
+                        std::fabs(sp.center[1] - result.scene.cameraMediumBound[1]) <= 1e-9 * std::max(1.0, std::fabs(sp.center[1])) && std::fabs(sp.center[2] - result.scene.cameraMediumBound[2]) <= 1e-9 * std::max(1.0, std::fabs(sp.center[2])))
+                        ++cameraFogSpheres;
+            same("spheres (an instanced sphere is written out per placement)", inv.spheres + inv.instancedSpheres - cameraFogSpheres, (int)l->spheres.size());
             same("disks", inv.disks, (int)l->disks.size());
             same("cylinders", inv.cylinders, (int)l->cylinders.size());
             // (a goniometric or projection light whose picture cannot be used is drawn as a point or spot light on Metal, so the four kinds are compared together)
