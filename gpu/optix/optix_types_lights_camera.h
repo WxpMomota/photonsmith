@@ -33,6 +33,10 @@ struct ProjectionLightGPU {
 	int nx, ny;                 // nx*ny must be <= kProjImageMaxDim^2
 	float sb_xmin, sb_xmax, sb_ymin, sb_ymax;  // screen bounds
 	float inv_tan;              // 1 / tan(fov_deg/2 in radians)
+	// A slide bigger than kProjImageMaxDim (a film's caustic net, a photo) is also uploaded whole as an image texture: its index in LaunchParams::textures (rows in image_rgb's
+	// order, linear bytes = value / texScale), read instead of the inline copy so the light keeps the slide's sharpness; -1 for none.
+	int texIdx = -1;
+	float texScale = 1.0f;
 	float image_rgb[kProjImageMaxDim * kProjImageMaxDim * 3];  // [(v*nx+u)*3+c]
 };
 

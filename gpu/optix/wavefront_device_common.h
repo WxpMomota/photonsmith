@@ -1173,7 +1173,8 @@ __device__ __forceinline__ void wf_wrap_equal_area_square(double& u, double& v) 
 // PDF is always 1 (delta light) - see punctual_lights.h.
 __device__ __forceinline__ bool wf_eval_punctual_light(
 	const PunctualLightGPU& light, const float3& p,
-	float3& wi, float3& Li, float& t_max)
+	float3& wi, float3& Li, float& t_max,
+	const TextureData* textures = nullptr, const unsigned char* texturePixels = nullptr)   // (a projector's whole slide: ProjectionLightGPU::texIdx)
 {
 	float Lr = 0.0f, Lg = 0.0f, Lb = 0.0f, wx = 0.0f, wy = 0.0f, wz = 0.0f;
 	switch (light.kind) {
@@ -1234,12 +1235,22 @@ __device__ __forceinline__ bool wf_eval_punctual_light(
 			if (sx < pr.sb_xmin || sx > pr.sb_xmax || sy < pr.sb_ymin || sy > pr.sb_ymax) return false;
 			float u = (sx - pr.sb_xmin) / (pr.sb_xmax - pr.sb_xmin);
 			float v = (sy - pr.sb_ymin) / (pr.sb_ymax - pr.sb_ymin);
-			int iu = (int)(u * pr.nx); iu = iu < 0 ? 0 : (iu >= pr.nx ? pr.nx - 1 : iu);
-			int iv = (int)(v * pr.ny); iv = iv < 0 ? 0 : (iv >= pr.ny ? pr.ny - 1 : iv);
-			int idx = (iv * pr.nx + iu) * 3;
-			float rC = fmaxf(0.0f, pr.image_rgb[idx + 0]);
-			float gC = fmaxf(0.0f, pr.image_rgb[idx + 1]);
-			float bC = fmaxf(0.0f, pr.image_rgb[idx + 2]);
+			float rC, gC, bC;
+			if (pr.texIdx >= 0 && textures && texturePixels) {   // the whole slide (ProjectionLightGPU::texIdx), nearest texel as the CPU's
+				const TextureData& st = textures[pr.texIdx];
+				int iu = (int)(u * st.width); iu = iu < 0 ? 0 : (iu >= st.width ? st.width - 1 : iu);
+				int iv = (int)(v * st.height); iv = iv < 0 ? 0 : (iv >= st.height ? st.height - 1 : iv);
+				const unsigned char* px = texturePixels + st.pixelOffset + (iv * st.width + iu) * 3;
+				const float k = pr.texScale * (1.0f / 255.0f);
+				rC = px[0] * k; gC = px[1] * k; bC = px[2] * k;
+			} else {
+				int iu = (int)(u * pr.nx); iu = iu < 0 ? 0 : (iu >= pr.nx ? pr.nx - 1 : iu);
+				int iv = (int)(v * pr.ny); iv = iv < 0 ? 0 : (iv >= pr.ny ? pr.ny - 1 : iv);
+				int idx = (iv * pr.nx + iu) * 3;
+				rC = fmaxf(0.0f, pr.image_rgb[idx + 0]);
+				gC = fmaxf(0.0f, pr.image_rgb[idx + 1]);
+				bC = fmaxf(0.0f, pr.image_rgb[idx + 2]);
+			}
 			float inv_r2 = 1.0f / r2;
 			Lr = pr.scale * rC * inv_r2; Lg = pr.scale * gC * inv_r2; Lb = pr.scale * bC * inv_r2;
 			break;

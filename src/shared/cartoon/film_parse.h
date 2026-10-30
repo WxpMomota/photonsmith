@@ -170,6 +170,11 @@
 //     swimmers mantas 2  at 0 6 -12  radius 8                   # mantas, eaglerays, stingrays (`rise T`), sealions, penguins, otters
 //     seabed   anemones 6  in -3 -6 3 -3                        # life on the seabed (film_seabed.h): anemones, seagrass, starfish, urchins, crabs, gardeneels
 //     wreck    0 -20  toward 60  length 28  list 18             # places: a wreck, `arch X Z`, `cenote X Z [radius R] [depth D]`, `reefwall X Z [length L] [height H]`
+//     diver    Ana from -6 3 -2 to 6 3 -10  lamp  ok 30          # round 15 (film_diver.h): a scuba diver on a path, breathing bubbles; `divecam` (a shot's word)
+//     school   sardines 600 at 0 4 -12  strike 20                # a school that parts round the camera and bolts from a hunter (film_school.h)
+//     bigfish  whaleshark 1 at 0 6 -20                           # whaleshark, hammerheads, reefsharks, dolphins, humpbacks
+//     reef     60 in -8 -14 8 -4  fluoresce                      # a coral reef (film_reef.h); `critters nudibranchs|seahorses|shrimp|mantisshrimp N in ...`
+//     nightdive glow 2  spawn 2 18                               # the water lighting up round what moves, corals spawning; `kelpforest N in X0 Z0 X1 Z1`
 //     space    stars 1  milkyway 1  sun 60 15                   # the universe (film_space.h, round 10): a set in space - the stars all round, the Milky Way, the sun a
 //                                                               # glowing ball at a bearing and an elevation; no sky, no air
 //     planet   home ocean  at 0 0 -20000  radius 6000           # a planet (film_planets.h): rocky, desert, ice, ocean, gas or lava; `tilt`, `spin SECONDS`

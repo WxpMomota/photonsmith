@@ -93,7 +93,7 @@ inline std::string windowText(const water::Sea &s, double t, const Vec3 &eye) {
 	const double depth = std::max(0.05, s.level - eye.y);
 	const double edge = depth * kCritical / std::sqrt(1.0 - kCritical * kCritical);   // (where the window's edge is on calm water)
 	const double r0 = 0.55 * edge, r1 = std::max(500.0, 60.0 * depth);
-	const int around = 160, rings = 70;
+	const int around = 120, rings = 50;
 	Mesh m, out;
 	std::vector<double> mirror;   // (how far past the critical angle the line of sight meets each point: the mirror where it is positive)
 	for (int j = 0; j <= rings; ++j) {
@@ -198,14 +198,15 @@ inline double depthExposure(const underwater::Water &w, double depth) {
 	return std::min(w.lamp > 0.0 ? 2.5 : 40.0, std::exp(0.8 * k * std::clamp(depth, 0.0, 400.0)));
 }
 // A diver's lamp on the camera (pbrt's eye and target): a warm spot a little to the side of the lens, as a diver holds one (backscatter is less there).
-inline std::string lampText(double lamp, const Vec3 &eye, const Vec3 &target) {
+// `blue` (round 15): a blue lamp, under which fluorescent corals glow.
+inline std::string lampText(double lamp, const Vec3 &eye, const Vec3 &target, bool blue = false) {
 	if (lamp <= 0.0) return std::string();
 	const Vec3 f = normalize(target - eye), right = normalize(cross(Vec3{0.0, 1.0, 0.0}, f) + Vec3{1e-9, 0, 0});
 	const Vec3 at = eye + right * 0.35 + Vec3{0.0, 0.15, 0.0}, to = target;
 	const double I = 12.0 * lamp;
 	char buf[320];
 	std::snprintf(buf, sizeof buf, "AttributeBegin\n  LightSource \"spot\" \"point3 from\" [ %.4f %.4f %.4f ] \"point3 to\" [ %.4f %.4f %.4f ] \"float coneangle\" [ 24 ] \"float conedelta\" [ 9 ] \"rgb I\" [ %.3f %.3f %.3f ]\nAttributeEnd\n",
-				  at.x, at.y, at.z, to.x, to.y, to.z, I, 0.93 * I, 0.82 * I);
+				  at.x, at.y, at.z, to.x, to.y, to.z, blue ? 0.25 * I : I, blue ? 0.45 * I : 0.93 * I, blue ? 1.1 * I : 0.82 * I);
 	return std::string("# a diver's lamp (film_undersea.h)\n") + buf;
 }
 // The specks in the water close to the lens that a lamp catches (story-space eye): a fixed fine pattern in 2 m tiles, drifting with the water.
@@ -289,7 +290,7 @@ inline bool bubbleAt(Vec3 p0, double r0, double age, double t, int seed, double 
 inline Mesh bubbleMesh(double r, double phase) {
 	if (r < 0.006) {
 		const double sq = 1.25 + 0.15 * std::sin(phase);
-		Mesh m = uvSphere(1.0, 12, 8);
+		Mesh m = uvSphere(1.0, 8, 6);
 		for (Vec3 &v : m.verts) v = Vec3{v.x * r * std::sqrt(sq), v.y * r / sq, v.z * r * std::sqrt(sq)};
 		for (Vec3 &n : m.normals) n = normalize(Vec3{n.x / std::sqrt(sq), n.y * sq, n.z / std::sqrt(sq)});
 		return m;
@@ -304,7 +305,7 @@ inline Mesh bubbleMesh(double r, double phase) {
 		const double a = rim * (1.0 - k / 10.0);
 		profile.push_back({R * std::sin(a), R * std::cos(a)});
 	}
-	Mesh m = lathe(profile, 20);
+	Mesh m = lathe(profile, 12);
 	for (std::size_t i = 0; i < m.verts.size(); ++i) {   // (the rim's ripple, and the cap set down so its middle is the bubble's)
 		Vec3 &v = m.verts[i];
 		const double ang = std::atan2(v.z, v.x), edge = smoothstep(0.6 * R, R, std::hypot(v.x, v.z));

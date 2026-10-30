@@ -938,7 +938,7 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 	for (unsigned int plj = 0; plj < plCount; ++plj) {
 		const unsigned int pli = (plStart + plj) % numPunctualLights;
 		float3 wi, Li; float t_max;
-		if (!wf_eval_punctual_light(punctualLights[pli], hit_point, wi, Li, t_max)) continue;
+		if (!wf_eval_punctual_light(punctualLights[pli], hit_point, wi, Li, t_max, textures, texturePixels)) continue;
 		if (!light_link::covers(~punctualLights[pli].notLit, linkGroup)) continue;   // light linking (light_link.h)
 		// See the area-light block above for the RoughDielectric two-sided
 		// rationale (matches optix_device_helpers.h's punctual-light NEE,

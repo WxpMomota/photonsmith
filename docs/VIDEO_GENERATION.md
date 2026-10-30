@@ -2268,6 +2268,68 @@ reefwall  25 0  toward -90  length 30  height 16
 
 Metal (the Mac) does not draw the comb jellies' thin films yet.
 
+### Under the sea, round 15 (2026-10-30)
+
+Ten more things for films under the water. As in round 14, the heights on these lines are above the seabed (a terrain's ground, or the plain floor 15 m under the
+surface when there is none).
+
+**Light on everything.** (film_sealight.h; nothing to write) Most of the sun's light now comes down through the water as a projector's slide of the caustic net, aimed
+down the sun's way as the surface bends it: the net plays over the sand, the rocks, the fish and a diver alike, and the water shows it as shafts of light. The sun itself
+keeps a fifth of its light, so shadows stay. The slide reaches up to 24 m round the camera, less round a camera near the sand (its pixels must be small for a macro lens),
+and the net softens on a deeper bed and is gone below 35 m. On the GPU a slide is read whole (before, it was squeezed to 64 x 64): the default and the wavefront renderers
+both read a slide bigger than that from the scene's textures (ProjectionLightGPU::texIdx). `caustics traced` keeps the round-9 way.
+
+**The sun and the rain from below.** Looking up, the sun is a cluster of glints dancing on the ripples where the line to it leaves the water, each a little star in the
+picture. With rain falling (`weather rain`, or a rainy `storm`) each drop that lands near the camera leaves a widening silver ring under the surface and a few tiny
+bubbles; the rain itself is not drawn under the water.
+
+**A scuba diver: `diver NAME from X Y Z to X Y Z [via X Y Z]... [at T] [speed S] [lamp] [ok T]... [suit black|blue|red]`.** (film_diver.h) A diver in a wetsuit, mask
+and fins, a tank on their back, swims level along the path from time T at S metres a second (0.4) with a slow flutter kick, hovering before and after. Each breath out is a
+burst of bubbles from the regulator, rising from where the diver was; it is heard (the regulator's hiss, the burble). `lamp`: a torch in the right hand lights the way;
+`ok T`: the OK sign in front of the mask for two seconds.
+
+**Schools that behave: `school sardines|anchovies|jacks|barracuda N at X Y Z [radius R] [strike T]... [hunter sharks|dolphins|sealions]`.** (film_school.h) Up to 3000 fish
+flocking, worked out once when the film is first rendered. The school parts round the camera and any diver that comes through it, and at each `strike` a hunter dashes
+through the middle: the fish bolt out sideways from its line, turning together - the turn flashes their silver flanks in a wave - and close again behind it.
+
+**Big animals: `bigfish whaleshark|hammerheads|reefsharks|dolphins|humpbacks N at X Y Z [radius R]`.** Whale sharks (the broad flat head, the wide mouth open, white spots in
+rows), hammerheads, reef sharks, dolphins (their tails beating up and down) and humpbacks (the giants' bodies of round 9, long white flippers, slow strokes) swimming round
+a circle.
+
+```
+diver      Ana from -6 3 -2 to 6 3 -10 via 0 2.5 -6 at 2 lamp ok 30 suit blue
+school     sardines 600 at 0 4 -12 radius 4 strike 20 hunter sharks
+bigfish    whaleshark 1 at 0 6 -20 radius 14
+```
+
+**A coral reef: `reef N in X0 Z0 X1 Z1 [bleached] [fluoresce]`.** (film_reef.h) Staghorn (antlers of branches, pale polyps at their tips), table corals, brain corals grooved
+in meanders, sea fans spread across the current and soft corals swaying. The corals that do not move are made once as PLY files. `bleached`: all of it white;
+`fluoresce`: the polyps glow green (lighting nothing) - film it at night with a blue lamp, `underwater lamp 1 blue`.
+
+**Small creatures: `critters nudibranchs|seahorses|shrimp|mantisshrimp N in X0 Z0 X1 Z1`.** Nudibranchs (bright, frilled, horns and a plume of gills, creeping), seahorses
+(their tails curled round a stalk of grass, a fin a blur on their backs), cleaner shrimp (red with a white stripe, feelers waving) and mantis shrimps (half out of a burrow,
+eyes on stalks each turning its own way). They are a few centimetres long: put the camera close, with a narrow field of view and `aperture` for a shallow focus.
+
+**A night dive: `nightdive [glow G] [spawn T0 T1]`.** (with a night `sky`) The plankton lights up blue round anything that moves - a diver, a school's leading fish, the
+swimmers, the big animals - fading over a second; from T0 to T1 the corals spawn, bundles rising from them like snow falling upwards; the reef fish sleep, hardly moving.
+
+```
+sky        23:00 23:00
+underwater lamp 1 blue
+reef       50 in -6 -10 6 -3 fluoresce
+nightdive  glow 2 spawn 2 18
+```
+
+**A kelp forest: `kelpforest N in X0 Z0 X1 Z1`.** Giant kelp: N stalks from holdfasts on the seabed all the way to the surface, a blade a metre or so long every third of a
+metre with a gas bladder at its base, the last metres lying along the surface in a canopy that shades the water under it. It sways with the swell and the current.
+
+**Camera work: `divecam [A]`, `follow NAME`.** `divecam` (a shot's word): a diver's camera, rising on each breath in and sinking as it goes out, the view tipping with it and
+swaying slowly (A 0 to 4). `follow` follows a diver by name, as it follows a character, and schools, swimmers and big animals by their line: `follow school1`,
+`follow swimmers2`, `follow bigfish1` (the first animal of that line, a school's middle). A slow rise to the surface with the camera keys ends half above it when the last key is
+at the surface (round 14's waterline).
+
+Metal (the Mac) still reads a projector's slide at 64 x 64.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

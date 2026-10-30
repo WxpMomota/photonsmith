@@ -405,6 +405,10 @@ class DataFilm {
 	std::string airMedium() const;
 
 	std::string worldAt(const std::string &header, double t) const;
+	// Under the sea (round 15): the seabed's height at pbrt's (x, z) - a terrain's ground, or the plain floor 15 m under the water - and the film's schools with their swim
+	// worked out (film_school.h prepare: once, the first time they are asked for, keeping clear of the camera and the divers).
+	double seabedAt(double x, double z) const;
+	const std::vector<school::School> &schoolsSwum() const;
 	// The shot's own lighting at t (`lighting`: shot_lighting.h): round the character it is on, or what the camera looks at, from where the camera is.
 	std::string shotLightsAt(const std::string &header, double t) const;
 
@@ -418,6 +422,15 @@ class DataFilm {
 		LineEnds &operator=(const LineEnds &) { return *this; }
 	};
 	mutable LineEnds lineEnds_;
+	struct Swum {   // (schoolsSwum's: a copy of the film starts without them)
+		std::mutex lock;
+		bool done = false;
+		std::vector<school::School> schools;
+		Swum() = default;
+		Swum(const Swum &) {}
+		Swum &operator=(const Swum &) { return *this; }
+	};
+	mutable Swum swum_;
 	double progress(const Anim &anim, double t, int component) const;
 	bool visible(const std::string &name, double t) const;
 	static std::string num(double v);

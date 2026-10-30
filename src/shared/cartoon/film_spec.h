@@ -64,7 +64,11 @@
 #include "film_underwater.h"
 #include "film_wildlife.h"
 #include "film_sealife.h"
+#include "film_diver.h"
+#include "film_reef.h"
+#include "film_school.h"
 #include "film_seabed.h"
+#include "film_sealight.h"
 #include "film_undersea.h"
 #include "film_macro.h"
 #include "film_night.h"
@@ -121,6 +125,7 @@ struct Shot {
 		double fov = 0.0;
 	} move;
 	double handheld = 0.0;
+	double divecam = 0.0;     // (round 15 `divecam [A]`: under the sea, a diver's camera - rising and sinking with each breath, swaying a little: film_file.cpp cameraAt)
 	bool waterline = false;   // (round 14 `waterline`: under the sea, the camera floats at the surface, half above it: film_undersea.h)
 	// (`fly`) a drone's flight over waypoints (pbrt's x z), a height above the land (smoothed so it does not bob over every rise), looking ahead and down or at a point
 	std::vector<std::pair<double, double>> fly;
@@ -450,6 +455,12 @@ struct Spec {
 	undersea::Sea undersea;
 	deepsea::Life deep;
 	seabed::World seabed;
+	// under the sea, round 15: divers (`diver`: film_diver.h), schools and big animals (`school`, `bigfish`: film_school.h - a school's swim is worked out the first time
+	// it is asked for, DataFilm::schoolsSwum), reefs, small creatures, night dives and kelp forests (`reef`, `critters`, `nightdive`, `kelpforest`: film_reef.h)
+	std::vector<diver::Diver> divers;
+	std::vector<school::School> schools;
+	std::vector<school::BigFish> bigFish;
+	reef::World reefLife;
 	// fire, lava and smoke (`fire`, `lava`, `volcano`, `wildfire`)
 	std::vector<fire::Fire> fires;
 	std::vector<fire::Lava> lavas;

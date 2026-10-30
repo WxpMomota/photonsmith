@@ -9,8 +9,143 @@ namespace cartoon {
 namespace film_file {
 
 inline bool underseaVerb(const std::string &verb) {
-	static const std::vector<std::string> k = {"underwater", "waterline", "current", "bubbles", "halocline", "deepsea", "octopus", "cuttlefish", "swimmers", "seabed", "wreck", "arch", "cenote", "reefwall"};
+	static const std::vector<std::string> k = {"underwater", "waterline", "current", "bubbles", "halocline", "deepsea", "octopus", "cuttlefish", "swimmers", "seabed", "wreck", "arch", "cenote", "reefwall",
+											   "diver", "divecam", "school", "bigfish", "reef", "critters", "nightdive", "kelpforest"};
 	return std::find(k.begin(), k.end(), verb) != k.end();
+}
+// Round 15's lines (`diver`, `divecam`, `school`, `bigfish`, `reef`, `critters`, `nightdive`, `kelpforest`) into `s`: "" or what is wrong with it.
+inline std::string underseaLine15(Spec &s, const std::string &verb, const std::string &line) {
+	using detail::number;
+	const auto fail = [](const std::string &what) { return what; };
+	const std::vector<std::string> t = detail::tokens(line);
+	std::vector<double> v;
+	std::size_t i = 1;
+	const auto numbers = [&](std::size_t n) {   // (the next n numbers, or false)
+		v.assign(n, 0.0);
+		for (std::size_t k = 0; k < n; ++k)
+			if (i + k >= t.size() || !number(t[i + k], v[k])) return false;
+		i += n;
+		return true;
+	};
+	const auto oneOf = [](const std::string &w, const std::vector<std::string> &kinds) { return std::find(kinds.begin(), kinds.end(), w) != kinds.end(); };
+	if (verb == "divecam") {
+		double a = 1.0;
+		if (s.shots.empty() || t.size() > 2 || (t.size() == 2 && (!number(t[1], a) || a < 0.0 || a > 4.0)))
+			return fail("`divecam [A]` belongs to a shot (start one with `shot 0 NAME` first): a diver's camera, rising and sinking with each breath (A 0 to 4, 1 by default)");
+		s.shots.back().divecam = a;
+		return std::string();
+	}
+	if (verb == "diver") {
+		const char *usage = "`diver NAME from X Y Z to X Y Z [via X Y Z]... [at T] [speed S] [lamp] [ok T]... [suit black|blue|red] [seed K]`";
+		diver::Diver d;
+		if (t.size() < 2) return fail(usage);
+		d.name = t[i++];
+		Vec3 from, to;
+		bool hasFrom = false, hasTo = false;
+		std::vector<Vec3> via;
+		while (i < t.size()) {
+			const std::string w = t[i++];
+			if (w == "lamp") {
+				d.lamp = true;
+				continue;
+			}
+			if (w == "suit" && i < t.size() && oneOf(t[i], diver::suits())) {
+				d.suit = t[i++];
+				continue;
+			}
+			if (w == "from" || w == "to" || w == "via") {
+				if (!numbers(3)) return fail(usage);
+				const Vec3 p{v[0], v[1], v[2]};
+				if (w == "from") from = p, hasFrom = true;
+				else if (w == "to") to = p, hasTo = true;
+				else if (via.size() < 32) via.push_back(p);
+				continue;
+			}
+			if (!numbers(1)) return fail(usage);
+			if (w == "at") d.at = v[0];
+			else if (w == "speed" && v[0] > 0.0 && v[0] <= 3.0) d.speed = v[0];
+			else if (w == "ok" && d.oks.size() < 16) d.oks.push_back(v[0]);
+			else if (w == "seed") d.seed = static_cast<int>(v[0]);
+			else return fail(usage);
+		}
+		if (!hasFrom || !hasTo) return fail(std::string(usage) + ": where the diver starts and where they go");
+		d.path.push_back(from);
+		d.path.insert(d.path.end(), via.begin(), via.end());
+		d.path.push_back(to);
+		s.divers.push_back(d);
+		return std::string();
+	}
+	if (verb == "school" || verb == "bigfish") {
+		const std::string usage = verb == "school" ? "`school sardines|anchovies|jacks|barracuda N at X Y Z [radius R] [strike T]... [hunter sharks|dolphins|sealions] [seed K]` (1 to 3000)"
+												   : "`bigfish whaleshark|hammerheads|reefsharks|dolphins|humpbacks N at X Y Z [radius R] [seed K]` (1 to 20)";
+		school::School sc;
+		school::BigFish bf;
+		if (i >= t.size() || !oneOf(t[i], verb == "school" ? school::kinds() : school::bigKinds())) return fail(usage);
+		sc.kind = bf.kind = t[i++];
+		if (!numbers(1) || v[0] < 1 || v[0] > (verb == "school" ? 3000 : 20)) return fail(usage);
+		sc.count = bf.count = static_cast<int>(v[0]);
+		if (i >= t.size() || t[i++] != "at" || !numbers(3)) return fail(usage);
+		sc.at = bf.at = {v[0], v[1], v[2]};
+		while (i < t.size()) {
+			const std::string w = t[i++];
+			if (verb == "school" && w == "hunter" && i < t.size() && (t[i] == "sharks" || t[i] == "dolphins" || t[i] == "sealions")) {
+				sc.hunter = t[i++];
+				continue;
+			}
+			if (!numbers(1)) return fail(usage);
+			if (w == "radius" && v[0] > 0.3 && v[0] <= 200.0) sc.radius = bf.radius = v[0];
+			else if (w == "strike" && verb == "school" && sc.strikes.size() < 32) sc.strikes.push_back(v[0]);
+			else if (w == "seed") sc.seed = bf.seed = static_cast<int>(v[0]);
+			else return fail(usage);
+		}
+		if (verb == "school") s.schools.push_back(sc);
+		else s.bigFish.push_back(bf);
+		return std::string();
+	}
+	if (verb == "reef" || verb == "critters" || verb == "kelpforest") {
+		const std::string usage = verb == "reef" ? "`reef N in X0 Z0 X1 Z1 [bleached] [fluoresce] [seed K]` (1 to 2000)"
+								  : verb == "critters" ? "`critters nudibranchs|seahorses|shrimp|mantisshrimp N in X0 Z0 X1 Z1 [seed K]` (1 to 200)"
+													   : "`kelpforest N in X0 Z0 X1 Z1 [seed K]` (1 to 500)";
+		reef::Reef rf;
+		reef::Critters cr;
+		reef::KelpForest kf;
+		if (verb == "critters") {
+			if (i >= t.size() || !oneOf(t[i], reef::critterKinds())) return fail(usage);
+			cr.kind = t[i++];
+		}
+		const double most = verb == "reef" ? 2000 : verb == "critters" ? 200 : 500;
+		if (!numbers(1) || v[0] < 1 || v[0] > most) return fail(usage);
+		rf.count = cr.count = kf.count = static_cast<int>(v[0]);
+		if (i >= t.size() || t[i++] != "in" || !numbers(4)) return fail(usage);
+		rf.x0 = cr.x0 = kf.x0 = std::min(v[0], v[2]), rf.z0 = cr.z0 = kf.z0 = std::min(v[1], v[3]);
+		rf.x1 = cr.x1 = kf.x1 = std::max(v[0], v[2]), rf.z1 = cr.z1 = kf.z1 = std::max(v[1], v[3]);
+		while (i < t.size()) {
+			const std::string w = t[i++];
+			if (verb == "reef" && (w == "bleached" || w == "fluoresce")) {
+				(w == "bleached" ? rf.bleached : rf.fluoresce) = true;
+				continue;
+			}
+			if (w != "seed" || !numbers(1)) return fail(usage);
+			rf.seed = cr.seed = kf.seed = static_cast<int>(v[0]);
+		}
+		if (verb == "reef") s.reefLife.reefs.push_back(rf);
+		else if (verb == "critters") s.reefLife.critters.push_back(cr);
+		else s.reefLife.kelp.push_back(kf);
+		return std::string();
+	}
+	if (verb == "nightdive") {
+		const char *usage = "`nightdive [glow G] [spawn T0 T1]`: night under the sea - the water lights up round what moves (G 0 to 10), the corals spawn from T0 to T1";
+		reef::Night &n = s.reefLife.night;
+		n.on = true;
+		while (i < t.size()) {
+			const std::string w = t[i++];
+			if (w == "glow" && numbers(1) && v[0] >= 0.0 && v[0] <= 10.0) n.glow = v[0];
+			else if (w == "spawn" && numbers(2) && v[1] > v[0]) n.spawn0 = v[0], n.spawn1 = v[1];
+			else return fail(usage);
+		}
+		return std::string();
+	}
+	return fail("`" + verb + "`: not a line of round 15");
 }
 // One of those lines into `s`: "" or what is wrong with it.
 inline std::string underseaLine(Spec &s, const std::string &verb, const std::string &line) {
@@ -27,13 +162,15 @@ inline std::string underseaLine(Spec &s, const std::string &verb, const std::str
 		return true;
 	};
 	const auto oneOf = [](const std::string &w, const std::vector<std::string> &kinds) { return std::find(kinds.begin(), kinds.end(), w) != kinds.end(); };
+	if (verb == "diver" || verb == "divecam" || verb == "school" || verb == "bigfish" || verb == "reef" || verb == "critters" || verb == "nightdive" || verb == "kelpforest")
+		return underseaLine15(s, verb, line);
 	if (verb == "underwater") {
 		const char *usage = "`underwater [clarity C] [colour blue|green|teal] [lamp L] [ripples]`: the camera is under the film's `water` (clarity 1 a clear sea, 2 tropical, 0.5 murky; "
-							"lamp: a diver's lamp on the camera, 1 a strong one; ripples: the sand in ripples)";
+							"lamp: a diver's lamp on the camera, 1 a strong one - `blue` makes it blue; ripples: the sand in ripples)";
 		while (i < t.size()) {
 			const std::string w = t[i++];
-			if (w == "ripples") {
-				s.underwater.ripples = true;
+			if (w == "ripples" || w == "blue") {   // (blue: the lamp's, round 15)
+				(w == "ripples" ? s.underwater.ripples : s.underwater.lampBlue) = true;
 				continue;
 			}
 			if (w == "colour" && i < t.size() && oneOf(t[i], underwater::colours())) {

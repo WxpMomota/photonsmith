@@ -36,6 +36,7 @@ struct Water {
 	std::string colour = "blue";
 	double lamp = 0.0;      // (round 14 `lamp L`: a diver's lamp on the camera, film_undersea.h)
 	bool ripples = false;   // (`ripples`: the sand of the seabed in ripples)
+	bool lampBlue = false;  // (round 15 `lamp L blue`: a blue lamp, for corals that fluoresce)
 };
 // The current (round 14 `current SPEED toward A [surge P]`): the water's flow, pbrt's metres a second, the same everywhere; with a surge it swings back and forth every P
 // seconds (as much as SPEED each way) about a fifth of SPEED onward. `drift(t)` is how far the water has moved by t (the flow's integral), for what drifts in it.
@@ -150,7 +151,8 @@ inline int causticFrame(double t) { return static_cast<int>(std::floor(t / 0.1))
 // `bedDepth` (round 14): how deep the bed under the camera is - the painted net fades out deeper (causticBand).
 inline std::string causticText(const std::string &film, double t, double cx, double cz, const std::function<double(double, double)> &groundAt, double tracedDepth = -1.0, bool ripples = false,
 							   double bedDepth = 0.0) {
-	const std::string picture = tracedDepth >= 0.0 ? caustics::picture(film, causticFrame(t), 512, tracedDepth) : causticPicture(film, causticFrame(t), 512, ripples, causticBand(bedDepth));
+	const int band = causticBand(bedDepth);   // (plain sand - the caustic slide lights it, round 15 - is one picture, so it can be a sharp one: a macro lens looks at it close)
+	const std::string picture = tracedDepth >= 0.0 ? caustics::picture(film, causticFrame(t), 512, tracedDepth) : causticPicture(film, causticFrame(t), band >= 3 ? 2048 : 512, ripples, band);
 	Mesh m;
 	const int n = 64;
 	const double half = 40.0, x0 = std::floor((cx - half) / 4.0) * 4.0, z0 = std::floor((cz - half) / 4.0) * 4.0, step = 2.0 * half / n;

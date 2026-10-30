@@ -846,6 +846,44 @@ double DataFilm::natureAt(double t) const {
 }
 
 bool DataFilm::wildSubject(const std::string &who, double t, Vec3 &feet, Vec3 &front, Vec3 &chest) const {
+	{   // under the sea (round 15): a diver by name, or schoolN, swimmersN, bigfishN (the Nth line of that word: its first animal, or a school's middle)
+		const double nt = natureAt(t);
+		const auto lift = [&](Vec3 p) { return Vec3{p.x, p.y + seabedAt(p.x, p.z), p.z}; };
+		Vec3 at, way{0, 0, 1};
+		bool found = false;
+		for (const diver::Diver &d : spec.divers)
+			if (d.name == who) {
+				diver::Diver l = d;
+				for (Vec3 &p : l.path) p = lift(p);
+				at = diver::diverAt(l, nt, &way), found = true;
+			}
+		double n = 0.0;
+		const auto numbered = [&](const char *word) {
+			const std::size_t w = std::char_traits<char>::length(word);
+			return who.size() > w && who.compare(0, w, word) == 0 && detail::number(who.substr(w), n) && n >= 1.0 && n == std::floor(n);
+		};
+		if (!found && numbered("school") && static_cast<std::size_t>(n) <= spec.schools.size()) {
+			const school::School &sc = schoolsSwum()[static_cast<std::size_t>(n) - 1];
+			Vec3 sum{0, 0, 0}, vel{0, 0, 0}, v;
+			for (int i = 0; i < sc.count; ++i) sum = sum + school::fishAt(sc, i, nt, &v), vel = vel + v;
+			at = sum * (1.0 / std::max(1, sc.count)), way = vel, found = true;
+		} else if (!found && numbered("swimmers") && static_cast<std::size_t>(n) <= spec.deep.swimmers.size()) {
+			deepsea::Swimmers g = spec.deep.swimmers[static_cast<std::size_t>(n) - 1];
+			if (g.kind != "otters") g.at = lift(g.at);
+			double roll = 0.0;
+			at = deepsea::swimmerAt(g, 0, nt, way, roll, spec.seas.empty() ? 0.0 : spec.seas[0].level), found = true;
+		} else if (!found && numbered("bigfish") && static_cast<std::size_t>(n) <= spec.bigFish.size()) {
+			school::BigFish b = spec.bigFish[static_cast<std::size_t>(n) - 1];
+			b.at = lift(b.at);
+			at = school::bigAt(b, 0, nt, way), found = true;
+		}
+		if (found) {
+			way.y = 0.0;
+			way = length(way) > 1e-9 ? normalize(way) : Vec3{0, 0, 1};
+			feet = story(at.x, at.y, at.z), front = story(way.x, 0.0, way.z), chest = feet;
+			return true;
+		}
+	}
 	const bool herd = who.rfind("herd", 0) == 0, flock = who.rfind("flock", 0) == 0;
 	if (!herd && !flock) return false;
 	double n = 0.0;
@@ -1755,6 +1793,11 @@ void DataFilm::cameraAt(double t, std::string &lookAt, std::string &camera, int 
 		const double dz = std::sin(0.97 * t + 3.0 * p), tx = std::sin(1.13 * t + 5.0 * p) + 0.4 * std::sin(4.1 * t + p), ty = std::sin(1.57 * t + 4.0 * p);
 		key.pos[0] += 0.012 * a * dx, key.pos[1] += 0.010 * a * dy, key.pos[2] += 0.008 * a * dz;
 		key.target[0] += 0.03 * a * tx, key.target[1] += 0.025 * a * ty;
+	}
+	if (shot.divecam > 0.0) {   // a diver's camera (round 15): rising on each breath in and sinking as it goes out, the view tipping a little with it, a slow sway
+		const double a = shot.divecam, breath = std::sin(2.0 * kPi * t / diver::kBreath), sway = std::sin(0.43 * t + 1.1) + 0.5 * std::sin(1.07 * t);
+		key.pos[1] += 0.06 * a * breath, key.pos[0] += 0.03 * a * sway, key.pos[2] += 0.02 * a * std::sin(0.31 * t);
+		key.target[1] += 0.1 * a * breath, key.target[0] += 0.05 * a * sway;
 	}
 	double quaking = 0.0;   // an earthquake: the camera shaken, fast and jolting
 	for (const geology::Quake &q : spec.quakes) quaking = std::max(quaking, q.levelAt(t));

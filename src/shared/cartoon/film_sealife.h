@@ -304,14 +304,14 @@ inline Life lifted(Life life, const std::function<double(double, double)> &groun
 	}
 	return life;
 }
-// All of a film's sea life at t (in the current's `flow` and `drift`: film_underwater.h Current).
-inline std::string text(const Life &life, double t, const Vec3 &flow = Vec3{0.0, 0.0, 0.0}, const Vec3 &drift = Vec3{0.0, 0.0, 0.0}) {
+// All of a film's sea life at t (in the current's `flow` and `drift`: film_underwater.h Current). `reefPace` (round 15): how fast the reef fish go - at night they sleep.
+inline std::string text(const Life &life, double t, const Vec3 &flow = Vec3{0.0, 0.0, 0.0}, const Vec3 &drift = Vec3{0.0, 0.0, 0.0}, double reefPace = 1.0) {
 	if (!life.any()) return std::string();
 	bool sharks = false;
 	for (const BaitBall &b : life.balls) sharks = sharks || b.hunter != "dolphins";
 	std::string out = detail::objects(!life.balls.empty(), sharks, !life.reefs.empty());
 	for (const BaitBall &b : life.balls) out += ballText(b, t);
-	for (const Reef &r : life.reefs) out += reefText(r, t, flow);
+	for (const Reef &r : life.reefs) out += reefText(r, t * reefPace, flow);
 	for (const Jellies &j : life.jellies) out += jellyText(j, t, drift);
 	for (const Turtles &tu : life.turtles) out += turtleText(tu, t);
 	return out;
