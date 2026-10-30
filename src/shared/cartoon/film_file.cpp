@@ -136,6 +136,8 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 		m.aspect = static_cast<double>(w) / h;
 	}
 	for (Spec::FaceAct &a : spec.faceActs) {   // the faces' acting from videos (face_track.h): beside the film, else in the library
+		if (const Character *c = character(a.who); c && characterKinds().count(c->kind) && !characterKinds().at(c->kind).face)
+			return filePath + ":" + std::to_string(a.line) + ": " + a.who + " is a " + c->kind + ", which has no face to act with (a rigged model needs face morphs)";
 		std::filesystem::path file = std::filesystem::path(a.file).is_absolute() ? std::filesystem::path(a.file) : (a.dir.empty() ? base : a.dir) / a.file;
 		std::error_code ec;
 		if (!std::filesystem::exists(file, ec) && !std::filesystem::path(a.file).is_absolute())
@@ -420,7 +422,15 @@ void DataFilm::heightsOfWalks() {
 			for (const auto &[x, z] : w.points) x0 = std::min(x0, x), x1 = std::max(x1, x), z0 = std::min(z0, z), z1 = std::max(z1, z);
 		const double half = std::min(30.0, 0.5 * std::max(x1 - x0, z1 - z0) + 2.0);
 		auto terrain = std::make_shared<film_paths::Terrain>(film_paths::terrainOf(flat, 0.5 * (x0 + x1), 0.5 * (z0 + z1), half, 0.1, c.start[1]));
-		if (grounded(c)) c.start[1] = terrain->floorAt(c.start[0], c.start[2], c.start[1], std::max(0.6, stepOf(c)));   // (`footing ground`: it stands on the floor under it)
+		if (grounded(c)) {   // (`footing ground`: it stands on the floor under it - one near where it was put, else the film's land however far above or below)
+			const double nearby = terrain->floorAt(c.start[0], c.start[2], c.start[1], std::max(0.6, stepOf(c)));   // (not `near`: a Windows macro)
+			if (nearby != c.start[1] || !spec.hasTerrain) {
+				c.start[1] = nearby;
+			} else if (const std::shared_ptr<const terrain::Field> land = terrain::fieldOf(spec.terrain); land->inside(c.start[0], c.start[2])) {
+				c.start[1] = land->heightAt(c.start[0], c.start[2]);
+				terrain = std::make_shared<film_paths::Terrain>(film_paths::terrainOf(flat, 0.5 * (x0 + x1), 0.5 * (z0 + z1), half, 0.1, c.start[1]));   // (its floors searched from there)
+			}
+		}
 		double y = c.start[1];
 		bool uneven = false;
 		const double step = stepOf(c);
@@ -1070,6 +1080,15 @@ void DataFilm::footOnGround(const Character &c, CharacterMoment &m) const {
 		m.frame = mul(translate(Vec3{0.0, -drop, 0.0}), m.frame);
 		for (int s = 0; s < feet; ++s) m.lockedFeet[s] = m.lockedFeet[s] + Vec3{0.0, drop, 0.0};
 	}
+}
+
+// A character at t as it is drawn - acting, its feet locked where they came down and (`footing ground`) on the floor under them, its hips down to the lower one - so what
+// it wears, holds or has drawn by it is where its body is.
+CharacterMoment DataFilm::standingMoment(const Character &c, double t) const {
+	CharacterMoment m = actingMoment(c, t);
+	lockFeet(c, t, m);
+	footOnGround(c, m);
+	return m;
 }
 
 Vec3 DataFilm::trailOf(const Character &c, double t, const CharacterMoment &m) const {

@@ -316,6 +316,7 @@ class DataFilm {
 	// Its feet held where they came down (CharacterMoment::lockedFeet), when its kind says where its gait puts them and it has walked.
 	void lockFeet(const Character &c, double t, CharacterMoment &m) const;
 	void footOnGround(const Character &c, CharacterMoment &m) const;   // (`footing ground`: round 12)
+	CharacterMoment standingMoment(const Character &c, double t) const;   // (acting, its feet locked and on the ground: as it is drawn, for what it holds and wears)
 	// How far a loose spring on the character's place lags it at t, in its body's space (CharacterMoment::trail).
 	Vec3 trailOf(const Character &c, double t, const CharacterMoment &m) const;
 	Vec3 chestOf(const Character &c, double t) const { return transformPoint(momentOf(c, t).frame, characterKinds().at(c.kind).chest * c.scale); }

@@ -244,7 +244,7 @@ inline CharacterKind pipKind() {
 		actor::Pose p = pipWalk(m.steps);
 		p.stepAmount *= runWidth(m);
 		placeOf(m.frame, p.pos, p.yaw);
-		p.blink = rig::blink(m.t, m.seed);
+		p.blink = m.faceShapes.empty() ? rig::blink(m.t, m.seed) : 0.0;   // (a face acted from a video blinks when the actor did: face_track.h)
 		p.squash = actor::breathe(m.t);
 		p.earSwing = m.jiggle;   // (its antennae swing behind its head: film_motion.h `jiggle`)
 		pipFace(m.face, p);
@@ -389,7 +389,7 @@ inline CharacterKind personKind() {
 		human::HumanPose p = personWalk(m.steps);
 		p.walkAmount *= runWidth(m);
 		placeOf(m.frame, p.pos, p.yaw);
-		p.blink = rig::blink(m.t, m.seed);
+		p.blink = m.faceShapes.empty() ? rig::blink(m.t, m.seed) : 0.0;   // (a face acted from a video blinks when the actor did: face_track.h)
 		personFace(m.face, p);
 		speakWith(m, p.mouthOpen, p.smile);
 		reachWith(m, p.handL, p.handWeightL, p.handR, p.handWeightR);
@@ -526,7 +526,7 @@ inline CharacterKind turtleKind() {
 		turtle::TurtlePose p = turtleWalk(m.steps);
 		p.walkAmount *= runWidth(m);
 		placeOf(m.frame, p.pos, p.yaw);
-		p.blink = rig::blink(m.t, m.seed);
+		p.blink = m.faceShapes.empty() ? rig::blink(m.t, m.seed) : 0.0;   // (a face acted from a video blinks when the actor did: face_track.h)
 		turtleFace(m.face, p);
 		speakWith(m, p.mouthOpen, p.smile);
 		reachWith(m, p.frontL, p.frontWeightL, p.frontR, p.frontWeightR);

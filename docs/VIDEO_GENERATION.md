@@ -2021,7 +2021,7 @@ the planets, Pluto, Ceres, the Moon, Io, Europa, Ganymede and Titan (true radii)
 
 Ten things that make a film's characters look and move as in a feature film. The lines are read by film_parse_character.h (and `act` and `rigged` by film_parse.cpp).
 
-**Skin that light goes into: `skin-light [NAME] D`.** The skin of the person, Pip, the turtle - and a rigged model's materials named skin, body, face, head or hand - becomes pbrt's
+**Skin that light goes into: `skin-light [NAME] D`.** The skin of the person, Pip, the turtle - and a rigged model's materials whose names have the word skin, body, face, head or hand and no word of clothing (`Wolf3D_Body` yes, `BodyArmor` no) - becomes pbrt's
 subsurface material (cartoon_lib.h `skinMaterial`): the colour it showed, with light travelling D times a cartoon skin's depth under it, red furthest and blue least (4.2, 1.7
 and 1.0 mm at 1, scaled with the character's size). Ears, fingers and a nose glow red with a light behind them and a face looks soft. 0 (the default) is the painted skin as
 before; 1 is the usual; up to 6. It is noisier than a painted skin: the films' adaptive sampling and denoiser take that out. CPU and both OptiX renderers.
@@ -2066,7 +2066,7 @@ a scarf's end hanging from the front of the neck. Each is held where the body ho
 hips to each foot), so a skirt swings round a stride.
 
 **Feet on the ground: `footing [NAME] ground|flat`.** A character standing on uneven ground - a slope, a stair, a rock, the film's `terrain` - stands on the floor under it
-(its height snaps to it when the film is loaded), each foot on the floor under that foot, its hips down to the lower foot so that leg reaches it (the other knee bends; at
+(its height snaps to it when the film is loaded: a floor near where it was put, else the film's land however far above or below), each foot on the floor under that foot, its hips down to the lower foot so that leg reaches it (the other knee bends; at
 most a third of its height), and the person's shoes tilted to the slope under them. A walk's planted feet already found the floor under them; now a standing character does
 too. `flat`, the default, keeps the old way.
 
@@ -2082,7 +2082,7 @@ powershell -ExecutionPolicy Bypass -File scripts\setup_video_to_acting.ps1      
 rigged  mira  film_assets/library/mira.glb
 mocap   mira  me.bvh  at 2              # the body (a rigged character)
 act     mira  me.face at 2              # the face: a rigged model's ARKit morphs as they are
-act     ann   me.face at 2 amount 0.8   # ... or a built-in character's feelings and mouth (to T1, amount A: how much)
+act     ann   me.face at 2 amount 0.8   # ... or a built-in character's feelings and mouth (to T1, amount A: how much); refused for one with no face
 ```
 
 It runs on this computer with Google's MediaPipe (Apache 2.0): its pose landmarker's 33 points in metres become a skeleton named as Mixamo names bones (Hips, Spine, Spine1,

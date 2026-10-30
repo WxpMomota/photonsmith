@@ -564,10 +564,8 @@ std::string DataFilm::castAt(double t) const {
 		if (!kind.text) continue;
 		const hair::Groom *groom = kind.headFrame ? groomFor(c) : nullptr;
 		const auto drawnAt = [&](double tc) {   // the character as its kind draws it at a time
-			CharacterMoment m = actingMoment(c, tc);
+			CharacterMoment m = standingMoment(c, tc);   // (its feet locked and, with `footing ground`, on the floor)
 			if (kind.trails) m.trail = trailOf(c, tc, m);
-			lockFeet(c, tc, m);
-			footOnGround(c, m);   // (`footing ground`)
 			m.voice = music_cues::voiceAt(spec.key, c.name, tc, shotStarts(), shotNameList(), &m.mouth);   // (a recording's loudness and mouth shapes)
 			speakingAt(c, tc, m);
 			m.face = faces::faceAt(c.feelings, tc);
@@ -592,9 +590,7 @@ std::string DataFilm::castAt(double t) const {
 				drawn = withMaterialWords(drawn, words);
 			}
 			if (groom) {   // hair of strands (film_hair.h): on its head now, its tips trailing where the head was 0.06 s ago, bent by the gusts
-				CharacterMoment was = actingMoment(c, tc - 0.06);
-				lockFeet(c, tc - 0.06, was);
-				footOnGround(c, was);
+				const CharacterMoment was = standingMoment(c, tc - 0.06);
 				const hair::Scalp scalp{kind.headFrame(m), kind.scalpCentre, kind.scalpRadii};
 				const Vec3 at = transformPoint(scalp.head, scalp.centre);
 				const auto own = c.colours.find("hair");
@@ -1060,7 +1056,8 @@ std::string DataFilm::clothAt(double t) const {
 			if (!who) continue;
 			const CharacterKind &kind = characterKinds().at(who->kind);
 			w.holdAt = [this, who, &kind, &cl](double when, int count, std::vector<Vec3> &held, std::vector<cloth::Sphere> &body) {
-				const CharacterMoment m = actingMoment(*who, std::max(0.0, motion::heldTime(spec.stepping, who->name, when, spec.fps)));
+				const double heldAt = std::max(0.0, motion::heldTime(spec.stepping, who->name, when, spec.fps));   // (on twos: the moment its frame holds)
+				const CharacterMoment m = standingMoment(*who, heldAt);   // (as it is drawn: its hips down with `footing ground`)
 				const double s = m.scale, shoulders = kind.chest.y + 0.45 * (kind.head.y - kind.chest.y), back = -0.85 * kind.radius;
 				const auto pbrt = [](Vec3 p) { return Vec3{-p.x, p.y, p.z}; };   // (story space to pbrt's)
 				held.clear(), body.clear();
@@ -1081,9 +1078,7 @@ std::string DataFilm::clothAt(double t) const {
 				body.push_back({pbrt(transformPoint(m.frame, Vec3{0.0, kind.chest.y, 0.0} * s)), 0.95 * kind.radius * s});
 				body.push_back({pbrt(transformPoint(m.frame, Vec3{0.0, 0.55 * kind.chest.y, 0.0} * s)), 0.9 * kind.radius * s});
 				if (cl.kind != "cape" && kind.feet) {   // (the legs: balls from the hips to each foot, so a skirt swings round them as they stride)
-					CharacterMoment withFeet = m;
-					lockFeet(*who, when, withFeet);
-					for (const Foot &f : kind.feet(withFeet)) {
+					for (const Foot &f : kind.feet(m)) {
 						const Vec3 hip = transformPoint(m.frame, Vec3{0.0, 0.52 * kind.chest.y, 0.0} * s);
 						for (int k = 0; k < 5; ++k) {
 							const double u = (k + 0.5) / 5.0;
@@ -1110,7 +1105,7 @@ std::string DataFilm::marksAt(const std::string &header, double t) const {
 		for (const Character &c : spec.characters) {
 			if (c.name != who) continue;
 			const CharacterKind &kind = characterKinds().at(c.kind);
-			const CharacterMoment m = actingMoment(c, motion::heldTime(spec.stepping, c.name, when, spec.fps));
+			const CharacterMoment m = standingMoment(c, motion::heldTime(spec.stepping, c.name, when, spec.fps));
 			head = transformPoint(m.frame, kind.head * m.scale), top = transformPoint(m.frame, Vec3{0.0, kind.height, 0.0} * m.scale);
 			feet = transformPoint(m.frame, {0.0, 0.0, 0.0}), chest = transformPoint(m.frame, kind.chest * m.scale);
 			return true;

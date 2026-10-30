@@ -818,8 +818,17 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 		// An emitter keeps the shape's material in pbrt-v4 (default diffuse 0.5), so it reflects what other lights shed on it. A flat diffuse reflectance is stored
 		// in `albedo` (zero otherwise, which is also what a black body - the Scene Builder's emitter - reads as); other materials on a lamp are not reflected here (the
 		// CPU builder wraps any material), and a textured reflectance uses its flat colour.
-		if (m.kind == pbrt_flatten::MaterialKind::Diffuse)
+		// A diffuse or a coated diffuse reflects as a diffuse surface of its reflectance (the coat's sheen is not drawn); an imagemap reflectance is sampled at the hit
+		// (lampAlbedoTexIdx): before, a textured one reflected nothing and a sunlit planet with a glow picture was black on its day side (on the CPU it was right).
+		const bool diffuseLike = m.kind == pbrt_flatten::MaterialKind::Diffuse || m.kind == pbrt_flatten::MaterialKind::CoatedDiffuse;
+		if (diffuseLike && !m.textureFilename.empty() && m.reflectanceGraph.empty()) {
+			d.lampAlbedoTexIdx = getOrBuildPbrtImageTexture(m.textureFilename, out, imageTextureCache, static_cast<float>(m.textureGamma), static_cast<GpuWrapMode>(m.textureWrapIndex),
+															m.textureInvert, m.textureMapping);
+			d.lampAlbedoTexScale = static_cast<float>(m.textureScale);
+			d.albedo = make_float3(1.0f, 1.0f, 1.0f);
+		} else if (diffuseLike) {
 			d.albedo = make_float3(static_cast<float>(m.color[0]), static_cast<float>(m.color[1]), static_cast<float>(m.color[2]));
+		}
 		// A smooth glass lamp adds its light and refracts (lamp_glass()): at index 1, a glow the scene behind shows through - an aurora's curtain, a beam of light.
 		const bool glass = m.kind == pbrt_flatten::MaterialKind::Dielectric && m.roughness_u <= 0.0 && m.roughness_v <= 0.0 && m.roughnessTextureFilename.empty();
 		if (glass) {
@@ -828,7 +837,7 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 			d.transmission_filter = make_float3(static_cast<float>(m.transmissionFilter[0]), static_cast<float>(m.transmissionFilter[1]), static_cast<float>(m.transmissionFilter[2]));
 		}
 		// (the CPU builder reflects anything but an interface or a black diffuse body: count what the flat diffuse and the glass above do not stand for, so the scene builder can say so)
-		if (!glass && m.kind != pbrt_flatten::MaterialKind::Interface && !(m.kind == pbrt_flatten::MaterialKind::Diffuse && m.textureFilename.empty())) ++out.lampMaterialsNotReflected;
+		if (!glass && m.kind != pbrt_flatten::MaterialKind::Interface && !(diffuseLike && m.reflectanceGraph.empty())) ++out.lampMaterialsNotReflected;
 		return d;
 	}
 

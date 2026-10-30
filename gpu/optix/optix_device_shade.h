@@ -1158,7 +1158,8 @@ __device__ __forceinline__ void shade_material(
 	if (lamp_scatters(mat)) {
 		MaterialData *view = ::new (static_cast<void *>(viewStorage)) MaterialData(mat);
 		view->type = lamp_glass(mat) ? MaterialType::Dielectric : MaterialType::Lambertian;   // (glass: `ior` and `transmission_filter` are already the glass's)
-		view->textureIdx = -1;   // (the texture of a lamp is its emission, not its reflectance)
+		view->textureIdx = mat.lampAlbedoTexIdx;   // (the texture of a lamp is its emission; its reflectance's picture, if any, is this)
+		view->emissionScale = mat.lampAlbedoTexScale;
 		emission = make_float3(0.0f, 0.0f, 0.0f);
 		use = view;
 	} else if (mat.roughTexIdx >= 0 || mat.condRoughTexIdx >= 0) {

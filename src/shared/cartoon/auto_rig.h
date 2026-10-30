@@ -230,6 +230,14 @@ inline std::string rig(gltf_skin::Rig &rig) {
 				gltf_skin::detail::transformDir(m, &piece.normals[v], b);
 				for (int e = 0; e < 3; ++e) piece.positions[v + static_cast<std::size_t>(e)] = a[e], piece.normals[v + static_cast<std::size_t>(e)] = b[e];
 			}
+			// its morph targets' deltas turned and scaled with it (a delta is a direction: no move), else a node scaled 0.01 left a jawOpen moving a hundred times too far
+			for (std::vector<std::vector<double>> *deltas : {&piece.morphPositions, &piece.morphNormals})
+				for (std::vector<double> &d : *deltas)
+					for (std::size_t v = 0; v + 2 < d.size(); v += 3) {
+						double b[3];
+						gltf_skin::detail::transformDir(m, &d[v], b);
+						for (int e = 0; e < 3; ++e) d[v + static_cast<std::size_t>(e)] = b[e];
+					}
 		}
 		for (std::size_t v = 0; v + 2 < piece.positions.size(); v += 3) points.push_back({piece.positions[v], piece.positions[v + 1], piece.positions[v + 2]});
 	}
