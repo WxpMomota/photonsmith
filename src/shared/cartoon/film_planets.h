@@ -562,10 +562,17 @@ inline std::string planetText(const std::string &film, const Planet &p, double n
 	const Pictures pic = pictures(film, p);
 	std::string out = "# a planet (film_planets.h): " + p.name + "\nAttributeBegin\n" + placement(p, nt);
 	out += "  Texture \"" + p.name + "_colour\" \"spectrum\" \"imagemap\" \"string filename\" [ \"" + pic.colour + "\" ]\n";
-	if (!pic.glow.empty()) {
-		char scale[32];
-		std::snprintf(scale, sizeof scale, "%.4f", p.kind == "lava" ? 1.5 : 0.25 * p.cities);
-		out += "  AreaLightSource \"diffuse\" \"string filename\" [ \"" + pic.glow + "\" ] \"float scale\" [ " + scale + " ]\n";
+	if (!pic.glow.empty() && p.kind == "lava") out += "  AreaLightSource \"diffuse\" \"string filename\" [ \"" + pic.glow + "\" ] \"float scale\" [ 1.5000 ]\n";
+	// City lights: a shell of clear glass (index 1) just above the ground that glows with them, casts no shadow and is never aimed at - as the aurora is drawn. On the
+	// planet's own sphere they made it a lamp, and the GPU renderers reflect sunlight off a lamp only in a flat colour: by day the whole planet was black but for its cities.
+	std::string cities;
+	if (!pic.glow.empty() && p.kind != "lava") {
+		char shell[400];
+		std::snprintf(shell, sizeof shell,
+					  "  AreaLightSource \"diffuse\" \"string filename\" [ \"%s\" ] \"float scale\" [ %.4f ] \"bool sampled\" false\n  Material \"dielectric\" \"float eta\" [ 1 ]\n"
+					  "  Shape \"sphere\" \"float radius\" [ %.4f ] \"bool shadow\" false\nAttributeEnd\n",
+					  pic.glow.c_str(), 0.25 * p.cities, p.radius * 1.0006);
+		cities = "# its cities' lights (film_planets.h)\nAttributeBegin\n" + placement(p, nt) + shell;
 	}
 	if (!pic.gloss.empty()) {
 		out += "  Texture \"" + p.name + "_roughness\" \"float\" \"imagemap\" \"string filename\" [ \"" + pic.gloss + "\" ]\n";
@@ -577,7 +584,7 @@ inline std::string planetText(const std::string &film, const Planet &p, double n
 	std::snprintf(buf, sizeof buf, "  Shape \"sphere\" \"float radius\" [ %.4f ]\nAttributeEnd\n", p.radius);
 	if (p.kind == "gas" && p.flow > 0.0) out = "# a planet (film_planets.h): " + p.name + "\n";   // (its sphere drawn by its flowing bands instead)
 	else out += buf;
-	return out + weatherText(film, p, pic.colour, nt, sunDir) + airText(film, p) + auroraText(film, p, nt, sunDir) + ringsText(p, nt);
+	return out + cities + weatherText(film, p, pic.colour, nt, sunDir) + airText(film, p) + auroraText(film, p, nt, sunDir) + ringsText(p, nt);
 }
 
 }  // namespace planets
