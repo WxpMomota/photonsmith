@@ -181,12 +181,12 @@ tengwang|56|2bb946d4105f354e|The stars over the river
 tengwang|57|951d0776adb7e3f0|The manuscript
 tengwang|58|865d628914f62e42|Dawn
 tengwang|59|d5560262f6b0c819|The title
-thunder-plains|1|4d0bc517cb00bc40|The plain
-thunder-plains|2|a6e1deed6afb3f0f|Wheeling
-thunder-plains|3|f3f27b254b49969f|The storm comes
-thunder-plains|4|be559c19220f67ee|The herd
-thunder-plains|5|317c05ca4ab524a2|They bolt
-thunder-plains|6|cf6961ae7abf6d03|The rain
+thunder-plains|1|c157521644f70151|The plain
+thunder-plains|2|987043d30c6401f6|Wheeling
+thunder-plains|3|d0d7ec3b17ee6b06|The storm comes
+thunder-plains|4|cf151c9257910b4a|The herd
+thunder-plains|5|c12ab17b23b61cac|They bolt
+thunder-plains|6|880d5b2cb4c552ac|The rain
 turtle-escape|1|cffe5681acb9d1b4|Wide on the room
 turtle-escape|2|32e0e1985fa12972|The plant
 turtle-escape|3|3b8ffe27735f87dd|The thermometer
@@ -261,12 +261,12 @@ turtle-escape|71|6f2de973fa2e5ff3|Behind the sofa
 turtle-escape|72|38f2667aa655d8db|Turtle?
 turtle-escape|73|36c6346b2f446b99|The tub
 turtle-escape|74|6585bd4d22b77349|Black
-valley-of-mists|1|038e8d5037c2f2d6|Above the mists
-valley-of-mists|2|93e9fb06ee25e8fd|First light
-valley-of-mists|3|203e33da5a4cbec9|Geese
-valley-of-mists|4|5c599cc67f8c8f0b|The mists lift
-valley-of-mists|5|19420eb413150c9e|The valley floor
-valley-of-mists|6|50cb0fb3c014d4be|Morning
+valley-of-mists|1|467cb0fb997af871|Above the mists
+valley-of-mists|2|2222a45658a1748e|First light
+valley-of-mists|3|3fedb9198f156193|Geese
+valley-of-mists|4|59af69d709b996f2|The mists lift
+valley-of-mists|5|af45b9de363a0ca7|The valley floor
+valley-of-mists|6|c73cb35b75571250|Morning
 worlds-beyond|1|9f2e49ebbcd613c6|Into the night
 worlds-beyond|2|c4496f48cb100f81|Past the fire
 worlds-beyond|3|ca9dd28c22e01e3d|The comet goes by

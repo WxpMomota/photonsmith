@@ -6,6 +6,8 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **Animals with anatomy (2026-10-31).** The generated quadrupeds have a real top line (withers, a dip in the back, a croup), a belly that tucks up to the flank, an arched neck, a head with a jaw and a muzzle, legs with knees, hocks and fetlocks, muscle at the shoulder and haunch, and a horse's mane and tail are strands of hair. Their joints did not move, so every walk and run stays as it was.
+
 * **The land grows, and animals are not one colour (2026-10-31).** Every film with land now has real grass out to 330 m, moving in the wind and coloured by the ground under it, with fallen leaves and ferns under trees and stones here and there; `undergrowth off` or `undergrowth amount A` changes it. Animals with no pattern wear a `natural` coat, darker along the back and paler under it with dark, dusty legs, and no two of a herd are alike.
 
 * **Forests that look real (2026-10-31).** A far tree is now the near tree's own limbs with fewer, bigger leaves, not a ball or a cone, so a tree keeps its outline to the horizon. Each leaf has its own place in a picture of leaves: its own colour and veins, and autumn reaches the exposed leaves first. Leaves also stopped giving back more light than they receive, which is what made autumn crowns glow.

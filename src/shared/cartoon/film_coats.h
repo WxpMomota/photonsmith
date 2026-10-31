@@ -166,7 +166,8 @@ inline Vec3 colourAt(const std::string &pattern, int variant, Vec3 coat, Vec3 le
 	const std::vector<float> &dark = detail::field(pattern, variant);
 	const int x = std::clamp(static_cast<int>(ax * kSize), 0, kSize - 1), y = std::clamp(static_cast<int>(ay * kSize), 0, kSize - 1);
 	const double d = dark[static_cast<std::size_t>(y * kSize + x)] * (pattern == "zebra" ? 1.0 : 1.0 - 0.6 * under);
-	Vec3 c = lerp(b, belly, (pattern == "natural" ? 0.42 : 0.55) * under * (pattern == "zebra" ? 0.3 : 1.0));
+	if (pattern == "natural") belly = b * 1.45 + Vec3{0.05, 0.05, 0.04};   // (its own colour paler, not a white belly a horse has not got)
+	Vec3 c = lerp(b, belly, 0.55 * under * (pattern == "zebra" ? 0.3 : 1.0));
 	if (pattern == "natural") {
 		const double round = detail::roundness(ax, ay), spine = smoothstep(0.35, 0.95, -std::cos(2.0 * kPi * round));
 		const double patches = nature::noise2(ax * 9.0, ay * 9.0, 71 + variant), hair = nature::noise2(ax * 6.0, ay * 90.0, 73 + variant);
@@ -183,7 +184,7 @@ inline Vec3 colourAt(const std::string &pattern, int variant, Vec3 coat, Vec3 le
 // The coat's picture of a kind in a pattern and variant (its scene path), from its model's coat and leg colours.
 inline std::string picture(const std::string &pattern, const std::string &kind, int variant, Vec3 coat, Vec3 legs) {
 	char name[160];
-	std::snprintf(name, sizeof name, "coat_v3_%s_%s_%d_%.3f_%.3f_%.3f", pattern.c_str(), kind.c_str(), variant, coat.x, coat.y, coat.z);
+	std::snprintf(name, sizeof name, "coat_v4_%s_%s_%d_%.3f_%.3f_%.3f", pattern.c_str(), kind.c_str(), variant, coat.x, coat.y, coat.z);
 	return film_sky::picture("_coats", name, kSize, kSize, [&](std::vector<float> &rgb) {
 		for (int y = 0; y < kSize; ++y)
 			for (int x = 0; x < kSize; ++x) {
