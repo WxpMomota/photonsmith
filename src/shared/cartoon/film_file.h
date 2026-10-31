@@ -473,6 +473,7 @@ class DataFilm {
 	// `grow` lines and shown or hidden by its `show` lines as scene blocks are (by a placement's `as ID`, and ID.PIECE), broken by its `shatter` lines
 	std::string modelsAt(const std::string &header, double t) const;
 	Mat4 animMatrix(const std::string &name, double t, int depth = 0, const Anim *upTo = nullptr) const;   // (those lines' transform of a name: pbrt's, as transformsAt writes it; `upTo`: only the lines before that one)
+	std::string swarmsAt(const std::string &header, double t) const;
 	Mat4 gazeMatrix(const Anim &a, double t, const Mat4 &outer) const;   // (a `gaze` line's turn, `outer` being all that is round it)
 	static std::string num(double v);
 	// The transforms of a block at t; with a shutter, a moving block's at the shutter's opening (StartTime) and closing (EndTime) - pbrt's object motion blur, which

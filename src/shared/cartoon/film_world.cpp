@@ -686,16 +686,7 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 	}
 	out += dressingAt(t);
 	out += modelsAt(header, t);   // the film's own models where they are placed (film_model.h)
-	if (!spec.swarms.empty()) {   // (film_swarm.h)
-		Vec3 eye, target;
-		double fov = 40.0;
-		film_subjects::cameraOf(header, eye, target, fov);
-		for (const swarm::Swarm &sw : spec.swarms) {
-			std::function<Vec3(double)> origin;
-			if (!sw.after.empty()) origin = [this, &sw](double at) { return transformPoint(animMatrix(sw.after, at), Vec3{0.0, 0.0, 0.0}); };
-			out += swarm::text(sw, t, Vec3{-eye.x, eye.y, eye.z}, origin);
-		}
-	}
+	out += swarmsAt(header, t);   // (film_swarm.h)
 	if (!spec.weather.empty() || !spec.emitters.empty()) {   // weather round the camera, and particles (film_particles.h)
 		Vec3 eye, target;
 		double fov = 40.0;
@@ -1638,6 +1629,20 @@ std::string DataFilm::airMedium() const {
 }
 
 
+// The film's swarms at t (film_swarm.h), their discs turned to the camera of `header`.
+std::string DataFilm::swarmsAt(const std::string &header, double t) const {
+	if (spec.swarms.empty()) return std::string();
+	Vec3 eye, target;
+	double fov = 40.0;
+	film_subjects::cameraOf(header, eye, target, fov);
+	std::string out;
+	for (const swarm::Swarm &sw : spec.swarms) {
+		std::function<Vec3(double)> origin;
+		if (!sw.after.empty()) origin = [this, &sw](double at) { return transformPoint(animMatrix(sw.after, at), Vec3{0.0, 0.0, 0.0}); };
+		out += swarm::text(sw, t, Vec3{-eye.x, eye.y, eye.z}, origin);
+	}
+	return out;
+}
 // A `gaze` line's turn at t: about its pivot, far enough that what faces `forward` at rest looks at the target (a point, or something moving: where its rest place is now),
 // no further than `most`, by how much the line's fade says. All worked out inside `outer`, what the block rides on, so it looks from where it is.
 Mat4 DataFilm::gazeMatrix(const Anim &a, double t, const Mat4 &outer) const {
