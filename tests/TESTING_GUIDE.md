@@ -51,6 +51,13 @@ use the MSVC path above for full coverage.
 `tests/build_and_run_tests.ps1` / `.bat` automate this CMake path (CMake
 configure + Debug/Release build + run).
 
+The same `CMakeLists.txt` also builds `cpu_integrator_tests`
+(`tests/unit/cpu_integrator_agreement_tests.cpp`): the CPU path tracer,
+BDPT, MLT, SPPM and the debug integrators rendered on small scenes and
+compared with each other and with closed forms. It runs the launcher, so
+build `ray_tracer` first (root `CMakeLists.txt`) and point `RT_LAUNCHER`
+at it if it is not found. CI runs both targets on Windows and macOS.
+
 The same target builds on **macOS** (about 3,570 tests, ~17 s to run; the OptiX/CUDA-dependent files and the few that call the renderer libraries directly are not part of it, see the comment at the top of `tests/CMakeLists.txt`):
 
 ```bash
@@ -64,8 +71,8 @@ The Metal tests are separate: `ctest` in a `-DRT_BUILD_METAL=ON` build (see [BUI
 
 ```
 tests/
-├── unit/                  # fast, isolated unit tests (190+ files and growing)
-├── integration/           # slower, exercise real rendering (22+ files and growing)
+├── unit/                  # fast, isolated unit tests (290+ files and growing)
+├── integration/           # slower, exercise real rendering (26+ files and growing)
 ├── ray_tracer_tests.vcxproj  # MSVC target - full coverage, see above
 ├── CMakeLists.txt         # Standalone CMake target - portable subset
 ├── build_and_run_tests.ps1/.bat  # Automates the CMake path
@@ -105,17 +112,18 @@ ray_tracer_tests.exe --gtest_brief=1
 
 ### Quick dev-loop filter
 
-A full run takes ~160s, but that's extremely concentrated: one suite
-(`MaterialsAndVolumes/MaterialCpuGpuParityTest` - the name predates the
-Materials/Volumes/Textures category split, it now covers all three)
-accounts for ~55% of it by itself - a legitimate but heavy per-material
-CPU/GPU-backend parity sweep, not wasted work. For fast local iteration:
+The whole suite in one process takes about 13 minutes (late October 2026,
+about 6,500 tests), so use the tiered runner instead (next section). In a
+single process, the heaviest suite is
+`MaterialsAndVolumes/MaterialCpuGpuParityTest` (the name predates the
+category split; it now sweeps Materials, Volumes, Textures, Lights,
+Cameras, Geometry and Basics) - a legitimate but heavy per-scene
+CPU/GPU-backend parity sweep, not wasted work. To leave it out:
 ```powershell
 ray_tracer_tests.exe --gtest_filter=-MaterialsAndVolumes/*
 ```
-cuts it to ~72s. See the main [README.md](../README.md)'s "Quick dev-loop
-filter" section for a more aggressive variant. Always run the full,
-unfiltered suite before pushing.
+Always run the full suite (`-Tier Split`) before pushing a change to
+rendering code.
 
 This suite also does a **regional (block-based) diff** alongside its
 whole-image brightness/channel checks, specifically to catch a divergence
@@ -127,11 +135,34 @@ corruption artifact (see that file's header comment), set
 `MATPARITY_ONLY_SCENE_ID=<id>` (e.g. `B14`) before running to render only
 that one scene in isolation.
 
-To actually run tests in parallel (not just skip a slow suite in one
-process), use `scripts/run_tests_parallel.ps1 -Tier Fast` instead of a
-hand-written filter - it excludes every GPU-touching and thread-pool-
-oversubscribing test (safe to shard aggressively) and verifies its own
-exclusion list still partitions the suite exactly on every run.
+### The tiered runner (`scripts/run_tests_parallel.ps1`)
+
+To actually run tests in parallel, use `scripts/run_tests_parallel.ps1`
+instead of a hand-written filter. It runs the test program it finds (it
+does not build it, and warns when the program or the launcher is older
+than the sources) in one of these tiers:
+
+```powershell
+.\scripts\run_tests_parallel.ps1 -Tier Fast     # the cheap, GPU-free tests in 16 shards: about 75 s - the loop while editing
+.\scripts\run_tests_parallel.ps1 -Tier Render   # the CPU-render suites (backend agreement, bundled scenes, pbrt reference pack): 4 shards, about 154 s
+.\scripts\run_tests_parallel.ps1 -Tier Slow     # the GPU tests, one process: about 340 s
+.\scripts\run_tests_parallel.ps1 -Tier Split    # the default: Fast, then Render and Slow at the same time - the whole suite in about 375 s
+.\scripts\run_tests_parallel.ps1 -Tier All -Filter "CameraMathTest.*"   # no tier, a filter of your own
+```
+
+`-RenderShards N`, `-Sequential` (Render and Slow one after the other) and
+`-Shards N` change how the work is spread. A test that renders on the GPU
+must have `Gpu`/`GPU` in its name or be listed in the script's
+`$gpuAndOversubscribingFilter`; otherwise it lands in Fast, whose shards
+set `RT_FORBID_GPU` and stop it. A new heavy CPU-render suite belongs in
+`$renderSuites`. A test that sweeps every film or scene is written as a
+`TEST_P` over `tests/unit/test_parts.h`'s parts so the shards can share it.
+The shards share the machine's film cache (`RAY_TRACER_FILM_CACHE`). After
+the totals the runner prints the slowest shard and the five slowest tests.
+[BUILD.md](../BUILD.md#fast-incremental-builds-and-a-quick-test-loop-windows)
+has the measurements behind these numbers. Before a commit,
+`python scripts/pre_commit_checks.py` runs CI's quick checks (build lists,
+environment-variable docs, code size).
 
 ## GPU Tests
 

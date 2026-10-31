@@ -30,6 +30,11 @@ The scene is a floor, a ball of the material under test and a lamp, in a sky. Ea
 | `hair` | eight hair strands (`curve` shapes) moved, 8 times bigger and turned; constant against picture sky | curve width and the hair shading under a transform |
 | `size` | the same scene at two picture sizes | a pixel-size dependency |
 | `spp` | 16 against 128 samples a pixel | bias that grows or shrinks with the sample count |
+| `normalmap`, `texturemap` | a flat normal map against none, on a disk and a cylinder; a picture with `uscale`/`vscale` 2 against the same picture tiled by hand, on every shape that makes its own texture coordinates | a normal map or a texture mapping a shape path drops |
+| `maps`, `instbump`, `spawn`, `oddmap` | normal and height maps on every shape, on the CPU and the GPU; a height map on a quad placed directly and as a scaled `ObjectInstance`; a normal map tilted far from the geometric normal; a height map whose sides are not powers of two | bump and normal maps under a transform, rays spawned on the wrong side, mip levels built from the wrong picture |
+| `subsurface`, `fog` | a subsurface ball under a constant sky held to 1%; coloured fog (a medium sphere and the camera medium), each channel held on its own | a sky sample weighted with the wrong pdf; a per-channel extinction averaged away |
+| `refraction`, `bundled` | bundled scenes with a lamp or the camera inside glass, against pbrt-v4's own means | pbrt's radiance-mode `eta^2` at each crossing |
+| `orientation`, `dots`, `mapping`, `wrap`, `motion`, `lightpic` | where things land in the picture (camera handedness, a projector's slide, dots cells, an imagemap's `wrap`, a motion-blur streak and its shadow, pictures on box and quad windows), compared by the rows and columns of the picture against the CPU's | what a mean cannot see: a mirror, a flipped slide, a pattern in the wrong place |
 
 The glass materials (`dielectric`, `thindielectric`, `roughdielectric`) skip `lightform` (a point light cannot be seen in a perfect specular surface) and the two fireflier ones get a looser tolerance (8%) in the groups that compare noisy means. Each material is a ball that fills the frame in the `sky` group, so the whole picture is the material.
 
@@ -52,8 +57,7 @@ The glass materials (`dielectric`, `thindielectric`, `roughdielectric`) skip `li
 
 ## On Windows (OptiX)
 
-`scripts
-un_optix_sweeps.ps1` builds the renderer and runs the sweep once for the recursive OptiX backend and once for the wavefront one (`RAY_TRACER_WAVEFRONT=1`), then prints one PASS or FAIL line each (about ten minutes a backend); the pairs that are off are printed above them. `-NoBuild` skips the build, `-Only sky,shapeform` runs just those groups, `-Backend Wavefront` just one backend, `-Detail` every pair. Exit code 0 means both found nothing off. Run it after a change under `gpu/optix/`, `src/shared/` or `src/TheRestOfYourLife/` that can change a picture: the Mac cannot run OptiX.
+`scripts/run_optix_sweeps.ps1` builds the renderer and runs the sweep once for the recursive OptiX backend and once for the wavefront one (`RAY_TRACER_WAVEFRONT=1`), then prints one PASS or FAIL line each (about ten minutes a backend); the pairs that are off are printed above them. `-NoBuild` skips the build, `-Only sky,shapeform` runs just those groups, `-Backend Wavefront` just one backend, `-Detail` every pair. Exit code 0 means both found nothing off. Run it after a change under `gpu/optix/`, `src/shared/` or `src/TheRestOfYourLife/` that can change a picture: the Mac cannot run OptiX.
 
 ## In ctest
 

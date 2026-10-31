@@ -60,4 +60,4 @@ In the GUI, right-click a rendered picture in the Preview tab and choose "Why is
 
 How it works: `src/shared/path_probe.h` is a sink that `camera_path.h`'s `ray_color()` reports into at the places it adds light to a path (one null-pointer check per call site when no probe runs). The test `PathProbeIntegration` checks the books against a closed form (a diffuse floor of albedo 0.5 under a white sky returns exactly 0.5, all of it the sky's) and that what the probe books is what `ray_color()` returns, sample for sample.
 
-**Not (yet) there:** object / material ids, direct-versus-indirect light splits, a shadow catcher, light groups. The Metal renderer writes no passes of its own, and the denoiser on a Mac sees colour only (the passes could guide it; see DENOISING.md).
+**Not (yet) there:** direct-versus-indirect light splits, and a shadow-catcher pass (the Scene Builder's *Render into the photo* gets the shadows by rendering the scene three times instead, `src/shared/photo_composite.h`; see PHOTO_TO_SCENE.md). The Metal renderer writes no passes of its own, and the denoiser on a Mac sees colour only (the passes could guide it; see DENOISING.md).

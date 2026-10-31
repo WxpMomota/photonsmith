@@ -6,7 +6,7 @@
 
 [**Download**](https://github.com/XinpeiWang/photonsmith/releases) | [**Website and gallery**](https://xinpeiwang.github.io/photonsmith/) | [**What is supported**](docs/BACKEND_SUPPORT.md) | [**How the renders are checked**](docs/CLOSED_FORMS_FOUND_THE_BUGS.md)
 
-A physically-based renderer with parallel **CPU**, **GPU (OptiX)** (Windows + NVIDIA) and **GPU (Metal)** (macOS) implementations, built up from the "Ray Tracing in One Weekend" book series into a much broader pbrt-v4-style feature set: 175 built-in scenes and 66 test scenes, a wide material library, multiple light types, real triangle-mesh/texture support, BVH acceleration, volumetrics, and an experimental SPPM (photon-mapping) integrator alongside standard path tracing.
+A physically-based renderer with parallel **CPU**, **GPU (OptiX)** (Windows + NVIDIA) and **GPU (Metal)** (macOS) implementations, built up from the "Ray Tracing in One Weekend" book series into a much broader pbrt-v4-style feature set: 175 built-in scenes and 86 test scenes, a wide material library, multiple light types, real triangle-mesh/texture support, BVH acceleration, volumetrics, and an experimental SPPM (photon-mapping) integrator alongside standard path tracing.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-lightgrey.svg)
@@ -36,7 +36,7 @@ A rendering bug is quiet: the picture still looks plausible while being 20% too 
 - **Closed forms.** Furnace scenes (a diffuse sphere under a white sky must read its albedo), a closed diffuse-transmission shell (0.2, 0.56, 0.632, 0.6464 ... 0.65), per-channel Beer-Lambert absorbers, and a point light over a plate are read by the CPU, both OptiX backends and the alternative integrators.
 - **Cross-checks.** The CPU path tracer against the two OptiX backends and Metal, and BDPT, MLT, SPPM and the debug integrators against the path tracer, on purpose-built scenes.
 - **Real pbrt-v4 as the reference.** 145 of the bundled scenes were rendered by an actual pbrt-v4 build, and its mean picture value is frozen in a table (`tests/data/pbrt_reference_means.txt`). The CPU renderer and both OptiX renderers are tested against it: about 140 of the 145 read within 1.5% of pbrt, and every scene is held to a band of about 2% around what it reads today, so a change that moves a picture away from pbrt fails a test on any machine, with no pbrt installed. Where behaviour is in doubt the pbrt-v4 source is read, and an independent script (`scripts/pbrt_rough_glass_reference.py`) gives a path-level reference for rough glass.
-- **Nearly 6,000 automated tests**, about six minutes on a desktop GPU (a tiered runner, `scripts/run_tests_parallel.ps1 -Tier Split`). [`docs/BACKEND_SUPPORT.md`](docs/BACKEND_SUPPORT.md) is one table of what the CPU, OptiX and Metal renderers each support, and [`docs/PBRT_SUPPORT.md`](docs/PBRT_SUPPORT.md) lists, directive by directive, what is supported and how closely it matches.
+- **About 6,500 automated tests**, about six minutes on a desktop GPU (a tiered runner, `scripts/run_tests_parallel.ps1 -Tier Split`). [`docs/BACKEND_SUPPORT.md`](docs/BACKEND_SUPPORT.md) is one table of what the CPU, OptiX and Metal renderers each support, and [`docs/PBRT_SUPPORT.md`](docs/PBRT_SUPPORT.md) lists, directive by directive, what is supported and how closely it matches.
 
 How this found more than a dozen bugs that a plain backend-versus-backend comparison could not see: [Closed forms found the bugs](docs/CLOSED_FORMS_FOUND_THE_BUGS.md).
 
@@ -86,7 +86,7 @@ See [INSTALL.md](INSTALL.md) for detailed usage instructions.
 
 ## 🔨 Building from Source
 
-**Cloning:** the full history is about 440 MB, because older commits contained generated GPU code and release archives that are no longer tracked. If you only want the code, take a shallow clone: `git clone --depth 1 https://github.com/XinpeiWang/photonsmith` downloads about 52 MB (150 MB checked out). A few large mesh and texture assets are tracked with Git LFS; run `git lfs pull` if they show up as small pointer files.
+**Cloning:** the full history is about 440 MB, because older commits contained generated GPU code and release archives that are no longer tracked. If you only want the code, take a shallow clone: `git clone --depth 1 https://github.com/XinpeiWang/photonsmith` downloads about 52 MB (150 MB checked out). The statue meshes in `models/` are ordinary files in the repository (no Git LFS any more); the large third-party scenes (Sponza, Bistro, San Miguel, ...) are not in it, and the GUI's **Download missing files** fetches them from their authors' sites.
 
 **Windows** (CPU, OptiX GPU and the Qt GUI), from a Visual Studio Developer PowerShell:
 ```powershell
@@ -103,12 +103,12 @@ Both in full, with the output locations, the macOS Metal and universal-binary op
 ### Core Rendering
 - ✅ **Path tracing** with next-event estimation and multiple importance sampling (power heuristic)
 - ✅ **BVH acceleration** on both CPU and GPU (SAH-based CPU BVH; OptiX's native BVH/GAS on GPU) — not a linear scan
-- ✅ **175 built-in scenes and 66 test scenes** (each has a stable name such as `cornell-box`, and a short id such as `A1`) spanning the "Ray Tracing" book series, a pbrt-v4-style material/light/camera showcase, dozens of real-world statue/object meshes, and several "movie-level" environment scenes (Sponza, Amazon Lumberyard Bistro, Rungholt, Fireplace Room, San Miguel, Sibenik Cathedral, Breakfast Room, Salle de Bain, Gallery) — see [Scenes](#-scenes) below
+- ✅ **175 built-in scenes and 86 test scenes** (each has a stable name such as `cornell-box`, and a short id such as `A1`) spanning the "Ray Tracing" book series, a pbrt-v4-style material/light/camera showcase, dozens of real-world statue/object meshes, and several "movie-level" environment scenes (Sponza, Amazon Lumberyard Bistro, Rungholt, Fireplace Room, San Miguel, Sibenik Cathedral, Breakfast Room, Salle de Bain, Gallery) — see [Scenes](#-scenes) below
 - ✅ **Real triangle meshes**: OBJ loading with BVH, per-face `.mtl` materials, and real `map_Kd` image-texture sampling (not just flat colors) on both CPU and GPU
 - ✅ **Stochastic Progressive Photon Mapping (SPPM)**, an alternative integrator for hard caustic/glass scenes a standard path tracer struggles to converge — on the CPU, and on the GPU for sphere/quad scenes (see [Known Limitations](#-known-limitations))
 - ✅ **Bidirectional Path Tracing (BDPT) and Metropolis Light Transport (MLT)**, additional alternative integrators (CPU-only, `--bdpt`/`--mlt`) for scenes with difficult light transport
 - ✅ **Adaptive sampling** (`--adaptive`): stops sampling pixels whose remaining noise would not show (CPU and both OptiX GPU renderers - on by default for film videos; opt-in on Metal)
-- ✅ **Volumetric media**: homogeneous participating media, procedural (Perlin-noise) cloud/fog, and heterogeneous NanoVDB grid media (CPU and OptiX; the blackbody glow of a temperature grid is CPU-only)
+- ✅ **Volumetric media**: homogeneous participating media, procedural (Perlin-noise) cloud/fog, and heterogeneous NanoVDB grid media (CPU, OptiX and Metal; the blackbody glow of a temperature grid is CPU-only)
 - ✅ **Anti-aliasing** through multi-sampling, **ACES filmic tone mapping** + sRGB output
 
 ### Materials
@@ -125,6 +125,7 @@ Pinhole, depth-of-field (thin-lens), orthographic, spherical/equirectangular 360
 - ✅ **Multi-frame rendering** with automatic frame numbering
 - ✅ **MP4 video assembly** via an `ffmpeg` subprocess (requires `ffmpeg` on `PATH`)
 - ✅ **Configurable FPS, speed, and quality** settings
+- ✅ **Films**: cartoons and short films whose scene changes every frame - built-in films (the Cartoons tab of the GUI's scene picker) and plain-text film files (`pbrt_scenes/*.film`) with characters, dialogue and voices, camera moves, nature (terrain, water, skies, weather, animals), space and underwater sets, and a soundtrack; `scripts/anim/film.py` previews, checks and renders them, and the GUI plays the result at 1x, 2x or 3x speed
 - 📖 See [docs/VIDEO_GENERATION.md](docs/VIDEO_GENERATION.md) for detailed usage
 
 ### Dual Rendering Modes
@@ -133,7 +134,7 @@ Pinhole, depth-of-field (thin-lens), orthographic, spherical/equirectangular 360
 - **Metal GPU Renderer** (macOS): a Metal path tracer (`gpu/metal/`, documented in `docs/METAL_BACKEND.md`, `--gpu` on a `-DRT_BUILD_METAL=ON` build) checked against the CPU renderer scene by scene — see [`docs/METAL_PARITY_STATUS.md`](docs/METAL_PARITY_STATUS.md) for exactly what matches and what doesn't
 
 ### Qt GUI
-A **Scene Builder** tab (add shapes, materials and lights, drag them around, preview, save a `.pbrt`; see [Build your own scene](#-build-your-own-scene)), a scene picker with live metadata (description, GPU compatibility, perf hint), camera presets, quality/resolution presets, GPU/CPU toggle, image vs. video mode with camera-path selection, a render queue, and one-click render. **Live Preview** renders continuously (OptiX on Windows, Metal on a Mac) so you can drag to orbit the camera, and move objects around and save the arrangement as a new scene (a user's guide: [`docs/LIVE_PREVIEW.md`](docs/LIVE_PREVIEW.md); the developer's notes: [`docs/MAC_LIVE_PREVIEW.md`](docs/MAC_LIVE_PREVIEW.md)). The interface is translated into English, Spanish, French, Japanese and Simplified Chinese (Language menu, applied on restart) and has selectable themes and fonts.
+A **Scene Builder** tab (add shapes, materials and lights, drag them around, preview, save a `.pbrt`; see [Build your own scene](#-build-your-own-scene)), a scene picker with live metadata (description, GPU compatibility, perf hint), camera presets, quality/resolution presets, GPU/CPU toggle, image vs. video mode with camera-path selection, a render queue, and one-click render. **Live Preview** renders continuously (OptiX on Windows, Metal on a Mac) so you can drag to orbit the camera, and move objects around and save the arrangement as a new scene (a user's guide: [`docs/LIVE_PREVIEW.md`](docs/LIVE_PREVIEW.md); the developer's notes: [`docs/MAC_LIVE_PREVIEW.md`](docs/MAC_LIVE_PREVIEW.md)). Finished videos play in the GUI's own player (at 1x, 2x or 3x speed), a film's timeline can be scrubbed in Live Preview, and a Power setting chooses how much of the computer a render takes (Smart: full power while the PC is not in use). The interface is translated into English, Spanish, French, Japanese and Simplified Chinese (Language menu, applied on restart) and has selectable themes and fonts.
 
 ## 📊 Performance
 
@@ -176,7 +177,7 @@ Video: see [docs/VIDEO_GENERATION.md](docs/VIDEO_GENERATION.md). On macOS the co
 
 ## 🖼️ Scenes
 
-175 built-in scenes and 66 test scenes, each with a stable name (`cornell-box`) and a
+175 built-in scenes and 86 test scenes, each with a stable name (`cornell-box`) and a
 short id (a category letter plus a number: `A1`, `B10`, `G25`), selected via the
 CLI's scene argument (either works, or the path of a `.pbrt` file) or the GUI's
 scene dropdown. Categories: **A** Basics (the book progression), **B** Materials,
@@ -197,7 +198,7 @@ scene, and
 for the authoritative per-scene table (description, performance,
 recommended SPP, camera defaults).
 
-Scenes that import external mesh/texture assets (mostly categories **G** and **H**) load them from `models/` (Git LFS for the large ones), and the GUI can download the ones that are missing; see [Scenes that need files](docs/SCENE_SELECTION.md#scenes-that-need-files).
+Scenes that import external mesh/texture assets (mostly categories **G** and **H**) load them from `models/` or a per-user assets folder, and the GUI can download the ones that are missing; see [Scenes that need files](docs/SCENE_SELECTION.md#scenes-that-need-files).
 
 ## 📁 Project Structure and Releases
 
@@ -219,7 +220,7 @@ See [BUILD.md](BUILD.md) for detailed troubleshooting.
 ### Black or Incorrect Output
 
 1. Check console for error messages
-2. Verify scene/mesh assets are present (mesh scenes need `models/`, some need Git LFS pulled)
+2. Verify scene/mesh assets are present (mesh scenes need their files in `models/` or downloaded by the GUI's **Download missing files**)
 3. Try reducing samples for faster feedback
 4. For a new mesh scene, verify the camera isn't embedded in geometry or in a fully-enclosed, unlit room
 

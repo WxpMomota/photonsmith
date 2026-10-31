@@ -26,14 +26,15 @@ Orbit and zoom turn around a point in front of the camera; flying moves that poi
 
 These are in the **Render Options** tab, in the group for Live Preview.
 
-* **Exposure**, and **Auto exposure** (on by default on a Mac): brightens a scene that would otherwise come up nearly black.
+* **Exposure**, and **Auto exposure** (Mac, on by default): brightens a scene that would otherwise come up nearly black.
 * **Samples/Frame** and **Max Bounces**: more samples per frame is smoother but slower to react; fewer bounces is faster but darker in closed rooms.
 * **Firefly Clamp**: limits the very bright single pixels that noise produces.
-* **Smooth noisy pixels** (on by default on a Mac): hides the noise of pixels that have few samples yet. It only changes what is shown, never the accumulated picture.
+* **Smooth noisy pixels** (Mac, on by default): hides the noise of pixels that have few samples yet. It only changes what is shown, never the accumulated picture.
 * **Depth of Field**, with **Aperture** and **Focus Distance**: blur by distance, in the scene's own units.
 * **AI denoise** (Mac, off by default): cleans the picture while it gathers samples; it offers to download the denoiser the first time you tick it.
+* **Denoiser** (Windows): None, the OptiX AI Denoiser or the SVGF denoiser (experimental, with its own tuning rows), and **Temporal Upscale** (Off, 2x, 4x), with **Adaptive Sampling** and its **Convergence Threshold**. The Windows preview also has more of its own options (ReSTIR DI and GI, Radiance Cache, Path Guiding, Neural Radiance Cache, Neural Reconstruction); the controls a renderer does not have are not shown.
 
-## Moving objects (Mac)
+## Moving objects
 
 Under the picture there are three buttons. **Move objects** switches the mouse over to the objects in the scene; the other two work on what you have moved.
 
@@ -48,7 +49,7 @@ What counts as "an object": everything in one group of the scene file (a box wri
 
 ## If something looks wrong
 
-* **Black or very dark**: raise Exposure, or leave Auto exposure on. A scene lit only by a small lamp can need more bounces.
+* **Black or very dark**: raise Exposure, or leave Auto exposure on (Mac). A scene lit only by a small lamp can need more bounces.
 * **Very noisy or flickering**: hold still; it clears. Turn **Smooth noisy pixels** on, or raise Samples/Frame.
 * **It will not start on a scene**: a few scenes use features the Mac's GPU renderer lacks (see [BACKEND_SUPPORT.md](BACKEND_SUPPORT.md)); render those with an ordinary Render (Output Mode: Render Single Image) instead.
 * **Slow on a large scene**: use fewer Samples/Frame or fewer Max Bounces (the image size in Settings changes the preview's proportions, not how big it is).

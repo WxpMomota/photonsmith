@@ -20,9 +20,12 @@ After extraction:
 - **RayTracerGUI.exe** - the graphical interface (if the GUI was built into
   this package)
 - **RayTracer.exe** - the command-line renderer
+- **scene_metadata.dll** - the scene and film lists the GUI shows
+- **realtime_renderer.dll, \*.ptx** - the GPU programs and Live Preview (the
+  CUDA runtime is built in; only the NVIDIA driver is needed)
 - **Qt6\*.dll, platforms/, styles/** - Qt runtime, needed by the GUI
-- **cudart64\*.dll** - NVIDIA CUDA runtime, needed for GPU mode
 - **vcruntime140\*.dll, msvcp140.dll** - Visual C++ runtime libraries
+- **pbrt_scenes/** - the scene files most built-in scenes load from
 - **output/** - folder where rendered images are saved
 
 ## System Requirements
@@ -78,6 +81,12 @@ details.
 - Update your NVIDIA drivers if you have a compatible GPU
 - Older/non-RTX NVIDIA GPUs may not support the OptiX features this
   renderer needs
+
+**A video or film renders its frames but no MP4 appears:**
+- Videos are assembled by `ffmpeg`, which is not in the package: install it
+  (https://ffmpeg.org/download.html) and make sure `ffmpeg` is on `PATH`.
+  The rendered frames are kept, so the video can be assembled afterwards.
+  See [docs/VIDEO_GENERATION.md](docs/VIDEO_GENERATION.md).
 
 **Render takes too long:**
 - Reduce samples per pixel (a scene's info panel/description shows its

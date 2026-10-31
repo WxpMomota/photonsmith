@@ -22,7 +22,7 @@ build, how to test, what a good change looks like, and where help is wanted.
 * **Windows**: build `ray_tracer_tests`, then run
   `powershell -ExecutionPolicy Bypass -File scripts/run_tests_parallel.ps1 -Tier Split`
   (about six minutes on a desktop GPU; `-Tier Fast` is the cheap tests only, about 75 s, `-Filter` narrows
-  by name). The suite has over 5,000 tests and needs to stay green.
+  by name). The suite has about 6,500 tests and needs to stay green. `tests/TESTING_GUIDE.md` has the tiers and the rest.
 * **Before every commit**: `python scripts/pre_commit_checks.py` (a few seconds) runs the checks CI's
   build-lists and code-size jobs run - both test build lists, every environment variable in
   `docs/ENVIRONMENT.md`, the code size ratchet - and lists source files git does not track yet.
@@ -70,7 +70,6 @@ Small, self-contained things, roughly from easiest:
   not known. Start with a closed-form version of the scene.
 * **`--lightpath` in participating media** has never been checked.
 * **Linux** support (the macOS port added most of the CMake and POSIX groundwork).
-* A **native arm64 macOS GUI** build (the current one is x86_64 under Rosetta).
 * Bigger projects: a GPU port of BDPT/MLT, and the remaining Metal gaps listed in
   [docs/METAL_PARITY_STATUS.md](docs/METAL_PARITY_STATUS.md).
 

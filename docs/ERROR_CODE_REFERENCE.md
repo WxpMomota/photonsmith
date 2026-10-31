@@ -59,11 +59,10 @@ The ray tracer uses a comprehensive error code system to make debugging easier. 
 
 ### 4 - ERR_FILE_READ_FAILED
 **Message:** Failed to read file  
-**Meaning:** Reserved for a generic file-read failure; not currently returned
-by any code path (registered in `error_codes.h`'s enum/message table and
-`qt_gui/error_handler.h`, exercised by `tests/unit/error_codes_tests.cpp`,
-but no `return ERR_FILE_READ_FAILED` call site exists yet - texture/resource
-read failures currently surface as `ERR_FILE_NOT_FOUND` (3) instead).
+**Meaning:** A file is there but cannot be read: a scene file the GPU
+renderers (OptiX and Metal) cannot load (with a `scene-load-failed` event,
+below), or a `--camera-keyframes` file that cannot be opened. Texture and
+resource read failures still surface as `ERR_FILE_NOT_FOUND` (3).
 
 ### 5 - ERR_FILE_WRITE_FAILED
 **Message:** Failed to write output file  
@@ -394,6 +393,8 @@ The line is `@rt ` and a flat JSON object whose values are all strings (`src/sha
 | `scene-file-missing` | 3 | `scene`, `file`, `folder`, `missing` (how many) | A scene that needs a download (or an asset it names) is not on disk |
 | `scene-load-failed` | 3 or 4 | `scene`, `file`, `detail` | The file is there but cannot be loaded; `detail` is the loader's sentence |
 | `scene-not-supported-on-gpu` | 211 | `scene` | The scene was never ported to this GPU backend: use CPU mode |
+| `frames-folder-busy` | 5 | `folder`, `detail` (the system's sentence) | A video starts afresh, but its old frames folder could not be emptied: another program held a file in it (`launcher/video_render.h`) |
+| `frames-folder-not-ours` | 5 | `folder` | A video's frames folder holds files this program did not make, so it is left alone |
 
 Before this, a missing scene file ended as 211 on the GPU ("use CPU mode", which could not render it either) and as 101 on the CPU ("scene contains no objects"). To add a reason: print it with `render_events::emitError`, give it a case in `ErrorHandler::textForReason` (and its translations), and add a row here.
 
@@ -424,7 +425,7 @@ The GUI shows:
 ### Exit Codes
 The ray_tracer.exe process returns the error code as its exit code:
 ```bash
-ray_tracer.exe --cpu 800 100 50 1 13 2 3
+ray_tracer.exe --cpu 800 100 50 cornell-box 278 278 -800
 echo Exit code: %ERRORLEVEL%  # Windows
 echo Exit code: $?             # Linux/Mac
 ```

@@ -12,6 +12,8 @@ ray_tracer/
 │   ├── shared/                   # CPU/GPU-shared headers: pbrt-v4-style BxDFs, cameras, lights, sampling,
 │   │                              #   the pbrt scene loader/flattener, scene_slugs.h (scene names),
 │   │                              #   scene_document.h (the Scene Builder's model)
+│   │   └── cartoon/              # The film system: built-in films (cartoons.h lists them), the film-file
+│   │                              #   parser and world (film_file/film_parse/film_world), rigs, sound
 │   ├── data/                     # Precomputed lookup tables (sampling sequences, spectral data)
 │   └── external/                 # Third-party headers (stb_image, NanoVDB, etc.)
 │
@@ -19,6 +21,9 @@ ray_tracer/
 │   ├── main.cpp                  # CPU/GPU/SPPM/video dispatch
 │   ├── launcher_args.h           # Command-line parsing
 │   ├── camera_path.h             # Video camera paths
+│   ├── video_render.h, cartoon_*.h  # Videos and films: frames rendered by child runs, frame workers
+│   ├── film_*.h, render_farm.h   # Film captions, transitions, temporal denoising; the render farm
+│   ├── smart_power.h             # The Smart power mode
 │   └── launcher.vcxproj          # Visual Studio project (auto-deploys to RayTracer_Package/)
 │
 ├── cpu_renderer/                  # CPU path tracer (static library)
@@ -33,7 +38,7 @@ ray_tracer/
 │                                  #   (metal_cpu_gpu_parity_check.cpp + parity_golden.txt)
 │
 ├── realtime_renderer/             # realtime_renderer.dll/.dylib - what the GUI's Live Preview talks to
-├── scene_metadata/                # scene_metadata.dll/.dylib - the scene registry the GUI loads at runtime
+├── scene_metadata/                # scene_metadata.dll/.dylib - the scene registry and film table the GUI loads at runtime
 │
 ├── gpu/optix/                     # OptiX GPU implementation - all three GPU backends share this one
 │   │                              #   flat directory (a single OptiX pipeline/PTX build), distinguished
@@ -43,7 +48,7 @@ ray_tracer/
 │   ├── optix_device_helpers.h    # Recursive backend's shared __device__ helpers (material shading, NEE)
 │   ├── wavefront_*.cu/.h         # Queue-based wavefront path tracer (alt. GPU backend)
 │   ├── sppm_*.cu/.h              # GPU SPPM (photon mapping) backend
-│   ├── optix_renderer*.cpp/.h    # OptiX host-side renderer (init/scene/render split across 3 files)
+│   ├── optix_renderer*.cpp/.h    # OptiX host-side renderer (init/scene/upload/render split across 4 files)
 │   ├── optix_interface.cpp/.h    # C API wrapper
 │   ├── scene_builder.cpp/.h      # Native demo-scene + pbrt-loaded-scene conversion to OptiX format
 │   ├── pbrt_gpu_builder.h        # Flattened pbrt scene -> GPU SceneData (the loader's GPU-side half)
@@ -64,9 +69,10 @@ ray_tracer/
 │   ├── translations/             # raytracer_{es,fr,ja,zh_CN}.ts - UI translations (lupdate/lrelease)
 │   └── (Qt build output)         # Builds to RayTracer_Package/
 │
-├── models/                        # Mesh (.obj) and texture assets, Git LFS for the large ones
+├── models/                        # Statue meshes (.obj) and textures, ordinary files (the large scenes are downloaded by the GUI)
 ├── images/                        # Texture images used by the built-in scenes (earth map, normal/bump maps)
-├── pbrt_scenes/                   # Scene files: the 58 bundled test scenes (category L) and your own (see pbrt_scenes/README.md)
+├── pbrt_scenes/                   # Scene files: the built-in scenes' files, the 86 test scenes (category L), film files
+│                                  #   (*.film) and their film_assets/, and your own (see pbrt_scenes/README.md)
 ├── resources/                     # Application icon and Windows resource files
 │
 ├── tests/                         # Google Test suite (unit/ and integration/)
@@ -78,14 +84,17 @@ ray_tracer/
 │   ├── deploy_launcher.ps1       # Verify the launcher deployed to RayTracer_Package/
 │   ├── build_and_deploy.ps1      # One-command build + deploy
 │   ├── deploy_qt_gui.ps1         # Qt dependency deployment
-│   └── setup_env.bat/.ps1        # Environment setup
+│   ├── run_tests_parallel.ps1    # The tiered test runner (see tests/TESTING_GUIDE.md)
+│   ├── anim/film.py              # Preview, check and render films (see scripts/anim/README.md)
+│   └── setup_env.bat/.ps1        # Environment setup (scripts/README.md lists the rest)
 │
 ├── docs/                          # Guides and references - start at docs/README.md
 │
 ├── RayTracer_Package/              # Deployment output (single canonical location)
 │   ├── RayTracerGUI.exe          # Qt GUI (built from qt_gui/)
 │   ├── ray_tracer.exe            # Console launcher (auto-deployed from launcher/)
-│   ├── optix_programs.ptx        # GPU shader (auto-deployed from optix_renderer/)
+│   ├── *.ptx                     # GPU programs (auto-deployed from optix_renderer/)
+│   ├── scene_metadata.dll, realtime_renderer.dll  # Auto-deployed from their projects
 │   └── Qt6*.dll + plugins        # Qt dependencies (deployed by scripts/deploy_qt_gui.ps1)
 │
 ├── README.md                      # The project's front page
@@ -98,7 +107,7 @@ ray_tracer/
 **Key Directories:**
 - **src/TheRestOfYourLife/** and **src/shared/** - Active production codebase (materials, lights, cameras, scenes)
 - **gpu/optix/** - GPU implementation, mirrors most of the CPU feature set (see [Known Limitations](../README.md#-known-limitations) for gaps)
-- **models/** - External mesh/texture assets (Git LFS)
+- **models/** - Statue mesh/texture assets (ordinary files, not Git LFS)
 - **RayTracer_Package/** - Single canonical deployment directory (auto-populated by builds)
 - **scripts/** - All build/deploy automation
 - **docs/** - Feature guides and architecture notes

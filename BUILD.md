@@ -25,8 +25,9 @@ This single command:
 **The output package includes:**
 - `RayTracerGUI.exe` - Main Qt GUI application
 - `ray_tracer.exe` - Console renderer backend
-- `optix_programs.ptx` - GPU shader
-- All Qt6 DLLs (Core, Gui, Widgets, Network, Svg)
+- `scene_metadata.dll` (the scene and film tables the GUI reads) and `realtime_renderer.dll` (Live Preview)
+- The GPU programs: `optix_programs.ptx` and one `optix_programs_<shape>.ptx` per shape, `wavefront_programs.ptx`, `sppm_programs.ptx`
+- All Qt6 DLLs (Core, Gui, Widgets, Network, Svg, Multimedia, MultimediaWidgets)
 - Qt plugins (platforms, styles, imageformats, etc.)
 
 **Launch the GUI:**
@@ -55,8 +56,8 @@ For more control, use the PowerShell script:
 # Build in Debug mode
 .\scripts\build_all.ps1 -Configuration Debug
 
-# Skip tests
-.\scripts\build_all.ps1 -SkipTests
+# Tests are skipped by default; build them too
+.\scripts\build_all.ps1 -SkipTests:$false
 
 # Skip Qt GUI
 .\scripts\build_all.ps1 -SkipGui
@@ -81,11 +82,12 @@ For more control, use the PowerShell script:
 4. Select platform: `x64`
 5. Build → Build Solution (Ctrl+Shift+B)
 
-**Automatic Deployment:** The `launcher` and `optix_renderer` projects now include post-build events that automatically copy:
+**Automatic Deployment:** The `launcher`, `optix_renderer`, `scene_metadata` and `realtime_renderer` projects include post-build events that automatically copy:
 - `ray_tracer.exe` → `RayTracer_Package/`
-- `optix_programs.ptx` → `RayTracer_Package/`
+- the `.ptx` programs → `RayTracer_Package/`
+- `scene_metadata.dll` and `realtime_renderer.dll` → `RayTracer_Package/`
 
-**Qt GUI:** To complete the package, build the Qt GUI separately (see Qt GUI Build section) and run `.\scripts\deploy_qt_gui.ps1` to add Qt dependencies.
+**Qt GUI:** To complete the package, build the Qt GUI separately (qmake writes `RayTracerGUI.exe` straight into `RayTracer_Package\`) and run `.\scripts\deploy_qt_gui.ps1` to add Qt dependencies.
 
 ### Fast incremental builds and a quick test loop (Windows)
 
@@ -103,7 +105,7 @@ How long a rebuild takes depends on what you touched. Measured on this repo (Rel
 Things that make this work, and what to keep in mind:
 
 - **Change tracking.** `Directory.Build.props`/`Directory.Build.targets` use MSBuild's one-`cl`-per-file mode (`UseMultiToolTask`) instead of `/MP`. With `/MP` the tracking logs lost each project's first source, so every build recompiled the entire solution (~95 s with nothing changed). A project that mixes C and C++ files needs one command line for all of them (`miniz.c` is compiled as C++ for this reason), or the two compile tasks overwrite each other's tracking entries again.
-- **CUDA.** `build_optix.targets` hands all 16 `.cu` files to `scripts/cuda_build.ps1`, which runs the compiles in parallel (`RT_CUDA_JOBS`, default 6) and rebuilds a file only when its source, a header it actually included (nvcc's own `-MD` dependency files, kept in `gpu/optix/.cudadeps/`) or its flags changed. `nvcc -t0` compiles the two target architectures concurrently.
+- **CUDA.** `build_optix.targets` hands all 21 `.cu` files to `scripts/cuda_build.ps1`, which runs the compiles in parallel (`RT_CUDA_JOBS`, default 6) and rebuilds a file only when its source, a header it actually included (nvcc's own `-MD` dependency files, kept in `gpu/optix/.cudadeps/`) or its flags changed. `nvcc -t0` compiles the two target architectures concurrently.
 - **PTX compile and the OptiX cache.** The recursive backend's device programs are six PTX modules, not one (`optix_programs.cu` is the core: raygen, miss, shadow any-hit, probe programs; `optix_programs_sphere/quad/disk/cylinder/triangle.cu` hold each shape's intersection and closest-hit programs; `OptiXRenderer::createProgramGroups` combines them). Every closest-hit program inlines the whole material system, and one module of all of them took 171 s in a single `cicc` process (54.8 MB of PTX; `-O` levels and `--split-compile` change nothing, `-G` is worse). Six modules compile side by side in 76 s, the longest being the sphere module; a device-header edit that used to cost 175 s of build now costs about 85 s. A *cold* OptiX cache is a separate cost: OptiX compiles the PTX to machine code on first use (`%LOCALAPPDATA%\NVIDIA\OptixCache`), ~250 s for the six modules here. `gpu/optix/optix_module_parallel.h` creates the modules with `optixModuleCreateWithTasks` and runs the tasks of ALL six on every core (`optixModulesCreateParallel`; one module at a time left most cores idle: 702 s). A warm cache is unaffected. After editing device code the first GPU run or test pays the JIT once. Tried and rejected: `shade_material` `__noinline__` (PTX 15-19 MB and nvcc 23-38 s, but the cold JIT is 531-992 s against 261 s), and `nvcc --optix-ir` (36.7 MB and 111 s, but OptiX itself took 702 s and then crashed on it). A new device-side global (`__constant__`/`__device__` variable) in a header the modules share must be `static`, or the modules fail to link at pipeline creation ("Symbol ... was defined multiple times").
 - **Development-only speed-up.** `msbuild /p:RtCudaLocalArchOnly=true` (or `RT_CUDA_LOCAL_ARCH_ONLY=1`) compiles the plain CUDA kernels only for the GPU in this machine. The result runs only on that GPU, so do not package it; the default builds sm_86 and sm_120.
 - **Running one scene's parity test.** `MaterialCpuGpuParityTest` renders only the scenes your `--gtest_filter` selects (one scene ~4 s; the full sweep ~140 s is unchanged):
@@ -131,23 +133,23 @@ The solution contains the following projects:
 
 2. **cpu_renderer** (`cpu_renderer/cpu_renderer.vcxproj`)
    - Static library: `cpu_renderer.lib`
-   - Multithreaded CPU path tracer
-   - Importance sampling with PDFs
-   - Cornell box scene support
+   - Multithreaded CPU path tracer, the pbrt-v4 scene loader, and the
+     BDPT/MLT/SPPM integrators
 
 3. **optix_renderer** (`optix_renderer/optix_renderer.vcxproj`)
    - Static library: `optix_renderer.lib`
-   - OptiX 9.1 GPU path tracer
-   - PTX shader compilation: `optix_programs.ptx`
+   - OptiX 9.1 GPU renderers (the default recursive one, wavefront, SPPM)
+   - PTX compilation: `optix_programs.ptx` and the per-shape
+     `optix_programs_<shape>.ptx`, `wavefront_programs.ptx`, `sppm_programs.ptx`
    - Requires NVIDIA GPU with OptiX support
 
 4. **scene_metadata** (`scene_metadata/scene_metadata.vcxproj`)
    - Dynamic library: `scene_metadata.dll`
-   - Exposes the C++ scene registry's live scene list/metadata to the Qt
-     GUI (which shells out to the CLI rather than linking `cpu_renderer.lib`
-     directly) - must be rebuilt whenever `scene_registry.h`/
-     `scene_registry_data.h` changes, or the GUI will show a stale scene
-     list
+   - Exposes the C++ scene registry's live scene list/metadata, and the
+     film table, to the Qt GUI (which shells out to the CLI rather than
+     linking `cpu_renderer.lib` directly) - must be rebuilt (and copied with
+     `ray_tracer.exe`) whenever `scene_registry.h`/`scene_registry_data.h`
+     or the films change, or the GUI will show a stale scene or film list
 
 5. **realtime_renderer** (`realtime_renderer/realtime_renderer.vcxproj`)
    - Dynamic library: `realtime_renderer.dll`
@@ -163,7 +165,7 @@ The solution contains the following projects:
    - Unit and integration tests
    - Tests both CPU and GPU renderers
 
-**What GitHub CI runs** (`.github/workflows/unit-tests.yml`, a hosted runner with no GPU, CUDA or OptiX): the portable CMake target `unit_tests` (BVH, materials, cameras, sampling, BDPT/SPPM math, volumetrics, pbrt loading) and, since the CPU renderer itself needs no SDK, `cpu_integrator_tests` (`tests/unit/cpu_integrator_agreement_tests.cpp`): the CPU path tracer, BDPT, MLT, SPPM and `--simplepath`/`--randomwalk` rendered on small pbrt scenes and compared with each other and with closed forms - the tests that pinned the BDPT/MLT/SPPM/diffuse-transmission defects. Both are built by `cmake -B build -A x64` + `cmake --build build --config Release` in `tests/` and run from the repository root. Everything that renders on an OptiX backend (`pbrt_example_scenes_tests.cpp`, the CPU-vs-GPU parity sweeps, the gallery) runs only here, with `scripts\run_tests_parallel.ps1 -Tier Split`; the GPU is never exercised in CI.
+**What GitHub CI runs** (`.github/workflows/unit-tests.yml`, a hosted runner with no GPU, CUDA or OptiX): the portable CMake target `unit_tests` (BVH, materials, cameras, sampling, BDPT/SPPM math, volumetrics, pbrt loading) and, since the CPU renderer itself needs no SDK, `cpu_integrator_tests` (`tests/unit/cpu_integrator_agreement_tests.cpp`): the CPU path tracer, BDPT, MLT, SPPM and `--simplepath`/`--randomwalk` rendered on small pbrt scenes and compared with each other and with closed forms - the tests that pinned the BDPT/MLT/SPPM/diffuse-transmission defects. Both are built by `cmake -B build -A x64` + `cmake --build build --config Release` in `tests/` and run from the repository root. Everything that renders on an OptiX backend (`pbrt_example_scenes_tests.cpp`, the CPU-vs-GPU parity sweeps, the gallery) runs only here, with `scripts\run_tests_parallel.ps1 -Tier Split`; the GPU is never exercised in CI. CI also runs the same two CMake test programs on macOS, the Metal ctests (`metal-poc` job), a Qt GUI build on both systems, a headless GUI self-test of a CPU-only Windows package (`.github/workflows/windows-gui.yml`), and the build-list and code-size checks that `python scripts/pre_commit_checks.py` runs locally.
 
 ### GUI (External Qt Build)
 
@@ -205,12 +207,12 @@ msbuild ray_tracer.sln /p:Configuration=Release /p:Platform=x64 `
 ### Release (Recommended)
 - Optimizations enabled
 - No debug symbols (fast execution)
-- Output: `x64\Release\` or `launcher\x64\Release\`
+- Output: `x64\Release\` (the test program: `bin\Release\`)
 
 ### Debug
 - Optimizations disabled
 - Full debug symbols
-- Output: `x64\Debug\` or `launcher\x64\Debug\`
+- Output: `x64\Debug\` (the test program: `bin\Debug\`)
 
 ## Build Outputs
 
@@ -218,36 +220,38 @@ After a successful build, the following files are automatically deployed:
 
 **Build Artifacts:**
 ```
-launcher\x64\Release\
-  └─ ray_tracer.exe              # Main launcher (PRIMARY BUILD OUTPUT)
-
-cpu_renderer\x64\Release\
-  └─ cpu_renderer.lib            # CPU renderer static library
-
-optix_renderer\x64\Release\
-  └─ optix_renderer.lib          # OptiX renderer static library
+x64\Release\
+  ├─ ray_tracer.exe              # Main launcher (PRIMARY BUILD OUTPUT)
+  ├─ cpu_renderer.lib            # CPU renderer static library
+  ├─ optix_renderer.lib          # OptiX renderer static library
+  ├─ scene_metadata.dll          # Scene and film tables for the GUI
+  └─ realtime_renderer.dll       # Live Preview
 
 gpu\optix\
-  └─ optix_programs.ptx          # OptiX shader (compiled from .cu)
+  └─ *.ptx                       # OptiX programs (compiled from .cu)
 
-tests\x64\Release\
+bin\Release\
   └─ ray_tracer_tests.exe        # Test suite
 
-qt_gui\release\
-  └─ RayTracerGUI.exe            # Qt GUI (if built)
+RayTracer_Package\
+  └─ RayTracerGUI.exe            # Qt GUI (if built; qmake's DESTDIR)
 ```
 
 **Auto-Deployed Package (via MSBuild post-build events):**
 ```
 RayTracer_Package\              # Canonical deployment directory
   ├─ ray_tracer.exe             # Auto-copied from launcher build
-  ├─ optix_programs.ptx         # Auto-copied from optix_renderer build
-  ├─ RayTracerGUI.exe           # Added by Qt build + deploy_qt_gui.ps1
+  ├─ *.ptx                      # Auto-copied from optix_renderer build
+  ├─ scene_metadata.dll         # Auto-copied from its project
+  ├─ realtime_renderer.dll      # Auto-copied from its project
+  ├─ RayTracerGUI.exe           # Written here by the Qt build
   ├─ Qt6Core.dll                # Qt dependencies (via deploy_qt_gui.ps1)
   ├─ Qt6Gui.dll
   ├─ Qt6Widgets.dll
   ├─ Qt6Network.dll
   ├─ Qt6Svg.dll
+  ├─ Qt6Multimedia.dll          # the GUI's video player
+  ├─ Qt6MultimediaWidgets.dll
   └─ [Qt plugins in subdirectories]
 ```
 
@@ -385,7 +389,7 @@ cmake -B build -DRT_BUILD_METAL=ON && cmake --build build
 ```
 Also builds a standalone `metal_poc` CLI, the `realtime_renderer.dylib`
 that backs the GUI's Live Preview, and (via `ctest`, once configured this
-way) twelve regression tests: host-side math, real on-device shader
+way) thirty regression tests: host-side math, real on-device shader
 kernels, and a CPU-vs-Metal parity harness that renders every scene on
 both and compares them
 (`METAL_PARITY_STRICT=1 ctest`; `scripts/update_metal_golden.sh` refreshes the
@@ -469,10 +473,7 @@ msbuild ray_tracer.sln /p:Configuration=Release /p:Platform=x64 /p:CudaToolkitPa
 
 ### Clean Build
 ```batch
-# Batch script
-.\scripts\build_all.bat Release clean
-
-# PowerShell script
+# PowerShell script (build_all.bat takes only the configuration)
 .\scripts\build_all.ps1 -Clean
 
 # Direct MSBuild
@@ -494,17 +495,17 @@ After building:
 
 1. **Run the launcher:**
    ```batch
-   .\launcher\x64\Release\ray_tracer.exe --help
+   .\x64\Release\ray_tracer.exe --help
    ```
 
-2. **Run tests:**
-   ```batch
-   .\tests\x64\Release\ray_tracer_tests.exe
+2. **Run tests** (see [tests/TESTING_GUIDE.md](tests/TESTING_GUIDE.md)):
+   ```powershell
+   .\scripts\run_tests_parallel.ps1 -Tier Fast
    ```
 
 3. **Run Qt GUI:**
    ```batch
-   .\qt_gui\release\RayTracerGUI.exe
+   .\RayTracer_Package\RayTracerGUI.exe
    ```
 
 4. **Deploy Qt package:**

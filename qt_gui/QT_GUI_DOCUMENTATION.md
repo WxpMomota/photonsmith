@@ -11,7 +11,11 @@ A Qt6-based graphical front-end for the ray tracer, offering:
 - 13 built-in color themes (see [`THEMES.md`](THEMES.md)) plus multi-language
   UI support
 - Single-image and video-generation output modes, with an in-app Preview
-  tab for finished renders
+  tab for finished renders (a video plays in its own preview tab, at 1x,
+  2x or 3x speed)
+- Live Preview (interactive GPU rendering, see
+  [`LIVE_PREVIEW.md`](../docs/LIVE_PREVIEW.md)) and the Scene Builder tab
+  ([`SCENE_BUILDER.md`](../docs/SCENE_BUILDER.md))
 - Real-time progress, render queueing, a log/output tab, and a
   diagnostics tab
 
@@ -135,7 +139,7 @@ cd RayTracer_Package
 * **Window and pane layout are remembered** (`window_geometry.h`): the main window's size, position and maximized state, and the Scene Builder's pane widths, come back on the next start. A saved position is used only if its title bar is still on a connected screen (`src/shared/window_placement.h`, unit-tested); after a monitor is unplugged the window opens at the default size, centred. *View > Reset Window Layout* returns to the defaults.
 * **The mouse wheel does not change a control by accident** (`wheel_guard.h`): a spin box, combo box or slider reacts to the wheel only once it has keyboard focus (click or Tab into it); otherwise the wheel scrolls the page behind it.
 * **Files a user would hate to lose are written atomically** (`atomic_file.h`, `QSaveFile`): saved scenes, the Scene Builder's autosave, saved logs and diagnostics reports go to a temporary file that replaces the old one only when the write has fully succeeded.
-* **The render queue is a table** (`render_queue_model.h` over `src/shared/job_queue.h`, unit-tested): the Progress tab lists every render of the session - waiting, running, and the finished ones with Done / Failed / Cancelled and how long they took (the last 50 are kept). Waiting jobs can be moved up or down; a failed or cancelled one can be retried; *Clear Finished* forgets the history and *Clear Queue* removes the waiting jobs only. One job runs at a time; a plain Stop leaves the rest waiting. Each queue event is in the log (`queue`).
+* **The render queue is a table** (`render_queue_model.h` over `src/shared/job_queue.h`, unit-tested): the Progress tab lists every render of the session - waiting, running, and the finished ones with Done / Failed / Cancelled and how long they took (the last 50 are kept). Waiting jobs can be moved up or down; a failed or cancelled one can be retried; *Clear Finished* forgets the history and *Clear Queue* removes the waiting jobs only. One job runs at a time; a plain Stop leaves the rest waiting. While the GPU renderer is being prepared (`gpu_warmup.h`: the default OptiX renderer's shaders compiling on the first start after an update), a job for that renderer waits and the status bar says so; CPU and wavefront jobs go at once. Each queue event is in the log (`queue`).
 * **Every user operation is logged** - see `docs/LOGGING.md`.
 
 ## Troubleshooting

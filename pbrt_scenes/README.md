@@ -30,6 +30,15 @@ A scene of your own can do the same (`@rt-category` must be one of the categorie
 with no description is listed with its resolution and samples. A scene saved by the Scene
 Builder is listed under the title you gave it.
 
+## Films
+
+A `.film` file in this folder (`pip-goes-out.film`, `swell-breaks.film`, ...) is a film made
+from a pbrt scene: it is listed on the GUI's **Cartoons** tab and as a video preset, with no
+rebuild. What its scenes, sets, casts, meshes and sounds need is in `film_assets/` (the film
+library of shared casts and sets is `film_assets/library/`). The film file language is
+described in [docs/VIDEO_GENERATION.md](../docs/VIDEO_GENERATION.md), *Films from files*;
+`ray_tracer --film-check FILE.film` says what is wrong with one.
+
 ## What is read, and when
 
 Listing a scene reads only the part of the file before `WorldBegin` — the

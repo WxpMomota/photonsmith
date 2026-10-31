@@ -44,12 +44,9 @@ Run the ray tracer in video mode - the MP4 is created automatically:
 ```
 
 This will:
-1. Create frames in `output/frames/` directory
+1. Create frames in `output/frames/` directory (`frame_0000.png` ... on the GPU, `frame_0000.ppm` ... on the CPU and for GPU SPPM)
 2. Automatically assemble them into an MP4 video
 3. Output the final video to `output/<name>_video.mp4`
-- `frame_0002.ppm`
-- ...
-- `frame_0060.ppm`
 
 ## Command-Line Options
 
@@ -263,7 +260,8 @@ a worker writes the scene to the same file, the renderer sees that it has change
 leaves a marker file when a frame's picture is whole; the video watches the markers, hands the pictures on in frame order, and **replaces a worker** that ends with frames left or that
 makes no progress for `--cartoon-timeout` seconds (a frame that takes a worker down twice fails and is repeated from the one before). Measured on "Pip and the Moon": 24 frames at 400 x 225
 and 25 samples took 30 s with a process per frame and 8 s with workers (0.34 s a frame); at 1280 x 720 and 64 samples, where rendering is most of the time, 3.3 s a frame became 2.9 s. The
-pictures are the same (a worker's frame differs from a separate run's by noise only: 0.03 of 255 against 6 to 13 between different frames). The CPU and Metal keep a process per frame.
+pictures are the same (a worker's frame differs from a separate run's by noise only: 0.03 of 255 against 6 to 13 between different frames). The CPU and Metal keep a process per frame. A film's frame runs and workers read no film file but
+the film's own (the video sets `RAY_TRACER_ONLY_FILM` to its key; a built-in film reads none), not every film file of the scene folders.
 
 **Where a frame's time went, and what is still the limit.** Measured with Nsight Systems on "Pip and the Moon" at 1280 x 720 and 64 samples: the GPU ran kernels for only about 0.9 s of a frame's 2.3 s. Most of the rest was the CPU, on one thread: tone-mapping 920,000 pixels, writing them as 2.7 million numbers of PPM text through iostream, and then the same text read back number by number twice (the frame run makes a PNG, the video makes its numbered PNG and deletes the frame run's). Now the tone map is split over the cores, the text is written and read in one block by hand (`src/shared/ppm_text.h`, byte for byte what iostream wrote and read: the pictures are identical, checked by comparing the files) and a frame run (`--ppm-only`) makes no PNG of its own. 24 frames at 64 samples take 31 s with one worker (55 s before) and 30 s with two (35 s before); a third or fourth worker gains nothing now, because what is left is the GPU itself (`evaluate_materials` is 60% of the kernel time, then the OptiX launches). More memory and more CPU cores do not help from here; the next gain is in the kernels. (`nsys profile` on a one-worker render of a few frames shows it.)
 
@@ -283,13 +281,18 @@ pictures are the same (a worker's frame differs from a separate run's by noise o
 
 **A long film is safe to render.** A frame that takes longer than `--cartoon-timeout S` seconds (15 minutes on a GPU by default, never on the CPU; `0` = never; the environment variable
 `RAY_TRACER_CARTOON_TIMEOUT` also sets it) is stopped and tried once more, so one stuck frame does not hold up the rest. A frame that still fails is repeated from the frame before it, so the
-video keeps its length and its sound stays in step (the run says how many). **`--resume` continues an interrupted video**: the frames already rendered are kept (each is a numbered picture in the
+video keeps its length and its sound stays in step (the run says how many) - but only a few: when more than 3 frames (or 2% of the frames, if that is more) failed, the run fails
+with an error and makes no video, keeping the frames that came out so that running it again resumes from them (filling hundreds of failed frames and reporting success once hid
+an hour of failures). With workers, four frames failing in a row stop the run at once, rather than failing the rest the same way. On an OptiX GPU one worker renders alone until
+its first frame is in (on a cold shader cache that frame compiles the shaders, which takes 5 to 15 GB of the computer's memory; workers compiling side by side ran a 32 GB
+computer out of memory), and another worker starts only while 6 GB of the computer's memory is free (at least one always runs). **`--resume` continues an interrupted video**: the frames already rendered are kept (each is a numbered picture in the
 `frames` folder, written whole or not at all), and only the missing ones are rendered; it does this only when the film, the size, the samples and the flags are the same as the interrupted run's
-(a signature file in the folder says so), and otherwise starts again. The GUI passes it for every cartoon video, so a render that was stopped continues when you start it again with the same settings and output folder. A rendered frame leaves only its picture in the folder, not the renderer's own files (a film has thousands).
+(a signature file in the folder says so; `--background`, `--smart-power`, `--gpu-device`, `--stats` and `--optix-validate` do not change the pictures and do not count,
+`--noise-target` and `--temporal-denoise` do), and otherwise starts again. The GUI passes it for every cartoon video, so a render that was stopped continues when you start it again with the same settings and output folder. A rendered frame leaves only its picture in the folder, not the renderer's own files (a film has thousands).
 
 **After a change to a film, only the frames that changed are rendered again.** Each rendered frame's scene has a fingerprint (`launcher/frame_fingerprint.h`: the scene text, without the
 build folder's name, and the content of every file it names - meshes, pictures), kept in the frames folder's `fingerprints.txt`. `program.txt` records the program that rendered the frames
-(its size and time, and the fingerprints of two of the film's moments). A resume by the same program keeps every finished frame, as before. A resume by a new program (a film or the renderer
+(its size and time, the GPU's shader files beside it, and the fingerprints of two of the film's moments; it is written only after a full, clean run). A resume by the same program keeps every finished frame, as before. A resume by a new program (a film or the renderer
 changed) builds each finished frame's scene again and compares fingerprints: a frame whose scene is the same is kept without rendering ("unchanged, kept"), the rest are rendered. So after
 moving one shot's camera, a resume renders that shot's frames and keeps the other 7,000. Frames rendered before fingerprints existed have none and are rendered again once. A change to
 the renderer itself that leaves every scene the same keeps every frame: delete the frames folder to render them all again.
@@ -358,7 +361,8 @@ A section a shot, by its number (1 is the first, as the doctor's sheet counts) o
     [The answer]
     tilt 3
 
-The change is made to the camera the code gives at each moment, so a moving camera keeps its move. A word the file does not know is printed once and left out. With the
+The change is made to the camera the code gives at each moment, so a moving camera keeps its move. A film made from a file (below; not one in parts) makes the change in its own header, before
+what is built round the camera - the water's surface, the decals, the sound's ears - so those follow the moved camera. A word the file does not know is printed once and left out. With the
 fingerprints above, a resumed video renders again only the frames of the shots the file changed (the file is part of `program.txt`'s stamp, so an edit always makes a resume
 compare the frames). When a change is right, it can stay in the file or be moved into the film's code.
 
@@ -500,9 +504,9 @@ film     windmill                  # the key: lower-case letters, digits, '-' (d
 name     The Windmill              # what the scene list calls it
 about    The sails turn, a ball rolls past, a lamp comes on.
 scene    windmill.pbrt             # relative to this file (required)
-length   12                        # seconds (required)
-fps      24                        # default 24
-still    6                         # the moment the scene list's picture shows (default: the middle)
+length   12                        # seconds (required; more than 0, at most 3600)
+fps      24                        # default 24 (a whole number, 1 to 240)
+still    6                         # the moment the scene list's picture shows (default: the middle; after the end: an error)
 tags     emissive,dusk             # words from the scene list's tags (others are ignored)
 ease     1                         # 1: motions start and stop gently (the default); 0: even pace (wherever the line is); or a curve (below)
 
@@ -552,7 +556,8 @@ set (`scene`), its `length`, its characters and walks, its shots, its dressing a
 file, `film_parts.h` joins the parts' films): its shots are the parts' shots in order, each part's soundtrack is laid at its start (crossfaded into the next), its captions,
 footsteps, feet and subjects are moved to the part's start, and a part that comes in with a dissolve or a wipe shows the other part's scene on the other side of the cut. The
 lines before the first part are every part's - a cast, a default set, an fps - except the film's own `film`, `name`, `about`, `tags`, `still` (a time in the whole film) and
-`music`. The whole film's cameras, cues and captions files are its own (`film_assets/<key>/`, its shots named as the parts name them); with no cues file each part plays the
+`music`, which are the whole film's: written inside a part they are an error, as a `shot` or `key` before the first part is, and `credits` belong to the last part
+(or before the first). The whole film's cameras, cues and captions files are its own (`film_assets/<key>/`, its shots named as the parts name them); with no cues file each part plays the
 score drafted from it. `ray_tracer --film-check FILE` checks each part as the film it is (a problem names the file's own line), and a part can be read on its own by its key,
 `<key>--2` (`--film-lines`, `--film-score`). `pbrt_scenes/pip-goes-out.film` is an example: Pip trots down the lantern path at dusk, and after a fade comes out into a morning
 meadow on the stage set (`sky`, grass, trees, birds) and cheers.
@@ -561,9 +566,11 @@ meadow on the stage set (`sky`, grass, trees, birds) and cheers.
 [facing D] ...` brings in a character as `library/WHO.cast` says it (WHO is NAME unless given): a cast file is what a `character` line says of a character but where it
 stands - a `kind` line, then its size, its parts' colours and its voice (`pitch` in semitones, `rate`), one to a line - and the rest of the `cast` line goes on top (`cast kid
 as pip-child at 0 0 1 skin #a0d0ff`). `set NAME` reads `library/NAME.set` there: film-file lines - its `scene` (from the set's own folder), `sky`, `place`, `scatter`,
-`ambience`, `terrain`, `forest`, `water`, weather, even characters - but not the film's own (`film`, `name`, `length`, `fps`, shots, parts). A film looks beside its own file
-first (`library/` next to it), then in `pbrt_scenes/film_assets/library`, which comes with casts (pip, pip-child, kai, ann, sam, shelly) and sets (dusk-path, meadow,
-valley). A problem in a library file is said with that file's own line. `pip-goes-out.film` uses `set dusk-path`, `set meadow` and `cast pip`. Any character can have a
+`ambience`, `terrain`, `forest`, `water`, weather, even characters and other sets (four deep at most) - but not the film's own (`film`, `name`, `about`, `tags`, `still`,
+`length`, `fps`, `music`, `shot`, `key`, `part`, `title`, `episode`, `theme`, `credits`, `credit`: an error in a set). A film looks beside its own file
+first (`library/` next to it), then in `pbrt_scenes/film_assets/library`, which comes with casts (pip, pip-child, kai, ann, sam, shelly, robot) and sets (dusk-path, meadow,
+valley, void). A problem in a set's lines is said with the set file's name and line (also one found after the film is read, such as an unknown kind or a block not marked
+in the scene); a cast with no `kind` line names the cast file, and a cast file's `rigged` model is found from the cast's folder. `pip-goes-out.film` uses `set dusk-path`, `set meadow` and `cast pip`. Any character can have a
 voice of its own the same way: `character bo person pitch -2 rate 0.9` (each line's own `pitch` and `rate` go on top).
 
 **Real voices: lines in the computer's own voices.** `voices system` in a film file (or `voice system` on one character's `character` or `cast` line, or `voice
@@ -1106,7 +1113,7 @@ gusts that sweep across them (`gusts` at its speed / 8 when the film has no `gus
 12 s), wandering: its funnel lowers from the cloud over the first 6 s and ropes out over the last 6, a twisting cone `height` metres tall (its cloud base, 700) narrowing to
 a rope `width` metres across at the ground (40), leaning and snaking more as it ropes out; round its foot a churning cloud of dust with dark debris whirled round and
 flung out, or over water a ring of spray (a waterspout); heard as a roar. The funnel is one grid and the cloud at its foot another below it (they never overlap); keep a
-`clouds deck` base above its top.
+`clouds deck` base above its top. (`tornado N at X Y Z ...`, with `at` as its second word, is a different line: a barracuda tornado under the sea, round 16.)
 
 **Fur and feathers: `herd ... fur A`, `flock ... feathers A`.** (film_fur.h; nature round 9, 2026-10-27)
 
@@ -1686,6 +1693,8 @@ on, with more of the reverb the further off. Nothing in the film file asks for i
 - a herd's hooves strike at each footfall of its gait - the four-beat walk, the trot's pairs, the gallop's rolling thunder - deer lighter than horses, wolves' pads soft; a
   wolf standing howls now and then; eagles cry from the sky;
 - birds sing from the trees near the camera, by day.
+
+`mute birds` takes every bird out of the soundtrack (the trees' and an ambience's songs, the eagles' cries, the geese, the night's owl), though they are still seen.
 
 A continuous sound is laid as overlapping grains a fraction of a second apart, each placed from where the camera is when it is heard; an event is placed once. They are
 mixed under the film's ambiences (which stay round the camera as before), its weather, footsteps, thunder, lines and music. `ray_tracer --film-sound <key> OUT.wav` writes
@@ -2390,8 +2399,10 @@ of the sea too (they had counted both, and a murk cast a dark disc on the sand e
 with the waves (at nine tenths of the wave it was above the water in a trough, and the picture's lower half showed the surface's top).
 
 The lines of rounds 14 to 16 (divers, schools, boats, vents, murk, the seabed's life and places, bubbles, `waterline` shots...) need an `underwater` line: without one the
-film is not read, where before they were left out of the picture without a word. `tornado ... around NAME` and `playmate ... with NAME` name a diver of the film, matched
-exactly. An underwater film is heard as a reef under the water and as the sea's waves above it, unless its `ambience` lines say otherwise. A boat's wake and a swimmer's
+film is not read, where before they were left out of the picture without a word. `underwater` in turn needs a `water ... level Y` line, and cannot be in the same film as
+`mist` or `fog` (both fill the air round the camera). `tornado ... around NAME` and `playmate ... with NAME` name a diver of the film, matched exactly. A `tornado` line is
+the barracuda's when its second word is `at` (`tornado N at X Y Z ...`) and the wind's otherwise (`tornado from X Z to X Z ...`, nature round 9). The lines that
+place animals, plants or bubbles also take `[seed K]` (the line's usage, said when it is wrong, lists its words). An underwater film is heard as a reef under the water and as the sea's waves above it, unless its `ambience` lines say otherwise. A boat's wake and a swimmer's
 trail are bubbles left where they were shed, rising, as the boat goes on. A school is worked out once for a film and kept in its cache folder (each frame renders in a
 process of its own, and working a big school out again in every one cost seconds a frame).
 
@@ -2498,12 +2509,12 @@ Reduce resolution or samples per pixel:
 
 ```
 output/
-├── frames/                  # Cleared and repopulated by each --video run
-│   ├── frame_0001.ppm       # Rendered frames, original frame index
-│   ├── frame_0002.ppm
+├── frames/                  # Cleared and repopulated by each --video run (a cartoon's: frames-<film key>/, kept for --resume)
+│   ├── frame_0000.ppm       # Rendered frames, original frame index (.png on the GPU)
+│   ├── frame_0001.ppm
 │   ├── ...
 │   ├── enc_0000.png         # PNG conversions, renumbered contiguously
-│   ├── enc_0001.png         # (skips any frame that failed to render)
+│   ├── enc_0001.png         # (skips any frame that failed to render; a film's frames keep their numbers, see "A long film is safe to render")
 │   └── ...
 ├── <stem>_video.mp4         # Final video, assembled by ffmpeg (<stem> from --output)
 ├── <stem>_video.log         # What the run printed, ending with its warnings and failures summed up

@@ -75,8 +75,8 @@ numbered sections below for the narrative detail behind any row.
 | Lights | Image infinite (HDRI, importance-sampled) | Y / Y / Y | N/A |
 | Lights | Portal light | Y / Y / Y | N/A |
 | Lights | Unrecognized pbrt light kind | N | Dropped, **no fallback rendered** — the one case in the whole loader with no safety net |
-| Light sampling | BVH light sampler (spatial + power) | CPU default only | Was briefly enabled on GPU-recursive (`BVHLightSampler2`) but found to render real scenes ~24x too dark (`MaterialCpuGpuParityTest`'s B22 case) and to fail on multiple hand-built multi-light test scenes despite passing its own bounds guards — a real, unresolved GPU-recursive bug (see `gpu_light_bvh_sample_index()`'s own header comment, `optix_device_helpers_lighting.h`), not a false positive. Deliberately re-disabled (`params.lightBvhNodeCount` forced to 0) — GPU-recursive, GPU-wavefront, and GPU-SPPM all fall back to the flat `PowerLightSampler`, a real, permanent substitute, not a degraded one |
-| Light sampling | Power light sampler (flat) | CPU (superseded) / GPU-wavefront and GPU-SPPM (default) | N/A |
+| Light sampling | BVH light sampler (spatial + power) | CPU default; GPU-wavefront (`BVHLightSampler2`, `wf_light_bvh_sample_index()` in `wavefront_restir_helpers.h`, ReSTIR DI and classic NEE) | Was briefly enabled on GPU-recursive (`BVHLightSampler2`) but found to render real scenes ~24x too dark (`MaterialCpuGpuParityTest`'s B22 case) and to fail on multiple hand-built multi-light test scenes despite passing its own bounds guards — a real, unresolved GPU-recursive bug (see `gpu_light_bvh_sample_index()`'s own header comment, `optix_device_helpers_lighting.h`), not a false positive. Deliberately re-disabled there (`params.lightBvhNodeCount` forced to 0, `optix_renderer_render.cpp`) — GPU-recursive and GPU-SPPM fall back to the flat `PowerLightSampler`, a real, permanent substitute, not a degraded one; the wavefront backend, which does not have the bug, uses the same tree |
+| Light sampling | Power light sampler (flat) | CPU (superseded) / GPU-recursive and GPU-SPPM (default); GPU-wavefront only when the scene builds no light tree | N/A |
 | Light sampling | `UniformLightSampler` | Dead code, zero callers | N/A — orphaned, not part of any fallback chain |
 | Light sampling | `ExhaustiveLightSampler` | Dead code (only reachable from unwired `restir.h`) | N/A — orphaned |
 | Light sampling | `PowerLightSampler` (`src/shared/power_light_sampler_scaffold.h`) | Dead code, zero callers | N/A — orphaned; not the same file as `src/TheRestOfYourLife/power_light_sampler.h`, which is real and CPU-default (see row above) |
@@ -84,7 +84,7 @@ numbered sections below for the narrative detail behind any row.
 | Media | Cloud (procedural Perlin-FBm) | Y / Y | N/A |
 | Media | RGB grid | Y / Y | N/A |
 | Media | Uniform grid | Y / Y | N/A |
-| Media | NanoVDB | Y, CPU only | GPU falls back to flat homogeneous fog (whole boundary shape), warned - see §5 |
+| Media | NanoVDB | Y, CPU and both OptiX backends (the GPU densifies it on the host, `nanovdb_dense.h`) | a blackbody `temperaturename` glow is dropped on the GPU with a warning - see §5 |
 | Media | Medium on disk / triangle mesh / etc. (GPU) | N | No fallback — GPU medium dispatch is sphere/cylinder-triggered only |
 | Cameras | Perspective (+ depth of field) | Y / Y / Y | N/A |
 | Cameras | Orthographic | Y / Y / Y | N/A |
@@ -101,6 +101,7 @@ numbered sections below for the narrative detail behind any row.
 | Samplers | Blue noise (bonus, non-pbrt-v4) | Y (CPU) | N/A |
 | Samplers | Independent | Y (CPU) | N/A |
 | Samplers | `--sampler` under GPU/BDPT/MLT/SPPM/debug integrators | Out of scope by design | Warned and ignored, doesn't error |
+| Samplers | Adaptive sampling (`--adaptive`, `--adaptive-threshold`) | Y / Y / Y | A pixel stops once it has converged (`src/shared/pixel_convergence_rule.h`) |
 | Integrators | Path (default) | Y / Y / Y | N/A |
 | Integrators | VolPath (media-aware) | Y / folded into default / Y | N/A |
 | Integrators | SPPM | Y / dedicated GPU pipeline / — | N/A |
@@ -114,10 +115,9 @@ numbered sections below for the narrative detail behind any row.
 | Acceleration | CPU hand-rolled BVH (`bvh.h`) | Y | N/A |
 | Acceleration | CPU SAH/HLBVH BVH (`bvh_aggregate.h`) | Y | N/A |
 | Acceleration | GPU hardware BVH (OptiX `OptixTraversableHandle`) | Y | N/A |
-| Acceleration | Light BVH on GPU | N | Falls back to the flat `PowerLightSampler` (see Light sampling row above) — permanent, not degraded |
+| Acceleration | Light BVH on GPU | GPU-wavefront Y; GPU-recursive and GPU-SPPM N | Those two fall back to the flat `PowerLightSampler` (see Light sampling row above) — permanent, not degraded |
 | Acceleration | CPU SAH kd-tree (`kd_tree.h`) | Y | N/A — wired via `kd_tree_hittable.h`; `Accelerator "kdtree"` now real, see §10 |
-| Tooling | Interactive/real-time progressive preview | N | No fallback — Qt GUI only launches the CLI as a subprocess and parses output; pbrt-v4's own reference implementation also lacks this, so it tracks upstream |
-| Tooling | Tone mapping (ACES / Reinhard / none) | Y | N/A |
+| Tooling | Interactive/real-time progressive preview | Y (GUI Live Preview: OptiX wavefront on Windows, Metal on a Mac) | Beyond pbrt-v4, whose reference implementation lacks this; see `docs/LIVE_PREVIEW.md` || Tooling | Tone mapping (ACES / Reinhard / none) | Y | N/A |
 | Tooling | Video generation (`--video`) | Y | N/A |
 | Tooling | System-compatibility diagnostics (`--diagnose`) | Y | N/A |
 | Orphaned scaffolding | ReSTIR / reservoir sampler (`restir.h`) | Present, unwired, beyond pbrt-v4 book scope | N/A — not part of any fallback chain |
@@ -256,7 +256,7 @@ infinite light).
 |---|---|
 | `bvh_light_sampler` (light BVH, spatial+power) | **CPU default**, `cpu_interface.cpp` |
 | `power_light_sampler` (`src/TheRestOfYourLife/`) | CPU, superseded by the BVH sampler as default |
-| pbrt-v4's PowerLightSampler algorithm (flat, power-only) | **GPU default (both recursive and wavefront)** - implemented natively in `gpu/optix/optix_renderer_scene.cpp`/`optix_types.h`, NOT via the C++ class below despite the shared algorithm name |
+| pbrt-v4's PowerLightSampler algorithm (flat, power-only) | **GPU-recursive and GPU-SPPM default** (GPU-wavefront uses the light BVH below, and this alias table only when no tree was built) - implemented natively in `gpu/optix/optix_renderer_scene.cpp`/`optix_types.h`, NOT via the C++ class below despite the shared algorithm name |
 | `UniformLightSampler` | present, **zero callers** — dead code |
 | `BVHLightSampler2` | Host-side tree build/upload (`OptiXRenderer::buildScene()`) shared by both GPU backends. **GPU-wavefront: live in production** (`wf_light_bvh_sample_index()`, `wavefront_restir_helpers.h`, feeding ReSTIR DI candidate generation and classic NEE in both `evaluate_materials`/`evaluate_materials_simple`) - verified ~99% success against a real 23-node/12-light tree. **GPU-recursive: still deliberately disabled** (`gpu_light_bvh_sample_index()`/`gpu_light_bvh_pmf()`, `optix_device_helpers_lighting.h`; `LaunchParams::lightBvhNodeCount` forced to 0, `optix_renderer_render.cpp`) - see the gap writeup below for the now-precisely-root-caused reason. GPU-SPPM never had a light-BVH path at all (its own `SPPMLaunchParams` has no light-BVH fields, only `aliasTable`). |
 | `ExhaustiveLightSampler` | only referenced by the unwired `restir.h` (see §11) — not reachable from any render path |
@@ -341,8 +341,9 @@ integer-overflow-into-heap-overflow risk a code-review pass found for a
 corrupt/malicious file claiming an extreme bbox). **On the GPU** (both OptiX backends) the file is read and densified on the host by the same code the CPU uses (`src/shared/nanovdb_dense.h`) and then rendered by the dense-grid medium `"uniformgrid"` already has, so no NanoVDB code runs on a device (which avoids the device-crash problems earlier GPU media work ran into). E9 matches the CPU to 0.1% in brightness (0.6075 CPU, 0.6080 recursive, 0.6074 wavefront), where it used to render as flat fog. Differences: a `"temperaturename"` blackbody grid is read on the CPU only (the GPU grid medium has no per-voxel emission; `scene_builder.cpp` warns and renders the density), and the file is read once per process (Live Preview does not re-read it on every camera move). Metal reads them too (since 2026-10-09): the same shared reader, drawn by Metal's per-voxel RGB grid medium.
 
 **Gap**: a GPU medium must live in a sphere (sampled along each ray's flight up to the nearest
-surface by the wavefront renderer since 2026-10-27, so surfaces and the camera may be inside it;
-see docs/PBRT_SUPPORT.md) — a `MediumInterface` on a disk/cylinder/trianglemesh has no effect on GPU
+surface by the wavefront renderer since 2026-10-27, so surfaces, the camera and another volume may
+be inside it, a nested volume taking over where a camera or shadow ray enters it; the default GPU
+renderer hands such a scene to the wavefront one; see docs/PBRT_SUPPORT.md) — a `MediumInterface` on a disk/cylinder/trianglemesh has no effect on GPU
 (cylinder gained real homogeneous-medium support since; disk is
 structurally not meaningful — zero-thickness, no "inside" to bound).
 **Trianglemesh specifically canary-tested and confirmed blocked** (same
@@ -671,8 +672,8 @@ but not usable features either since nothing reaches them:
   CPU-side samplers actually wired into `cpu_interface.cpp` - not to be
   confused with the next item below, a different, same-named-until-recently
   file), left in place. `BVHLightSampler2` used to be listed here too, but
-  is no longer orphaned - see §4 (real host build + device traversal on
-  GPU-recursive).
+  is no longer orphaned - see §4 (real host build, device traversal on
+  GPU-wavefront; disabled on GPU-recursive).
 - `ExhaustiveLightSampler` — only referenced by `restir.h`, which is itself
   unwired.
 - `PowerLightSampler<MaxLights>` (`src/shared/power_light_sampler_scaffold.h`
@@ -682,9 +683,13 @@ but not usable features either since nothing reaches them:
   power-weighted alias-table light sampling
   (`gpu/optix/optix_renderer_scene.cpp`/`optix_types.h`) implements the same
   algorithm natively rather than through this class.
-- `restir.h` / `reservoir_sampler.h` (ReSTIR/RIS temporal+spatial reservoir
-  reuse) — real-looking scaffolding, beyond pbrt-v4 book scope to begin
-  with, never connected to any integrator.
+- `src/shared/restir.h` (ReSTIR/RIS temporal+spatial reservoir reuse) —
+  real-looking scaffolding, beyond pbrt-v4 book scope to begin with, never
+  connected to any integrator (the Live Preview's ReSTIR is a separate GPU
+  implementation, `gpu/optix/wavefront_restir_*.h`). Its
+  `reservoir_sampler.h` is not orphaned: its `AliasTable`,
+  `WeightedReservoirSampler` and `PCG32Rng` are used by MLT (`mlt.h`),
+  `vol_path.h` and the CPU's `power_light_sampler.h`.
 - `PixelSensor` / `SpectralFilm` (§9) — real spectral-film classes, never
   called.
 
@@ -702,27 +707,33 @@ all), not gap closures.
 `--simplevolpath`, `--lightpath`, `--video[-frames|-fps|-speed|
 -camera-path|-preset]`, `--isolate-pbrt-lighting` (Metal/`--gpu` on macOS
 only - skips the hardcoded demo room's own lights for a loaded pbrt
-scene, `docs/history/METAL_GPU_FEASIBILITY.md` section 199). Full validation/
-mutual-exclusion logic in `launcher/main.cpp`.
+scene, `docs/history/METAL_GPU_FEASIBILITY.md` section 199). Many more have
+been added since (`--adaptive`, `--aovs`, `--denoise-guides`, `--probe`,
+`--scene-report`, `--print-scene-size`, the film and cartoon flags, ...):
+`ray_tracer --help` prints them all, and `launcher/flag_scopes.h` gives
+every one a scope (a test checks the two agree). Parsing and the
+validation/mutual-exclusion logic are in `launcher/launcher_args.h` and
+`launcher/main.cpp`.
 
 Tone mapping: ACES (Narkowicz approx, default), Reinhard, or none.
 
-**Gap**: no real-time/interactive progressive preview. The Qt GUI launches
-the CLI as a subprocess and parses its output — there's no live progressive
-raster or interactive viewport (pbrt-v4 itself doesn't have one either in
-the book/reference implementation, so this tracks upstream, not a gap
-relative to it specifically).
+Interactive preview (beyond pbrt-v4, which has none in the book/reference
+implementation): the Qt GUI launches the CLI as a subprocess for finished
+renders, and separately has **Live Preview** (`realtime_renderer/`, the
+OptiX wavefront renderer frame by frame on Windows, Metal on a Mac; see
+`docs/LIVE_PREVIEW.md`) and the Scene Builder's rendered viewport built on
+it.
 
 ---
 
 ## Summary: gaps from pbrt-v4, ranked by how much they'd actually matter
 
-1. ~~NanoVDB heterogeneous media~~ (§5) — **closed, CPU only**. Was the
-   clearest, most consequential gap (pbrt-v4's primary real-world
-   volumetric path); now real via a vendored header-only NanoVDB reader,
-   reusing the existing `GridMediumData`/DDA-majorant machinery
-   unchanged. GPU has no NanoVDB support at all - see §5's own comment
-   for why that's scoped as a separate follow-up, not attempted here.
+1. ~~NanoVDB heterogeneous media~~ (§5) — **closed, CPU and both OptiX
+   backends**. Was the clearest, most consequential gap (pbrt-v4's primary
+   real-world volumetric path); now real via a vendored header-only NanoVDB
+   reader, reusing the existing `GridMediumData`/DDA-majorant machinery
+   unchanged. The GPU reads the file on the host with the same code and
+   draws the densified grid (§5).
 2. **`PixelSensor`/`SpectralFilm` remain dead code** (§9) — the behavioral
    gap they were built to close (early per-sample RGB reduction, and the
    gamut-clamp bias it caused) is now fixed directly via
@@ -759,12 +770,13 @@ relative to it specifically).
    **alternate** camera models too (Orthographic/Spherical/Realistic, CPU
    only, §6) — is unaffected by any of this. Every pbrt-v4 shape kind this
    loader builds at all now has real object motion blur on CPU.
-5. No GPU light BVH (§4) — **still open, NOT closed**. A real port to
+5. No GPU-recursive light BVH (§4) — **still open, NOT closed** (the wavefront backend has one). A real port to
    GPU-recursive was built and compiles, but was found to render real
    scenes ~24x too dark and was deliberately re-disabled rather than
    shipped broken - see §4's own full account of the confirmed regression
    and the mitigations that did not fix it.
-   GPU-wavefront and GPU-SPPM still always use the flat power sampler.
+   GPU-recursive and GPU-SPPM still always use the flat power sampler;
+   GPU-wavefront uses the light BVH.
 6. ~~`Accelerator` pbrt directive not parsed~~ — **closed**. `Accelerator
    "bvh" "string splitmethod"/"integer maxnodeprims"` is now real, parsed
    input (`pbrt_scene.h`); `pbrt_flatten.h` resolves it to `FlatScene::
@@ -810,9 +822,9 @@ all of them, and it's worth knowing which is which before relying on one.
 
 **Falls back to something functional (warns, keeps rendering):**
 
-- `MakeNamedMedium "nanovdb"` on **GPU** → falls back to a flat homogeneous
-  medium filling the boundary shape, with a warning (CPU renders the real
-  grid - see §5).
+- `MakeNamedMedium "nanovdb"` with a `"string temperaturename"` on **GPU** →
+  the density is drawn, the blackbody glow is dropped with a warning (CPU
+  renders the glow - see §5).
 - A moving Disk/Cylinder (`ActiveTransform` motion) on **GPU** → falls back
   to its StartTime position, static, with a warning (CPU renders the real
   motion blur - see §6).
@@ -863,10 +875,10 @@ all of them, and it's worth knowing which is which before relying on one.
 **Working counterpart already in place (not a degraded fallback — just the
 permanent behavior):**
 
-- No GPU-wavefront/GPU-SPPM light BVH → both backends always use the flat
+- No GPU-recursive/GPU-SPPM light BVH → both backends always use the flat
   `PowerLightSampler` instead. That's a real, working counterpart, not a
   failure mode — it's the permanent default for those two backends, just
-  with worse scaling on many-light scenes than GPU-recursive's now-real spatial BVH
+  with worse scaling on many-light scenes than GPU-wavefront's real spatial BVH
   sampler (or CPU's).
 - No real spectral film accumulation → CPU `--spectral` reduces to RGB
   every sample rather than accumulating spectral radiance. This isn't a
@@ -880,5 +892,5 @@ Worth fixing separately (not done here — this is a survey, not a patch):
 - (Previously noted here: `src/shared/pbrt_scene.h`'s top-of-file comment
   calling out subsurface/curves/instancing/media as unimplemented, and
   NanoVDB media as the sole remaining gap. Already fixed - the comment no
-  longer exists, and NanoVDB itself is now real, CPU-side, as of this
-  doc's own §5.)
+  longer exists, and NanoVDB itself is now real, on the CPU and both OptiX
+  backends, as of this doc's own §5.)

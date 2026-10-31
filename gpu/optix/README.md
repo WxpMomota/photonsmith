@@ -27,9 +27,9 @@ are distinguished by prefix instead - see File Structure below.
 - `optix_types.h` - shared host/device data structures (materials, geometry,
   launch params) - the common vocabulary all three backends read/write.
 - `optix_interface.h`/`.cpp` - C API wrapper the CPU-side launcher/GUI call.
-- `optix_renderer.h` + `optix_renderer_init.cpp`/`_scene.cpp`/`_render.cpp` -
+- `optix_renderer.h` + `optix_renderer_init.cpp`/`_scene.cpp`/`_upload.cpp`/`_render.cpp` -
   the recursive backend's host-side `OptiXRenderer` class, split by concern
-  (init/scene-build/render) rather than one large file.
+  (init/scene-build/upload/render) rather than one large file.
 - `optix_programs.cu` - recursive backend's core OptiX device programs (raygen,
   miss, shadow any-hit, probe rays); `optix_programs_sphere.cu`, `_quad.cu`
   (quad and bilinear patch), `_disk.cu`, `_cylinder.cu` and `_triangle.cu` hold
@@ -63,9 +63,10 @@ backends.
 
 ## Build System
 
-OptiX/CUDA programs (`.cu` files) are compiled to PTX (recursive, wavefront)
-or device-linked object code (wavefront's non-OptiX kernels, SPPM) at build
-time via `build_optix.targets`. The host code loads PTX modules at runtime
+OptiX/CUDA programs (`.cu` files) are compiled to PTX (the OptiX programs of
+all three backends) or device-linked object code (the wavefront and SPPM
+backends' plain CUDA kernels) at build time via `build_optix.targets`, which
+hands them to `scripts/cuda_build.ps1` to compile in parallel. The host code loads PTX modules at runtime
 and creates the OptiX pipeline(s).
 
 ## OptiX Pipeline (recursive backend)
@@ -79,14 +80,18 @@ and creates the OptiX pipeline(s).
 
 ## Materials
 
-Every pbrt-v4 material class has a real implementation on all three
-backends - see [`docs/FEATURE_INVENTORY.md`](../../docs/FEATURE_INVENTORY.md)
+Every pbrt-v4 material class has a real implementation on the recursive and
+wavefront backends (GPU SPPM handles only textured diffuse surfaces and
+rejects other scenes with a reason) - see [`docs/FEATURE_INVENTORY.md`](../../docs/FEATURE_INVENTORY.md)
 for the full, current list and per-backend caveats; this directory tracks
 that document, not the other way around.
 
 ## Requirements
 
-- OptiX SDK 7.0+ (tested with 9.1.0)
-- CUDA 11.0+ (compiled with 13.2)
-- NVIDIA GPU with RT cores (Turing/Ampere/Ada/Hopper/Blackwell)
-- Windows 10/11 with recent NVIDIA drivers (535.00+)
+- OptiX SDK 9.1+ and CUDA Toolkit 13.2+ to build (see [BUILD.md](../../BUILD.md))
+- An NVIDIA RTX GPU of the Ampere generation or newer: the plain CUDA
+  kernels are compiled for sm_86 (which RTX 30 and RTX 40 cards run) and
+  sm_120 (RTX 50), and the PTX for sm_86; `RtCudaLocalArchOnly=true`
+  builds for the local GPU only
+- Windows 10/11 with an NVIDIA driver new enough for CUDA 13.2 (developed
+  on 595.79+)

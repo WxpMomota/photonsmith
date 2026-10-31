@@ -97,6 +97,13 @@ everything it supports in one bundle rather than opting GPU in/out per tier):
      downloader would also need until this project has an Apple Developer
      signing identity, worth calling out in the release notes
 
+   Pushing a `v*` tag also does steps 1 and 2 on a GitHub runner
+   (`.github/workflows/release-macos.yml`, or run "Release (macOS)" by
+   hand): it builds the universal dmg, runs the packaged app's headless GUI
+   self-test (`scripts/gui_selftest.py`) and attaches the dmg to the tag's
+   release. A Metal render still needs a real Mac to check; and
+   `scripts/mac_release_check.sh` runs the Mac's whole pre-release check.
+
 3. Create (or add to) the release - same tag-and-upload step as Windows,
    just with the `.dmg` instead of a `.zip`: `gh release create v1.x.x
    releases/RayTracer_macOS_*.dmg --title v1.x.x --notes "..."` (or `gh
@@ -152,6 +159,9 @@ RayTracer_Package/
 ├── RayTracer.exe             # CLI renderer, CPU-only - every tier
 ├── launcher.bat
 ├── README.txt
+├── pbrt_scenes/, images/, models/   # the tracked scene files and a few textures/meshes
+├── fonts/                    # the film captions' fallback font
+├── LICENSE, THIRD_PARTY_NOTICES.md, licenses/
 └── output/
 
 # -Tier Medium or Full also adds:
@@ -162,8 +172,12 @@ RayTracer_Package/
 # -Tier Full also adds:
 ├── realtime_renderer.dll     # GPU Live Preview
 ├── optix_programs.ptx        # GPU shaders, JIT-compiled against the
-├── wavefront_programs.ptx    #   target machine's own NVIDIA driver at launch
+├── optix_programs_<shape>.ptx #  target machine's own NVIDIA driver at
+├── wavefront_programs.ptx    #   first use (sphere, quad, disk, cylinder,
+├── sppm_programs.ptx         #   triangle)
 ```
+
+Videos and films need `ffmpeg` on the user's `PATH`; it is not packaged.
 
 ### macOS
 
@@ -179,6 +193,7 @@ RayTracer_Package_macOS/
 │       │   ├── RayTracerGUI            # Qt GUI
 │       │   ├── ray_tracer              # CLI renderer, CPU + Metal GPU - the GUI's own subprocess
 │       │   ├── scene_metadata.dylib
+│       │   ├── realtime_renderer.dylib # Metal Live Preview
 │       │   └── metal_poc_*.metal       # Metal shader source (compiled from source at runtime,
 │       │                               #   no offline .metallib step - see metal_poc.mm)
 │       └── Frameworks/                 # Qt frameworks, bundled by macdeployqt

@@ -50,29 +50,32 @@ result down, because the other strategy's sample is already covering it.
 
 ## Current implementation
 
-The CPU renderer and the GPU-recursive backend share one implementation:
-`src/shared/math_utils.h`'s 2-argument `PowerHeuristic(pdf_a, pdf_b)` (a
-`CPU_GPU`-tagged template, compiled by both the host compiler and nvcc -
-see that file's own comment), each wrapped in a local `mis_power_heuristic()`
-helper and used at every NEE (light-sampling) site. The GPU-wavefront
-backend does NOT call into this shared helper - it has its own independent
-`wf_mis()` implementation (`gpu/optix/wavefront_device_helpers.h`) with its
-own copy of the `a^2/(a^2+b^2)` formula, kept separate rather than sharing
-the CPU/GPU-recursive helper. (`src/shared/mis_sampling.h` also defines a
+All three share one implementation: `src/shared/math_utils.h`'s
+2-argument `PowerHeuristic(pdf_a, pdf_b)` (a `CPU_GPU`-tagged template,
+compiled by both the host compiler and nvcc - see that file's own
+comment). The CPU and the GPU-recursive backend wrap it in a local
+`mis_power_heuristic()` helper (`camera.h`; `gpu/optix/optix_device_basics.h`)
+used at every NEE (light-sampling) site; the GPU-wavefront backend calls
+it directly. (The wavefront backend used to have its own copy, `wf_mis()`,
+which returned 1 when both densities were tiny and gave NaN for a light
+pdf above ~1.8e19; it was removed, see the note in
+`gpu/optix/wavefront_device_common.h`.) (`src/shared/mis_sampling.h` also defines a
 different, 4-argument `PowerHeuristic(nf, fPdf, ng, gPdf)` used by other,
 unrelated call sites - e.g. sphere/cone light sampling and its own tests -
 not this NEE/MIS path.)
 
-- **CPU**: `src/TheRestOfYourLife/camera.h`'s `ray_color()` (and its
-  spectral counterpart `ray_color_spectral()`) - one-sample MIS combining
+- **CPU**: `camera::ray_color()` (and its spectral counterpart
+  `ray_color_spectral()`), declared in `src/TheRestOfYourLife/camera.h` and
+  defined in `src/TheRestOfYourLife/camera_path.h` - one-sample MIS combining
   a BSDF-sampled bounce with an NEE light sample each iteration, weighted
   via `mis_power_heuristic()`.
-- **GPU-recursive**: `gpu/optix/optix_device_helpers.h`'s `shade_material()`
+- **GPU-recursive**: `gpu/optix/optix_device_shade.h`'s `shade_material()`
   - real NEE + MIS at every non-delta material hit, including against the
   sky/infinite lights, not just area lights.
 - **GPU-wavefront**: the equivalent NEE-gated path in
-  `wavefront_kernels_materials.cu`'s `evaluate_materials()` kernel, via its
-  own `wf_mis()` helper (`wavefront_device_helpers.h`).
+  `wavefront_kernels_materials.cu`'s `evaluate_materials()` kernel (the
+  light and sky samples in `gpu/optix/wavefront_device_scatter.h`, the
+  emitter-hit weight in `wavefront_device_camera.h`), via `PowerHeuristic`.
 
 Delta-distribution materials (mirror, perfect dielectric) skip NEE/MIS
 entirely on all three backends, since a delta BSDF has zero probability of

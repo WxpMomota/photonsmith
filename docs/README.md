@@ -10,7 +10,9 @@ A guide to this folder and the other documents. The repository's front page is t
 | [SCENE_SELECTION.md](SCENE_SELECTION.md) | Scene names and ids, categories, what a scene's info means, header tags, adding a scene |
 | [SCENE_BUILDER.md](SCENE_BUILDER.md) | The GUI's Scene Builder: build a scene and save a `.pbrt` |
 | [PHOTO_TO_SCENE.md](PHOTO_TO_SCENE.md) | Pictures as textures, one photo to a 3D object, and bringing in a photo scan |
-| [VIDEO_GENERATION.md](VIDEO_GENERATION.md) | Camera paths, frames, assembling an MP4 |
+| [MODELS.md](MODELS.md) | The Scene Builder's model library: the meshes in `models/` and adding your own |
+| [VIDEO_GENERATION.md](VIDEO_GENERATION.md) | Videos and films: camera paths, cartoon presets, film files (characters, sound, nature, space, under the sea), assembling an MP4 |
+| [scripts/anim/README.md](../scripts/anim/README.md) | `film.py`: previewing, checking and rendering a film |
 | [DENOISING.md](DENOISING.md) | The AI denoisers (OptiX on the GPU, Open Image Denoise on the CPU and Mac), how to turn them on, how well they work |
 | [RENDER_PASSES.md](RENDER_PASSES.md) | Albedo, normal, depth, uv and alpha passes for compositing |
 | [LOGGING.md](LOGGING.md) | The log file: where it is and what to send with a bug report |
@@ -30,6 +32,8 @@ A guide to this folder and the other documents. The repository's front page is t
 | [FEATURE_INVENTORY.md](FEATURE_INVENTORY.md) | Feature by feature and backend by backend, and the gaps from pbrt-v4 |
 | [MULTIPLE_IMPORTANCE_SAMPLING.md](MULTIPLE_IMPORTANCE_SAMPLING.md) | How MIS is used |
 | [CLOSED_FORMS_FOUND_THE_BUGS.md](CLOSED_FORMS_FOUND_THE_BUGS.md) | Why the tests check closed-form answers, and what that found |
+| [CONSISTENCY_SWEEP.md](CONSISTENCY_SWEEP.md) | `scripts/consistency_sweep.py`: pairs of scenes that must look alike, rendered and compared |
+| [SETTINGS_SWEEP.md](SETTINGS_SWEEP.md) | `scripts/settings_sweep.py`: every pair of render settings tried |
 | [METAL_BACKEND.md](METAL_BACKEND.md), [METAL_PARITY_STATUS.md](METAL_PARITY_STATUS.md) | The Metal backend and how closely it matches the CPU renderer ([history/](history/) has the long diary) |
 
 ## Building and contributing
@@ -45,3 +49,4 @@ A guide to this folder and the other documents. The repository's front page is t
 | [gpu/optix/README.md](../gpu/optix/README.md) | The OptiX backends |
 | [qt_gui/QT_GUI_DOCUMENTATION.md](../qt_gui/QT_GUI_DOCUMENTATION.md) | The Qt GUI's code, themes and installation |
 | [CHANGELOG.md](../CHANGELOG.md), [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) | What changed, and the licences of what is included |
+| [REVIEW_2026-10-11.md](REVIEW_2026-10-11.md) | A review of the work of 2026-10-10 and 11: what was fixed, what was left open |

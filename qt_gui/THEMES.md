@@ -1,6 +1,6 @@
 # Theme attribution
 
-The GUI ships thirteen colour schemes (`qt_gui/theme.cpp`). Seven of them take
+The GUI ships thirteen colour schemes (`qt_gui/palette_data.cpp`). Seven of them take
 their numbers from established, widely-used developer colour schemes rather
 than from values invented here — they have been eye-tested by far more people
 than this project has, and they land somewhere users already recognise. The
@@ -10,8 +10,8 @@ remaining six (Cyberpunk plus the five topical schemes below) are original.
 
 **Only colour values were used.** No source file, palette file, stylesheet,
 icon, or other asset from any of these projects is included in this repository
-or was copied into it. Each palette is a hand-typed table of hex values in
-`theme.cpp`, transcribed from the upstream project's own published palette.
+or was copied into it. Each palette is a hand-typed table of colour values in
+`palette_data.cpp`, transcribed from the upstream project's own published palette.
 
 This distinction matters for Breeze and Qt Creator, whose licences are
 copyleft: their palette *files* could not be vendored here, but a colour value
@@ -82,7 +82,7 @@ which is what the `QScrollArea#tabScroll > QWidget` rules (mainwindow_style.cpp)
 do for the transparent colour.
 
 The `background-image` itself, though, is applied separately — by
-`ThemedScrollArea` (`mainwindow.h`) calling `viewport()->setStyleSheet(...)`
+`ThemedScrollArea` (`mainwindow_widgets.h`) calling `viewport()->setStyleSheet(...)`
 directly on its own viewport, a per-widget stylesheet, not a rule in the
 app-wide one. That split exists because the app-wide stylesheet never
 reliably applied a `background-image` to this specific nested selector at
@@ -97,7 +97,7 @@ either of these and it appears in the Theme menu alongside the built-ins, with
 no rebuild:
 
     <folder containing RayTracerGUI.exe>/themes/
-    %APPDATA%/Ray Tracer Project/Ray Tracer/themes/
+    %LOCALAPPDATA%/Ray Tracer Project/Ray Tracer/themes/   (Qt's AppConfigLocation, + /themes, on other systems)
 
 `qt_gui/themes/example.theme` is a complete, commented starting point — copy it
 into one of the folders above and edit. Every colour role is required; `id` must

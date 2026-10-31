@@ -1,7 +1,7 @@
 # Looking at a cartoon film
 
-The cartoon films (Lamp and Ball, Ball Parade, The Little Robot, Fireflies) are C++: `src/shared/cartoon/cartoon_lib.h` is the toolkit, there is one header per film, and `cartoons.h`
-lists them. A film is a function `std::string sceneAt(double t)` that returns the complete pbrt-v4 scene for the instant `t` (seconds), so every material, light and shape the renderer
+The built-in films (Lamp and Ball, Fireflies, The Little Robot, the Nomai, Prince Teng and nature, space and undersea showcases, ...) are C++: `src/shared/cartoon/cartoon_lib.h` is the toolkit, there is one header per film, and `cartoons.h`
+lists them (`ray_tracer --film-table` prints the table). Films can also be plain-text film files (`pbrt_scenes/*.film`, read by `film_file.h`) with no C++ at all; `docs/VIDEO_GENERATION.md` ("Films from files") has their language, and this script takes their keys the same way. A film is a function `std::string sceneAt(double t)` that returns the complete pbrt-v4 scene for the instant `t` (seconds), so every material, light and shape the renderer
 supports can be animated. There is one implementation of the toolkit; the GUI, `--video-preset` and this script all render the same thing.
 
 `film.py` is plain Python 3 and only drives `ray_tracer` (the GPU, denoised, unless you pass `--cpu`):
@@ -11,8 +11,14 @@ python scripts/anim/film.py list                            # the films and thei
 python scripts/anim/film.py still fireflies@13.5            # one frame, to look at (no @: the film's own best still)
 python scripts/anim/film.py sheet fireflies --count 16      # the whole film as a contact sheet: stills tiled with their times (needs Pillow)
 python scripts/anim/film.py sheet little-robot --times 2,8,20,30
-python scripts/anim/film.py video fireflies                 # the finished video
+python scripts/anim/film.py video fireflies                 # the finished video (--temporal R: temporal denoising)
+python scripts/anim/film.py preview nomai-signal            # a quick, coarse look at the whole film with its sound; only changed frames render again
+python scripts/anim/film.py doctor tengwang                 # every shot checked: dark, blown-out or flat frames, jumps at cuts, framing, sliding feet (exit 1 on a warning)
+python scripts/anim/film.py budget nomai-signal --write     # how many samples each shot needs, written into the film's cameras file
+python scripts/anim/film.py baseline [KEY ...] [--write]    # every film, shot by shot, against tests/data/film_baseline.txt
 ```
+
+`--exe PATH` (default: `RayTracer_Package/ray_tracer` next to this repository), `--cpu`, `--height N`, `--spp N` and `--out PATH` go before or after the command; the script's header has the details.
 
 A frame is also an ordinary scene: `ray_tracer --gpu --denoise 1280 256 8 cartoon:fireflies@13.5`, and the GUI's Cartoons tab lists a still of each film.
 

@@ -18,7 +18,11 @@ Utility scripts for building, packaging, and testing the ray tracer.
   step, for quickly running/testing your own local build - NOT for producing
   a release; use package.ps1 for that (below)
 - **`build_and_deploy_macos.sh`** - macOS equivalent (CPU renderer + CLI + Qt
-  GUI only - no GPU/OptiX backend on macOS). Run on macOS, not from Windows.
+  GUI + the Metal GPU backend, into a `.app` and `.dmg`; `--arch universal`,
+  `--skip-dmg`). Run on macOS, not from Windows.
+- **`cuda_build.ps1`** - Called by `build_optix.targets`: compiles the CUDA/OptiX
+  sources in parallel, each only when its source, a header it included or its
+  flags changed (see BUILD.md).
 - **`setup_env.ps1`** / **`setup_env.bat`** - Auto-detect and set the CUDA/OptiX
   SDK paths a build needs; run once on a fresh machine before the first build.
 
@@ -82,15 +86,58 @@ Utility scripts for building, packaging, and testing the ray tracer.
 - **`run_tests_parallel.ps1`** - Shards `ray_tracer_tests.exe` across multiple
   parallel processes (`GTEST_TOTAL_SHARDS`), with per-shard scratch
   directories to avoid output-file collisions
-  - `-Tier Fast|Render|Slow|Split|All` selects the cheap tests (sharded 16 ways, ~40 s), the CPU-render suites
-    (4 shards, ~154 s), the GPU tests (one process, ~270 s), or Fast then Render and Slow at the same time
-    (`Split`, ~375 s for the whole suite); see BUILD.md
+  - `-Tier Fast|Render|Slow|Split|All` selects the cheap tests (sharded 16 ways, ~75 s), the CPU-render suites
+    (4 shards, ~154 s), the GPU tests (one process, ~340 s), or Fast then Render and Slow at the same time
+    (`Split`, the default, ~375 s for the whole suite); see BUILD.md
   - See `tests/TESTING_GUIDE.md` for the full usage pattern
+- **`pre_commit_checks.py`** - CI's quick checks before a commit (about a second): `check_build_lists.py` (every
+  test file in both test builds), `check_env_docs.py` (every environment variable in `docs/ENVIRONMENT.md`) and
+  `check_code_size.py` (no new function over 300 lines or file over 2000), plus a warning for source files git
+  does not track yet.
+- **`gui_selftest.py`** - Starts the built GUI headless in each `RT_GUI_SELFTEST` mode and fails on a crash, a hang
+  or a wrong result (`--modes`, `--live-preview`); Windows and macOS (`gui_selftest_macos.sh` wraps it).
+- **`gtest_annotations.py`** - Prints the failed tests of gtest XML reports as GitHub Actions annotations (CI).
+- **`run_gallery_isolated.ps1`** - Renders every gallery scene that needs external files, each in its own process
+  (`-Cpu`, `-SkipLarge`, `-Filter`); see BUILD.md.
+- **Comparing with real pbrt-v4:** `pbrt_compare.py` (the Scene Builder's combination scenes), `pbrt_scene_compare.py`
+  (the bundled scenes), `pbrt_reference_pack.py` (writes `tests/data/pbrt_reference_means.txt`, the frozen pbrt means
+  the tests check against), `pbrt_rough_glass_reference.py` (an independent path-level reference for rough glass).
+- **Comparing our own renderers:** `backend_parity.py` (CPU against OptiX), `bundled_scene_compare.py` (every bundled
+  scene CPU against GPU, mirrored or flipped pictures too), `combo_sweep.py` (the shape-by-material scenes),
+  `settings_sweep.py` (pairs of settings, `docs/SETTINGS_SWEEP.md`), `refactor_check.py` (seeded renders that must stay
+  byte-identical across a refactor), `worker_orphan_check.py` (a film's workers end when the launcher is killed).
+- **Mac only:** `mac_release_check.sh` (everything checked before a release), `check_metal_shaders.py` (compiles the
+  Metal shaders offline), `metal_pbrt_pack.py`, `metal_render_hash.sh`, `metal_large_scenes_sweep.sh`,
+  `update_metal_golden.sh` (refreshes `gpu/metal/tests/parity_golden.txt`).
 
 - **`render_baseline.py`** (+ `exr_io.py`, its EXR reader) - Renders 15 scenes on the CPU and both GPU backends and compares them with a
   baseline captured before a change, pixel by pixel with measured noise, to catch brightness shifts of ~0.3% or less that the test suite
   tolerates. `capture <name>` before, `compare <name>` after (`--expect-identical` for a pure refactor). See BUILD.md.
   Needs numpy; baselines go under `baselines/` (git-ignored).
+
+### Films
+- **`anim/film.py`** - Previews, checks and renders the films (`preview`, `video`, `doctor`, `budget`, `baseline`, ...);
+  see [`anim/README.md`](anim/README.md) and `docs/VIDEO_GENERATION.md`.
+- **`measure_cartoons.py`** - Measures what a frame of each film costs and writes it into the film table.
+- **`make_rigged_animals.py`**, **`make_rigged_robot.py`**, **`make_rigged_face.py`**, **`make_tengwang_assets.py`** -
+  Make the films' generated assets in `pbrt_scenes/film_assets/` (rigged glTF animals, the robot, Mira, the Prince
+  Teng pictures).
+- **`gpu_kernel_bench.py`** - GPU time per kernel of a short film render, from Nsight Systems.
+
+### Optional helpers
+- **`setup_photo_to_mesh.ps1`** / **`.sh`** - Sets up the Scene Builder's "Object from a photo" helper (a private
+  Python environment with TripoSR) in the per-user data folder.
+- **`setup_video_to_acting.ps1`** - Sets up the films' "act it yourself" helper (MediaPipe): a video of you acting
+  drives a character's body and face.
+
+### Generators
+- **`stamp_scene_sizes.py`** - Writes each bundled scene's `# @rt-size` header line (`--check` lists missing ones).
+- **`gen_scene_packs.py`** (`qt_gui/scene_packs.txt`) and **`update_asset_manifest.sh`**
+  (`qt_gui/downloadable_assets.txt`) - The catalogues behind the GUI's "Download missing files".
+- **`gen_environment_scenes.py`** - Generates the `pbrt_scenes/environment-*.pbrt` scenes from `models/*.obj` + `.mtl`.
+- **`make_model_thumbnails.sh`** - The model library's pictures (`models/thumbnails/`).
+- **`pack_glb.py`** - Repacks a glTF model as a slim single `.glb`.
+- **`conductor_rgb_presets.py`**, **`measured_rgb_weights.py`** - Regenerate RGB tables from pbrt-v4's spectra.
 
 ### Maintenance
 - **`clean_vs_cache.bat`** - Batch script to clean Visual Studio build cache

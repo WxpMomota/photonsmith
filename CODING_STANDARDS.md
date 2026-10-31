@@ -5,7 +5,7 @@ This document defines the coding standards and best practices for the Ray Tracer
 
 ## General Principles
 - **Clarity over cleverness**: Write code that is easy to read and understand
-- **Modern C++**: Use C++17/20 features where appropriate
+- **Modern C++**: Use C++17 features where appropriate (every build is C++17: the MSBuild projects, CMake and nvcc; no C++20)
 - **const-correctness**: Use `const` wherever possible
 - **Type safety**: Prefer static_cast over C-style casts
 - **RAII**: Prefer automatic resource management over manual cleanup
@@ -401,7 +401,7 @@ assert(width > 0 && "Image width must be positive");
 ### Cornell Box Constants
 - Box dimensions: 555 units
 - Center point: (278, 278, 278)
-- Use `kBoxSize` and `kCornellBoxCenter` constants
+- Use the `kBoxSize` and `kCornellBoxCenter` constants (`gpu/optix/scene_builder.cpp`) in native scene code; the scenes themselves are `.pbrt` files
 
 ### Ray Offset
 - Minimum t-value for ray intersections: 0.001f
@@ -435,8 +435,10 @@ Before committing code, verify:
 
 ### Build System
 - Use `scripts\build_all.ps1` for complete build
-- Use `build_and_deploy.ps1` for build + package
-- Run `deploy_qt_gui.ps1` after Qt GUI changes
+- Use `scripts\build_and_deploy.ps1` for build + package
+- Run `scripts\deploy_qt_gui.ps1` after Qt GUI changes
+- Run `python scripts/pre_commit_checks.py` before a commit (build lists, environment-variable docs, code size)
+- Add a new test file to both `tests/ray_tracer_tests.vcxproj` and `tests/CMakeLists.txt` (or to `tests/portable_build_exclusions.txt`), and `git add` every new source file: CI builds a clean checkout
 
 ## Additional Resources
 

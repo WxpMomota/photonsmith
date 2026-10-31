@@ -100,7 +100,7 @@ After installation completes:
 
 1. **Verify** the installation using the PowerShell check above
 2. **Restart** Visual Studio to pick up new environment variables
-3. **Let me know** it's installed, and I'll proceed with creating the Qt GUI project
+3. **Build** the GUI as [QT_GUI_DOCUMENTATION.md](QT_GUI_DOCUMENTATION.md) ("Building") or [BUILD.md](../BUILD.md) describes
 
 ## Troubleshooting
 
@@ -114,7 +114,7 @@ After installation completes:
 - Disable antivirus temporarily
 
 ### "qmake not found"
-- Double-check the installation path (might be 6.7.x or 6.9.x instead of 6.8.x)
+- Double-check the installation path (the build scripts look for 6.11.1, then 6.10.0 and 6.9.0, under `C:\Qt\<version>\msvc2022_64`)
 - Manually browse to `C:\Qt` and find the installed version
 
 ## Licensing Note
@@ -124,8 +124,4 @@ Qt is available under:
 - **GPL v3**: Free for open source projects
 - **Commercial**: Paid license for static linking or proprietary needs
 
-Our ray tracer will use **dynamic linking (DLLs)**, which is LGPL-compliant. ✅
-
----
-
-**Ready?** Once Qt6 is installed and verified, let me know and we'll build the new GUI! 🚀
+The ray tracer uses **dynamic linking (DLLs)**, which is LGPL-compliant.

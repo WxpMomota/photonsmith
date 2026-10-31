@@ -8,7 +8,7 @@ Build a scene from shapes, materials and lights, move things around, see a pictu
 
 **Studio Showcase** (in the Settings tab under *Materials*, or `pbrt_scenes/studio-showcase.pbrt`, which **Open** loads here for editing) is a small photo studio made with the Builder, to show what it can do together: a **cyclorama** backdrop lit by the **Studio** three-light rig and a **window-pattern projector**; a **rounded box** of red car paint worn through to copper (a **mixed material**); a block of mossy stone (a **ready-made mix**); a candle-wax ball (**subsurface**); a clear glass ball on a tile with a **tiled picture** (texture repeats); and a gold ball. It renders the same on the CPU and OptiX (the means of the two pictures agree to 0.1%). Switch **Rendered** on after opening it to look around it and drag things while it refines. The scene is defined in code, `src/shared/scene_showcase.h`, and `tests/unit/scene_showcase_tests.cpp` checks that the file is exactly what the code writes and that it is a valid Builder scene (`RT_SHOWCASE_OUT=<the file> ray_tracer_tests --gtest_filter=SceneShowcaseTest.WriteTheFile` writes it again after a change).
 
-## Looking at and moving things
+## First steps
 
 1. Open the **Scene Builder** tab. It starts with an example (a checkered floor, glass and gold balls, a red box, a ceiling light and a pale sky).
 2. Press **Preview**. A small picture appears in a second or two (Draft quality, on the CPU).
@@ -209,7 +209,7 @@ The copies are ordinary objects with their own numbered names: move, recolour or
 
 A volume has no material, picture or light of its own, and **Gives off light** does not apply to it. It is saved as pbrt `MakeNamedMedium` with a `MediumInterface` on a sphere (or cylinder, for fog and smoke), so it renders the same on the CPU, both OptiX backends and the Mac. The medium fills the sphere, not a box: a cloud's density is declared in a cube round the sphere and cut by it. Rotating a cloud turns its lumps; a sphere of fog looks the same turned.
 
-Things to know: a volume shows only where light reaches it, so a scene lit by a small lamp makes fog glow near it; a bigger sphere with the same density is thicker (light crosses more of it); and a scene with many dense volumes takes longer to render and shows more noise at low sample counts.
+Things to know: a volume shows only where light reaches it, so a scene lit by a small lamp makes fog glow near it; a bigger sphere with the same density is thicker (light crosses more of it); and a scene with many dense volumes takes longer to render and shows more noise at low sample counts. A volume may hold objects, the camera or another volume (smoke inside a fog): on Windows a GPU render of such a scene is drawn by the wavefront renderer, which samples each volume up to the nearest surface and lets an inner volume take over where it begins (the default GPU renderer hands it over and says so).
 
 ## Props
 

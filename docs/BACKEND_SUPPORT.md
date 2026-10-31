@@ -24,6 +24,7 @@ This page is the overview. The detail lives in:
 | **Textures**: image, checker, marble, fbm, windy, wrinkled, dots, bilerp | Y | Y | Y | Y |
 | **Lights**: point, spot, distant, goniometric, projection, area (all samplable shapes), infinite (constant and image), portal | Y | Y | Y | Y |
 | **Media**: homogeneous (incl. per-channel), cloud, RGB grid | Y | Y | Y | homogeneous and RGB grid Y (rgbgrid-medium matches the CPU; inside a medium Metal samples area, point/spot and distant lights, but not goniometric or projection lights); cloud Y (E2 cloud-medium-scene and E5 cloud-medium: the body matches the CPU to about 2%; the density, including the wispiness warp, is checked against the CPU's by a shader test; OptiX's density still has no wispiness warp. E5 agrees with the CPU to 0.5% over the whole cloud, and a white-furnace test (`cloud-furnace.pbrt`: a non-absorbing cloud under a uniform sky must be invisible) passes on Metal) |
+| a volume with surfaces, the camera or another volume inside it | Y | handed to the wavefront renderer (it says so; `something_inside_a_volume`) | Y (each volume sampled up to the nearest surface; a nested one takes over where the ray enters it, for camera and shadow rays alike) | see METAL_BACKEND.md |
 | uniform grid, NanoVDB | Y | grid Y, NanoVDB Y (the density; a blackbody `temperaturename` glow is dropped with a warning) | grid Y, NanoVDB Y (the same) | grid Y, NanoVDB Y (read on the host by the shared `nanovdb_dense.h`, drawn by the RGB grid medium; E9 matches the CPU to 0.2% in brightness (worst 4x4 block 2.5-2.9%); the two absolute checks the CPU and OptiX pass, `nanovdb-furnace` (1.000 within 1.5%) and `nanovdb-thin-slab` (closed form 7.46e-4, Metal reads +0.7%), pass: ctest `metal_poc_nanovdb`; a `temperaturename` glow is dropped with a warning; grids over 64M voxels are not uploaded) |
 | camera medium | Y | Y | Y | Y |
 | **Cameras**: perspective (+ depth of field), orthographic, spherical, realistic lens | Y | Y | Y | Y |
@@ -33,7 +34,7 @@ This page is the overview. The detail lives in:
 | SPPM | Y | Y (own pipeline) | - | CPU (`--sppm --gpu` warns and renders on the CPU; it used to stop with "OptiX is not available!") |
 | BDPT, MLT, random walk, AO, debug integrators | Y | CPU | CPU | CPU |
 | **Sampling options**: `--sampler`, `--lightsampler`, `--regularize`, `--spectral` | Y | ignored (warned) | partly (always-on spectral pipeline) | ignored (warned) |
-| adaptive sampling | Y | - | Live Preview only | Y (off unless asked) |
+| adaptive sampling (`--adaptive`) | Y | Y | Y (and in Live Preview) | Y (off unless asked) |
 | crop window, `--seed` (reproducible), firefly clamp, exposure, tone map | Y | Y | Y | Y |
 | **Denoising** (`--denoise`) | Intel Open Image Denoise (default path tracer; GUI installs it on request; `--denoise-guides` adds surface colour and normal) | OptiX AI denoiser | OptiX AI denoiser | Intel Open Image Denoise (colour only) |
 | **Render passes** (`--aovs`) | Y | Y (made on the CPU scene) | Y (same) | Y (same) |
