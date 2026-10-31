@@ -213,7 +213,7 @@
   <!-- Post-Build Event: Auto-deploy to RayTracer_Package -->
   <Target Name="PostBuild" AfterTargets="Build">
     <PropertyGroup>
-      <PackageDir>$(SolutionDir)RayTracer_Package</PackageDir>
+      <PackageDir Condition="'$(PackageDir)' == ''">$(SolutionDir)RayTracer_Package</PackageDir>
     </PropertyGroup>
 
     <!-- Create package directory if it doesn't exist -->

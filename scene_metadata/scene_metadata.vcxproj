@@ -113,7 +113,7 @@
   <!-- Post-Build Event: Auto-deploy to RayTracer_Package, next to RayTracerGUI.exe -->
   <Target Name="PostBuild" AfterTargets="Build">
     <PropertyGroup>
-      <PackageDir>$(SolutionDir)RayTracer_Package</PackageDir>
+      <PackageDir Condition="'$(PackageDir)' == ''">$(SolutionDir)RayTracer_Package</PackageDir>
     </PropertyGroup>
     <MakeDir Directories="$(PackageDir)" Condition="!Exists('$(PackageDir)')" />
     <Message Text="[Post-Build] Copying scene_metadata.dll to RayTracer_Package..." Importance="high" />

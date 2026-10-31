@@ -157,7 +157,7 @@
   <Target Name="PostBuild" AfterTargets="Build">
     <PropertyGroup>
       <PtxSource>$(MSBuildProjectDirectory)\..\gpu\optix\optix_programs.ptx</PtxSource>
-      <PackageDir>$(MSBuildProjectDirectory)\..\RayTracer_Package</PackageDir>
+      <PackageDir Condition="'$(PackageDir)' == ''">$(MSBuildProjectDirectory)\..\RayTracer_Package</PackageDir>
     </PropertyGroup>
     <!-- Create package directory if it doesn't exist -->
     <MakeDir Directories="$(PackageDir)" Condition="!Exists('$(PackageDir)')" />
