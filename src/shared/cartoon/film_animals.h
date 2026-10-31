@@ -159,6 +159,7 @@ inline std::string poseObject(const Model &m, const std::string &name, const std
 			if (mat.name == "coat") coatColour = {mat.baseColor[0], mat.baseColor[1], mat.baseColor[2]};
 			if (mat.name == "legs") legColour = {mat.baseColor[0], mat.baseColor[1], mat.baseColor[2]};
 		}
+		if (pattern == "natural") coatColour = coats::individual(kind, variant, coatColour), legColour = coatColour;
 		painted = "coat_" + kind + "_" + pattern + "_" + std::to_string(variant) + (wet ? "_wet" : "");
 		textures = "Texture \"" + painted + "\" \"spectrum\" \"imagemap\" \"string filename\" [ \"" + coats::picture(pattern, kind, variant, coatColour, legColour) + "\" ]" +
 				   (wet ? " \"float scale\" [ 0.55 ]" : "") + "\n";
@@ -167,7 +168,7 @@ inline std::string poseObject(const Model &m, const std::string &name, const std
 		const gltf_import::Material &mat = materials[i];
 		const Vec3 colour{mat.baseColor[0], mat.baseColor[1], mat.baseColor[2]};
 		if (!painted.empty() && (mat.name == "coat" || mat.name == "legs") && !meshes[i].uvs.empty()) {   // (painted: film_coats.h)
-			colours.push_back(colour);
+			colours.push_back(pattern == "natural" ? coats::individual(kind, variant, colour) : colour);   // (its fur the animal's own colour)
 			body += attr(wet ? "Material \"coateddiffuse\" \"texture reflectance\" \"" + painted + "\" \"float roughness\" [ 0.2 ]" : "Material \"diffuse\" \"texture reflectance\" \"" + painted + "\"",
 						 emitMesh(meshes[i], identity()));
 			continue;
@@ -220,6 +221,7 @@ inline std::string heroFur(const std::string &kind, const std::string &clip, int
 		if (mat.name == "coat") coatColour = {mat.baseColor[0], mat.baseColor[1], mat.baseColor[2]};
 		if (mat.name == "legs") legColour = {mat.baseColor[0], mat.baseColor[1], mat.baseColor[2]};
 	}
+	if (pattern == "natural") coatColour = coats::individual(kind, variant, coatColour), legColour = coatColour;
 	const fur::Coat coat = fur::coatOf(kind);
 	const double density = 9000.0 * amount;
 	const Vec3 back = normalize(transformPoint(place, {0.0, 0.0, -1.0}) - transformPoint(place, {0.0, 0.0, 0.0})), down{0.0, -1.0, 0.0};

@@ -6,6 +6,8 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **The land grows, and animals are not one colour (2026-10-31).** Every film with land now has real grass out to 330 m, moving in the wind and coloured by the ground under it, with fallen leaves and ferns under trees and stones here and there; `undergrowth off` or `undergrowth amount A` changes it. Animals with no pattern wear a `natural` coat, darker along the back and paler under it with dark, dusty legs, and no two of a herd are alike.
+
 * **Forests that look real (2026-10-31).** A far tree is now the near tree's own limbs with fewer, bigger leaves, not a ball or a cone, so a tree keeps its outline to the horizon. Each leaf has its own place in a picture of leaves: its own colour and veins, and autumn reaches the exposed leaves first. Leaves also stopped giving back more light than they receive, which is what made autumn crowns glow.
 
 * **Land without cracks or an edge (2026-10-31).** Black lines along ridges (normals finer than the mesh) and thin dark gullies drawn as cliffs are gone, land seen from the air fades into the sky instead of ending at a dark band, and rain no longer smears across the lens.

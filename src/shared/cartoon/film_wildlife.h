@@ -60,7 +60,7 @@ struct Herd {
 	int count = 10;
 	double fx = 0.0, fz = 0.0, tx = 0.0, tz = 0.0, speed = 0.0, t0 = 0.0, flee = -1.0;
 	int seed = 1;
-	double fur = 0.0;   // (film_fur.h) how much fur, 0 none
+	double fur = 0.7;   // (film_fur.h) how much fur, 0 none
 	std::string coat;   // (film_coats.h) its coat's pattern: zebra, tiger, cheetah, leopard, giraffe, shade, plain ("": its kind's own)
 	int heroes = 0;     // (`hero N`) the first N animals get fur of real strands (film_animals.h heroFur) for close-ups
 	double heroFur = 1.0;
@@ -688,7 +688,7 @@ inline std::string herdText(const Herd &h, double t, const terrain::Field *groun
 				}
 			}
 		}
-		pose = poses.poseName(h.kind, clip, k, out, hero ? 0.0 : h.fur, pattern, i % 3, wet > 0.0);
+		pose = poses.poseName(h.kind, clip, k, out, hero ? 0.0 : h.kind == "elephants" ? 0.0 : h.fur, pattern, i % coats::variantsOf(pattern), wet > 0.0);
 		const Vec3 storyAt{-p.x, p.y, p.z}, storyFwd{-dir.x, 0.0, dir.z};
 		// leaning into a turn, as a running animal does (its weight against the turn: tan(lean) = v w / g, its speed times how fast it turns)
 		double lean = 0.0;
@@ -704,7 +704,7 @@ inline std::string herdText(const Herd &h, double t, const terrain::Field *groun
 		if (hero) {
 			const Mat4 mirror = scale(-1.0, 1.0, 1.0);
 			k = ((k % animals::posesOf(clip)) + animals::posesOf(clip)) % animals::posesOf(clip);
-			out += animals::heroFur(h.kind, clip, k, pattern, i % 3, h.heroFur, mul(mirror, placing), s);   // (the object's meshes are mirrored as emitMesh writes them: the fur is placed as they end up)
+			out += animals::heroFur(h.kind, clip, k, pattern, i % coats::variantsOf(pattern), h.heroFur, mul(mirror, placing), s);   // (the object's meshes are mirrored as emitMesh writes them: the fur is placed as they end up)
 		}
 	}
 	return out;

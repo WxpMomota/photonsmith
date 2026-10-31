@@ -60,6 +60,7 @@
 #include "film_geology.h"
 #include "film_soundscape.h"
 #include "film_forest.h"
+#include "film_cover.h"
 #include "film_skyfx.h"
 #include "film_cache.h"
 #include "film_camera.h"
@@ -332,6 +333,7 @@ struct Spec {
 	std::vector<std::string> groups;              // (a group's name: animated by the lines naming it, with no block of its own)
 	std::map<std::string, std::array<double, 3>> subjectPoints;   // (`subject NAME at X Y Z` in a shot: where on a block, group or placement the film doctor looks, at rest)
 	surround::Surround around;                    // (`surround FILE ...`: film_surround.h)
+	cover::Cover undergrowth;                     // (what grows on the land by itself, unless `undergrowth off`: film_cover.h)
 	std::vector<Character> characters;
 	// props with physics: the block they move, and the line that says so
 	std::vector<std::pair<std::string, physics::Bounce>> bounces;

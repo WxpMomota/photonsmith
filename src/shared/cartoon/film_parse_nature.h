@@ -980,6 +980,12 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		}
 		if (!(wt.amount > 0.0 && wt.amount <= 4.0) || wt.t1 <= wt.t0) return fail("a weather's amount is from 0 to 4 and its end after its start");
 		s.weather.push_back(wt);
+	} else if (verb == "undergrowth") {   // film_cover.h
+		const std::vector<std::string> t = detail::tokens(line);
+		double amount = 0.0;
+		if (t.size() == 2 && t[1] == "off") s.undergrowth.on = false;
+		else if (t.size() == 3 && t[1] == "amount" && number(t[2], amount) && amount > 0.0 && amount <= 3.0) s.undergrowth.amount = amount;
+		else return fail("`undergrowth off`, or `undergrowth amount A` (above 0, up to 3)");
 	} else if (verb == "swarm") {
 		swarm::Swarm sw;
 		if (const std::string e = swarm::parse(detail::tokens(line), sw); !e.empty()) return fail(e);

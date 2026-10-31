@@ -10,6 +10,8 @@
 //   leopard   rosettes: rings of dark broken round the spots' edges, a darker gold inside
 //   giraffe   patches: the cells of a jittered Voronoi tiling, brown, parted by a network of cream lines
 //   shade     only countershading: a paler belly under a darker back, as almost every mammal has
+//   natural   what an animal without a pattern really wears: darker along its back, paler under it, the colour wandering in big soft patches and short streaks with the lie of
+//             the hair, its legs darkening towards the ground and dusty at the foot; each animal its own colour (individual)
 //
 // Every pattern also pales the belly. Each species gets three variants (another seed each), and a herd's animals take them in turn, so no two neighbours are the same.
 // A picture is 384 pixels square, made once per pattern, kind and variant into the film cache (`_coats`); the pattern fields are worked out once per pattern and variant.
@@ -23,20 +25,37 @@
 
 #include "cartoon_lib.h"
 #include "film_sky.h"
+#include "nature_lib.h"
 
 namespace cartoon {
 namespace coats {
 
 inline const std::vector<std::string> &patterns() {
-	static const std::vector<std::string> p = {"zebra", "tiger", "cheetah", "leopard", "giraffe", "shade", "plain"};
+	static const std::vector<std::string> p = {"zebra", "tiger", "cheetah", "leopard", "giraffe", "shade", "natural", "plain"};
 	return p;
 }
 // A kind's own pattern when its herd line names none ("": the model's flat colours, as before).
 inline std::string defaultFor(const std::string &kind) {
 	if (kind == "zebras") return "zebra";
 	if (kind == "giraffes") return "giraffe";
-	if (kind == "lions" || kind == "bears" || kind == "elephants" || kind == "foxes") return "shade";
+	if (kind == "lions" || kind == "bears" || kind == "elephants" || kind == "foxes" || kind == "horses" || kind == "deer" || kind == "wolves" || kind == "rabbits") return "natural";
 	return "";
+}
+// How many animals of a pattern are told apart: a grown pattern is worked out for each, so three; a natural coat is only colours.
+inline int variantsOf(const std::string &pattern) { return pattern == "natural" ? 6 : 3; }
+// This animal's own colour, from its model's: horses come in the colours horses come in, and any other kind differs a little from one animal to the next.
+inline Vec3 individual(const std::string &kind, int variant, Vec3 coat) {
+	const int v = variant % 6;
+	if (kind == "horses") {
+		static const Vec3 own[6] = {{0.30, 0.15, 0.08}, {0.42, 0.18, 0.07}, {0.14, 0.09, 0.07}, {0.46, 0.45, 0.43}, {0.58, 0.43, 0.25}, {0.07, 0.06, 0.055}};
+		return own[v];
+	}
+	if (kind == "wolves") {
+		static const Vec3 own[6] = {{0.34, 0.32, 0.29}, {0.42, 0.38, 0.32}, {0.24, 0.22, 0.20}, {0.47, 0.44, 0.39}, {0.30, 0.26, 0.21}, {0.12, 0.11, 0.10}};
+		return own[v];
+	}
+	const double light = 0.8 + 0.4 * hash01(v, 91), warm = 0.08 * (hash01(v, 92) - 0.5);
+	return Vec3{coat.x * (1.0 + warm), coat.y, coat.z * (1.0 - warm)} * light;
 }
 
 constexpr int kSize = 384;
@@ -147,14 +166,24 @@ inline Vec3 colourAt(const std::string &pattern, int variant, Vec3 coat, Vec3 le
 	const std::vector<float> &dark = detail::field(pattern, variant);
 	const int x = std::clamp(static_cast<int>(ax * kSize), 0, kSize - 1), y = std::clamp(static_cast<int>(ay * kSize), 0, kSize - 1);
 	const double d = dark[static_cast<std::size_t>(y * kSize + x)] * (pattern == "zebra" ? 1.0 : 1.0 - 0.6 * under);
-	const Vec3 c = lerp(b, belly, 0.55 * under * (pattern == "zebra" ? 0.3 : 1.0));
+	Vec3 c = lerp(b, belly, (pattern == "natural" ? 0.42 : 0.55) * under * (pattern == "zebra" ? 0.3 : 1.0));
+	if (pattern == "natural") {
+		const double round = detail::roundness(ax, ay), spine = smoothstep(0.35, 0.95, -std::cos(2.0 * kPi * round));
+		const double patches = nature::noise2(ax * 9.0, ay * 9.0, 71 + variant), hair = nature::noise2(ax * 6.0, ay * 90.0, 73 + variant);
+		c = c * ((0.8 + 0.4 * patches) * (0.92 + 0.16 * hair) * (1.0 - 0.3 * spine));
+		if (ay >= 0.5) {   // (a leg: from the body down to the foot, darker, then dusty)
+			const double down = std::clamp(ax / 0.5, 0.0, 1.0);
+			c = lerp(c, c * 0.42, smoothstep(0.4, 0.9, down));
+			c = lerp(c, Vec3{0.30, 0.24, 0.17}, 0.5 * smoothstep(0.78, 1.0, down) * (0.6 + 0.8 * patches));
+		}
+	}
 	return lerp(c, ink, d);
 }
 
 // The coat's picture of a kind in a pattern and variant (its scene path), from its model's coat and leg colours.
 inline std::string picture(const std::string &pattern, const std::string &kind, int variant, Vec3 coat, Vec3 legs) {
 	char name[160];
-	std::snprintf(name, sizeof name, "coat_v2_%s_%s_%d_%.3f_%.3f_%.3f", pattern.c_str(), kind.c_str(), variant, coat.x, coat.y, coat.z);
+	std::snprintf(name, sizeof name, "coat_v3_%s_%s_%d_%.3f_%.3f_%.3f", pattern.c_str(), kind.c_str(), variant, coat.x, coat.y, coat.z);
 	return film_sky::picture("_coats", name, kSize, kSize, [&](std::vector<float> &rgb) {
 		for (int y = 0; y < kSize; ++y)
 			for (int x = 0; x < kSize; ++x) {

@@ -2637,6 +2637,10 @@ uvs (its surface cut into near-flat charts along its creases, each laid flat and
 
 **The land.** (film_terrain.h) A cliff is somewhere steep and not a line: a gully one cell wide is ground. The land's normals come from its own faces, not from finer ground than the mesh has, which leaned away from the viewer near a ridge and shaded it black. Below the horizon the sky goes dark over its first 10 degrees (film_sky.h), so land that ends short of the horizon, seen from the air, fades into haze rather than stopping at a dark band. Rain (film_particles.h) keeps 5 m clear of the lens, and is as thin as a drop.
 
+**What grows on the land: `undergrowth off`, `undergrowth amount A`.** (film_cover.h) A film with land has it unless it says otherwise: real blades of grass out to 330 m, wind running through them, and under the trees fallen leaves and ferns, with stones here and there. The land is laid out in grids of squares 1, 3, 9 and 27 m across, finer near the camera and fixed to the land so nothing crawls; each square in view is a placement of one of a few dozen objects, turned, tilted to lie on the ground and leaning with the wind. Its colour comes from the ground under it, so a savanna is straw and a valley green, and a picture gives each blade its own shade, dark at the root and pale at the tip. Thin land has as many squares with fewer blades in each. Nothing grows on steep ground, in water, high on a mountain, on snow, on dunes or in a canyon, in space or under the sea.
+
+**Coats.** (film_coats.h) An animal with no pattern of its own now wears `natural`, the default for horses, deer, wolves, foxes, bears, lions, rabbits and elephants: darker along the back, paler under it, the colour wandering in soft patches and with the lie of the hair, the legs darkening towards the ground and dusty at the foot. No two of a herd are alike: horses come in six colours from bay to grey, and any other kind varies a little. A herd has fur unless it says `fur 0`.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

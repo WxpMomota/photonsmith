@@ -91,7 +91,7 @@ TEST(FilmAnimals13, CoatPatternsAreStableAndVaried) {
 	namespace coats = cartoon::coats;
 	EXPECT_EQ(coats::defaultFor("zebras"), "zebra");
 	EXPECT_EQ(coats::defaultFor("giraffes"), "giraffe");
-	EXPECT_EQ(coats::defaultFor("deer"), "");
+	EXPECT_EQ(coats::defaultFor("deer"), "natural");
 	for (const std::string &p : {std::string("zebra"), std::string("leopard"), std::string("giraffe")}) {
 		SCOPED_TRACE(p);
 		double lo = 1e9, hi = -1e9, differ = 0.0;

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -128,4 +129,92 @@ TEST(FilmReal, RainKeepsClearOfTheLens) {
 	while (in >> x >> y >> z) nearest = std::min(nearest, std::sqrt(x * x + (y - 2.0) * (y - 2.0) + z * z));
 	EXPECT_GT(nearest, 4.7);
 	EXPECT_LT(nearest, 8.0) << "but close enough to be seen";
+}
+
+namespace {
+terrain::Spec landOf(const std::string &biome) {
+	terrain::Spec s;
+	s.kind = "hills", s.size = 400.0, s.height = 12.0, s.seed = 3, s.biome = biome, s.ranges = false;
+	return s;
+}
+std::size_t placements(const std::string &text) {
+	std::size_t n = 0;
+	for (std::size_t at = text.find("ObjectInstance"); at != std::string::npos; at = text.find("ObjectInstance", at + 1)) ++n;
+	return n;
+}
+}  // namespace
+
+// The land grows something of its own: grass in view of the camera, finer near it, none behind it; thinned by blades, not by leaving squares bare, which reads as a grid.
+TEST(FilmReal, TheLandGrowsWhatItWouldInViewOfTheCamera) {
+	namespace cover = cartoon::cover;
+	const terrain::Spec s = landOf("");
+	const auto field = terrain::fieldOf(s);
+	const V3 eye{0.0, field->heightAt(0.0, 0.0) + 1.6, 0.0}, ahead{0.0, 2.0, -100.0};
+	const cover::Cover on;
+	const std::string text = cover::text("photonsmith-test-cover", *field, on, eye, ahead, 40.0, 1.0, 0.0, {}, {});
+	EXPECT_GT(placements(text), 100u);
+	EXPECT_NE(text.find("cover_grass_0_"), std::string::npos) << "the finest squares near the camera";
+	EXPECT_NE(text.find("cover_grass_3_"), std::string::npos) << "the coarsest far off";
+	EXPECT_NE(text.find("diffusetransmission"), std::string::npos) << "light comes through a blade";
+	// the same place and the same square as the camera moves: what grows is fixed to the land
+	const V3 eye2{1.0, eye.y, 0.0};
+	const std::string moved = cover::text("photonsmith-test-cover", *field, on, eye2, ahead + V3{1.0, 0.0, 0.0}, 40.0, 1.0, 0.0, {}, {});
+	const std::size_t a = text.rfind("ConcatTransform"), line = text.find('\n', a);
+	EXPECT_NE(moved.find(text.substr(a, line - a)), std::string::npos);
+	// snow and `undergrowth off`, and land that grows nothing
+	EXPECT_EQ(cover::text("photonsmith-test-cover", *field, on, eye, ahead, 40.0, 1.0, 0.8, {}, {}), "");
+	cover::Cover off;
+	off.on = false;
+	EXPECT_EQ(cover::text("photonsmith-test-cover", *field, off, eye, ahead, 40.0, 1.0, 0.0, {}, {}), "");
+	EXPECT_EQ(cover::growthOf(landOf("arctic")).density, 0.0);
+	// thin land has as many squares, with fewer blades in each
+	EXPECT_LT(cover::growthOf(landOf("desert")).density, 0.3);
+	const auto desert = terrain::fieldOf(landOf("desert"));
+	EXPECT_NEAR(static_cast<double>(placements(cover::text("photonsmith-test-cover-d", *desert, on, eye, ahead, 40.0, 1.0, 0.0, {}, {}))), static_cast<double>(placements(text)), 0.35 * placements(text));
+}
+
+// Under trees the grass gives way to fallen leaves, with an edge that wanders and no square of a grid.
+TEST(FilmReal, UnderTheTreesTheGrassGivesWayToLitter) {
+	namespace cover = cartoon::cover;
+	const terrain::Spec s = landOf("");
+	const auto field = terrain::fieldOf(s);
+	const double y = field->heightAt(0.0, -12.0);
+	forest::Tree tree;
+	tree.species = "broadleaf", tree.at = {0.0, y, -12.0};
+	const V3 eye{0.0, y + 1.6, 0.0}, ahead{0.0, y, -30.0};
+	const std::string text = cover::text("photonsmith-test-cover", *field, {}, eye, ahead, 40.0, 1.0, 0.0, {}, {{tree}});
+	EXPECT_NE(text.find("cover_litter_"), std::string::npos);
+	EXPECT_NE(text.find("cover_grass_"), std::string::npos) << "and grass beyond them";
+	EXPECT_EQ(cover::text("photonsmith-test-cover", *field, {}, eye, ahead, 40.0, 1.0, 0.0, {}, {}).find("cover_litter_"), std::string::npos);
+}
+
+TEST(FilmReal, UndergrowthCanBeTurnedOffAndThinned) {
+	cartoon::film_file::Spec s;
+	bool handled = false;
+	EXPECT_EQ(cartoon::film_file::natureLine(s, "undergrowth", "undergrowth amount 0.5", "amount 0.5", handled), "");
+	EXPECT_DOUBLE_EQ(s.undergrowth.amount, 0.5);
+	EXPECT_EQ(cartoon::film_file::natureLine(s, "undergrowth", "undergrowth off", "off", handled), "");
+	EXPECT_FALSE(s.undergrowth.on);
+	EXPECT_NE(cartoon::film_file::natureLine(s, "undergrowth", "undergrowth lots", "lots", handled), "");
+}
+
+// A coat with no pattern is not one flat colour: darker along the back, paler under the belly, the legs dark at the foot, and a herd is not all alike.
+TEST(FilmReal, ANaturalCoatIsNotOneFlatColour) {
+	namespace coats = cartoon::coats;
+	const V3 coat{0.4, 0.25, 0.14};
+	const auto mean = [&](double ax, double ay) {
+		double sum = 0.0;
+		for (int k = 0; k < 20; ++k) {
+			const V3 c = coats::colourAt("natural", 0, coat, coat, ax + 0.004 * k, ay);
+			sum += c.x + c.y + c.z;
+		}
+		return sum / 20.0;
+	};
+	EXPECT_GT(mean(0.2, 0.01), 1.4 * mean(0.2, 0.25)) << "a paler belly (the seam) than back (half way round)";
+	EXPECT_LT(mean(0.4, 0.56), 0.8 * mean(0.05, 0.56)) << "a leg darker towards the foot";
+	std::map<int, int> colours;
+	for (int v = 0; v < coats::variantsOf("natural"); ++v) ++colours[static_cast<int>(coats::individual("horses", v, coat).x * 100.0)];
+	EXPECT_GE(colours.size(), 5u) << "no two horses of a herd of six alike";
+	EXPECT_EQ(coats::defaultFor("horses"), "natural");
+	EXPECT_EQ(coats::defaultFor("zebras"), "zebra") << "a real pattern stays";
 }

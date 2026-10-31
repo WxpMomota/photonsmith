@@ -799,13 +799,7 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 		for (const flowers::Meadow &m : spec.meadows)
 			out += flowers::text(m, t, nt, ground.get(), spec.seas.empty() ? -1e30 : spec.seas[0].level, facing, el > -1.0, east, written);
 	}
-	if (!spec.forests.empty()) {   // forests (film_forest.h): near the camera in full
-		Vec3 eye, target;
-		double fov = 40.0;
-		film_subjects::cameraOf(header, eye, target, fov);
-		for (std::size_t i = 0; i < spec.forests.size() && i < spec.planted.size(); ++i)
-			out += forest::text(spec.key.empty() ? std::string("film") : spec.key, spec.planted[i], spec.forests[i], nt, t, eye, spec.gusts);
-	}
+	out += plantsAt(header, t, nt);
 	for (const Piece &piece : scene.world) {
 		if (piece.block < 0) {
 			out += piece.text;
@@ -1629,6 +1623,19 @@ std::string DataFilm::airMedium() const {
 }
 
 
+// The film's forests (film_forest.h: near the camera in full) and what grows on its land by itself (film_cover.h), seen from the camera of `header`. `nt`: the wind's time.
+std::string DataFilm::plantsAt(const std::string &header, double t, double nt) const {
+	const bool grows = spec.hasTerrain && !spec.space.on && !spec.hasUnderwater;
+	if (spec.forests.empty() && !grows) return std::string();
+	Vec3 eye, target;
+	double fov = 40.0;
+	film_subjects::cameraOf(header, eye, target, fov);
+	const std::string film = spec.key.empty() ? std::string("film") : spec.key;
+	std::string out;
+	for (std::size_t i = 0; i < spec.forests.size() && i < spec.planted.size(); ++i) out += forest::text(film, spec.planted[i], spec.forests[i], nt, t, eye, spec.gusts);
+	if (grows) out += cover::text(film, *terrain::fieldOf(spec.terrain), spec.undergrowth, eye, target, fov, nt, weatherAt(t).snow, spec.gusts, spec.planted);
+	return out;
+}
 // The film's swarms at t (film_swarm.h), their discs turned to the camera of `header`.
 std::string DataFilm::swarmsAt(const std::string &header, double t) const {
 	if (spec.swarms.empty()) return std::string();
