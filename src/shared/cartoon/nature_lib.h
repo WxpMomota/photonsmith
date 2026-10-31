@@ -198,6 +198,7 @@ inline Mesh rock(double size, int salt) {
 	return m;
 }
 
+constexpr double kBarkTile = 1.2;   // (a picture of bark covers this many metres of a tree)
 // A tree trunk `height` tall from the origin: a tapering column that flares at the root, with a gentle bend (`lean` metres at the top towards +x) and bark-like bumps.
 inline Mesh trunk(double height, double radius, double lean, int salt) {
 	std::vector<std::pair<double, double>> profile;
@@ -213,6 +214,7 @@ inline Mesh trunk(double height, double radius, double lean, int salt) {
 		const double s = v.y / height;
 		v.x += lean * s * s;
 	}
+	for (auto &uv : m.uvs) uv = {uv.first * std::max(1.0, std::round(2.0 * kPi * radius / kBarkTile)), uv.second * height / kBarkTile};   // (bark at its real size)
 	return m;
 }
 

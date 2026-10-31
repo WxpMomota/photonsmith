@@ -218,3 +218,79 @@ TEST(FilmReal, ANaturalCoatIsNotOneFlatColour) {
 	EXPECT_EQ(coats::defaultFor("horses"), "natural");
 	EXPECT_EQ(coats::defaultFor("zebras"), "zebra") << "a real pattern stays";
 }
+
+// A crown is grown, not filled: its branches fork, compete for the air and thicken towards the trunk, and no two trees' are alike.
+TEST(FilmReal, ACrownIsGrownNotFilled) {
+	namespace d = forest::detail;
+	d::Crown c;
+	c.root = {0.0, 2.5, 0.0}, c.centre = {0.0, 6.0, 0.0}, c.radii = {4.0, 3.2, 4.0};
+	const std::vector<d::Branch> a = d::grownBranches(c, 11), b = d::grownBranches(c, 12);
+	ASSERT_GT(a.size(), 200u);
+	int forks = 0, tips = 0;
+	for (const d::Branch &n : a) forks += n.children >= 2, tips += n.children == 0;
+	EXPECT_GT(forks, 15);
+	EXPECT_GT(tips, 30);
+	for (std::size_t k = 1; k < a.size(); ++k) ASSERT_LE(a[k].radius, a[static_cast<std::size_t>(a[k].parent)].radius + 1e-9) << "thinner than what it grows from";
+	EXPECT_GT(a[0].radius, 5.0 * a.back().radius);
+	EXPECT_NE(a.size(), b.size()) << "another tree's is its own";
+	// the same crown comes out the same, and it is not a ball: seen from above its edge wanders
+	EXPECT_EQ(d::grownBranches(c, 11).size(), a.size());
+	double most[16] = {0.0};
+	for (const d::Branch &n : a) {
+		const int at = static_cast<int>((std::atan2(n.at.z, n.at.x) + cartoon::kPi) / (2.0 * cartoon::kPi) * 15.999);
+		most[at] = std::max(most[at], std::hypot(n.at.x, n.at.z));
+	}
+	const auto [lo, hi] = std::minmax_element(most, most + 16);
+	EXPECT_GT(*hi - *lo, 0.5) << "lobes and hollows";
+	// bare in winter its twigs show; a leafy tree's twigs hold leaves
+	const auto summer = d::grow("broadleaf", 2, false, false), winter = d::grow("broadleaf", 2, true, false);
+	EXPECT_TRUE(winter.foliage.tris.empty());
+	EXPECT_GT(summer.foliage.tris.size(), 10000u);
+	EXPECT_GT(winter.wood.tris.size(), summer.wood.tris.size());
+}
+
+// Bark tiles with no seam, stands in ridges where it should and is smooth where it should, and every part of a tree carries it.
+TEST(FilmReal, BarkTilesAndEveryPartOfATreeCarriesIt) {
+	namespace d = forest::detail;
+	for (const std::string sp : {"broadleaf", "conifer", "acacia", "birch", "palm", "kapok", "snag"}) {
+		for (int k = 0; k < 40; ++k) {
+			const double t = k / 40.0;
+			EXPECT_NEAR(d::barkHeight(sp, 0.0, t), d::barkHeight(sp, 1.0, t), 1e-6) << sp;
+			EXPECT_NEAR(d::barkHeight(sp, t, 0.0), d::barkHeight(sp, t, 1.0), 1e-6) << sp;
+		}
+		const d::Grown g = d::grow(sp, 0, false, false);
+		EXPECT_EQ(g.wood.uvs.size(), g.wood.verts.size()) << sp << ": a mesh with too few is shown with none";
+	}
+	double oakLow = 1.0, birchLow = 1.0;
+	for (int k = 0; k < 200; ++k) {
+		const double u = k / 200.0, v = 0.37 * k / 200.0;
+		oakLow = std::min(oakLow, d::barkHeight("broadleaf", u, v)), birchLow = std::min(birchLow, d::barkHeight("birch", u, v));
+	}
+	EXPECT_LT(oakLow, 0.2) << "deep furrows";
+	EXPECT_GT(birchLow, 0.5) << "smooth";
+	const std::string text = forest::objectText("photonsmith-test-bark", "birch", 0, "summer", true);
+	EXPECT_NE(text.find("\"texture displacement\""), std::string::npos) << "a relief the low sun catches";
+}
+
+// A wood is not scattered evenly: groves and glades, seedlings by their parents, the old and the young, and its dead.
+TEST(FilmReal, AWoodFormsAsWoodsDo) {
+	forest::Forest f;
+	f.kind = "mixed", f.count = 900, f.area = true, f.x0 = -200, f.z0 = -200, f.x1 = 200, f.z1 = 200;
+	const std::vector<forest::Tree> trees = forest::plant(f, nullptr, -1e30, {});
+	ASSERT_GT(trees.size(), 600u);
+	int cells[10][10] = {{0}}, snags = 0, logs = 0;
+	double smallest = 1e30, largest = 0.0;
+	for (const forest::Tree &t : trees) {
+		++cells[std::clamp(static_cast<int>((t.at.x + 200.0) / 40.0), 0, 9)][std::clamp(static_cast<int>((t.at.z + 200.0) / 40.0), 0, 9)];
+		snags += t.species == "snag", logs += t.species == "log";
+		smallest = std::min(smallest, t.scale), largest = std::max(largest, t.scale);
+	}
+	const double mean = static_cast<double>(trees.size()) / 100.0;
+	double spread = 0.0;
+	for (const auto &row : cells)
+		for (const int n : row) spread += (n - mean) * (n - mean) / 100.0;
+	EXPECT_GT(spread / mean, 3.0) << "evenly scattered trees give about 1: these stand in groves";
+	EXPECT_GT(snags, 3);
+	EXPECT_GT(logs, 3);
+	EXPECT_GT(largest / smallest, 3.0) << "saplings and giants";
+}

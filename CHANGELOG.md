@@ -6,6 +6,8 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **Trees grown as trees grow (2026-10-31).** Crowns are grown by space colonisation, so branches fork and compete and every outline is its own, not a ball of leaves on a stick. Bark is a real-sized tiling picture with relief, different for each species, and roots run into the ground. A wood stands in groves and glades, with saplings near their parents, a spread of ages, and dead trees standing and fallen.
+
 * **Animals with anatomy (2026-10-31).** The generated quadrupeds have a real top line (withers, a dip in the back, a croup), a belly that tucks up to the flank, an arched neck, a head with a jaw and a muzzle, legs with knees, hocks and fetlocks, muscle at the shoulder and haunch, and a horse's mane and tail are strands of hair. Their joints did not move, so every walk and run stays as it was.
 
 * **The land grows, and animals are not one colour (2026-10-31).** Every film with land now has real grass out to 330 m, moving in the wind and coloured by the ground under it, with fallen leaves and ferns under trees and stones here and there; `undergrowth off` or `undergrowth amount A` changes it. Animals with no pattern wear a `natural` coat, darker along the back and paler under it with dark, dusty legs, and no two of a herd are alike.
