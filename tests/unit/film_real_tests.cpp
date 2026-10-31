@@ -198,6 +198,24 @@ TEST(FilmReal, UndergrowthCanBeTurnedOffAndThinned) {
 	EXPECT_NE(cartoon::film_file::natureLine(s, "undergrowth", "undergrowth lots", "lots", handled), "");
 }
 
+// Where a finer grid of grass hands over to a coarser one no bare ground shows: every spot is in a square that is laid, however the rings' edges wander.
+TEST(FilmReal, TheRingsOfGrassLeaveNoHolesWhereTheyMeet) {
+	namespace cover = cartoon::cover;
+	const V3 eye{0.31, 1.8, 0.77};
+	const auto laid = [&](double x, double z) {
+		for (std::size_t r = 0; r < cover::rings().size(); ++r) {
+			const double cell = cover::rings()[r].cell, cx = (std::floor(x / cell) + 0.5) * cell, cz = (std::floor(z / cell) + 0.5) * cell;
+			if (cover::ringLays(r, std::sqrt((cx - eye.x) * (cx - eye.x) + eye.y * eye.y + (cz - eye.z) * (cz - eye.z)), 0.999)) return true;   // (the far edge at its nearest)
+		}
+		return false;
+	};
+	for (double d = 0.1; d < 270.0; d += 0.13)
+		for (int a = 0; a < 360; a += 7) {
+			const double x = eye.x + d * std::cos(a * 0.0174533), z = eye.z + d * std::sin(a * 0.0174533);
+			ASSERT_TRUE(laid(x, z)) << d << " m from the camera, at " << a << " degrees";
+		}
+}
+
 // A coat with no pattern is not one flat colour: darker along the back, paler under the belly, the legs dark at the foot, and a herd is not all alike.
 TEST(FilmReal, ANaturalCoatIsNotOneFlatColour) {
 	namespace coats = cartoon::coats;

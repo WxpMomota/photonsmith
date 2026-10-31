@@ -30,8 +30,8 @@ domino-run|3|9a46243a3518904c|Close-up at the lamp
 domino-run|4|69bb702e81bf3204|Rising pull back
 fire-and-ice|1|4bc04aa4de04b12a|Geysers at dusk
 fire-and-ice|2|33c1c656c5ebd2bb|The fire mountain
-fire-and-ice|3|ddc942f32881a1c5|Fire at dusk
-fire-and-ice|4|927363bc1dde0ffd|Lights in the sky
+fire-and-ice|3|3905dfc8763dce69|Fire at dusk
+fire-and-ice|4|908cd5dd5987c6e9|Lights in the sky
 fire-and-ice|5|7bac7043260903cb|The ground shakes
 fire-and-ice|6|ade96f9fd0453171|Fire and ice
 fireflies|1|3ac9e141c444374a|Ground-level macro
@@ -111,17 +111,17 @@ pip-goes-out|2|2176887f580d9f79|The lantern lights
 pip-goes-out|3|2b3b1421b9e36ba8|Into the sun
 pip-goes-out|4|a0549e6fb8f1094e|Cheering
 pip-goes-out|5|3c333a32d94cf28f|Credits
-seasons-wood|1|cb8893725b2482bd|The meadow wakes
-seasons-wood|2|2a84ee2f8331991c|Following the sun
-seasons-wood|3|84d470d69b8dd094|The wood turns
-seasons-wood|4|d8b4a4311ec31ffe|Leaves fall
+seasons-wood|1|88c8336952b1e8e0|The meadow wakes
+seasons-wood|2|7e212c35de022a25|Following the sun
+seasons-wood|3|1da7f85c78f65faa|The wood turns
+seasons-wood|4|fcdc7140b56bb159|Leaves fall
 seasons-wood|5|1c95d793573cf1ed|Winter
 swell-breaks|1|ee87f192fa995065|Open water
-swell-breaks|2|6ab5f08ba95fffb7|The breakers
-swell-breaks|3|93031cd2342bfed0|A wave
-swell-breaks|4|36fd91b25d47c79b|Evening clouds
-swell-breaks|5|2ca524a4955ec1e3|Sundown
-swell-breaks|6|8b985df35994c7de|Twilight
+swell-breaks|2|ce3a680908da7754|The breakers
+swell-breaks|3|716f5955c5c8a643|A wave
+swell-breaks|4|9384cee2c33708ab|Evening clouds
+swell-breaks|5|872ab1a61ad55314|Sundown
+swell-breaks|6|974a27330d1fb297|Twilight
 tengwang|1|5a5f4211f2a736ee|Black, a bell, the sea of clouds
 tengwang|2|790d08863b3375c9|The river comes out of the mountains
 tengwang|3|ee3eb329f0cd405a|The Gan River and Hongzhou
@@ -181,12 +181,12 @@ tengwang|56|1940601775feb7af|The stars over the river
 tengwang|57|61394eb350570369|The manuscript
 tengwang|58|ce808850ed728313|Dawn
 tengwang|59|d5560262f6b0c819|The title
-thunder-plains|1|2a5f897486199af6|The plain
-thunder-plains|2|c56fe2b8521e6fad|Wheeling
-thunder-plains|3|b4fbd95f5e8c0f3f|The storm comes
-thunder-plains|4|9f5e88d321ca30a7|The herd
-thunder-plains|5|07e1bf995192ca46|They bolt
-thunder-plains|6|f033c989c8ab8c5f|The rain
+thunder-plains|1|660597ff008da97b|The plain
+thunder-plains|2|5d322829ea67d1ca|Wheeling
+thunder-plains|3|f781a87b7e21c004|The storm comes
+thunder-plains|4|ecdfb45df716c717|The herd
+thunder-plains|5|3281fba34b32b1e5|They bolt
+thunder-plains|6|876d441291454808|The rain
 turtle-escape|1|cffe5681acb9d1b4|Wide on the room
 turtle-escape|2|32e0e1985fa12972|The plant
 turtle-escape|3|3b8ffe27735f87dd|The thermometer
@@ -265,8 +265,8 @@ valley-of-mists|1|70fc7249fcc5e400|Above the mists
 valley-of-mists|2|7b1295d8a339126d|First light
 valley-of-mists|3|01fe9259cd55d5a5|Geese
 valley-of-mists|4|b95a15a9a90e22f6|The mists lift
-valley-of-mists|5|a753c5ee65d3b03a|The valley floor
-valley-of-mists|6|a5ad05f1f23213ed|Morning
+valley-of-mists|5|5131a56bc7285452|The valley floor
+valley-of-mists|6|771014ca34a3b337|Morning
 worlds-beyond|1|9f2e49ebbcd613c6|Into the night
 worlds-beyond|2|c4496f48cb100f81|Past the fire
 worlds-beyond|3|ca9dd28c22e01e3d|The comet goes by

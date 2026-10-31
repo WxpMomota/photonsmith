@@ -47,6 +47,14 @@ inline const std::vector<Ring> &rings() {
 	static const std::vector<Ring> r = {{1.0, 8.0, 900, 3, 0.0045}, {3.0, 42.0, 1500, 3, 0.012}, {9.0, 130.0, 1800, 2, 0.036}, {27.0, 330.0, 1800, 1, 0.11}};
 	return r;
 }
+// Whether a square of ring r is laid, `away` from the camera. `wander` (0 to 1, the square's own) moves the ring's far edge, as a line where the grass changes would show. That edge can
+// then fall short by a square, and a spot can be in a square whose middle is half a diagonal further off, so the next ring starts inside it: every spot is in one ring or both, and
+// no bare ground shows where they meet.
+inline bool ringLays(std::size_t r, double away, double wander) {
+	const std::vector<Ring> &all = rings();
+	if (away + all[r].cell * wander >= all[r].reach) return false;
+	return r == 0 || away + 0.75 * all[r].cell >= all[r - 1].reach - 1.75 * all[r - 1].cell;
+}
 // What grows on a land: `grass` the colour of the green, `straw` of the dry, `tall` how high.
 struct Growth {
 	Vec3 green, straw;
@@ -170,8 +178,7 @@ inline std::string text(const std::string &film, const terrain::Field &field, co
 	const std::vector<Ring> &all = rings();
 	for (std::size_t r = 0; r < all.size(); ++r) {
 		const Ring &ring = all[r];
-		const double inner = r == 0 ? 0.0 : all[r - 1].reach;
-		const int i0 = static_cast<int>(std::floor((eyeP.x - ring.reach) / ring.cell)), i1 = static_cast<int>(std::ceil((eyeP.x + ring.reach) / ring.cell));
+		const int i0 =static_cast<int>(std::floor((eyeP.x - ring.reach) / ring.cell)), i1 = static_cast<int>(std::ceil((eyeP.x + ring.reach) / ring.cell));
 		const int k0 = static_cast<int>(std::floor((eyeP.z - ring.reach) / ring.cell)), k1 = static_cast<int>(std::ceil((eyeP.z + ring.reach) / ring.cell));
 		for (int k = k0; k <= k1; ++k)
 			for (int i = i0; i <= i1; ++i) {
@@ -180,8 +187,7 @@ inline std::string text(const std::string &film, const terrain::Field &field, co
 				const double y = field.heightAt(x, z);
 				const double away = std::sqrt((x - eyeP.x) * (x - eyeP.x) + (y - eyeP.y) * (y - eyeP.y) + (z - eyeP.z) * (z - eyeP.z));
 				const int salt = (i * 7919) ^ (k * 104729) ^ static_cast<int>(r * 31);
-				const double jitter = ring.cell * hash01(salt, 71);   // (the rings' edges wander: a line where the grass changes would show)
-				if (away + jitter < inner || away + jitter >= ring.reach) continue;
+				if (!ringLays(r, away, hash01(salt, 71))) continue;
 				const Vec3 to = normalize(Vec3{x - eyeP.x, 0.0, z - eyeP.z});
 				if (away > 2.0 * ring.cell && dot(to, ahead) < wide) continue;   // (not in view)
 				const Vec3 n = field.normalAt(x, z, 0.5 * ring.cell);
