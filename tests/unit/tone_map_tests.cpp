@@ -197,6 +197,23 @@ TEST(ToneMapModeFromName, KnowsAgxAndNeutral) {
 	EXPECT_EQ(mode, ToneMapMode::Filmic);
 }
 
+// The list the messages print and the check that parses a look line are the parser's own names, no more and no fewer.
+TEST(ToneMapModeFromName, TheNamesListIsWhatTheParserTakes) {
+	std::string list = kToneMapNames, name;
+	ToneMapMode mode;
+	std::size_t count = 0;
+	for (std::size_t at = 0; at <= list.size(); ++at) {
+		if (at < list.size() && list[at] != ',' && list[at] != ' ') { name += list[at]; continue; }
+		if (name.empty()) continue;
+		EXPECT_TRUE(tone_map_mode_from_name(name, mode)) << name;
+		EXPECT_TRUE(tone_map_name_known(name)) << name;
+		name.clear();
+		++count;
+	}
+	EXPECT_EQ(count, 7u);
+	EXPECT_FALSE(tone_map_name_known("velvia"));
+}
+
 // Filmic against Blender 5.2's own Filmic (base contrast), measured on a linear test image saved through its view transform (8-bit, so within 2/255 of what
 // Blender shows): greys from 4 stops under middle grey to 4 over, and a pure red whose other channels come up as it passes 4 stops over grey.
 TEST(ApplyToneMapRgb, FilmicMatchesBlendersFilmic) {

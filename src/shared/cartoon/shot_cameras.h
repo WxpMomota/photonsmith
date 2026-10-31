@@ -181,8 +181,7 @@ inline File parse(const std::string &text) {
 				f.problems.push_back(where + "'tonemap' before any [shot] section");
 				continue;
 			}
-			ToneMapMode mode;
-			if (!tone_map_mode_from_name(name, mode)) {
+			if (!tone_map_name_known(name)) {
 				f.problems.push_back(where + "'tonemap' takes " + kToneMapNames);
 				continue;
 			}

@@ -785,8 +785,7 @@ inline FlagResult handle_quality_flag(const std::string& arg, int argc, char** a
 		std::string name = argv[i + 1];
 		std::transform(name.begin(), name.end(), name.begin(),
 						[](unsigned char c) { return std::tolower(c); });
-		ToneMapMode mode;
-		if (tone_map_mode_from_name(name, mode)) {
+		if (tone_map_name_known(name)) {
 			out.tonemap = name;
 		} else {
 			std::cerr << "Invalid --tonemap \"" << argv[i + 1] << "\", using default (aces). Valid: " << kToneMapNames << "\n";

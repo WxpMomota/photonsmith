@@ -35,6 +35,8 @@
 #include <cmath>
 #include <string>
 
+#include "tone_map_names.h"
+
 // ---------------------------------------------------------------------------
 // sRGB OETF  (linear float -> display-encoded float in [0,1])
 //
@@ -235,9 +237,6 @@ enum class ToneMapMode {
 // behavior and warning text, matching sampler_kind_from_name()'s own
 // contract (camera.h).
 // ---------------------------------------------------------------------------
-// The names tone_map_mode_from_name() takes, for the messages that list them.
-constexpr const char* kToneMapNames = "aces, agx, agx-punchy, filmic, neutral, reinhard, none";
-
 inline bool tone_map_mode_from_name(const std::string& name, ToneMapMode& out) {
 	if (name == "aces")     { out = ToneMapMode::ACES;     return true; }
 	if (name == "reinhard") { out = ToneMapMode::Reinhard; return true; }
