@@ -88,7 +88,10 @@ struct Look {
 	// the line - a dark wavering edge with a bright one over it - and drops of water running slowly down the dome above it, each a little lens showing the picture behind it
 	// turned over (D 1 about seventy of them). film_undersea.h writes these for a camera at the waterline.
 	double waterline = -10.0, drops = 0.0, dropsTime = 0.0;
-	bool active() const { return shimmer > 0.0 || waterline > -1.0 || drops > 0.0 || paint > 0.0 || sunbeams > 0.0 || bloom > 0.0 || flare > 0.0 || star > 0.0 || vignette > 0.0 || warmth != 0.0 || saturation != 1.0 || graded(); }
+	// A flat port in front of the lens (round 16: an underwater housing): `distort K` bows straight lines outwards towards the edges (pincushion: K above 0), `fringe F`
+	// splits the colours there - the red pulled out, the blue in - as the water and the port's glass bend them differently.
+	double distort = 0.0, fringe = 0.0;
+	bool active() const { return shimmer > 0.0 || waterline > -1.0 || drops > 0.0 || distort != 0.0 || fringe != 0.0 || paint > 0.0 || sunbeams > 0.0 || bloom > 0.0 || flare > 0.0 || star > 0.0 || vignette > 0.0 || warmth != 0.0 || saturation != 1.0 || graded(); }
 };
 
 // Values that were set (a flag, a scene line) override `base`; a negative bloom/vignette or a saturation below 0 means "not given" in `given`.
@@ -165,6 +168,8 @@ inline std::string parse(const std::string &text, Look &out) {
 		else if (word == "waterline") out.waterline = std::clamp(v, -5.0, 5.0);
 		else if (word == "drops") out.drops = std::clamp(v, 0.0, 5.0);
 		else if (word == "drops-time") out.dropsTime = v;
+		else if (word == "distort") out.distort = std::clamp(v, -0.5, 0.5);
+		else if (word == "fringe") out.fringe = std::clamp(v, 0.0, 0.05);
 		else if (word == "warmth") out.warmth = std::clamp(v, -1.0, 1.0);
 		else if (word == "saturation") out.saturation = std::clamp(v, 0.0, 3.0);
 		else if (word == "paint") out.paint = std::clamp(v, 0.0, 40.0);
@@ -309,6 +314,21 @@ inline void apply(float *rgb, int w, int h, const Look &look) {
 				for (int k = 0; k < 3; ++k) rgb[(static_cast<std::size_t>(y) * static_cast<std::size_t>(w) + static_cast<std::size_t>(x)) * 3 + k] = static_cast<float>(c[k]);
 			}
 		}
+	}
+
+	if (look.distort != 0.0 || look.fringe != 0.0) {   // a flat port (see Look::distort): each colour looked up a little further out the further from the middle it is
+		const std::vector<float> src(rgb, rgb + n * 3);
+		const double cx = 0.5 * w, cy = 0.5 * h, half = 0.5 * std::hypot(static_cast<double>(w), static_cast<double>(h));
+		for (int y = 0; y < h; ++y)
+			for (int x = 0; x < w; ++x) {
+				const double dx = (x + 0.5 - cx) / half, dy = (y + 0.5 - cy) / half, r2 = dx * dx + dy * dy;
+				for (int k = 0; k < 3; ++k) {
+					const double f = 1.0 / (1.0 + look.distort * r2) * (1.0 - (k - 1) * look.fringe * r2);   // (red further out than green, blue nearer in)
+					double c[3];
+					detail::sample(src, w, h, cx + dx * f * half, cy + dy * f * half, c);
+					rgb[(static_cast<std::size_t>(y) * static_cast<std::size_t>(w) + static_cast<std::size_t>(x)) * 3 + k] = static_cast<float>(c[k]);
+				}
+			}
 	}
 
 	if (look.waterline > -1.0 || look.drops > 0.0) {   // a dome port at the waterline (see Look::waterline): the drops on it, then the line's meniscus

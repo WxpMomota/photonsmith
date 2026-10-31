@@ -78,8 +78,10 @@ inline Vec3 transformDir(const Mat4 &m, Vec3 d) { return transformPoint(m, d) - 
 
 // The groom's strands on a head as scene text. `before` is the head's frame a moment ago (its tips trail towards where they were then: the motion), `gust` the
 // wind's bend at the head (dressing::gustAt), `colour` the hair's colour (the character's), `size` the character's scale, `seed` its own number.
-inline std::string text(const Groom &g, const Scalp &s, const Mat4 &before, Vec3 gust, Vec3 colour, double size, int seed) {
-	const detail::Style st = detail::styleOf(g.style);
+// `floatUp` (round 16): under the water, 0 to 1 - the hair's weight gone and a little lift in its place, so it floats out round the head.
+inline std::string text(const Groom &g, const Scalp &s, const Mat4 &before, Vec3 gust, Vec3 colour, double size, int seed, double floatUp = 0.0) {
+	detail::Style st = detail::styleOf(g.style);
+	st.gravity *= 1.0 - 1.25 * std::clamp(floatUp, 0.0, 1.0);
 	const double L = (g.length > 0.0 ? g.length : st.length) * size, curl = (g.curl >= 0.0 ? g.curl : st.curl);
 	const int count = std::clamp(static_cast<int>(st.strands * g.density), 50, 60000);
 	const Mat4 inv = invertAffine(s.head);

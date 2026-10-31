@@ -175,6 +175,10 @@
 //     bigfish  whaleshark 1 at 0 6 -20                           # whaleshark, hammerheads, reefsharks, dolphins, humpbacks
 //     reef     60 in -8 -14 8 -4  fluoresce                      # a coral reef (film_reef.h); `critters nudibranchs|seahorses|shrimp|mantisshrimp N in ...`
 //     nightdive glow 2  spawn 2 18                               # the water lighting up round what moves, corals spawning; `kelpforest N in X0 Z0 X1 Z1`
+//     boat     0 -14  toward 90  speed 2  anchor 13              # round 16 (film_boat.h): a boat overhead, its wake, its anchor; `sardinerun X Y Z [gannets N]`
+//     vents    3 in -6 -46 6 -40                                 # black smokers (film_vents.h); `murk X Y Z [radius R] [green|grey]`, `silt X Z at T`
+//     tornado  150 at 0 3 -8  around Ana                         # barracuda (film_behaviour.h); `cleaningstation`, `playmate X Y Z with NAME`, `damselfish N at`
+//     wreckroom 30 -20  length 12                                # inside a wreck; `underwater port flat filter red`: a camera's housing
 //     space    stars 1  milkyway 1  sun 60 15                   # the universe (film_space.h, round 10): a set in space - the stars all round, the Milky Way, the sun a
 //                                                               # glowing ball at a bearing and an elevation; no sky, no air
 //     planet   home ocean  at 0 0 -20000  radius 6000           # a planet (film_planets.h): rocky, desert, ice, ocean, gas or lava; `tilt`, `spin SECONDS`

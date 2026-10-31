@@ -239,8 +239,8 @@ inline std::string crittersText(const Critters &c, double t, const std::function
 			const Mat4 place = mul(translate(detail::story({x, groundAt(x, z) + 0.004, z})), rotate({0, 1, 0}, heading));
 			Mesh body = sealife::detail::body(L, 0.55, 0.3, 0.0, {{0.0, -0.5}, {0.1, -0.35}, {0.14, -0.05}, {0.13, 0.25}, {0.09, 0.42}, {0.0, 0.5}});
 			for (Vec3 &v : body.verts) v.y = std::max(v.y, -0.01 * L) + 0.03 * L;   // (flat underneath)
-			detail::add(a, body, place);
-			Mesh frill;
+			Mesh trim, spots;   // (round 16: each in one of five patterns - a body colour, its frill, horns and gills in another, and spots on some)
+			Mesh &frill = trim;
 			for (const double side : {-1.0, 1.0})
 				for (int q = 0; q < 16; ++q) {
 					const double z0 = (-0.42 + 0.84 * q / 16.0) * L, z1 = (-0.42 + 0.84 * (q + 1) / 16.0) * L;
@@ -249,12 +249,21 @@ inline std::string crittersText(const Critters &c, double t, const std::function
 					sealife::detail::fin(frill, {side * hw(z0) * 0.9, 0.035 * L, z0}, {side * (hw(z0) + 0.06 * L), 0.035 * L + wave(z0), z0}, {side * hw(z1) * 0.9, 0.035 * L, z1});
 					sealife::detail::fin(frill, {side * hw(z1) * 0.9, 0.035 * L, z1}, {side * (hw(z0) + 0.06 * L), 0.035 * L + wave(z0), z0}, {side * (hw(z1) + 0.06 * L), 0.035 * L + wave(z1), z1});
 				}
-			detail::add(b, frill, place);
-			for (const double side : {-1.0, 1.0}) detail::add(b, detail::cone(0.012 * L, 0.18 * L, 6), mul(place, alignY({side * 0.05 * L, 0.08 * L, 0.36 * L}, {side * 0.3, 1.0, 0.4})));
+			for (const double side : {-1.0, 1.0}) detail::add(trim, detail::cone(0.012 * L, 0.18 * L, 6), alignY({side * 0.05 * L, 0.08 * L, 0.36 * L}, {side * 0.3, 1.0, 0.4}));
 			for (int g = 0; g < 7; ++g) {   // the gill plume
 				const double ga = 2.0 * kPi * g / 7.0;
-				detail::add(b, sdf::tubeMesh({{0.0, 0.08 * L, -0.28 * L}, {0.06 * L * std::cos(ga), 0.2 * L, -0.28 * L + 0.06 * L * std::sin(ga)}}, 0.01 * L, 0.3, 4), place);
+				detail::add(trim, sdf::tubeMesh({{0.0, 0.08 * L, -0.28 * L}, {0.06 * L * std::cos(ga), 0.2 * L, -0.28 * L + 0.06 * L * std::sin(ga)}}, 0.01 * L, 0.3, 4));
 			}
+			static const Vec3 bodies[5] = {{0.45, 0.12, 0.6}, {0.08, 0.15, 0.55}, {0.92, 0.9, 0.86}, {0.04, 0.04, 0.05}, {0.95, 0.4, 0.05}};
+			static const Vec3 trims[5] = {{0.95, 0.5, 0.05}, {0.95, 0.85, 0.1}, {0.95, 0.55, 0.1}, {0.95, 0.85, 0.15}, {0.25, 0.1, 0.55}};
+			const int scheme = static_cast<int>(hash01(s, 9) * 5.0) % 5;
+			if (scheme != 0 && scheme != 4) {   // spots over its back (white, yellow, or the trim's colour)
+				std::vector<Vec3> dots;
+				for (int q = 0; q < 26; ++q) dots.push_back({(hash01(q, s + 1) - 0.5) * 0.18 * L, 0.06 * L, (hash01(q, s + 2) - 0.5) * 0.75 * L});
+				spots = detail::beads(dots, 0.012 * L);
+			}
+			out += attr(coated(bodies[scheme], 0.2), emitMesh(body, place)) + attr(coated(trims[scheme], 0.2), emitMesh(trim, place));
+			if (!spots.tris.empty()) out += attr(coated(scheme == 3 ? trims[scheme] : Vec3{0.95, 0.95, 0.92}, 0.2), emitMesh(spots, place));
 		} else if (c.kind == "seahorses") {   // upright, its tail curled round a stalk of grass, bobbing, the fin on its back a blur
 			const double H = 0.15 + 0.05 * hash01(s, 4), y = groundAt(x, z), bob = 0.01 * std::sin(0.8 * t + s);
 			const Mat4 place = mul(translate(detail::story({x, y, z})), rotate({0, 1, 0}, heading));
@@ -323,7 +332,7 @@ inline std::string crittersText(const Critters &c, double t, const std::function
 	const Vec3 colA = nudi ? Vec3{0.45, 0.12, 0.6} : horse ? Vec3{0.85, 0.6, 0.12} : shrimp ? Vec3{0.8, 0.08, 0.06} : Vec3{0.2, 0.55, 0.3};
 	const Vec3 colB = nudi ? Vec3{0.95, 0.5, 0.05} : horse ? Vec3{0.9, 0.75, 0.4} : shrimp ? Vec3{0.95, 0.95, 0.92} : Vec3{0.15, 0.3, 0.8};
 	const Vec3 colD = horse ? Vec3{0.25, 0.45, 0.15} : shrimp ? Vec3{0.8, 0.08, 0.06} : Vec3{0.85, 0.35, 0.1};
-	out += attr(coated(colA, 0.25), emitMesh(a, identity()));
+	if (!a.tris.empty()) out += attr(coated(colA, 0.25), emitMesh(a, identity()));
 	if (!b.tris.empty()) out += attr(horse ? translucentMaterial(colB, colB * 0.5) : coated(colB, 0.25), emitMesh(b, identity()));
 	if (!d.tris.empty()) out += attr(c.kind == "mantisshrimp" ? diffuseMaterial({0.03, 0.03, 0.03}) : coated(colD, 0.4), emitMesh(d, identity()));
 	if (c.kind == "mantisshrimp") {   // (its folded claws in orange: drawn over the burrow's mouth in d, so a second pass for them is not worth it - they read as dark)

@@ -98,18 +98,27 @@ extern "C" __global__ void __raygen__wf_intersect() {
 	// mediaTMin to the nearest surface enters, and the part of the flight inside it - pbrt's medium along the ray up to the next surface, so the
 	// ground and objects inside a volume stop the flight, and a ray that starts inside one (the camera, a bounce off something in it) is in it from
 	// its origin. The flight becomes a hit on the volume's medium material (geomType kWfGeomListedMedium), sampled by the material kernels; one that
-	// gets through comes back here as the same ray with mediaTMin past it, so each volume along the ray is sampled in turn. (Where two volumes
-	// overlap, the second is sampled only beyond the first one's far side.)
+	// gets through comes back here as the same ray with mediaTMin past it, so each volume along the ray is sampled in turn. A volume inside another
+	// (ink, smoke or murky water in the sea round the camera) takes over where the flight enters it, as pbrt's MediumInterface "inner" "outer" does:
+	// the outer one's flight ends there, and of two the ray is in at once the one it leaves first is sampled. (Before, the inner one was sampled
+	// only beyond the outer one's far side - never, in the sea - and showed only as its shadow.)
 	const float tSurface = payload.hit ? payload.t : 1e30f;
 	int   listed = -1;
 	float listedT0 = 0.0f, listedT1 = 0.0f;
 	for (unsigned int i = 0; i < wf_params.numMediumShapes; ++i) {
 		float t0, t1;
-		if (wf_medium_shape_flight(wf_params.mediumShapes[i], ray.origin, ray.direction, ray.mediaTMin, tSurface, t0, t1) && (listed < 0 || t0 < listedT0)) {
+		if (!wf_medium_shape_flight(wf_params.mediumShapes[i], ray.origin, ray.direction, ray.mediaTMin, tSurface, t0, t1)) continue;
+		const float tie = 1e-5f * fmaxf(1.0f, fabsf(t0));
+		if (listed < 0 || t0 < listedT0 - tie || (t0 <= listedT0 + tie && t1 < listedT1)) {
 			listed   = (int)i;
 			listedT0 = t0;
 			listedT1 = t1;
 		}
+	}
+	for (unsigned int i = 0; listed >= 0 && i < wf_params.numMediumShapes; ++i) {   // (the flight ends where another volume begins inside it)
+		float t0, t1;
+		if ((int)i != listed && wf_medium_shape_flight(wf_params.mediumShapes[i], ray.origin, ray.direction, ray.mediaTMin, tSurface, t0, t1) && t0 > listedT0 && t0 < listedT1)
+			listedT1 = t0;
 	}
 
 	// pbrt's camera medium (unbounded fog the camera starts inside): sample the free flight against the nearest

@@ -88,7 +88,10 @@ inline std::string withCaustics(std::string scene, const std::string &film, doub
 	if (!findSun(scene, sun)) return scene;
 	const Vec3 d = refractedSun(sun.toward);
 	const int k = underwater::causticFrame(t), band = underwater::causticBand(bedDepth);
-	const Vec3 aim{std::round(eye.x / 4.0) * 4.0, level, std::round(eye.z / 4.0) * 4.0};   // (in 4 m steps: the net stays where it is in the water as the camera moves)
+	// where the beam that reaches the camera comes in through the surface (round 16: not straight above it - deep down, a slanting sun's light arrives from metres off,
+	// and a camera near the sand was outside a small slide), in 4 m steps: the net stays where it is in the water as the camera moves
+	const Vec3 in = eye + d * (std::max(0.0, level - eye.y) / std::max(0.2, d.y));
+	const Vec3 aim{std::round(in.x / 4.0) * 4.0, level, std::round(in.z / 4.0) * 4.0};
 	const Vec3 at = aim + d * kBack;
 	const double r = kBack + std::max(0.0, bedDepth) / std::max(0.2, d.y);   // (to the bed, along the beam)
 	const double luminance = 0.2126 * sun.L.x + 0.7152 * sun.L.y + 0.0722 * sun.L.z;

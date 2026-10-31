@@ -37,6 +37,7 @@ struct Water {
 	double lamp = 0.0;      // (round 14 `lamp L`: a diver's lamp on the camera, film_undersea.h)
 	bool ripples = false;   // (`ripples`: the sand of the seabed in ripples)
 	bool lampBlue = false;  // (round 15 `lamp L blue`: a blue lamp, for corals that fluoresce)
+	std::string port = "dome", filter;   // (round 16 `port flat|dome`, `filter red|magenta`: the camera's housing and a colour-correction filter: film_undersea.h housingLook)
 };
 // The current (round 14 `current SPEED toward A [surge P]`): the water's flow, pbrt's metres a second, the same everywhere; with a surge it swings back and forth every P
 // seconds (as much as SPEED each way) about a fifth of SPEED onward. `drift(t)` is how far the water has moved by t (the flow's integral), for what drifts in it.
@@ -137,7 +138,8 @@ inline std::string causticPicture(const std::string &film, int k, int size, bool
 	return film_sky::picture(film, name, size, size, [&](std::vector<float> &rgb) {
 		for (int j = 0; j < size; ++j)
 			for (int i = 0; i < size; ++i) {
-				const double net = contrast > 0.0 ? 0.8 + contrast * (0.35 + 1.9 * causticAt((i + 0.5) / size, (j + 0.5) / size, k) - 0.8) : 0.8;
+				const double grain = band >= 3 ? 0.9 + 0.2 * hash01(j * size + i, 41) : 1.0;   // (round 16: plain sand, seen close, is grains)
+				const double net = (contrast > 0.0 ? 0.8 + contrast * (0.35 + 1.9 * causticAt((i + 0.5) / size, (j + 0.5) / size, k) - 0.8) : 0.8) * grain;
 				const float val = static_cast<float>(net * (ripples ? rippleShade((i + 0.5) / size, (j + 0.5) / size) : 1.0));
 				const std::size_t q = (static_cast<std::size_t>(j) * size + i) * 3;
 				rgb[q] = rgb[q + 1] = rgb[q + 2] = val;

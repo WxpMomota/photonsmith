@@ -64,11 +64,14 @@
 #include "film_underwater.h"
 #include "film_wildlife.h"
 #include "film_sealife.h"
+#include "film_behaviour.h"
+#include "film_boat.h"
 #include "film_diver.h"
 #include "film_reef.h"
 #include "film_school.h"
 #include "film_seabed.h"
 #include "film_sealight.h"
+#include "film_vents.h"
 #include "film_undersea.h"
 #include "film_macro.h"
 #include "film_night.h"
@@ -179,6 +182,7 @@ struct CharacterMoment {
 	double steps = 0.0;
 	bool moving = false;
 	double going = 0.0;      // how much it is walking, 0 .. 1, eased over 0.3 s as a walk starts and ends (a rigged model fades between its idle and walk clips by it)
+	double swim = 0.0;       // (round 16) under the water: 1 - its walks are swims at its own height, its strokes its kind's (film_kinds.h), laid level by castAt
 	double t = 0.0;
 	const std::vector<rig::Gesture> *gestures = nullptr;
 	double detail = 0.0;
@@ -461,6 +465,14 @@ struct Spec {
 	std::vector<school::School> schools;
 	std::vector<school::BigFish> bigFish;
 	reef::World reefLife;
+	// round 16: boats overhead and sardine runs (`boat`, `sardinerun`: film_boat.h), hydrothermal vents (`vents`: film_vents.h), murky water and silt (`murk`, `silt`:
+	// film_undersea.h), set pieces of behaviour (`cleaningstation`, `tornado`, `playmate`, `damselfish`: film_behaviour.h); `wreckroom` is a seabed place
+	std::vector<boat::Boat> boats;
+	std::vector<boat::Run> sardineRuns;
+	std::vector<vents::Vents> vents;
+	std::vector<undersea::Murk> murks;
+	std::vector<undersea::Silt> silts;
+	behaviour::World behaviours;
 	// fire, lava and smoke (`fire`, `lava`, `volcano`, `wildfire`)
 	std::vector<fire::Fire> fires;
 	std::vector<fire::Lava> lavas;

@@ -1090,7 +1090,7 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 			}
 		}
 		s.fog.on = true;
-	} else if (underseaVerb(verb)) {   // under the sea: the water, its flow, bubbles, the deep, the seabed and its places (film_parse_sea.h)
+	} else if (underseaVerb(verb) || barracudaTornado(verb, line)) {   // under the sea: the water, its flow, bubbles, the deep, the seabed and its places (film_parse_sea.h)
 		return underseaLine(s, verb, line);
 	} else if (verb == "kelp" || verb == "coral") {
 		const std::vector<std::string> t = detail::tokens(line);

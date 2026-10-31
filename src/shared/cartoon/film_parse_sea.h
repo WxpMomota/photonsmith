@@ -10,8 +10,14 @@ namespace film_file {
 
 inline bool underseaVerb(const std::string &verb) {
 	static const std::vector<std::string> k = {"underwater", "waterline", "current", "bubbles", "halocline", "deepsea", "octopus", "cuttlefish", "swimmers", "seabed", "wreck", "arch", "cenote", "reefwall",
-											   "diver", "divecam", "school", "bigfish", "reef", "critters", "nightdive", "kelpforest"};
+											   "diver", "divecam", "school", "bigfish", "reef", "critters", "nightdive", "kelpforest", "boat", "sardinerun", "vents", "murk", "silt",
+											   "cleaningstation", "playmate", "damselfish", "wreckroom"};
 	return std::find(k.begin(), k.end(), verb) != k.end();
+}
+// A barracuda tornado's line (`tornado N at X Y Z ...`, round 16) - not the wind's (`tornado from X Z to X Z ...`, film_wind.h), which shares the word.
+inline bool barracudaTornado(const std::string &verb, const std::string &line) {
+	const std::vector<std::string> t = detail::tokens(line);
+	return verb == "tornado" && t.size() > 2 && t[2] == "at";
 }
 // Round 15's lines (`diver`, `divecam`, `school`, `bigfish`, `reef`, `critters`, `nightdive`, `kelpforest`) into `s`: "" or what is wrong with it.
 inline std::string underseaLine15(Spec &s, const std::string &verb, const std::string &line) {
@@ -147,6 +153,146 @@ inline std::string underseaLine15(Spec &s, const std::string &verb, const std::s
 	}
 	return fail("`" + verb + "`: not a line of round 15");
 }
+// Round 16's lines (`boat`, `sardinerun`, `vents`, `murk`, `silt`, `cleaningstation`, `tornado`, `playmate`, `damselfish`) into `s`: "" or what is wrong with it.
+inline std::string underseaLine16(Spec &s, const std::string &verb, const std::string &line) {
+	using detail::number;
+	const auto fail = [](const std::string &what) { return what; };
+	const std::vector<std::string> t = detail::tokens(line);
+	std::vector<double> v;
+	std::size_t i = 1;
+	const auto numbers = [&](std::size_t n) {   // (the next n numbers, or false)
+		v.assign(n, 0.0);
+		for (std::size_t k = 0; k < n; ++k)
+			if (i + k >= t.size() || !number(t[i + k], v[k])) return false;
+		i += n;
+		return true;
+	};
+	if (verb == "boat") {
+		const char *usage = "`boat X Z [toward A] [length L] [speed S] [during T0 T1] [anchor T] [seed K]` (L 3 to 60 m, S up to 15 m/s)";
+		boat::Boat b;
+		if (!numbers(2)) return fail(usage);
+		b.x = v[0], b.z = v[1];
+		while (i < t.size()) {
+			const std::string w = t[i++];
+			if (w == "during" && numbers(2) && v[1] > v[0]) {
+				b.t0 = v[0], b.t1 = v[1];
+				continue;
+			}
+			if (w == "during" || !numbers(1)) return fail(usage);
+			if (w == "toward") b.toward = v[0];
+			else if (w == "length" && v[0] >= 3.0 && v[0] <= 60.0) b.length = v[0];
+			else if (w == "speed" && v[0] >= 0.0 && v[0] <= 15.0) b.speed = v[0];
+			else if (w == "anchor") b.anchor = v[0];
+			else if (w == "seed") b.seed = static_cast<int>(v[0]);
+			else return fail(usage);
+		}
+		s.boats.push_back(b);
+		return std::string();
+	}
+	if (verb == "sardinerun") {
+		const char *usage = "`sardinerun X Y Z [radius R] [gannets N] [dolphins N] [from T] [seed K]` (gannets 0 to 60, dolphins 0 to 20)";
+		boat::Run r;
+		if (!numbers(3)) return fail(usage);
+		r.at = {v[0], v[1], v[2]};
+		while (i < t.size()) {
+			const std::string w = t[i++];
+			if (!numbers(1)) return fail(usage);
+			if (w == "radius" && v[0] > 0.3 && v[0] <= 30.0) r.radius = v[0];
+			else if (w == "gannets" && v[0] >= 0 && v[0] <= 60) r.gannets = static_cast<int>(v[0]);
+			else if (w == "dolphins" && v[0] >= 0 && v[0] <= 20) r.dolphins = static_cast<int>(v[0]);
+			else if (w == "from") r.from = v[0];
+			else if (w == "seed") r.seed = static_cast<int>(v[0]);
+			else return fail(usage);
+		}
+		s.sardineRuns.push_back(r);
+		return std::string();
+	}
+	if (verb == "vents") {
+		const char *usage = "`vents N in X0 Z0 X1 Z1 [seed K]` (1 to 30)";
+		vents::Vents vs;
+		if (!numbers(1) || v[0] < 1 || v[0] > 30) return fail(usage);
+		vs.count = static_cast<int>(v[0]);
+		if (i >= t.size() || t[i++] != "in" || !numbers(4)) return fail(usage);
+		vs.x0 = std::min(v[0], v[2]), vs.z0 = std::min(v[1], v[3]), vs.x1 = std::max(v[0], v[2]), vs.z1 = std::max(v[1], v[3]);
+		if (i < t.size()) {
+			if (t[i++] != "seed" || !numbers(1)) return fail(usage);
+			vs.seed = static_cast<int>(v[0]);
+		}
+		if (i < t.size()) return fail(usage);
+		s.vents.push_back(vs);
+		return std::string();
+	}
+	if (verb == "murk") {
+		const char *usage = "`murk X Y Z [radius R] [green|grey] [density D]`: a ball of murky water (R 0.5 to 200 m, D 0.05 to 20)";
+		undersea::Murk m;
+		if (!numbers(3)) return fail(usage);
+		m.at = {v[0], v[1], v[2]};
+		while (i < t.size()) {
+			const std::string w = t[i++];
+			if (w == "green" || w == "grey") {
+				m.colour = w;
+				continue;
+			}
+			if (!numbers(1)) return fail(usage);
+			if (w == "radius" && v[0] >= 0.5 && v[0] <= 200.0) m.radius = v[0];
+			else if (w == "density" && v[0] >= 0.05 && v[0] <= 20.0) m.density = v[0];
+			else return fail(usage);
+		}
+		s.murks.push_back(m);
+		return std::string();
+	}
+	if (verb == "silt") {
+		const char *usage = "`silt X Z at T [size S]`: a puff of silt kicked up from the seabed at T (S 0.1 to 3)";
+		undersea::Silt sl;
+		if (!numbers(2)) return fail(usage);
+		sl.x = v[0], sl.z = v[1];
+		bool timed = false;
+		while (i < t.size()) {
+			const std::string w = t[i++];
+			if (!numbers(1)) return fail(usage);
+			if (w == "at") sl.at = v[0], timed = true;
+			else if (w == "size" && v[0] >= 0.1 && v[0] <= 3.0) sl.size = v[0];
+			else return fail(usage);
+		}
+		if (!timed) return fail(usage);
+		s.silts.push_back(sl);
+		return std::string();
+	}
+	// the set pieces of behaviour (film_behaviour.h)
+	const std::string usage = verb == "cleaningstation" ? "`cleaningstation X Y Z [seed K]`"
+							  : verb == "tornado" ? "`tornado N at X Y Z [around NAME] [radius R] [height H] [seed K]` (10 to 600)"
+							  : verb == "playmate" ? "`playmate X Y Z [with NAME] [seed K]`"
+												   : "`damselfish N at X Y Z [radius R] [seed K]` (1 to 40)";
+	behaviour::Station st;
+	behaviour::Tornado tn;
+	behaviour::Playmate pm;
+	behaviour::Damsels dm;
+	if (verb == "tornado" || verb == "damselfish") {
+		if (!numbers(1) || v[0] < (verb == "tornado" ? 10 : 1) || v[0] > (verb == "tornado" ? 600 : 40)) return fail(usage);
+		tn.count = dm.count = static_cast<int>(v[0]);
+		if (i >= t.size() || t[i++] != "at") return fail(usage);
+	}
+	if (!numbers(3)) return fail(usage);
+	st.at = tn.at = pm.at = dm.at = {v[0], v[1], v[2]};
+	while (i < t.size()) {
+		const std::string w = t[i++];
+		if ((w == "around" && verb == "tornado") || (w == "with" && verb == "playmate")) {
+			if (i >= t.size()) return fail(usage);
+			(verb == "tornado" ? tn.around : pm.with) = t[i++];
+			continue;
+		}
+		if (!numbers(1)) return fail(usage);
+		if (w == "seed") st.seed = tn.seed = pm.seed = dm.seed = static_cast<int>(v[0]);
+		else if (w == "radius" && (verb == "tornado" || verb == "damselfish") && v[0] > 0.2 && v[0] <= 30.0) tn.radius = dm.radius = v[0];
+		else if (w == "height" && verb == "tornado" && v[0] > 0.5 && v[0] <= 60.0) tn.height = v[0];
+		else return fail(usage);
+	}
+	if (verb == "cleaningstation") s.behaviours.stations.push_back(st);
+	else if (verb == "tornado") s.behaviours.tornadoes.push_back(tn);
+	else if (verb == "playmate") s.behaviours.playmates.push_back(pm);
+	else s.behaviours.damsels.push_back(dm);
+	return std::string();
+}
 // One of those lines into `s`: "" or what is wrong with it.
 inline std::string underseaLine(Spec &s, const std::string &verb, const std::string &line) {
 	using detail::number;
@@ -164,13 +310,20 @@ inline std::string underseaLine(Spec &s, const std::string &verb, const std::str
 	const auto oneOf = [](const std::string &w, const std::vector<std::string> &kinds) { return std::find(kinds.begin(), kinds.end(), w) != kinds.end(); };
 	if (verb == "diver" || verb == "divecam" || verb == "school" || verb == "bigfish" || verb == "reef" || verb == "critters" || verb == "nightdive" || verb == "kelpforest")
 		return underseaLine15(s, verb, line);
+	if (verb == "boat" || verb == "sardinerun" || verb == "vents" || verb == "murk" || verb == "silt" || verb == "cleaningstation" || verb == "tornado" || verb == "playmate" ||
+		verb == "damselfish")
+		return underseaLine16(s, verb, line);
 	if (verb == "underwater") {
 		const char *usage = "`underwater [clarity C] [colour blue|green|teal] [lamp L] [ripples]`: the camera is under the film's `water` (clarity 1 a clear sea, 2 tropical, 0.5 murky; "
-							"lamp: a diver's lamp on the camera, 1 a strong one - `blue` makes it blue; ripples: the sand in ripples)";
+							"lamp: a diver's lamp on the camera, 1 a strong one - `blue` makes it blue; ripples: the sand in ripples; `port flat|dome`, `filter red|magenta`: the camera's housing)";
 		while (i < t.size()) {
 			const std::string w = t[i++];
 			if (w == "ripples" || w == "blue") {   // (blue: the lamp's, round 15)
 				(w == "ripples" ? s.underwater.ripples : s.underwater.lampBlue) = true;
+				continue;
+			}
+			if ((w == "port" && i < t.size() && (t[i] == "flat" || t[i] == "dome")) || (w == "filter" && i < t.size() && (t[i] == "red" || t[i] == "magenta"))) {   // (round 16)
+				(w == "port" ? s.underwater.port : s.underwater.filter) = t[i++];
 				continue;
 			}
 			if (w == "colour" && i < t.size() && oneOf(t[i], underwater::colours())) {
@@ -353,9 +506,11 @@ inline std::string underseaLine(Spec &s, const std::string &verb, const std::str
 	const std::string usage = verb == "wreck" ? "`wreck X Z [toward A] [length L] [list D]` (L 5 to 150 m)"
 							  : verb == "arch" ? "`arch X Z [toward A] [size S]` (S 0.2 to 10)"
 							  : verb == "cenote" ? "`cenote X Z [radius R] [depth D]` (R 3 to 60 m, D 5 to 120 m)"
+							  : verb == "wreckroom" ? "`wreckroom X Z [toward A] [length L]` (inside a wreck: L 4 to 60 m)"
 												 : "`reefwall X Z [toward A] [length L] [height H]` (L 4 to 200 m, H 2 to 120 m)";
 	seabed::Place p;
 	p.kind = verb;
+	if (verb == "wreckroom") p.length = 12.0;
 	if (!numbers(2)) return fail(usage);
 	p.x = v[0], p.z = v[1];
 	while (i < t.size()) {
@@ -364,6 +519,7 @@ inline std::string underseaLine(Spec &s, const std::string &verb, const std::str
 		if (w == "toward" && verb != "cenote") p.toward = v[0];
 		else if (w == "length" && verb == "wreck" && v[0] >= 5.0 && v[0] <= 150.0) p.length = v[0];
 		else if (w == "length" && verb == "reefwall" && v[0] >= 4.0 && v[0] <= 200.0) p.length = v[0];
+		else if (w == "length" && verb == "wreckroom" && v[0] >= 4.0 && v[0] <= 60.0) p.length = v[0];
 		else if (w == "list" && verb == "wreck" && std::abs(v[0]) <= 80.0) p.list = v[0];
 		else if (w == "size" && verb == "arch" && v[0] >= 0.2 && v[0] <= 10.0) p.size = v[0];
 		else if (w == "radius" && verb == "cenote" && v[0] >= 3.0 && v[0] <= 60.0) p.radius = v[0];

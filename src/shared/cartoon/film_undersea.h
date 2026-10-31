@@ -30,6 +30,7 @@
 #include <vector>
 
 #include "cartoon_lib.h"
+#include "film_clouds.h"
 #include "film_underwater.h"
 #include "film_water.h"
 
@@ -72,6 +73,17 @@ struct Sea {
 
 namespace detail {
 inline Vec3 story(Vec3 p) { return {-p.x, p.y, p.z}; }
+// `m` placed by `place` and added to `into` (no uvs).
+inline void addPlaced(Mesh &into, const Mesh &m, const Mat4 &place) {
+	const int base = static_cast<int>(into.verts.size());
+	const Mat4 inv = invertAffine(place);
+	for (std::size_t i = 0; i < m.verts.size(); ++i) {
+		into.verts.push_back(transformPoint(place, m.verts[i]));
+		const Vec3 n = m.normals[i];
+		into.normals.push_back(normalize(Vec3{inv[0] * n.x + inv[4] * n.y + inv[8] * n.z, inv[1] * n.x + inv[5] * n.y + inv[9] * n.z, inv[2] * n.x + inv[6] * n.y + inv[10] * n.z}));
+	}
+	for (const auto &t : m.tris) into.tris.push_back({t[0] + base, t[1] + base, t[2] + base});
+}
 // A shape list that casts no shadows (ray visibility): each mesh's Shape line marked.
 inline std::string noShadow(std::string shapes) {
 	for (std::size_t at = 0; (at = shapes.find("Shape \"trianglemesh\"", at)) != std::string::npos; at += 20) shapes.insert(at + 20, " \"bool shadow\" false");
@@ -157,7 +169,7 @@ inline Waterline waterlineOf(const water::Sea &s, double t, const Vec3 &eye) {
 	return w;
 }
 // A camera put within 0.6 m of the surface - or any, in a shot with `waterline` (`atSurface`) - floats on it, as a camera held at the surface is: the frame header with
-// its LookAt (eye and target together) moved to nine tenths of the wave at the eye, so the surface stays near its dome and the line across it rocks with the waves. Any other
+// its LookAt (eye and target together) moved with the wave at the eye, a little under it, so the surface stays near its dome and the line across it rocks with the waves. Any other
 // header as it was.
 inline std::string floated(const std::string &header, const water::Sea &s, double t, bool atSurface = false) {
 	static const std::regex look(R"(LookAt\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+))");
@@ -166,7 +178,10 @@ inline std::string floated(const std::string &header, const water::Sea &s, doubl
 	double v[6];
 	for (int k = 0; k < 6; ++k) v[k] = std::atof(m[k + 1].str().c_str());
 	if (!atSurface && std::abs(v[1] - s.level) > 0.6) return header;
-	const double dy = 0.9 * (surfaceAt(s, v[0], v[2], t) - s.level) + (atSurface ? s.level - v[1] : 0.0);
+	// (round 16: with the wave, a little under it - lower at a crest, closer in a trough - so the line still rocks; at nine tenths of the wave, as before, the lens
+	// was above the water in a trough, and under the line the picture showed the surface's top)
+	const double w = surfaceAt(s, v[0], v[2], t) - s.level;
+	const double dy = w - (0.004 + 0.05 * std::max(0.0, w + 0.5 * s.waves)) + (atSurface ? s.level - v[1] : 0.0);
 	char buf[200];
 	std::snprintf(buf, sizeof buf, "LookAt %.6f %.6f %.6f %.6f %.6f %.6f", v[0], v[1] + dy, v[2], v[3], v[4] + dy, v[5]);
 	return header.substr(0, static_cast<std::size_t>(m.position(0))) + buf + header.substr(static_cast<std::size_t>(m.position(0) + m.length(0)));
@@ -406,6 +421,123 @@ inline std::string text(const Sea &sea, double t, double level, const underwater
 	for (const Ring &r : sea.rings) out += ringText(r, t, level, c);
 	for (const Layer &l : sea.layers) out += layerText(l, t, eye);
 	return out;
+}
+// ---- silt and murk (round 16) ----
+// A puff of silt kicked up from the seabed at pbrt's `at` (on the sand) `age` seconds ago, `size` times a fin's kick (1: an anchor landing, 0.3 a fin): fine grains
+// thrown up and out in a billow, hanging, spreading and settling over twenty seconds.
+inline std::string siltText(const Vec3 &at, double age, double size, int seed) {
+	if (age < 0.0 || age > 25.0 || size <= 0.0) return std::string();
+	const int n = static_cast<int>(std::clamp(1400.0 * size, 60.0, 2500.0));
+	const double spread = 1.0 - std::exp(-age / 1.5), settle = std::max(0.0, age - 3.0) * 0.03;
+	std::vector<Vec3> grains;
+	for (int k = 0; k < n; ++k) {
+		const double a = 2.0 * kPi * hash01(k, seed + 1), r = std::sqrt(hash01(k, seed + 2)) * (0.4 + 1.6 * size) * spread, up = (0.15 + 0.9 * size) * hash01(k, seed + 3) * spread;
+		const double wob = 0.05 * std::sin(0.7 * age + k);
+		const Vec3 p{at.x + r * std::cos(a) + wob, at.y + std::max(0.01, up * (1.0 - 0.6 * std::pow(hash01(k, seed + 4), 2.0)) - settle * hash01(k, seed + 5)), at.z + r * std::sin(a) - wob};
+		grains.push_back(detail::story(p));
+	}
+	Mesh m;
+	const Mesh g = uvSphere(1.0, 4, 3);
+	for (std::size_t q = 0; q < grains.size(); ++q) {
+		const double r = 0.0012 + 0.0016 * hash01(static_cast<int>(q), seed + 6);
+		const int base = static_cast<int>(m.verts.size());
+		for (std::size_t i = 0; i < g.verts.size(); ++i) m.verts.push_back(grains[q] + g.verts[i] * r), m.normals.push_back(g.normals[i]);
+		for (const auto &tr : g.tris) m.tris.push_back({tr[0] + base, tr[1] + base, tr[2] + base});
+	}
+	return "# silt (film_undersea.h)\n" + attr(diffuseMaterial({0.6, 0.55, 0.45}), detail::noShadow(emitMesh(m, identity())));
+}
+// ---- the camera's housing (round 16) ----
+// The look's words for the housing and its filter: a flat port bows the picture out at its edges and fringes the colours there; a red filter (blue water) or a magenta
+// one (green water) brings back the colours the water took.
+inline std::string housingLook(const underwater::Water &w) {
+	std::string out;
+	if (w.port == "flat") out += " distort 0.12 fringe 0.006";
+	if (w.filter == "red") out += " gain 1.55 0.98 0.82";
+	else if (w.filter == "magenta") out += " gain 1.35 0.82 1.15";
+	return out;
+}
+// A frame header seen through a flat port: the field of view a third narrower (through a flat window the water makes things look a third nearer).
+inline std::string throughFlatPort(const std::string &header) {
+	static const std::regex fov(R"("float fov" \[ ([0-9.eE+-]+) \])");
+	std::smatch m;
+	if (!std::regex_search(header, m, fov)) return header;
+	const double f = std::atof(m[1].str().c_str()), narrowed = 2.0 * std::atan(std::tan(0.5 * f * kPi / 180.0) / 1.333) * 180.0 / kPi;
+	char buf[64];
+	std::snprintf(buf, sizeof buf, "\"float fov\" [ %.4f ]", narrowed);
+	return header.substr(0, static_cast<std::size_t>(m.position(0))) + buf + header.substr(static_cast<std::size_t>(m.position(0) + m.length(0)));
+}
+// ---- silt you ask for (round 16 `silt X Z at T [size S]`) ----
+struct Silt {
+	double x = 0.0, z = 0.0, at = 0.0, size = 1.0;
+};
+// ---- close up (round 16) ----
+// Sand for a camera close to the seabed (pbrt's `eye` within 1.5 m of it, looking at `look` on the sand): grains of sand in their own colours, bits of broken shell and a
+// few pebbles strewn over the half metre round where it looks - fixed in the world (each 4 cm cell its own, from its place), so they stay put as the camera moves.
+inline std::string grainsText(const Vec3 &eye, const Vec3 &look, const std::function<double(double, double)> &bedAt) {
+	if (eye.y - bedAt(eye.x, eye.z) > 1.5) return std::string();
+	const double cell = 0.04, R = 0.6;
+	Mesh sand, shells;
+	const Mesh g = uvSphere(1.0, 4, 3);
+	const int cx = static_cast<int>(std::floor(look.x / cell)), cz = static_cast<int>(std::floor(look.z / cell)), n = static_cast<int>(R / cell);
+	for (int j = -n; j <= n; ++j)
+		for (int i = -n; i <= n; ++i) {
+			const int key = (cx + i) * 73856093 ^ (cz + j) * 19349663;
+			for (int k = 0; k < 5; ++k) {
+				const double x = (cx + i + hash01(key + k, 1)) * cell, z = (cz + j + hash01(key + k, 2)) * cell;
+				if (std::hypot(x - look.x, z - look.z) > R) continue;
+				const double r = 0.0005 + 0.0012 * hash01(key + k, 3);
+				const Vec3 p{-x, bedAt(x, z) + 0.6 * r, z};
+				const int base = static_cast<int>(sand.verts.size());
+				for (std::size_t q = 0; q < g.verts.size(); ++q) sand.verts.push_back(p + Vec3{g.verts[q].x, 0.7 * g.verts[q].y, g.verts[q].z} * r), sand.normals.push_back(g.normals[q]);
+				for (const auto &tr : g.tris) sand.tris.push_back({tr[0] + base, tr[1] + base, tr[2] + base});
+			}
+			if (hash01(key, 7) < 0.06) {   // a bit of broken shell, or a pebble
+				const double x = (cx + i + 0.5) * cell, z = (cz + j + 0.5) * cell, s = 0.006 + 0.012 * hash01(key, 8);
+				Mesh bit = lathe({{0.0, 0.25}, {0.6, 0.18}, {1.0, 0.0}, {0.9, -0.05}, {0.0, 0.1}}, 10);
+				bit.uvs.clear();
+				detail::addPlaced(shells, bit, mul(translate(-x, bedAt(x, z) + 0.002, z), rotate({0, 1, 0}, 360.0 * hash01(key, 9)), rotate({1, 0, 0}, 25.0 * hash01(key, 10)), scale(s, s * (0.5 + hash01(key, 11)), s)));
+			}
+		}
+	std::string out = "# sand close up (film_undersea.h)\n" + attr(diffuseMaterial({0.62, 0.55, 0.42}), detail::noShadow(emitMesh(sand, identity())));
+	if (!shells.tris.empty()) out += attr(coated({0.85, 0.8, 0.72}, 0.3), emitMesh(shells, identity()));
+	return out;
+}
+// A murky patch of water (`murk X Y Z radius R [green|grey] [density D]`): a ball of thicker water inside the sea - coastal green, or grey with silt - its own medium in a
+// sphere, the sea outside it (drawn by the GPU's wavefront renderer; the CPU cannot have it and a medium round the camera at once).
+struct Murk {
+	Vec3 at;
+	double radius = 8.0, density = 1.0;
+	std::string colour = "green";
+};
+inline std::string murkText(const Murk &m, int index, const underwater::Water &w) {
+	// a grid of the sea's own water plus the murk - thickest in the middle, in patches, none at all at the edge - in a sphere just inside the grid's box, so where the
+	// sphere ends the water on both sides is the same and the ball has no edge to see
+	const Vec3 sea = underwater::absorption(w), seaS = underwater::scattering(w);
+	const Vec3 s = m.colour == "grey" ? Vec3{0.16, 0.155, 0.15} : Vec3{0.10, 0.16, 0.08};
+	const Vec3 a = m.colour == "grey" ? Vec3{0.04, 0.04, 0.045} : Vec3{0.06, 0.03, 0.08};
+	const int n = 16;
+	std::string sa, ss;
+	char buf[96];
+	for (int k = 0; k < n; ++k)
+		for (int j = 0; j < n; ++j)
+			for (int i = 0; i < n; ++i) {
+				const double x = 2.0 * (i + 0.5) / n - 1.0, y = 2.0 * (j + 0.5) / n - 1.0, z = 2.0 * (k + 0.5) / n - 1.0;
+				const double r = std::sqrt(x * x + y * y + z * z), patch = clouds::detail::fbm3(x * 1.6 + 5.0, y * 1.6, z * 1.6, 41 + index);
+				const double d = m.density * smoothstep(1.0, 0.75, r) * smoothstep(1.0, 0.25, r * (0.7 + 0.6 * patch));
+				std::snprintf(buf, sizeof buf, "%.4f %.4f %.4f ", sea.x + a.x * d, sea.y + a.y * d, sea.z + a.z * d);
+				sa += buf;
+				std::snprintf(buf, sizeof buf, "%.4f %.4f %.4f ", seaS.x + s.x * d, seaS.y + s.y * d, seaS.z + s.z * d);
+				ss += buf;
+			}
+	const double R = m.radius;
+	char head[600];
+	std::snprintf(head, sizeof head,
+				  "# murky water (film_undersea.h)\nAttributeBegin\n  Translate %.4f %.4f %.4f\n  Scale %.4f %.4f %.4f\n  MakeNamedMedium \"murk_%d\" \"string type\" [ \"rgbgrid\" ] \"integer nx\" [ %d ] \"integer ny\" [ %d ] \"integer nz\" [ %d ] \"float g\" [ 0.6 ]\n",
+				  m.at.x - R, m.at.y - R, m.at.z - R, 2.0 * R, 2.0 * R, 2.0 * R, index, n, n, n);
+	std::string out = head + ("    \"rgb sigma_a\" [ " + sa + "]\n    \"rgb sigma_s\" [ " + ss + "]\nAttributeEnd\n");
+	std::snprintf(head, sizeof head, "AttributeBegin\n  Translate %.4f %.4f %.4f\n  Material \"interface\"\n  MediumInterface \"murk_%d\" \"sea\"\n  Shape \"sphere\" \"float radius\" [ %.4f ]\nAttributeEnd\n", m.at.x,
+				  m.at.y, m.at.z, index, 0.98 * R);
+	return out + head;
 }
 // The film's bubbles and layers with their heights made pbrt's (on a terrain heights are above the ground there).
 inline Sea lifted(Sea sea, const std::function<double(double, double)> &groundAt) {

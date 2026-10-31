@@ -43,7 +43,7 @@ struct Patch {
 	double x0 = -5.0, z0 = -5.0, x1 = 5.0, z1 = 5.0;
 };
 struct Place {
-	std::string kind;   // wreck, arch, cenote, reefwall
+	std::string kind;   // wreck, arch, cenote, reefwall, wreckroom (round 16)
 	double x = 0.0, z = 0.0, toward = 0.0, size = 1.0, length = 30.0, height = 20.0, list = 20.0, radius = 12.0, depth = 25.0;
 };
 struct World {
@@ -158,7 +158,8 @@ inline std::string starsAndUrchinsText(const Patch &p, double t, const std::func
 	return out;
 }
 // Crabs at t: each walking sideways in short dashes (its own line, out and back), legs stepping in alternate fours, claws held up.
-inline std::string crabText(const Patch &p, double t, const std::function<double(double, double)> &groundAt) {
+// `pale` (round 16): the ghostly white crabs of a hydrothermal vent.
+inline std::string crabText(const Patch &p, double t, const std::function<double(double, double)> &groundAt, bool pale = false) {
 	Mesh shell, legs;
 	for (int i = 0; i < p.count; ++i) {
 		const int s = p.seed * 37 + i;
@@ -186,7 +187,8 @@ inline std::string crabText(const Patch &p, double t, const std::function<double
 			detail::add(shell, uvSphere(1.0, 10, 6), mul(place, translate(sd * 0.35 * S, 0.35 * S, 0.95 * S), scale(0.12 * S, 0.1 * S, 0.2 * S)));
 		}
 	}
-	return "# crabs (film_seabed.h)\n" + attr(coated({0.75, 0.28, 0.12}, 0.3), emitMesh(shell, identity())) + attr(coated({0.8, 0.4, 0.2}, 0.35), emitMesh(legs, identity()));
+	return "# crabs (film_seabed.h)\n" + attr(coated(pale ? Vec3{0.85, 0.84, 0.8} : Vec3{0.75, 0.28, 0.12}, 0.3), emitMesh(shell, identity())) +
+		   attr(coated(pale ? Vec3{0.88, 0.86, 0.82} : Vec3{0.8, 0.4, 0.2}, 0.35), emitMesh(legs, identity()));
 }
 // Garden eels at t: standing out of their holes, swaying, facing into the flow; sinking into their holes while the camera (pbrt's eye) is within 4 m, rising again after.
 inline std::string gardenEelText(const Patch &p, double t, const std::function<double(double, double)> &groundAt, const Vec3 &flow, const Vec3 &eye) {
@@ -325,6 +327,34 @@ inline std::string placeText(const std::string &film, const Place &p, int index,
 			deepsea::detail::add(roots, sdf::tubeMesh(pts, 0.04, 0.3, 5));
 		}
 		return out + attr(coated({0.25, 0.18, 0.12}, 0.8), emitMesh(roots, frame));
+	}
+	if (p.kind == "wreckroom") {   // (round 16) inside a wreck: a corridor of rusted plates to swim along, its length along +z of its frame
+		const double L = p.length, W = 2.4, H = 2.2, wall = 0.15;
+		std::snprintf(name, sizeof name, "wreckroom_%d_%d", static_cast<int>(L * 10), index);
+		out += film_cache::part(film, name, coated({0.28, 0.16, 0.09}, 0.8), frame, [&] {
+			const auto f = [L, W, H, wall](Vec3 q) {
+				const double outer = sdf::roundBox(q, translate(0.0, -0.5 * H, 0.0), {0.5 * W + wall, 0.5 * H + wall, 0.5 * L}, 0.05);
+				const double inner = sdf::roundBox(q, translate(0.0, -0.5 * H, 0.0), {0.5 * W, 0.5 * H, 0.5 * L + 1.0}, 0.03);   // (open at both ends: the doors)
+				double holes = 1e9;
+				for (double z = -0.5 * L + 1.0; z < 0.5 * L - 0.5; z += 1.5)   // portholes along both sides
+					holes = std::min(holes, sdf::capsule(q, {-0.5 * W - 0.5, 1.35, z}, {0.5 * W + 0.5, 1.35, z}, 0.2));
+				holes = std::min(holes, sdf::roundBox(q, translate(-0.3, -H, -0.15 * L), {0.5, 0.4, 0.9}, 0.1));   // (a hatch broken open in the deck overhead)
+				return sdf::smax(sdf::smax(outer, -inner, 0.04), -holes, 0.03);
+			};
+			Mesh m = sdf::surfaceNets(f, {-0.5 * W - 0.4, -0.3, -0.5 * L - 0.2}, {0.5 * W + 0.4, H + 0.4, 0.5 * L + 0.2}, 0.07);
+			sdf::computeNormals(m);
+			return m;
+		});
+		Mesh debris;   // pipes along the ceiling, crates fallen over, a beam down across the floor
+		for (const double side : {-1.0, 1.0}) deepsea::detail::add(debris, sdf::tubeMesh({{side * 0.9, H - 0.2, -0.5 * L}, {side * 0.9, H - 0.2, 0.5 * L}}, 0.06, 1.0, 8));
+		for (int k = 0; k < 5; ++k) {
+			const double z = -0.4 * L + 0.8 * L * hash01(k, index + 3);
+			deepsea::detail::add(debris, box(0.5, 0.4, 0.5), mul(translate((hash01(k, index + 4) - 0.5) * 1.4, 0.2, z), rotate({0, 1, 0}, 60.0 * hash01(k, index + 5)), rotate({0, 0, 1}, 15.0 * hash01(k, index + 6))));
+		}
+		deepsea::detail::add(debris, sdf::tubeMesh({{-1.1, 0.1, 0.1 * L}, {1.0, 0.9, 0.18 * L}}, 0.1, 1.0, 6));
+		out += attr(coated({0.22, 0.14, 0.09}, 0.85), emitMesh(debris, frame));
+		out += attr(diffuseMaterial({0.42, 0.38, 0.3}), emitMesh(box(W, 0.06, L), mul(frame, translate(0.0, 0.03, 0.0))));   // (the floor deep in silt)
+		return out;
 	}
 	// a reef wall: a slab of rock rising sheer, its face crowded with growth
 	const double L = p.length, H = p.height;

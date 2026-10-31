@@ -2330,6 +2330,65 @@ at the surface (round 14's waterline).
 
 Metal (the Mac) still reads a projector's slide at 64 x 64.
 
+### Under the sea, round 16 (2026-10-30)
+
+Ten more things for films under the water. As in rounds 14 and 15, the heights on these lines are above the seabed (a terrain's ground, or the plain floor 15 m under
+the surface when there is none); x and z are pbrt's, as on the round-14 and 15 lines.
+
+**Cartoon characters under the water.** (nothing to write) A character brought in under the surface (its height 0.3 m or more below it) swims: its walks are swims at its
+own height, the body laid level along its way with a breaststroke and a flutter kick, bobbing gently; standing still it treads water upright. Its hair floats up and sways
+in the current. While it talks bubbles burble up from its mouth, and its voice is muffled - the high sounds gone, a little more echo.
+
+**A boat overhead: `boat X Z [toward A] [length L] [speed S] [during T0 T1] [anchor T] [seed K]`.** (film_boat.h) A boat on the surface (L 3 to 60 m, 8) going its way at S
+metres a second (2): seen from below, the hull - red under the waterline - and its shadow on the sand, the propeller's trail of bubbles behind it. `anchor T`: it eases to
+a stop and drops its anchor, which falls on its chain and lands in a puff of silt. Its engine is heard, a low drone from where it is, quieter at anchor.
+
+**A sardine run: `sardinerun X Y Z [radius R] [gannets N] [dolphins N] [from T] [seed K]`.** A bait ball of sardines (R 3) herded by dolphins, sharks striking through it
+every few seconds; from T gannets fold their wings and plunge in one after another, each splash leaving a column of bubbles. The dolphins whistle and click, each gannet
+cracks into the water.
+
+**Hydrothermal vents: `vents N in X0 Z0 X1 Z1 [seed K]`.** (film_vents.h) Black smokers: chimneys of mineral rock two to six metres tall, crusted yellow at the mouth, each
+pouring a black plume that billows up and spreads (stopping short of the surface in a shallow sea); the water over the mouth shimmers in the heat; round the foot, tube
+worms with red plumes, pale crabs and swarming shrimp. Film it deep, with a lamp.
+
+**Silt and murk: `murk X Y Z [radius R] [green|grey] [density D]`, `silt X Z at T [size S]`.** A ball of murky water - coastal green or grey with silt - thickest in the
+middle, in patches, and fading out at its edge so it has none; `silt`: a puff of silt kicked up from the bed at T that billows out and settles. A diver finning within a
+metre of the bed kicks up silt behind them on their own.
+
+**Inside a wreck: `wreckroom X Z [toward A] [length L]`.** (film_seabed.h) A corridor of rusted plates to swim along (L 4 to 60 m, 12): portholes letting in shafts of the
+light outside, a hatch overhead, debris and silt on the floor. Take a lamp in: `underwater lamp 1`.
+
+**Behaviour: `cleaningstation X Y Z`, `tornado N at X Y Z [around NAME] [radius R] [height H]`, `playmate X Y Z [with NAME]`, `damselfish N at X Y Z [radius R]`.**
+(film_behaviour.h) A cleaning station: a grouper hanging still over a coral head, mouth open, while cleaner wrasse dart over it and in at its mouth, other fish
+circling for their turn. A barracuda tornado: N fish (10 to 600) circling in
+a column round a point - or round a diver, following them. A playful sea lion that loops and rolls round a diver and blows bubbles at them. Territorial damselfish that
+dart at anyone - the camera, a diver - who comes near their patch.
+
+**Close up.** (nothing to write) With the camera within a metre and a half of the sand, the sand where it looks is grains in their own colours, bits of broken shell and
+pebbles, fixed in place as the camera moves; plain sand, seen close, is speckled. The caustic slide is now aimed where the sun's beam reaches the camera (before, deep down
+it lit the sand metres off and a macro shot could be outside it). Nudibranchs come in five colour schemes, with spots; seahorses are bigger on thinner stalks.
+
+**The sounds of the sea.** (with `ambience reef` and `ambience sea`) Under the water the reef's hush and crackle, above it the waves' wash, switching as the camera crosses
+the waterline. Boats' engines, dolphins' whistles and clicks, the humpbacks' song and the gannets' plunges are heard from where they are.
+
+**A real underwater camera: `underwater ... [port flat|dome] [filter red|magenta]`.** Behind a flat port the field of view is a third narrower (the water makes things look
+a third nearer) and the picture bends and fringes with colour towards its edges; a dome port (the default) does neither. A red filter (blue water) or a magenta one (green
+water) puts back the warm colours the water takes away.
+
+```
+underwater clarity 2  colour teal  port flat  filter red
+boat       0 -14  toward 90  length 10  speed 2  during 6 40  anchor 13
+sardinerun 0 6 -30  gannets 8  dolphins 3  from 22
+vents      3 in -6 -46 6 -40
+murk       14 3 -20  radius 6  green
+tornado    150 at 0 3 -8  around Ana
+wreckroom  30 -20  length 12
+```
+
+The GPU's wavefront renderer now draws a fog, smoke or ink volume inside another one - the murk, the vents' plumes, round 14's octopus ink, all inside the sea round the
+camera: before, it sampled the inner one only beyond the outer one's far side, so the inner showed only as its shadow. And a camera at the waterline stays a little under
+the surface at its lens with the waves (at nine tenths of the wave it was above the water in a trough, and the picture's lower half showed the surface's top).
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)
