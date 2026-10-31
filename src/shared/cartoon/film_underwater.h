@@ -34,6 +34,25 @@ namespace underwater {
 struct Water {
 	double clarity = 1.0;   // how far you see: 1 a clear sea (about 25 m), 2 tropical, 0.5 a murky one
 	std::string colour = "blue";
+	double lamp = 0.0;      // (round 14 `lamp L`: a diver's lamp on the camera, film_undersea.h)
+	bool ripples = false;   // (`ripples`: the sand of the seabed in ripples)
+	bool lampBlue = false;  // (round 15 `lamp L blue`: a blue lamp, for corals that fluoresce)
+	std::string port = "dome", filter;   // (round 16 `port flat|dome`, `filter red|magenta`: the camera's housing and a colour-correction filter: film_undersea.h housingLook)
+};
+// The current (round 14 `current SPEED toward A [surge P]`): the water's flow, pbrt's metres a second, the same everywhere; with a surge it swings back and forth every P
+// seconds (as much as SPEED each way) about a fifth of SPEED onward. `drift(t)` is how far the water has moved by t (the flow's integral), for what drifts in it.
+struct Current {
+	bool on = false;
+	double speed = 0.0, toward = 0.0, surge = 0.0;
+	Vec3 dir() const { return {std::sin(toward * kPi / 180.0), 0.0, std::cos(toward * kPi / 180.0)}; }
+	Vec3 velocity(double t) const {
+		if (!on) return {0.0, 0.0, 0.0};
+		return dir() * (surge > 0.0 ? 0.2 * speed + speed * std::sin(2.0 * kPi * t / surge) : speed);
+	}
+	Vec3 drift(double t) const {
+		if (!on) return {0.0, 0.0, 0.0};
+		return dir() * (surge > 0.0 ? 0.2 * speed * t - speed * surge / (2.0 * kPi) * (std::cos(2.0 * kPi * t / surge) - 1.0) : speed * t);
+	}
 };
 struct Kelp {
 	int count = 40;
@@ -50,14 +69,22 @@ inline const std::vector<std::string> &colours() {
 	return k;
 }
 
-// The water round the camera: what goes before the Camera line, and the sphere it ends at (story-space eye).
-inline std::string beforeCamera(const Water &w) {
-	const double c = 1.0 / std::max(0.1, w.clarity);
-	const Vec3 a = w.colour == "green" ? Vec3{0.20, 0.06, 0.12} : w.colour == "teal" ? Vec3{0.17, 0.05, 0.07} : Vec3{0.16, 0.05, 0.03};   // absorption per metre (red goes first)
-	const Vec3 s = w.colour == "green" ? Vec3{0.04, 0.07, 0.04} : Vec3{0.03, 0.055, 0.07};   // (scattering: the blue glow of the water all round)
+// The water's absorption per metre (red goes first) and its scattering (the blue glow of the water all round), for its colour and clarity.
+inline Vec3 absorption(const Water &w) {
+	const Vec3 a = w.colour == "green" ? Vec3{0.20, 0.06, 0.12} : w.colour == "teal" ? Vec3{0.17, 0.05, 0.07} : Vec3{0.16, 0.05, 0.03};
+	return a * (1.0 / std::max(0.1, w.clarity));
+}
+inline Vec3 scattering(const Water &w) {
+	const Vec3 s = w.colour == "green" ? Vec3{0.04, 0.07, 0.04} : Vec3{0.03, 0.055, 0.07};
+	return s * (1.0 / std::max(0.1, w.clarity));
+}
+// The water round the camera: what goes before the Camera line (the camera in it unless `cameraInside` is false: a camera at or above the surface), and the sphere it ends
+// at (story-space eye).
+inline std::string beforeCamera(const Water &w, bool cameraInside = true) {
+	const Vec3 a = absorption(w), s = scattering(w);
 	char buf[360];
-	std::snprintf(buf, sizeof buf, "MakeNamedMedium \"sea\" \"string type\" [ \"homogeneous\" ] \"rgb sigma_a\" [ %.5f %.5f %.5f ] \"rgb sigma_s\" [ %.5f %.5f %.5f ] \"float g\" [ 0.55 ]\nMediumInterface \"\" \"sea\"\n",
-				  a.x * c, a.y * c, a.z * c, s.x * c, s.y * c, s.z * c);
+	std::snprintf(buf, sizeof buf, "MakeNamedMedium \"sea\" \"string type\" [ \"homogeneous\" ] \"rgb sigma_a\" [ %.5f %.5f %.5f ] \"rgb sigma_s\" [ %.5f %.5f %.5f ] \"float g\" [ 0.55 ]\n%s",
+				  a.x, a.y, a.z, s.x, s.y, s.z, cameraInside ? "MediumInterface \"\" \"sea\"\n" : "");
 	return buf;
 }
 // (the sphere the water ends at: centred at `centreStory` (story space). The film puts a very large one with its top at the surface: the half-space under it, near enough.)
@@ -91,14 +118,29 @@ inline double causticAt(double u, double v, int k) {
 	};
 	return 0.55 * layer(u, v, 6, 11, 1.0) + 0.45 * layer(u + 0.37, v + 0.21, 9, 23, 0.8);
 }
-// The net as a tiling picture at `size` pixels.
-inline std::string causticPicture(const std::string &film, int k, int size) {
-	char name[48];
-	std::snprintf(name, sizeof name, "caustic_%d_%02d", size, k);
+// Sand ripples (round 14 `ripples`) at (u, v) of a 4 m tile: 32 crests across it, wandering a little, each with a long gentle side towards the light and a short steep
+// one away from it - as the light finds them, about 0.81 to 1.04.
+inline double rippleShade(double u, double v) {
+	const double w = u + 0.018 * std::sin(2.0 * kPi * 2.0 * v) + 0.009 * std::sin(2.0 * kPi * (5.0 * v + u)) + 0.004 * std::sin(2.0 * kPi * (13.0 * v - 2.0 * u));
+	const double s = w * 32.0 - std::floor(w * 32.0);
+	const double lit = s < 0.72 ? 0.07 : -0.16;   // (the gentle side a little brighter, the steep one in shade)
+	return 0.97 + lit * (1.0 - std::exp(-12.0 * std::min(s, 1.0 - s)));
+}
+// The net as a tiling picture at `size` pixels (on rippled sand with `ripples`). `band` (round 14) fades it with the seabed's depth - the waves' focus blurs out on its way
+// down: 0 the full net (a bed less than 10 m down), 1 and 2 fainter (20 m, 35 m), 3 none (deeper: plain sand).
+inline double causticContrast(int band) { return band <= 0 ? 1.0 : band == 1 ? 0.6 : band == 2 ? 0.3 : 0.0; }
+inline int causticBand(double bedDepth) { return bedDepth < 10.0 ? 0 : bedDepth < 20.0 ? 1 : bedDepth < 35.0 ? 2 : 3; }
+inline std::string causticPicture(const std::string &film, int k, int size, bool ripples = false, int band = 0) {
+	char name[64];
+	if (band >= 3) k = 0;   // (no net: one picture for every frame)
+	std::snprintf(name, sizeof name, "caustic_%d_%02d%s%s", size, k, ripples ? "_rip" : "", band > 0 ? (band == 1 ? "_b1" : band == 2 ? "_b2" : "_b3") : "");
+	const double contrast = causticContrast(band);
 	return film_sky::picture(film, name, size, size, [&](std::vector<float> &rgb) {
 		for (int j = 0; j < size; ++j)
 			for (int i = 0; i < size; ++i) {
-				const float val = static_cast<float>(0.35 + 1.9 * causticAt((i + 0.5) / size, (j + 0.5) / size, k));
+				const double grain = band >= 3 ? 0.9 + 0.2 * hash01(j * size + i, 41) : 1.0;   // (round 16: plain sand, seen close, is grains)
+				const double net = (contrast > 0.0 ? 0.8 + contrast * (0.35 + 1.9 * causticAt((i + 0.5) / size, (j + 0.5) / size, k) - 0.8) : 0.8) * grain;
+				const float val = static_cast<float>(net * (ripples ? rippleShade((i + 0.5) / size, (j + 0.5) / size) : 1.0));
 				const std::size_t q = (static_cast<std::size_t>(j) * size + i) * 3;
 				rgb[q] = rgb[q + 1] = rgb[q + 2] = val;
 			}
@@ -108,8 +150,11 @@ inline int causticFrame(double t) { return static_cast<int>(std::floor(t / 0.1))
 
 // The caustics on the seabed round the camera's ground point (pbrt's x z), `groundAt` the seabed's height: a decal of sand coloured by the net of light, tiled every 4 m.
 // `tracedDepth` (0 or more: `caustics traced`, film_caustics.h): the net traced from the surface for a bed that deep, instead of the painted one.
-inline std::string causticText(const std::string &film, double t, double cx, double cz, const std::function<double(double, double)> &groundAt, double tracedDepth = -1.0) {
-	const std::string picture = tracedDepth >= 0.0 ? caustics::picture(film, causticFrame(t), 512, tracedDepth) : causticPicture(film, causticFrame(t), 512);
+// `bedDepth` (round 14): how deep the bed under the camera is - the painted net fades out deeper (causticBand).
+inline std::string causticText(const std::string &film, double t, double cx, double cz, const std::function<double(double, double)> &groundAt, double tracedDepth = -1.0, bool ripples = false,
+							   double bedDepth = 0.0) {
+	const int band = causticBand(bedDepth);   // (plain sand - the caustic slide lights it, round 15 - is one picture, so it can be a sharp one: a macro lens looks at it close)
+	const std::string picture = tracedDepth >= 0.0 ? caustics::picture(film, causticFrame(t), 512, tracedDepth) : causticPicture(film, causticFrame(t), band >= 3 ? 2048 : 512, ripples, band);
 	Mesh m;
 	const int n = 64;
 	const double half = 40.0, x0 = std::floor((cx - half) / 4.0) * 4.0, z0 = std::floor((cz - half) / 4.0) * 4.0, step = 2.0 * half / n;
@@ -141,19 +186,22 @@ inline std::string shaftsText(const std::string &film, double t, const Vec3 &eye
 
 // ---- marine snow ----
 // Flecks drifting down round the camera (story-space eye): a fixed pattern in tiles 6 m square (the same in each, so it stands still in the water), sinking slowly.
-inline std::string snowText(double t, const Vec3 &eyeStory) {
+// `drift` (pbrt's): how far the current has carried the water by t (the flecks go with it); none above `ceiling` (pbrt's y: the surface, for a camera at it).
+inline std::string snowText(double t, const Vec3 &eyeStory, const Vec3 &drift = Vec3{0.0, 0.0, 0.0}, double ceiling = 1e30) {
 	Mesh m;
 	const Mesh fleck = uvSphere(1.0, 4, 3);
 	const double tile = 6.0;
-	const int tx = static_cast<int>(std::floor(eyeStory.x / tile)), ty = static_cast<int>(std::floor(eyeStory.y / tile)), tz = static_cast<int>(std::floor(eyeStory.z / tile));
+	const Vec3 carried{-drift.x, drift.y, drift.z};
+	const Vec3 look = eyeStory - carried;   // (the pattern moves with the water: look it up where the water came from)
+	const int tx = static_cast<int>(std::floor(look.x / tile)), ty = static_cast<int>(std::floor(look.y / tile)), tz = static_cast<int>(std::floor(look.z / tile));
 	for (int a = -1; a <= 1; ++a)
 		for (int b = -1; b <= 1; ++b)
 			for (int c = -1; c <= 1; ++c)
 				for (int k = 0; k < 40; ++k) {
 					const Vec3 base{(tx + a + hash01(k, 1)) * tile, (ty + b + hash01(k, 2)) * tile, (tz + c + hash01(k, 3)) * tile};
 					const double sink = std::fmod(t * 0.03 + hash01(k, 4) * tile, tile);
-					Vec3 p = base - Vec3{0.0, sink, 0.0} + Vec3{0.2 * std::sin(t * 0.3 + k), 0.0, 0.2 * std::cos(t * 0.25 + 2.0 * k)};
-					if (length(p - eyeStory) > 9.0 || length(p - eyeStory) < 0.3) continue;
+					Vec3 p = base - Vec3{0.0, sink, 0.0} + Vec3{0.2 * std::sin(t * 0.3 + k), 0.0, 0.2 * std::cos(t * 0.25 + 2.0 * k)} + carried;
+					if (length(p - eyeStory) > 9.0 || length(p - eyeStory) < 0.3 || p.y > ceiling) continue;
 					const double r = 0.006 + 0.012 * hash01(k, 5);
 					const int base0 = static_cast<int>(m.verts.size());
 					for (std::size_t i = 0; i < fleck.verts.size(); ++i) {
@@ -167,14 +215,15 @@ inline std::string snowText(double t, const Vec3 &eyeStory) {
 
 // ---- kelp and coral ----
 // A kelp forest at t: each stipe rising from the seabed in a gentle S, swaying with the swell (its top furthest), blades along it.
-inline std::string kelpText(const Kelp &k, double t, const std::function<double(double, double)> &groundAt) {
+// `flow` (pbrt's, metres a second: round 14's current): the stipes lean down-current, the more the higher up them.
+inline std::string kelpText(const Kelp &k, double t, const std::function<double(double, double)> &groundAt, const Vec3 &flow = Vec3{0.0, 0.0, 0.0}) {
 	Mesh m;
 	for (int i = 0; i < k.count; ++i) {
 		const int s = k.seed * 977 + i;
 		const double x = k.x0 + (k.x1 - k.x0) * hash01(s, 1), z = k.z0 + (k.z1 - k.z0) * hash01(s, 2);
 		const double h = k.height * (0.6 + 0.6 * hash01(s, 3)), phase = 2.0 * kPi * hash01(s, 4);
 		const Vec3 root{-x, groundAt(x, z), z};
-		const Vec3 sway{0.6 * std::sin(t * 0.7 + phase + x * 0.05), 0.0, 0.4 * std::cos(t * 0.6 + phase)};
+		const Vec3 sway = Vec3{0.6 * std::sin(t * 0.7 + phase + x * 0.05), 0.0, 0.4 * std::cos(t * 0.6 + phase)} + Vec3{-flow.x, 0.0, flow.z} * 6.0;
 		const auto stem = [&](double u) { return root + Vec3{0.0, h * u, 0.0} + sway * (u * u * h * 0.25) + Vec3{0.3 * std::sin(u * 5.0 + phase), 0.0, 0.0}; };
 		const Vec3 side = normalize(Vec3{std::cos(phase), 0.0, std::sin(phase)});
 		nature::addStrip(m, stem, [](double u) { return 0.05 * (1.0 - 0.6 * u); }, side, 10);

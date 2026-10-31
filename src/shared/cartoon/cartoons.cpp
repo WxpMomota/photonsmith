@@ -229,7 +229,10 @@ Film filmOf(Registry &r, const film_file::DataFilm &d, bool drafted, int id, con
 	// else to hear has a soft wind: a video of a film is never silent.)
 	const bool quiet = !drafted && music_cues::fileOf(d.spec.key).empty() && !d.hasEvents() && d.spec.ambience.empty() && d.spec.weather.empty() && d.spec.lightnings.empty();
 	f.soundtrack = [p, drafted, quiet, names = d.shotNameList(), speech = f.speechAt](audio::Mix &m) {
-		dressing::play(m, quiet ? std::vector<dressing::Ambience>{{"wind", 0.6}} : p->spec.ambience);
+		std::vector<dressing::Ambience> beds = quiet ? std::vector<dressing::Ambience>{{"wind", 0.6}} : p->spec.ambience;
+		if (p->spec.hasUnderwater)   // (an underwater film's reef and sea beds follow the camera across the waterline: the soundscape plays them, film_world.cpp)
+			beds.erase(std::remove_if(beds.begin(), beds.end(), [](const dressing::Ambience &a) { return a.kind == "reef" || a.kind == "sea" || a.kind == "seawash"; }), beds.end());
+		dressing::play(m, beds);
 		for (const particles::Weather &w : p->spec.weather)
 			if (w.kind == "rain") particles::rainSound(m, w);
 		sfx::play(m, p->events());

@@ -307,7 +307,7 @@ struct Ambience {
 	double gain = 1.0;
 };
 inline const std::vector<std::string> &ambienceKinds() {
-	static const std::vector<std::string> k = {"wind", "birds", "crickets", "water", "night", "sea", "falls", "geese"};
+	static const std::vector<std::string> k = {"wind", "birds", "crickets", "water", "night", "sea", "falls", "geese", "reef"};
 	return k;
 }
 namespace sound {
@@ -348,14 +348,29 @@ inline void water(audio::Mix &m, double length, double gain) {
 		m.put(t, audio::chirp(f, f * 1.6, 0.035, 0.0, 0.0), 0.025 * gain, -0.6 + 1.2 * audio::unit(static_cast<unsigned>(t * 991.0)), 0.3);
 	}
 }
-inline void sea(audio::Mix &m, double length, double gain, bool breakers = true) {
-	for (double s = 0.0; s < length; s += 1.4)   // the wash: low noise, overlapping
+inline void sea(audio::Mix &m, double length, double gain, bool breakers = true, double from = 0.0) {   // (`from`: where it starts)
+	for (double s = from; s < length; s += 1.4)   // the wash: low noise, overlapping
 		m.put(s, audio::noiseBurst(2.8, 1.0, 0.8, 300.0, 700.0, 61u + static_cast<unsigned>(s * 10.0)), 0.06 * gain, 0.4 * std::sin(s * 0.2), 0.4);
-	for (double t = 1.5; breakers && t < length; t += 5.5 + 3.5 * audio::unit(static_cast<unsigned>(t * 100.0) + 3u)) {   // a wave breaking: a swell of noise that opens up, then a long hiss
+	for (double t = from + 1.5; breakers && t < length; t += 5.5 + 3.5 * audio::unit(static_cast<unsigned>(t * 100.0) + 3u)) {   // a wave breaking: a swell of noise that opens up, then a long hiss
 		const unsigned seed = static_cast<unsigned>(t * 1000.0) + 5u;
 		m.put(t, audio::noiseBurst(1.2, 0.9, 0.2, 400.0, 2400.0, seed), 0.12 * gain, -0.5 + audio::unit(seed), 0.5);
 		m.put(t + 1.0, audio::noiseBurst(3.5, 0.05, 3.2, 2600.0, 900.0, seed + 1u), 0.07 * gain, -0.5 + audio::unit(seed + 2u), 0.5);
 	}
+}
+// Under the water: a low, close hush, and the crackle of a reef's snapping shrimp - thousands of tiny clicks, near and far - with now and then a burble of bubbles.
+inline void reef(audio::Mix &m, double length, double gain, double from = 0.0) {
+	for (double s = from; s < length; s += 1.2)   // the hush: low noise, overlapping, never quite still
+		m.put(s, audio::noiseBurst(2.4, 0.9, 0.9, 90.0, 260.0, 81u + static_cast<unsigned>(s * 10.0)), 0.09 * gain * (0.8 + 0.2 * std::sin(0.4 * s)), 0.3 * std::sin(0.13 * s), 0.5);
+	for (double t = from; t < length; t += 0.004 + 0.03 * audio::unit(static_cast<unsigned>(t * 10007.0) + 13u)) {   // the shrimp: sharp clicks, each its own distance
+		const unsigned seed = static_cast<unsigned>(t * 99991.0) + 29u;
+		const double close = audio::unit(seed);
+		m.put(t, audio::noiseBurst(0.006, 0.0002, 0.005, 2500.0 + 4000.0 * close, 9000.0, seed), 0.012 * gain * (0.3 + close * close), -0.9 + 1.8 * audio::unit(seed + 1u), 0.6);
+	}
+	for (double t = from + 2.0; t < length; t += 6.0 + 7.0 * audio::unit(static_cast<unsigned>(t * 100.0) + 91u))   // a burble of bubbles somewhere near
+		for (int k = 0; k < 5; ++k) {
+			const unsigned seed = static_cast<unsigned>(t * 1000.0) + 7u * static_cast<unsigned>(k);
+			m.put(t + 0.09 * k, audio::chirp(240.0 + 300.0 * audio::unit(seed), 520.0 + 400.0 * audio::unit(seed + 1u), 0.05, 0.0, 0.0), 0.02 * gain, -0.5 + audio::unit(seed + 2u), 0.4);
+		}
 }
 inline void falls(audio::Mix &m, double length, double gain) {
 	for (double s = 0.0; s < length; s += 0.8) {   // a roar: broad noise, low and high, overlapping so it never breathes
@@ -391,6 +406,7 @@ inline void play(audio::Mix &m, const std::vector<Ambience> &beds) {
 		else if (a.kind == "sea" || a.kind == "seawash") sound::sea(m, m.seconds(), a.gain, a.kind == "sea");   // (seawash: no breakers of its own)
 		else if (a.kind == "falls") sound::falls(m, m.seconds(), a.gain);
 		else if (a.kind == "geese") sound::geese(m, m.seconds(), a.gain);
+		else if (a.kind == "reef") sound::reef(m, m.seconds(), a.gain);
 	}
 }
 

@@ -37,6 +37,7 @@ struct Sea {
 	bool spectral = true;     // an ocean spectrum (film_ocean.h); `model gerstner`: the twenty summed waves of before
 	bool foam = true;
 	bool fromBelow = false;   // (film_underwater.h) seen from under it: a thin water surface, which lets the sun's light down
+	double holeX = 0.0, holeZ = 0.0, holeR = 0.0;   // (film_undersea.h) a camera at the waterline: the surface keeps clear of its lens, out to holeR (pbrt's x z)
 	Vec3 glow{0.0, 0.0, 0.0};   // (film_glow.h `bioluminescence`) the light its foam gives out where the sea is stirred; none when zero
 	const Vec3 *glowing() const { return glow.x + glow.y + glow.z > 0.0 ? &glow : nullptr; }
 };
@@ -243,6 +244,10 @@ inline std::string seaText(const Sea &s, double t, const Vec3 &eyeStory, const V
 		for (int i = 0; i < around; ++i) {
 			const int a = j * w + i;
 			for (const std::array<int, 3> &tri : {std::array<int, 3>{a, a + w, a + 1}, std::array<int, 3>{a + 1, a + w, a + w + 1}}) {
+				if (s.holeR > 0.0) {   // (round a camera at the waterline: nothing)
+					const Vec3 c = (water.verts[static_cast<std::size_t>(tri[0])] + water.verts[static_cast<std::size_t>(tri[1])] + water.verts[static_cast<std::size_t>(tri[2])]) * (1.0 / 3.0);
+					if (std::hypot(-c.x - s.holeX, c.z - s.holeZ) < s.holeR) continue;
+				}
 				water.tris.push_back(tri);
 				if (shallow[static_cast<std::size_t>(tri[0])] && shallow[static_cast<std::size_t>(tri[1])] && shallow[static_cast<std::size_t>(tri[2])]) clearWater.tris.push_back(tri);
 				else deep.push_back(tri);

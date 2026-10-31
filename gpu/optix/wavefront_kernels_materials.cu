@@ -475,10 +475,13 @@ extern "C" __global__ void evaluate_materials(
 
 	switch (lamp_glass(mat) ? MaterialType::Dielectric : mat.type) {   // (a lamp of glass refracts as the Dielectric below)
 	case MaterialType::DiffuseLight: {
-		// Only a lamp that also reflects gets here (every other emitter returned above): a diffuse surface of the lamp's flat reflectance.
+		// Only a lamp that also reflects gets here (every other emitter returned above): a diffuse surface of the lamp's reflectance - flat, or its picture
+		// (lampAlbedoTexIdx: its textureIdx is its emission).
 		scattered_dir = normalize(normal + wf_rand_unit(seed));
 		if (wf_near_zero(scattered_dir)) scattered_dir = normal;
-		attenuation = albedoSpectrum(mat.albedo);
+		attenuation = albedoSpectrum(mat.lampAlbedoTexIdx >= 0
+			? wf_sample_texture(textures, texturePixels, mat.lampAlbedoTexIdx, h.uv_u, h.uv_v, hit_point) * mat.lampAlbedoTexScale * mat.albedo
+			: mat.albedo);
 		scattered   = true;
 		is_specular = false;
 		break;
@@ -712,7 +715,7 @@ extern "C" __global__ void evaluate_materials(
 		const bool c_rej = !c_sample.scattered;
 		if (c_rej && c_dist.EffectivelySmooth()) { scattered = false; break; }
 		float3 c_F = c_rej ? make_float3(0.0f, 0.0f, 0.0f)
-		                   : FrConductorRGB(c_sample.wm_dot_wi, mat.eta_c.x, mat.eta_c.y, mat.eta_c.z, mat.k_c.x, mat.k_c.y, mat.k_c.z);
+		                   : FrConductorRGB(c_sample.wm_dot_wi, mat.eta_c.x, mat.eta_c.y, mat.eta_c.z, mat.k_c.x, mat.k_c.y, mat.k_c.z, mat.filmThickness, mat.filmEta);
 		scattered_dir = c_rej ? cn : normalize(c_sample.wo_x*ctan + c_sample.wo_y*cbitan + c_sample.wo_z*cn);
 		scattered   = true;
 

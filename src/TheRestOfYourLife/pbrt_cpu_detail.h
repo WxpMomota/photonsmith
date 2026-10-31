@@ -311,18 +311,23 @@ inline std::shared_ptr<material> makeMaterialBase(const pbrt_flatten::Material &
 		// named spectrum) keeps the pre-existing approximation: our `metal`
 		// takes a flat albedo and a fuzz, so roughness maps onto fuzz
 		// directly.
-		if (m.hasConductorPreset)
-			return std::make_shared<conductor>(
+		if (m.hasConductorPreset) {
+			auto c = std::make_shared<conductor>(
 				m.conductorEta[0], m.conductorEta[1], m.conductorEta[2],
 				m.conductorK[0], m.conductorK[1], m.conductorK[2],
 				m.roughness_u, m.roughness_v, m.remapRoughness);
+			c->set_film(m.filmThickness, m.filmEta);
+			return c;
+		}
 		{
 			// "rgb reflectance" (or nothing given): pbrt-v4's own conversion to eta = 1 and k solved from the reflectance, run through
 			// the same GGX + complex-Fresnel conductor. The old flat-albedo `metal` (roughness as a mirror fuzz) never had a glossy
 			// lobe, so a point/spot light could not make a highlight on it at all (K43 rendered no highlight; Metal and pbrt do).
 			const color k = reflectanceToConductorK(albedo);
-			return std::make_shared<conductor>(1.0, 1.0, 1.0, k.x(), k.y(), k.z(),
+			auto c = std::make_shared<conductor>(1.0, 1.0, 1.0, k.x(), k.y(), k.z(),
 				m.roughness_u, m.roughness_v, m.remapRoughness);
+			c->set_film(m.filmThickness, m.filmEta);
+			return c;
 		}
 	// Pass-through "interface" material (pbrt-v4's Material "none"/"" -
 	// see MaterialKind::Interface's own comment and interface_material's

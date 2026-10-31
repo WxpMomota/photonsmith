@@ -693,6 +693,17 @@ void MainWindow::addVideoPreviewTab(const QString &title, const QString &tooltip
 
 	QSlider *positionSlider = new QSlider(Qt::Horizontal);
 	controlsLayout->addWidget(positionSlider, 1);
+	// Play speed: normal, twice or three times as fast (a long film watched through quickly). The player's own rate, so the picture, the sound and the slider all keep up;
+	// each tab keeps its own.
+	QComboBox *speedBox = new QComboBox();
+	for (const int rate : {1, 2, 3}) speedBox->addItem(QString::number(rate) + QChar(0x00D7), rate);   // (1x, 2x, 3x with a real times sign)
+	speedBox->setToolTip(tr("Play speed"));
+	connect(speedBox, &QComboBox::currentIndexChanged, page, [page, player, speedBox](int) {
+		const double rate = speedBox->currentData().toDouble();
+		player->setPlaybackRate(rate);
+		page->setProperty("playSpeed", rate);   // (what was asked for: a player with no media backend - a headless test machine - may keep its own rate at 1)
+	});
+	controlsLayout->addWidget(speedBox);
 	layout->addWidget(controls);
 
 	connect(player, &QMediaPlayer::playbackStateChanged, page, [playPauseButton](QMediaPlayer::PlaybackState state) {

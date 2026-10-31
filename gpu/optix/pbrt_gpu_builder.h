@@ -1834,6 +1834,28 @@ inline void addPunctualLights(BuildCtx &c) {
 						}
 					}
 					usedRealSlide = true;
+					// a bigger slide is uploaded whole too (ProjectionLightGPU::texIdx): the inline copy above stays as its stand-in. Linear bytes over the slide's brightest value,
+					// rows in the inline copy's order (bottom up)
+					if ((width > kProjImageMaxDim || height > kProjImageMaxDim) && width <= 4096 && height <= 4096) {
+						float peak = 0.0f;
+						for (std::size_t i = 0; i < static_cast<std::size_t>(width) * height * 3; ++i) peak = std::max(peak, fdata[i]);
+						if (peak > 0.0f) {
+							TextureData tex{};
+							tex.kind = TextureKind::Image;
+							tex.width = width;
+							tex.height = height;
+							tex.srgb = false;
+							tex.pixelOffset = static_cast<int>(out.texturePixels.size());
+							for (int v = 0; v < height; ++v) {
+								const float *row = fdata + static_cast<std::size_t>(height - 1 - v) * width * 3;
+								for (int k = 0; k < width * 3; ++k)
+									out.texturePixels.push_back(static_cast<unsigned char>(std::lround(std::clamp(row[k] / peak, 0.0f, 1.0f) * 255.0f)));
+							}
+							pr.texIdx = static_cast<int>(out.textures.size());
+							pr.texScale = peak;
+							out.textures.push_back(tex);
+						}
+					}
 				}
 				if (fdata) stbi_image_free(fdata);
 			}

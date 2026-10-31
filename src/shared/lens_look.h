@@ -80,7 +80,18 @@ struct Look {
 			if (lift[k] != 0.0 || gamma[k] != 1.0 || gain[k] != 1.0 || tint[k] != 1.0) return true;
 		return false;
 	}
-	bool active() const { return paint > 0.0 || sunbeams > 0.0 || bloom > 0.0 || flare > 0.0 || star > 0.0 || vignette > 0.0 || warmth != 0.0 || saturation != 1.0 || graded(); }
+	// Heat shimmer (`shimmer A`, at `shimmer-time T` seconds): the air over hot ground bending the light - what a long lens sees across a plain at midday. The picture is
+	// pushed about by a field of rising, wavering ripples, A (a share of the picture's height: 0.002 a light shimmer, 0.006 a strong one) at the bottom of the frame where
+	// the hot air is, fading to nothing two thirds of the way up. A film writes its time into each frame's look line, so the ripples move from frame to frame.
+	double shimmer = 0.0, shimmerTime = 0.0;
+	// A dome port half under the water (`waterline Y`: the line's row, a share of the picture's height from the top; `drops D`, at `drops-time T`): the meniscus along
+	// the line - a dark wavering edge with a bright one over it - and drops of water running slowly down the dome above it, each a little lens showing the picture behind it
+	// turned over (D 1 about seventy of them). film_undersea.h writes these for a camera at the waterline.
+	double waterline = -10.0, drops = 0.0, dropsTime = 0.0;
+	// A flat port in front of the lens (round 16: an underwater housing): `distort K` bows straight lines outwards towards the edges (pincushion: K above 0), `fringe F`
+	// splits the colours there - the red pulled out, the blue in - as the water and the port's glass bend them differently.
+	double distort = 0.0, fringe = 0.0;
+	bool active() const { return shimmer > 0.0 || waterline > -1.0 || drops > 0.0 || distort != 0.0 || fringe != 0.0 || paint > 0.0 || sunbeams > 0.0 || bloom > 0.0 || flare > 0.0 || star > 0.0 || vignette > 0.0 || warmth != 0.0 || saturation != 1.0 || graded(); }
 };
 
 // Values that were set (a flag, a scene line) override `base`; a negative bloom/vignette or a saturation below 0 means "not given" in `given`.
@@ -152,6 +163,13 @@ inline std::string parse(const std::string &text, Look &out) {
 		else if (word == "star-length") out.starLength = std::clamp(v, 0.005, 0.5);
 		else if (word == "star-threshold") out.starThreshold = std::clamp(v, 0.0, 1000.0);
 		else if (word == "vignette") out.vignette = std::clamp(v, 0.0, 1.0);
+		else if (word == "shimmer") out.shimmer = std::clamp(v, 0.0, 0.05);
+		else if (word == "shimmer-time") out.shimmerTime = v;
+		else if (word == "waterline") out.waterline = std::clamp(v, -5.0, 5.0);
+		else if (word == "drops") out.drops = std::clamp(v, 0.0, 5.0);
+		else if (word == "drops-time") out.dropsTime = v;
+		else if (word == "distort") out.distort = std::clamp(v, -0.5, 0.5);
+		else if (word == "fringe") out.fringe = std::clamp(v, 0.0, 0.05);
 		else if (word == "warmth") out.warmth = std::clamp(v, -1.0, 1.0);
 		else if (word == "saturation") out.saturation = std::clamp(v, 0.0, 3.0);
 		else if (word == "paint") out.paint = std::clamp(v, 0.0, 40.0);
@@ -279,6 +297,78 @@ inline void apply(float *rgb, int w, int h, const Look &look) {
 	const std::size_t n = static_cast<std::size_t>(w) * static_cast<std::size_t>(h);
 	for (std::size_t i = 0; i < n * 3; ++i)
 		if (!std::isfinite(rgb[i])) rgb[i] = 0.0f;
+
+	if (look.shimmer > 0.0) {   // heat shimmer first: it is in the air, in front of the lens (see Look::shimmer)
+		const std::vector<float> src(rgb, rgb + n * 3);
+		const double T = look.shimmerTime, A = look.shimmer * h;
+		for (int y = 0; y < h; ++y) {
+			const double v = (y + 0.5) / h, heat = std::clamp((v - 0.33) / 0.67, 0.0, 1.0);
+			if (heat <= 0.0) continue;
+			for (int x = 0; x < w; ++x) {
+				const double u = (x + 0.5) / h;   // (both in picture heights, so the ripples are round whatever the frame's shape)
+				const double rise = v * 60.0 + T * 7.0;   // (the ripples climb as the warm air does)
+				const double dx = 0.6 * std::sin(rise + 3.0 * std::sin(u * 11.0 + T * 1.7)) + 0.4 * std::sin(2.3 * rise - u * 23.0 + T * 3.1);
+				const double dy = 0.5 * std::sin(1.7 * rise + u * 17.0 - T * 2.3);
+				double c[3];
+				detail::sample(src, w, h, x + 0.5 + A * heat * heat * dx, y + 0.5 + 0.4 * A * heat * heat * dy, c);
+				for (int k = 0; k < 3; ++k) rgb[(static_cast<std::size_t>(y) * static_cast<std::size_t>(w) + static_cast<std::size_t>(x)) * 3 + k] = static_cast<float>(c[k]);
+			}
+		}
+	}
+
+	if (look.distort != 0.0 || look.fringe != 0.0) {   // a flat port (see Look::distort): each colour looked up a little further out the further from the middle it is
+		const std::vector<float> src(rgb, rgb + n * 3);
+		const double cx = 0.5 * w, cy = 0.5 * h, half = 0.5 * std::hypot(static_cast<double>(w), static_cast<double>(h));
+		for (int y = 0; y < h; ++y)
+			for (int x = 0; x < w; ++x) {
+				const double dx = (x + 0.5 - cx) / half, dy = (y + 0.5 - cy) / half, r2 = dx * dx + dy * dy;
+				for (int k = 0; k < 3; ++k) {
+					const double f = 1.0 / (1.0 + look.distort * r2) * (1.0 - (k - 1) * look.fringe * r2);   // (red further out than green, blue nearer in)
+					double c[3];
+					detail::sample(src, w, h, cx + dx * f * half, cy + dy * f * half, c);
+					rgb[(static_cast<std::size_t>(y) * static_cast<std::size_t>(w) + static_cast<std::size_t>(x)) * 3 + k] = static_cast<float>(c[k]);
+				}
+			}
+	}
+
+	if (look.waterline > -1.0 || look.drops > 0.0) {   // a dome port at the waterline (see Look::waterline): the drops on it, then the line's meniscus
+		const std::vector<float> src(rgb, rgb + n * 3);
+		const double line = (look.waterline > -1.0 ? look.waterline : 1.0) * h, T = look.dropsTime;
+		const auto px = [&](int x, int y) { return rgb + (static_cast<std::size_t>(y) * static_cast<std::size_t>(w) + static_cast<std::size_t>(x)) * 3; };
+		const int count = static_cast<int>(std::lround(70.0 * look.drops));
+		for (int k = 0; k < count && line > 0.0; ++k) {
+			const auto rnd = [k](int salt) {
+				unsigned v = static_cast<unsigned>(k) * 747796405u + static_cast<unsigned>(salt) * 2891336453u + 12345u;
+				v = ((v >> ((v >> 28u) + 4u)) ^ v) * 277803737u;
+				return ((v >> 22u) ^ v) % 1000003u / 1000003.0;
+			};
+			const double R = (0.006 + 0.028 * rnd(1) * rnd(1)) * h;
+			const double fall = 0.004 * h * T * (0.3 + rnd(4));   // (each runs down at its own pace, the big ones faster)
+			const double span = std::max(1.0, line - 2.0 * R);
+			const double cy = R + std::fmod(rnd(2) * span + fall * (1.0 + 20.0 * R / h), span), cx = rnd(3) * w;
+			for (int y = std::max(0, static_cast<int>(cy - R)); y <= std::min(h - 1, static_cast<int>(cy + R)); ++y)
+				for (int x = std::max(0, static_cast<int>(cx - R)); x <= std::min(w - 1, static_cast<int>(cx + R)); ++x) {
+					const double dx = x + 0.5 - cx, dy = y + 0.5 - cy, d = std::sqrt(dx * dx + dy * dy) / R;
+					if (d >= 1.0) continue;
+					double c[3];
+					detail::sample(src, w, h, cx - 1.8 * dx, cy - 1.8 * dy, c);   // (a little lens: what is behind it, turned over)
+					const double rim = d > 0.8 ? 0.55 + 0.45 * (1.0 - (d - 0.8) / 0.2) : 1.0;
+					const double glint = std::exp(-((dx + 0.35 * R) * (dx + 0.35 * R) + (dy + 0.4 * R) * (dy + 0.4 * R)) / (0.02 * R * R));
+					float *o = px(x, y);
+					for (int q = 0; q < 3; ++q) o[q] = static_cast<float>(c[q] * 1.05 * rim + 1.5 * glint);
+				}
+		}
+		if (look.waterline > -1.0 && line > -0.03 * h && line < 1.03 * h)
+			for (int x = 0; x < w; ++x) {
+				const double u = (x + 0.5) / h, yl = line + 0.004 * h * std::sin(u * 21.0 + T * 2.3) + 0.0025 * h * std::sin(u * 57.0 - T * 4.1);
+				for (int y = std::max(0, static_cast<int>(yl - 0.012 * h)); y <= std::min(h - 1, static_cast<int>(yl + 0.012 * h)); ++y) {
+					const double s = (y + 0.5 - yl) / (0.004 * h);   // (above the line negative)
+					const double dark = 1.0 - 0.75 * std::exp(-s * s), bright = 0.6 * std::exp(-(s + 1.6) * (s + 1.6) / 0.5);
+					float *o = px(x, y);
+					for (int q = 0; q < 3; ++q) o[q] = static_cast<float>(o[q] * dark + bright * (0.5 + o[q]));
+				}
+			}
+	}
 
 	if (look.paint > 0.0) {   // the painting first: the lens and the grade go over it (sizes are given at a picture 1080 high)
 		const double scale = h / 1080.0;

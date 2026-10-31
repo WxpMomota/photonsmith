@@ -6,6 +6,8 @@
  */
 #include <gtest/gtest.h>
 
+#include <filesystem>
+#include <fstream>
 #include <vector>
 
 #include "pbrt_gpu_builder.h"
@@ -48,7 +50,30 @@ TEST(PbrtGpuLampMaterial, ADefaultLampReflectsAndABlackBodyDoesNot) {
 
 TEST(PbrtGpuLampMaterial, ALampWithAnotherMaterialIsCountedAsNotReflected) {
 	const SceneData scene = buildScene("WorldBegin\n" + lamp("Material \"conductor\"", 0) + lamp("Material \"coateddiffuse\"", 2) + lamp("", 4));
-	EXPECT_EQ(scene.lampMaterialsNotReflected, 2) << "the conductor and the coated lamp; the default one is a flat diffuse";
+	EXPECT_EQ(scene.lampMaterialsNotReflected, 1) << "the conductor; a coated diffuse reflects as its diffuse base, the default one is a flat diffuse";
+}
+
+// A lamp whose diffuse or coated-diffuse reflectance is a picture (a planet with a glow picture) reflects that picture: lampAlbedoTexIdx. Before, it reflected nothing on
+// the GPU and a sunlit planet's day side was black there while the CPU drew it.
+TEST(PbrtGpuLampMaterial, ALampWithAPictureForItsReflectanceReflectsThePicture) {
+	const std::filesystem::path pic = std::filesystem::temp_directory_path() / "photonsmith_lamp_reflectance.ppm";
+	{
+		std::ofstream f(pic, std::ios::binary);
+		f << "P6\n2 2\n255\n";
+		const unsigned char px[12] = {20, 80, 200, 20, 80, 200, 40, 160, 40, 40, 160, 40};
+		f.write(reinterpret_cast<const char*>(px), sizeof px);
+	}
+	const std::string tex = "Texture \"land\" \"spectrum\" \"imagemap\" \"string filename\" [ \"" + pic.generic_string() + "\" ]\n";
+	const SceneData scene = buildScene("WorldBegin\n" + tex + lamp("Material \"coateddiffuse\" \"texture reflectance\" \"land\"", 0) +
+									   lamp("Material \"diffuse\" \"texture reflectance\" \"land\"", 2));
+	const std::vector<const MaterialData*> lamps = lampMaterials(scene);
+	ASSERT_EQ(lamps.size(), 2u);
+	for (const MaterialData* m : lamps) {
+		EXPECT_TRUE(lamp_reflects(*m));
+		EXPECT_GE(m->lampAlbedoTexIdx, 0) << "its reflectance's picture";
+		EXPECT_NE(m->lampAlbedoTexIdx, m->textureIdx) << "not its emission's";
+	}
+	EXPECT_EQ(scene.lampMaterialsNotReflected, 0);
 }
 
 TEST(PbrtGpuLampMaterial, AnOrdinaryConductorIsNotALamp) {

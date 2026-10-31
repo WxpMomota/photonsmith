@@ -1445,9 +1445,30 @@ void MainWindow::runVideoFramesSelfTest(const std::function<void(const QString &
 		log(*shotTaken ? "a picture was taken while frames were coming in" : "(the video was too quick for a picture part-way)");
 		shot("videoframes_done");
 		// the Preview tab opens for the finished video a moment later: its sidebar (the render's info, the scene's description and the technique note in one column) is photographed then
-		QTimer::singleShot(3000, this, [this, shot, log, ok]() {
+		QTimer::singleShot(3000, this, [this, shot, log, ok]() mutable {
 			if (m_previewTabIndex >= 0) m_tabWidget->setCurrentIndex(m_previewTabIndex);
 			QApplication::processEvents();
+			// the player's speed: 1x, 2x and 3x, and choosing one sets the player's own rate
+			QWidget *page = m_previewSubTabs ? m_previewSubTabs->currentWidget() : nullptr;
+			QComboBox *speed = nullptr;
+			if (page)
+				for (QComboBox *c : page->findChildren<QComboBox *>())
+					if (c->toolTip() == tr("Play speed")) speed = c;
+			QMediaPlayer *player = page ? page->findChild<QMediaPlayer *>() : nullptr;
+			const bool found = speed && player && speed->count() == 3;
+			if (!player)   // (no video tab: the video was not put together here - no ffmpeg on a bare test machine - so there is no player to look at)
+				log("(no video playing in the Preview tab: its speed choice is not looked at)");
+			else
+				log(QString("%1: the video's speed choice (1x, 2x, 3x)").arg(found ? "ok" : "FAIL"));
+			ok = ok && (found || !player);
+			if (found) {
+				speed->setCurrentIndex(2);
+				QApplication::processEvents();
+				// (the speed asked for; the player's own rate is only logged - with no media backend, on a headless test machine, it may stay at 1)
+				const bool fast = std::abs(page->property("playSpeed").toDouble() - 3.0) < 1e-9 && speed->currentText() == QString("3") + QChar(0x00D7);
+				log(QString("%1: 3x asked for (%2); the player plays at rate %3").arg(fast ? "ok" : "FAIL").arg(speed->currentText()).arg(player->playbackRate()));
+				ok = ok && fast;
+			}
 			shot("videoframes_preview");
 			log(ok ? "RESULT: OK" : "RESULT: FAIL");
 			QApplication::exit(ok ? 0 : 1);

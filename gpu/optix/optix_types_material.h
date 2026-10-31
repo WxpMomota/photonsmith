@@ -421,6 +421,10 @@ struct MaterialData {
 	// DiffuseLight only: the lamp's surface is smooth glass (pbrt: an AreaLightSource on a "dielectric" shape) of index `ior`, tinted by `transmission_filter` - it adds its
 	// light and then refracts like a Dielectric, so at index 1 it is a glow the scene behind shows through (lamp_glass()).
 	bool lampGlass = false;
+	// DiffuseLight only: a picture for the reflectance of a lamp that also reflects (lamp_reflects()), times `albedo` - pbrt's AreaLightSource on a shape whose diffuse or
+	// coated-diffuse material has an imagemap reflectance (a planet with a glow picture: its day side in its own colours). -1: the flat `albedo`. textureIdx is its emission.
+	int lampAlbedoTexIdx = -1;
+	float lampAlbedoTexScale = 1.0f;
 	// Light linking (src/shared/light_link.h): the link group of the shapes this material is on, and for an emitter the groups it does NOT light (bit g: group g) -
 	// kept inverted so that a zeroed MaterialData lights every group.
 	int linkGroup = 0;
@@ -437,6 +441,9 @@ struct MaterialData {
 	float proxyBlend = 0.0f;
 	// Ray visibility (src/shared/pbrt_scene.h MaterialDecl): bit 1 hidden from camera rays (they pass through it), bit 2 casts no shadows; 0 (a zeroed MaterialData) seen by all.
 	int hidden = 0;
+	// Conductor: a thin film on it (nanometres, 0 none) and its index - the interference colours (fresnel.h FrThinFilm; pbrt_flatten Material::filmThickness).
+	float filmThickness = 0.0f;
+	float filmEta = 1.33f;
 };
 
 // A lamp that also reflects (pbrt-v4: an AreaLightSource keeps the shape's Material, default diffuse 0.5). The builder (pbrt_gpu_builder_materials.h makeMaterial) stores a flat

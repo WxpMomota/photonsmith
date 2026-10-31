@@ -189,6 +189,76 @@ inline T FrComplex(T cos_theta_i, std::complex<T> eta) {
 #endif
 
 // ---------------------------------------------------------------------------
+// FrThinFilm -- a thin transparent film (index film_eta, film_nm nanometres thick) on a conductor (eta_r + i eta_k), seen from the air: Airy's sum of
+// the light reflected at the film's top and at its foot after any number of trips across it, which interfere - the colours of a soap film, an oil slick,
+// a beetle's or a hummingbird's shell, a dragonfly's wing. r = (r01 + r12 e^(i delta)) / (1 + r01 r12 e^(i delta)) for each polarisation, delta =
+// 4 pi film_eta film_nm cos(theta_film) / lambda; R = (|r_s|^2 + |r_p|^2) / 2. With no film (film_nm 0, or film_eta 1) it is FrComplex exactly. Not in
+// pbrt-v4 (its ThinFilm is not a material): this renderer's own, on the conductor ("float filmthickness", "float filmeta").
+// FrThinFilmRGB: each channel the mean of three wavelengths across its band (so a thick film greys out as the eye sees it, rather than ringing).
+// ---------------------------------------------------------------------------
+namespace thin_film_detail {
+template <typename T>
+struct Cx {
+	T re, im;
+};
+template <typename T> CPU_GPU Cx<T> add(Cx<T> a, Cx<T> b) { return {a.re + b.re, a.im + b.im}; }
+template <typename T> CPU_GPU Cx<T> sub(Cx<T> a, Cx<T> b) { return {a.re - b.re, a.im - b.im}; }
+template <typename T> CPU_GPU Cx<T> mul(Cx<T> a, Cx<T> b) { return {a.re * b.re - a.im * b.im, a.re * b.im + a.im * b.re}; }
+template <typename T> CPU_GPU Cx<T> div(Cx<T> a, Cx<T> b) {
+	const T d = b.re * b.re + b.im * b.im;
+	return {(a.re * b.re + a.im * b.im) / d, (a.im * b.re - a.re * b.im) / d};
+}
+template <typename T> CPU_GPU Cx<T> csqrt(Cx<T> z) {   // (the root with a non-negative real part)
+#if defined(__CUDACC__)
+	const T m = sqrtf(z.re * z.re + z.im * z.im);
+	return {sqrtf(fmaxf(T(0), (m + z.re) / T(2))), (z.im >= T(0) ? T(1) : T(-1)) * sqrtf(fmaxf(T(0), (m - z.re) / T(2)))};
+#else
+	const T m = std::sqrt(z.re * z.re + z.im * z.im);
+	return {std::sqrt(std::fmax(T(0), (m + z.re) / T(2))), (z.im >= T(0) ? T(1) : T(-1)) * std::sqrt(std::fmax(T(0), (m - z.re) / T(2)))};
+#endif
+}
+template <typename T> CPU_GPU T norm2(Cx<T> z) { return z.re * z.re + z.im * z.im; }
+}  // namespace thin_film_detail
+
+template <typename T>
+CPU_GPU T FrThinFilm(T cos_theta_i, T lambda_nm, T film_nm, T film_eta, T eta_r, T eta_k) {
+	using namespace thin_film_detail;
+#if defined(__CUDACC__)
+	cos_theta_i = fmaxf(T(0), fminf(T(1), cos_theta_i));
+	const T sin2_i = T(1) - cos_theta_i * cos_theta_i, n1 = fmaxf(film_eta, T(1));
+	const T cos1 = sqrtf(fmaxf(T(0), T(1) - sin2_i / (n1 * n1)));
+	const T delta = T(4.0 * 3.14159265358979323846) * n1 * film_nm * cos1 / lambda_nm;
+	const Cx<T> phase{cosf(delta), sinf(delta)};
+#else
+	cos_theta_i = std::fmax(T(0), std::fmin(T(1), cos_theta_i));
+	const T sin2_i = T(1) - cos_theta_i * cos_theta_i, n1 = std::fmax(film_eta, T(1));
+	const T cos1 = std::sqrt(std::fmax(T(0), T(1) - sin2_i / (n1 * n1)));
+	const T delta = T(4.0 * 3.14159265358979323846) * n1 * film_nm * cos1 / lambda_nm;
+	const Cx<T> phase{std::cos(delta), std::sin(delta)};
+#endif
+	const Cx<T> n2{eta_r, eta_k}, one{T(1), T(0)};
+	const Cx<T> cos2 = csqrt(sub(one, div(Cx<T>{sin2_i, T(0)}, mul(n2, n2))));   // (Snell from the air: n1 sin1 = sin_i)
+	// the film's top (air to film: real) and its foot (film to conductor: complex), s and p
+	const T r01s = (cos_theta_i - n1 * cos1) / (cos_theta_i + n1 * cos1), r01p = (n1 * cos_theta_i - cos1) / (n1 * cos_theta_i + cos1);
+	const Cx<T> a{n1 * cos1, T(0)}, b = mul(n2, cos2), c = mul(n2, Cx<T>{cos1, T(0)}), d{n1 * cos2.re, n1 * cos2.im};
+	const Cx<T> r12s = div(sub(a, b), add(a, b)), r12p = div(sub(c, d), add(c, d));
+	const auto airy = [&](T r01, Cx<T> r12) {
+		const Cx<T> e = mul(r12, phase);
+		return norm2(div(add(Cx<T>{r01, T(0)}, e), add(one, Cx<T>{r01 * e.re, r01 * e.im})));
+	};
+	return (airy(r01s, r12s) + airy(r01p, r12p)) / T(2);
+}
+template <typename T>
+CPU_GPU void FrThinFilmRGB(T cos_theta_i, T film_nm, T film_eta, T eta_r, T eta_g, T eta_b, T k_r, T k_g, T k_b, T &fr, T &fg, T &fb) {
+	fr = fg = fb = T(0);
+	for (int i = 0; i < 3; ++i) {
+		fr += FrThinFilm(cos_theta_i, T(590 + 30 * i), film_nm, film_eta, eta_r, k_r) / T(3);
+		fg += FrThinFilm(cos_theta_i, T(510 + 30 * i), film_nm, film_eta, eta_g, k_g) / T(3);
+		fb += FrThinFilm(cos_theta_i, T(430 + 30 * i), film_nm, film_eta, eta_b, k_b) / T(3);
+	}
+}
+
+// ---------------------------------------------------------------------------
 // FrConductorRGB -- evaluate FrComplex for R, G, B channels simultaneously
 // Returns reflectance as (F_R, F_G, F_B).
 // Mirrors pbrt-v4 SampledSpectrum FrComplex(cosTheta, eta[], k[]) but
@@ -202,6 +272,15 @@ CPU_GPU float3 FrConductorRGB(float cos_theta_i,
 	return make_float3(FrComplex(cos_theta_i, eta_r, k_r),
 					   FrComplex(cos_theta_i, eta_g, k_g),
 					   FrComplex(cos_theta_i, eta_b, k_b));
+}
+// The same with a thin film on the conductor (film_nm 0: none): MaterialData::filmThickness / filmEta.
+CPU_GPU float3 FrConductorRGB(float cos_theta_i,
+									  float eta_r, float eta_g, float eta_b,
+									  float k_r,   float k_g,   float k_b, float film_nm, float film_eta) {
+	if (film_nm <= 0.0f) return FrConductorRGB(cos_theta_i, eta_r, eta_g, eta_b, k_r, k_g, k_b);
+	float3 f;
+	FrThinFilmRGB(cos_theta_i, film_nm, film_eta, eta_r, eta_g, eta_b, k_r, k_g, k_b, f.x, f.y, f.z);
+	return f;
 }
 #endif  // __CUDACC__
 

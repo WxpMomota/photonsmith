@@ -5,8 +5,8 @@
 //   waterfalls   a roar from the pool at the foot of each
 //   fire         a fire's low roar and its crackle; a wildfire's roar; lava's hiss and its bubbles popping; a volcano's rumble
 //   surf         each wave crashing where it breaks near the camera, and the fizz of its wash after
-//   animals      hoofbeats at each footfall of a herd's gait (a galloping herd thunders; wolves' pads are soft), eagles' cries from the sky, wolves howling when they
-//                stand
+//   animals      hoofbeats at each footfall of a herd's gait (a galloping herd thunders; wolves' pads are soft), eagles' cries from the sky; a standing herd's calls (callOf:
+//                a lion's roar, an elephant's trumpet, a wolf's howl, a bear's growl, a fox's bark, a zebra's bray), geese honking as a flight goes
 //   birds        songs from the trees of a forest near the camera
 //
 // A continuous sound (a roar, a hiss) is laid as overlapping grains a fraction of a second apart, each placed from where the camera is when it is heard; an event (a crash,
@@ -133,6 +133,98 @@ inline std::vector<float> birdPhrase(unsigned seed) {   // three to six quick no
 	return s;
 }
 inline std::vector<float> bubble(unsigned seed) { return audio::slide(110.0 + 50.0 * audio::unit(seed), 55.0, 0.3, 9.0); }
+
+// ---- animal calls (round 13) ----
+// A voiced call, as an animal's throat makes one: a buzz (the vocal folds' pulses, rich in harmonics) gliding from f0 to f1, made rough by `rough` (the pulses'
+// rate jittering and their strength flickering ~30 times a second: a growl, a roar's rasp), with `breath` of noise, through the mouth's two resonances (formants
+// at fA and fB Hz) that make it an "ah" or an "oo"; swelling in and dying away.
+inline std::vector<float> voiced(double f0, double f1, double length, double fA, double fB, double rough, double breath, unsigned seed) {
+	std::vector<float> v(audio::samplesFor(length), 0.0f);
+	const double rate = audio::kRate;
+	double phase = 0.0, jitter = 0.0, flicker = 0.0;
+	unsigned noise = audio::mixSeed(seed);
+	// two resonators (a state-variable band-pass each)
+	double a1 = 0.0, b1 = 0.0, a2 = 0.0, b2 = 0.0;
+	const double qA = 0.25, qB = 0.3;
+	const double gA = 2.0 * std::sin(audio::kTau * 0.5 * std::min(fA, 0.2 * rate) / rate), gB = 2.0 * std::sin(audio::kTau * 0.5 * std::min(fB, 0.2 * rate) / rate);
+	for (std::size_t i = 0; i < v.size(); ++i) {
+		const double t = static_cast<double>(i) / rate, u = std::min(1.0, t / length);
+		noise = noise * 1664525u + 1013904223u;
+		const double white = (noise >> 8) / 8388608.0 - 1.0;
+		jitter += (white - jitter) * 0.002, flicker += (white - flicker) * 0.004;
+		const double f = (f0 + (f1 - f0) * u * u * (3.0 - 2.0 * u)) * (1.0 + 0.6 * rough * jitter);
+		phase += f / rate;
+		phase -= std::floor(phase);
+		const double buzz = (2.0 * phase - 1.0) * (1.0 - 0.6 * rough * (0.5 + 0.5 * std::sin(audio::kTau * 31.0 * t + 6.0 * flicker)));
+		const double src = buzz + breath * white;
+		b1 += gA * a1, a1 += gA * (src - b1 - qA * a1);   // (a1: the band-pass at fA)
+		b2 += gB * a2, a2 += gB * (src - b2 - qB * a2);
+		const double env = std::min(1.0, t / std::max(0.01, 0.12 * length)) * std::min(1.0, (length - t) / std::max(0.01, 0.35 * length));
+		v[i] = static_cast<float>(0.35 * env * (a1 + 0.6 * a2));
+	}
+	return v;
+}
+inline void then(std::vector<float> &s, const std::vector<float> &next, double gap) {
+	s.resize(s.size() + static_cast<std::size_t>(gap * audio::kRate), 0.0f);
+	s.insert(s.end(), next.begin(), next.end());
+}
+// A lion's roar: a deep moaning rise and the full roar falling away, then the grunts, each shorter and lower.
+inline std::vector<float> roar(unsigned seed) {
+	std::vector<float> s = voiced(110.0, 175.0, 0.9, 420.0, 1000.0, 0.35, 0.2, seed);
+	then(s, voiced(185.0, 105.0, 1.6, 380.0, 950.0, 0.55, 0.3, seed + 1), 0.05);
+	for (int k = 0; k < 5; ++k) then(s, voiced(135.0 - 6.0 * k, 95.0 - 4.0 * k, 0.55 - 0.06 * k, 340.0, 800.0, 0.6, 0.35, seed + 2 + k), 0.45 + 0.08 * k);
+	return s;
+}
+// An elephant's trumpet: a brassy blast, rising and breaking, through the trunk (high resonances), and the low rumble under it.
+inline std::vector<float> trumpet(unsigned seed) {
+	std::vector<float> s = voiced(430.0, 560.0, 0.5, 1100.0, 2600.0, 0.25, 0.25, seed);
+	then(s, voiced(560.0, 380.0, 0.9, 1000.0, 2400.0, 0.4, 0.3, seed + 1), 0.0);
+	const std::vector<float> rumble = voiced(28.0, 24.0, 1.4, 120.0, 260.0, 0.3, 0.1, seed + 2);
+	for (std::size_t i = 0; i < rumble.size() && i < s.size(); ++i) s[i] += 0.8f * rumble[i];
+	return s;
+}
+// A bear's growl: low, long and rough.
+inline std::vector<float> growl(unsigned seed) { return voiced(78.0, 62.0, 1.5, 300.0, 700.0, 0.95, 0.45, seed); }
+// A fox's bark: two or three sharp yelps.
+inline std::vector<float> bark(unsigned seed) {
+	std::vector<float> s = voiced(820.0, 560.0, 0.16, 1300.0, 2600.0, 0.35, 0.3, seed);
+	for (int k = 0; k < 1 + static_cast<int>(2.0 * audio::unit(seed + 3)); ++k) then(s, voiced(800.0 - 40.0 * k, 540.0, 0.15, 1300.0, 2600.0, 0.35, 0.3, seed + 4 + k), 0.55);
+	return s;
+}
+// A zebra's bray (and a penguin's: higher): a run of quick barking gasps, in and out ("kwa-ha-ha").
+inline std::vector<float> bray(unsigned seed, double pitch = 1.0) {
+	std::vector<float> s;
+	for (int k = 0; k < 6; ++k)
+		then(s, voiced((k % 2 ? 360.0 : 620.0) * pitch, (k % 2 ? 330.0 : 520.0) * pitch, 0.14, 850.0 * pitch, 1900.0 * pitch, 0.4, 0.45, seed + k), k ? 0.05 : 0.0);
+	return s;
+}
+// A horse's whinny: a high neigh shaking down.
+inline std::vector<float> whinny(unsigned seed) { return audio::chirp(1100.0 + 100.0 * audio::unit(seed), 520.0, 1.3, 9.0, 0.08, 0.7); }
+// A deer's bark (a roe's alarm): one gruff cough.
+inline std::vector<float> deerBark(unsigned seed) { return voiced(420.0, 300.0, 0.3, 700.0, 1700.0, 0.6, 0.6, seed); }
+// A goose's honk: two or three nasal honks.
+inline std::vector<float> honk(unsigned seed) {
+	std::vector<float> s = voiced(420.0, 380.0, 0.2, 950.0, 2100.0, 0.1, 0.15, seed);
+	then(s, voiced(400.0, 360.0, 0.18, 950.0, 2100.0, 0.1, 0.15, seed + 1), 0.25);
+	return s;
+}
+// A kind's call while it stands (an empty sound: it has none), how loud, from how far it carries (m), and every how many seconds one of a herd's callers calls.
+struct Call {
+	std::vector<float> sound;
+	double gain = 0.0, within = 30.0, every = 0.0;
+};
+inline Call callOf(const std::string &kind, unsigned seed) {
+	if (kind == "wolves") return {howl(seed), 0.4, 60.0, 25.0};
+	if (kind == "lions") return {roar(seed), 0.55, 120.0, 30.0};
+	if (kind == "elephants") return {trumpet(seed), 0.5, 100.0, 35.0};
+	if (kind == "bears") return {growl(seed), 0.35, 30.0, 25.0};
+	if (kind == "foxes") return {bark(seed), 0.3, 50.0, 20.0};
+	if (kind == "zebras") return {bray(seed), 0.35, 60.0, 22.0};
+	if (kind == "penguins") return {bray(seed, 1.35), 0.3, 40.0, 12.0};
+	if (kind == "horses") return {whinny(seed), 0.3, 60.0, 30.0};
+	if (kind == "deer") return {deerBark(seed), 0.3, 50.0, 28.0};
+	return {};
+}
 
 }  // namespace soundscape
 }  // namespace cartoon

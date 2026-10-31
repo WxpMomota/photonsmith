@@ -316,6 +316,7 @@ class DataFilm {
 	// Its feet held where they came down (CharacterMoment::lockedFeet), when its kind says where its gait puts them and it has walked.
 	void lockFeet(const Character &c, double t, CharacterMoment &m) const;
 	void footOnGround(const Character &c, CharacterMoment &m) const;   // (`footing ground`: round 12)
+	CharacterMoment standingMoment(const Character &c, double t) const;   // (acting, its feet locked and on the ground: as it is drawn, for what it holds and wears)
 	// How far a loose spring on the character's place lags it at t, in its body's space (CharacterMoment::trail).
 	Vec3 trailOf(const Character &c, double t, const CharacterMoment &m) const;
 	Vec3 chestOf(const Character &c, double t) const { return transformPoint(momentOf(c, t).frame, characterKinds().at(c.kind).chest * c.scale); }
@@ -404,6 +405,12 @@ class DataFilm {
 	std::string airMedium() const;
 
 	std::string worldAt(const std::string &header, double t) const;
+	// Under the sea (round 15): the seabed's height at pbrt's (x, z) - a terrain's ground, or the plain floor 15 m under the water - and the film's schools with their swim
+	// worked out (film_school.h prepare: once, the first time they are asked for, keeping clear of the camera and the divers).
+	double seabedAt(double x, double z) const;
+	// (round 16) whether a character is under the water - brought in 0.3 m or more below its surface - and so swims, talks in bubbles and is heard muffled.
+	bool swimming(const Character &c) const { return spec.hasUnderwater && !spec.seas.empty() && c.start[1] < spec.seas[0].level - 0.3; }
+	const std::vector<school::School> &schoolsSwum() const;
 	// The shot's own lighting at t (`lighting`: shot_lighting.h): round the character it is on, or what the camera looks at, from where the camera is.
 	std::string shotLightsAt(const std::string &header, double t) const;
 
@@ -417,6 +424,15 @@ class DataFilm {
 		LineEnds &operator=(const LineEnds &) { return *this; }
 	};
 	mutable LineEnds lineEnds_;
+	struct Swum {   // (schoolsSwum's: a copy of the film starts without them)
+		std::mutex lock;
+		bool done = false;
+		std::vector<school::School> schools;
+		Swum() = default;
+		Swum(const Swum &) {}
+		Swum &operator=(const Swum &) { return *this; }
+	};
+	mutable Swum swum_;
 	double progress(const Anim &anim, double t, int component) const;
 	bool visible(const std::string &name, double t) const;
 	static std::string num(double v);

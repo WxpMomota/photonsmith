@@ -255,8 +255,9 @@ inline Kept &kept() {
 
 // The cloth at film time t (simulated from its start, or on from where this process got to).
 inline State simulate(const std::string &film, const Cloth &c, const World &w, double t) {
-	char shape[160];
-	std::snprintf(shape, sizeof shape, "#%g,%g,%g,%g,%g,%g,%g,%g,%g", c.at.x, c.at.y, c.at.z, c.width, c.height, c.facing, c.drop, c.stiffness, c.windScale);
+	char shape[200];
+	std::snprintf(shape, sizeof shape, "#%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g", c.at.x, c.at.y, c.at.z, c.width, c.height, c.facing, c.drop, c.stiffness, c.windScale, c.flare,
+				  c.ground);
 	const std::string key = film + "#" + std::to_string(c.line) + "#" + c.kind + "#" + c.who + shape;   // (an edited cloth starts again)
 	State s;
 	{

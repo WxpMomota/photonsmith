@@ -41,10 +41,6 @@ static bool nearly_unit(double x, double y, double z, double tol = 1e-9) {
 	return std::abs(vec3_len(x, y, z) - 1.0) < tol;
 }
 
-static bool nearly_eq(double a, double b, double tol = 1e-9) {
-	return std::abs(a - b) < tol;
-}
-
 // Build a minimal hit_record with a given normal and dpdu.
 static hit_record make_rec(vec3 normal, vec3 dpdu,
 							double u = 0.5, double v = 0.5) {

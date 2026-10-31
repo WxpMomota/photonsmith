@@ -81,21 +81,6 @@ inline std::string peaksText() {
 	return attr(diffuseMaterial({0.07, 0.085, 0.045}), film_cache::plyShape(files[0])) + attr(diffuseMaterial({0.24, 0.21, 0.19}), film_cache::plyShape(files[1])) +
 		   attr(diffuseMaterial({0.52, 0.50, 0.48}), film_cache::plyShape(files[2]));
 }
-// The sea of clouds: a cloud medium in a box 26 km across, `top` metres at its upper edge, cut by a sphere whose top is at `top` (the camera must be above it).
-inline std::string cloudSeaText(double top, double density, double scatter, double frequency, Vec3 centre = {-17000.0, 0.0, -1000.0}, const std::string &name = "sea") {
-	const double w = 26000.0, depth = top + 250.0;
-	char buf[700];
-	std::snprintf(buf, sizeof buf,
-				  "AttributeBegin\n  Translate %.1f %.1f %.1f\n  Scale %.1f %.1f %.1f\n  MakeNamedMedium \"%s\" \"string type\" [ \"cloud\" ] \"rgb sigma_a\" [ 0 0 0 ] \"rgb sigma_s\" [ %.5f %.5f %.5f ] \"float g\" [ 0.8 ] \"float density\" [ %.3f ] \"float wispiness\" [ 1.2 ] \"float frequency\" [ %.2f ]\nAttributeEnd\n",
-				  -(centre.x + w / 2.0), -250.0, centre.z - w / 2.0, w, depth / 0.9, w, name.c_str(), scatter, scatter, scatter, density, frequency);
-	// (the box's height: the cloud's density falls with height in the box, (1 - y) * 4.5 * density, so a box whose top is a little above the sphere's leaves the cloud thinning
-	// out into billows just under the sphere, rather than cut off flat by it)
-	std::string out = buf;
-	const double R = 40000.0;
-	std::snprintf(buf, sizeof buf, "AttributeBegin\n  Translate %.1f %.1f %.1f\n  Material \"interface\"\n  MediumInterface \"%s\" \"\"\n  Shape \"sphere\" \"float radius\" [ %.1f ]\nAttributeEnd\n", -centre.x, top - R,
-				  centre.z, name.c_str(), R);
-	return out + buf;
-}
 
 // The sea of clouds as a surface: the tops of the clouds, billowing (domain-warped noise in rounded heaps), soft and translucent, a kilometre up; seen from above, as the
 // opening sees them, this reads as cloud and costs a fraction of a cloud medium.

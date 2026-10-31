@@ -2020,7 +2020,7 @@ the planets, Pluto, Ceres, the Moon, Io, Europa, Ganymede and Titan (true radii)
 
 Ten things that make a film's characters look and move as in a feature film. The lines are read by film_parse_character.h (and `act` and `rigged` by film_parse.cpp).
 
-**Skin that light goes into: `skin-light [NAME] D`.** The skin of the person, Pip, the turtle - and a rigged model's materials named skin, body, face, head or hand - becomes pbrt's
+**Skin that light goes into: `skin-light [NAME] D`.** The skin of the person, Pip, the turtle - and a rigged model's materials whose names have the word skin, body, face, head or hand and no word of clothing (`Wolf3D_Body` yes, `BodyArmor` no) - becomes pbrt's
 subsurface material (cartoon_lib.h `skinMaterial`): the colour it showed, with light travelling D times a cartoon skin's depth under it, red furthest and blue least (4.2, 1.7
 and 1.0 mm at 1, scaled with the character's size). Ears, fingers and a nose glow red with a light behind them and a face looks soft. 0 (the default) is the painted skin as
 before; 1 is the usual; up to 6. It is noisier than a painted skin: the films' adaptive sampling and denoiser take that out. CPU and both OptiX renderers.
@@ -2065,7 +2065,7 @@ a scarf's end hanging from the front of the neck. Each is held where the body ho
 hips to each foot), so a skirt swings round a stride.
 
 **Feet on the ground: `footing [NAME] ground|flat`.** A character standing on uneven ground - a slope, a stair, a rock, the film's `terrain` - stands on the floor under it
-(its height snaps to it when the film is loaded), each foot on the floor under that foot, its hips down to the lower foot so that leg reaches it (the other knee bends; at
+(its height snaps to it when the film is loaded: a floor near where it was put, else the film's land however far above or below), each foot on the floor under that foot, its hips down to the lower foot so that leg reaches it (the other knee bends; at
 most a third of its height), and the person's shoes tilted to the slope under them. A walk's planted feet already found the floor under them; now a standing character does
 too. `flat`, the default, keeps the old way.
 
@@ -2081,7 +2081,7 @@ powershell -ExecutionPolicy Bypass -File scripts\setup_video_to_acting.ps1      
 rigged  mira  film_assets/library/mira.glb
 mocap   mira  me.bvh  at 2              # the body (a rigged character)
 act     mira  me.face at 2              # the face: a rigged model's ARKit morphs as they are
-act     ann   me.face at 2 amount 0.8   # ... or a built-in character's feelings and mouth (to T1, amount A: how much)
+act     ann   me.face at 2 amount 0.8   # ... or a built-in character's feelings and mouth (to T1, amount A: how much); refused for one with no face
 ```
 
 It runs on this computer with Google's MediaPipe (Apache 2.0): its pose landmarker's 33 points in metres become a skeleton named as Mixamo names bones (Hips, Spine, Spine1,
@@ -2095,6 +2095,305 @@ at its sides down to the hand's tip). Its skin is weighted to the bones nearest 
 not the arm hanging beside it), never to the other side's bones and the legs only below the hips. It gets the clips idle (a T pose's arms lowered), walk, wave and nod, and its
 bones have Mixamo's names, so `mocap` plays captures on it. It stands facing +z (glTF's front), y up. It is a guess, not a rigger's work: an odd pose, a long robe or a tail
 moves roughly. `autorig` on a rigged model fits a new skeleton anyway.
+
+### Real animals, round 13 (2026-10-30)
+
+Ten things for nature films about real animals. The lines are read by film_parse_nature.h; the animals are the rigged models `scripts/make_rigged_animals.py` writes into
+`pbrt_scenes/film_assets/library/animals/`.
+
+**More species.** Lions (a mane), zebras, giraffes (ossicones, the long neck), elephants (trunk, tusks, big ears, pillar legs), bears, foxes (a bushy tail with a white tip),
+rabbits (they hop), penguins (they waddle) and snakes (an S-curve sliding along), beside deer, horses and wolves: `herd KIND COUNT from X Z to X Z`. Each has its strides,
+the speeds where it changes gait and its flight speed (film_animals.h `species`).
+
+**Coat patterns: `herd ... coat PATTERN`.** (film_coats.h) A zebra's stripes and a giraffe's patches grow by reaction-diffusion (Gray-Scott: stripes when it spreads one way
+faster than the other, spots otherwise) and a giraffe's network is a Voronoi pattern; tiger, cheetah, leopard, `shade` (darker above, pale below: countershading) and plain.
+Each animal of a herd has its own variant of the pattern. The picture is painted once into the film's cache and wrapped round the model by its uvs. Zebras and giraffes have
+theirs without being asked.
+
+**Hero fur: `herd ... hero N`.** The first N animals of a herd get fur of real strands (pbrt curves in the hair material) over their coats, coloured from the pattern, for
+close-ups (`herofur A` how much); the rest of the herd keeps the cheap ribbons of `fur`.
+
+**Gaits.** Walk, trot and gallop for the four-legged kinds, with each kind's own swing; a bounding gallop for the cats and dogs, hopping for rabbits, a waddle, a slither;
+animals lean into their turns.
+
+**Behaviour: `hunt PREDATORS PREY at T [stalk S] [catch]`, `herd ... young N`, `herd ... name N`.** Two named herds: the predators creep up for `stalk` seconds (3), unseen,
+then charge - a burst faster than the prey's flight, tiring after 8 s; the prey take fright as the charge comes (or when a stalker is within 8 m) and scatter, swerving.
+With `catch` the first animal a predator reaches falls on its side and the pride gathers at it. `young N`: young ones following their mothers at half their size.
+
+**Animals and water.** On a film with `water`, an animal in the water throws spray from its legs (more and higher the faster it goes) and leaves foam rings widening behind
+it; out of the water it is wet for six seconds - its coat darker and glossy, drops falling - and shakes itself, flinging a ring of spray.
+
+**Birds that really fly: `flight eagles|geese COUNT from X Y Z to X Y Z at T [speed S]`.** Perched at `from`, wings folded and looking round; they take off one after
+another with hard wingbeats, fly an arc (flapping as they climb, gliding as they come down), flare to land - the body up, wings high and beating back - and perch at `to`.
+
+**Life under the sea.** (film_sealife.h)
+
+```
+baitball   0 9 -6  count 500  radius 2.2  strike 4  strike 9  hunter sharks   # or dolphins
+reeffish   40 in -4 0.5 -2 4 3 4
+jellyfish  8 in -5 7 -10 5 12 -2  glow 1.5
+seaturtles 2 at 0 7 -4  radius 5
+```
+
+A bait ball is hundreds of silver fish milling round its middle; at each `strike` a hunter dashes through it on a line (reaching the middle at that time) and the fish near
+its path burst away from it, then drift back. Reef fish circle homes of their own in reef colours (yellow and blue tangs, an orange clownfish with white bands, a grey with
+dark stripes). Jellyfish pulse - a quick contraction of the bell, a slow relaxing - rising a little with each pulse; the bell lets the light through and its rim glows without
+lighting anything. Sea turtles fly on their front flippers round a circle. On a terrain every height is above the ground there.
+
+**The small world: `insects`, `dew`, and thin-film iridescence.** (film_macro.h)
+
+```
+dew        400 in -0.25 -0.25 0.25 0.25
+insects    bees 2 in -0.12 0.06 -0.12 0.12 0.12 0.05
+insects    dragonflies 1 in -0.2 0.12 -0.2 0.2 0.18 0
+insects    beetles 2 in -0.06 0 -0.06 0.06 0 0.06  film 380
+shot 0 A
+  key 0 0.06 0.35   0 0.05 0   35 0.004 0.35   # close, with a lens 4 mm across focused at 35 cm: a shallow depth of field
+```
+
+Sizes are real (a bee 1.3 cm). Bees and dragonflies hover, then dart to the next point. Their wings beat far faster than a frame, so each wing is drawn as the fan it sweeps,
+with an alpha picture: see-through where the wing passes fast, densest at the ends of the stroke where it turns; the renderers' stochastic alpha test makes it partly
+transparent. Beetles walk on six legs in two tripods. Dew is blades of grass bent over with drops of water (glass, index 1.33) along them and at their tips.
+
+Beetles' shells, a dragonfly's body and the wings are iridescent: the renderer's conductor takes a thin film, `Material "conductor" ... "float filmthickness" [ NM ]
+"float filmeta" [ 1.56 ]` (fresnel.h `FrThinFilm`): the light reflected at the film's top and at its foot interferes (Airy's sum over the trips across the film, per
+polarisation), so the colour depends on the film's thickness and changes with the angle it is seen at, as a beetle's, a soap film's or an oil slick's does. Each channel
+is the mean of three wavelengths across its band. With no film it is the bare conductor exactly. CPU, both OptiX renderers and SPPM; pbrt-v4 has no such parameter (it
+draws the bare metal), and Metal does not yet.
+
+**Night and the long lens: `night`, `cameratrap`, `shimmer`, and animal calls.** (film_night.h)
+
+```
+night      eyeshine 1  flash 1
+cameratrap ir  name CAM 03  clock 02:14  date 2026-10-30  temp -2
+shimmer    0.004
+```
+
+`eyeshine`: the animals' pupils glow back at the camera in their kind's colour (the tapetum behind the retina: green-gold for cats and dogs, yellow for deer, blue-green for
+horses, orange for bears, a rabbit's red), a glow that lights nothing. The models' eyes have an iris and a pupil of their kind's shape: a horizontal bar for the grazers, a
+vertical slit for a fox, round for the rest. `flash`: a light on the camera. `cameratrap`: a trail camera's picture - its flash, a darker edge, and the strip along the foot
+of the frame (its name, the date, the clock running on from `clock`, the temperature) on a card in front of the lens; `ir` its infrared night look, grey with a green cast.
+`shimmer A`: heat shimmer, the picture wavering as hot air rises off the ground (lens_look.h `shimmer`, A a share of the picture's height, strongest at the foot of the
+frame); the film writes each frame's time into its look line so the ripples move.
+
+Animals call (film_soundscape.h): a standing herd's callers now and then - a lion's roar (a moaning rise, the roar, the grunts), an elephant's trumpet over a low rumble, a
+wolf's howl, a bear's growl, a fox's bark, a zebra's or a penguin's bray, a horse's whinny, a deer's bark - from a small synthesised voice (a buzz through two formants,
+roughened for a growl), placed where the animal is; geese honk and eagles cry as a flight goes.
+
+### Under the sea, round 14 (2026-10-30)
+
+Ten things for films under the water (with `water` and `underwater`). Heights of what is placed on these lines are above the seabed - a terrain's ground, or the plain
+sandy floor 15 m under the surface when there is none (the camera's keys are as ever: above a terrain's ground, else in the world).
+
+**The surface from below.** (film_undersea.h) Looking up from under the water, the whole sky is squeezed into a circle overhead - Snell's window, 48.6 degrees from straight
+up - and beyond it the surface is a mirror of what is under it (total internal reflection). The mirror is laid just under the sea's thin surface wherever the line of sight
+meets a wave past the critical angle, each wave at its own slope, so the window's edge ripples and wobbles; it casts no shadows (ray visibility), so the sun still comes down
+through it. Nothing to write: every underwater frame has it.
+
+**Half above, half below: `waterline`.** A shot's word (`shot 4 Over and under` then `waterline`): its camera floats at the surface, a dome port half in the water. The air
+above and the water below are split where the waves stand on the dome, so the line rocks up and down the picture as they go by; the lens look draws its meniscus - a dark,
+wavering edge with a bright one over it - and drops of water running slowly down the dome above it (`lens_look.h` `waterline Y`, `drops D`, `drops-time T`). Any camera
+put within 0.6 m of the surface floats on it too.
+
+**Depth and light: `underwater ... lamp L ripples`, `halocline Y`, `exposure auto`.** The water takes red first, then orange and yellow, as the light comes down through it
+(it always did); `exposure auto` now opens up as the camera goes down, and the painted caustics fade out on a bed deeper than 10 m and are gone below 35 m. `lamp L` puts a
+diver's lamp on the camera (a warm spot a little to the side of the lens): the colours the depth took come back close to it, and specks in the water glint in its beam
+(backscatter) - with a lamp the exposure opens up only a little. `ripples`: the sand of the seabed in ripples. `halocline Y [strength S]`: the boundary between two waters
+at height Y (in the world), a slowly heaving sheet that bends the light a little and mirrors at a glancing look.
+
+```
+underwater clarity 1.5  colour blue  lamp 0.8  ripples
+exposure   auto
+halocline  -9
+```
+
+**The deep: `deepsea KIND N in X0 Y0 Z0 X1 Y1 Z1`, `deepsea sparks`.** (film_deepsea.h) Anglerfish hang nearly still, a gape of needle teeth under the lure on their rod,
+glowing blue-white (a small light: it lights its own face); lanternfish swim in loose schools, rows of blue lights along their bellies; comb jellies drift, rainbows running
+down their eight comb rows (thin-film conductors, round 13's iridescence - they need light, a lamp, to show); siphonophores trail tens of metres of stem, swimming bells at
+the head, glowing faintly blue all along. `deepsea sparks`: the water lights up blue behind the animals of the deep as they swim. The deep's own lights light nothing (they
+are never sampled), so a film 300 m down is dark but for them and the lamp.
+
+```
+terrain    dunes  size 400  height 1  y -300  far off
+deepsea    lanternfish 60  in -4 2 -8 4 4 -3
+deepsea    anglerfish 2  in -1 1 -3 1 1.5 -2
+deepsea    sparks
+```
+
+**The octopus and the cuttlefish: `octopus X Y Z [toward A] [size S] [jet T]... [ink T]... [hide T]`, `cuttlefish N at X Y Z [radius R]`.** An octopus crawls over the
+seabed on its arms, each reaching and pulling in its own time, the tips curling. `hide T`: it stops, curls its arms in, its skin turns the colour of the sand and rises in
+bumps. `jet T`: it blanches and shoots off backwards, mantle first, arms streaming behind, and settles again. `ink T`: a dark cloud left where it was, spreading, rising a
+little and drifting with the current (an absorbing grid medium: on the CPU, a frame with it loses the water round the camera - render it on the GPU). Cuttlefish hover,
+the fin round the mantle rippling in waves, dark bands passing over their backs.
+
+**Animals that fly through water: `swimmers mantas|eaglerays|stingrays|sealions|penguins|otters N at X Y Z [radius R] [rise T]`.** Mantas fly slowly on wings 4 m across,
+dark above, white below; eagle rays are smaller and quicker, white-spotted, with long tails. Stingrays lie buried in the sand until `rise T`, then lift off in a cloud of
+sand and glide away, their rims rippling. Sea lions loop and roll; penguins rocket past on beating wings with trails of bubbles from their feathers; otters float on their
+backs at the surface (whatever Y says), turning right over now and then.
+
+**Bubbles: `bubbles stream X Y Z [rate R] [size S] [during T0 T1]`, `bubbles breath X Y Z [every P]`, `bubbles net X Z at T [radius R] [depth D]`, `bubbles ring X Y Z at
+T`.** (film_undersea.h) Each bubble rises at the speed its size gives it (a few millimetres at about a quarter of a metre a second, zigzagging; the big ones as flattened caps
+that rock, faster), grows as the pressure falls on the way up (Boyle's law), drifts with the current and is gone at the surface. They are air in water - a dielectric of eta
+1/1.333, so they mirror silver at their edges - and cast no shadows. A stream comes from a vent or a crack; a breath is a diver's, a burst every P seconds of a few big caps
+and a cloud of small bubbles (heard: the regulator's hiss, then the burble); a net is a humpback's spiral curtain, blown over 10 s; a ring rises and widens. Under the water
+the sea is heard as a reef - a low hush, the crackle of snapping shrimp and a burble now and then - not as waves (`ambience reef`).
+
+**Life on the seabed: `seabed anemones|seagrass|starfish|urchins|crabs|gardeneels N in X0 Z0 X1 Z1`.** (film_seabed.h) Anemones crowned with a hundred swaying tentacles,
+clownfish living in them, darting out and ducking back in; seagrass meadows (N clumps) bending with the current; starfish and urchins on the sand; crabs walking sideways in
+short dashes, claws up; garden eels standing out of their holes facing into the current - sinking back in as the camera comes within a few metres.
+
+**One current for everything: `current SPEED toward A [surge P]`.** (film_underwater.h Current) The water's flow, SPEED metres a second towards A degrees: kelp, seagrass and
+anemone tentacles lean with it, the marine snow, the jellyfish and the bubbles drift in it, ink is carried by it, and reef fish turn to hold station against it. `surge P`
+swings it back and forth every P seconds (as much as SPEED each way) about a slow onward drift - the push and pull near a shore.
+
+```
+current  0.25 toward 90  surge 6
+seabed   anemones 6  in -3 -6 3 -3
+seabed   gardeneels 60  in 4 -8 10 -2
+```
+
+**Places to film: `wreck X Z [toward A] [length L] [list D]`, `arch X Z [toward A] [size S]`, `cenote X Z [radius R] [depth D]`, `reefwall X Z [toward A] [length L]
+[height H]`.** (film_seabed.h; each made once as a PLY file) A sunken ship, its rusted hull open where the deck rotted away, ribs and portholes, a fallen mast, settled on
+its side and grown over with corals. A rock arch with holes in its roof the sun shines down through. A cenote: a cavern in the rock, flooded, open to the sky through a round
+hole at the surface - one beam of sunlight down to its floor D below (with a `halocline` half way down), roots hanging from the opening. A reef wall rising sheer from the
+floor, crowded with sea fans and sponges: with a deep floor (a terrain far down), a drop-off into the blue.
+
+```
+wreck     0 -20  toward 60  length 28  list 18
+arch      -25 5  toward 90  size 1.2
+cenote    0 40  radius 10  depth 18
+reefwall  25 0  toward -90  length 30  height 16
+```
+
+Metal (the Mac) does not draw the comb jellies' thin films yet.
+
+### Under the sea, round 15 (2026-10-30)
+
+Ten more things for films under the water. As in round 14, the heights on these lines are above the seabed (a terrain's ground, or the plain floor 15 m under the
+surface when there is none).
+
+**Light on everything.** (film_sealight.h; nothing to write) Most of the sun's light now comes down through the water as a projector's slide of the caustic net, aimed
+down the sun's way as the surface bends it: the net plays over the sand, the rocks, the fish and a diver alike, and the water shows it as shafts of light. The sun itself
+keeps a fifth of its light, so shadows stay. The slide reaches up to 24 m round the camera, less round a camera near the sand (its pixels must be small for a macro lens),
+and the net softens on a deeper bed and is gone below 35 m. On the GPU a slide is read whole (before, it was squeezed to 64 x 64): the default and the wavefront renderers
+both read a slide bigger than that from the scene's textures (ProjectionLightGPU::texIdx). `caustics traced` keeps the round-9 way.
+
+**The sun and the rain from below.** Looking up, the sun is a cluster of glints dancing on the ripples where the line to it leaves the water, each a little star in the
+picture. With rain falling (`weather rain`, or a rainy `storm`) each drop that lands near the camera leaves a widening silver ring under the surface and a few tiny
+bubbles; the rain itself is not drawn under the water.
+
+**A scuba diver: `diver NAME from X Y Z to X Y Z [via X Y Z]... [at T] [speed S] [lamp] [ok T]... [suit black|blue|red]`.** (film_diver.h) A diver in a wetsuit, mask
+and fins, a tank on their back, swims level along the path from time T at S metres a second (0.4) with a slow flutter kick, hovering before and after. Each breath out is a
+burst of bubbles from the regulator, rising from where the diver was; it is heard (the regulator's hiss, the burble). `lamp`: a torch in the right hand lights the way;
+`ok T`: the OK sign in front of the mask for two seconds.
+
+**Schools that behave: `school sardines|anchovies|jacks|barracuda N at X Y Z [radius R] [strike T]... [hunter sharks|dolphins|sealions]`.** (film_school.h) Up to 3000 fish
+flocking, worked out once when the film is first rendered. The school parts round the camera and any diver that comes through it, and at each `strike` a hunter dashes
+through the middle: the fish bolt out sideways from its line, turning together - the turn flashes their silver flanks in a wave - and close again behind it.
+
+**Big animals: `bigfish whaleshark|hammerheads|reefsharks|dolphins|humpbacks N at X Y Z [radius R]`.** Whale sharks (the broad flat head, the wide mouth open, white spots in
+rows), hammerheads, reef sharks, dolphins (their tails beating up and down) and humpbacks (the giants' bodies of round 9, long white flippers, slow strokes) swimming round
+a circle.
+
+```
+diver      Ana from -6 3 -2 to 6 3 -10 via 0 2.5 -6 at 2 lamp ok 30 suit blue
+school     sardines 600 at 0 4 -12 radius 4 strike 20 hunter sharks
+bigfish    whaleshark 1 at 0 6 -20 radius 14
+```
+
+**A coral reef: `reef N in X0 Z0 X1 Z1 [bleached] [fluoresce]`.** (film_reef.h) Staghorn (antlers of branches, pale polyps at their tips), table corals, brain corals grooved
+in meanders, sea fans spread across the current and soft corals swaying. The corals that do not move are made once as PLY files. `bleached`: all of it white;
+`fluoresce`: the polyps glow green (lighting nothing) - film it at night with a blue lamp, `underwater lamp 1 blue`.
+
+**Small creatures: `critters nudibranchs|seahorses|shrimp|mantisshrimp N in X0 Z0 X1 Z1`.** Nudibranchs (bright, frilled, horns and a plume of gills, creeping), seahorses
+(their tails curled round a stalk of grass, a fin a blur on their backs), cleaner shrimp (red with a white stripe, feelers waving) and mantis shrimps (half out of a burrow,
+eyes on stalks each turning its own way). They are a few centimetres long: put the camera close, with a narrow field of view and `aperture` for a shallow focus.
+
+**A night dive: `nightdive [glow G] [spawn T0 T1]`.** (with a night `sky`) The plankton lights up blue round anything that moves - a diver, a school's leading fish, the
+swimmers, the big animals - fading over a second; from T0 to T1 the corals spawn, bundles rising from them like snow falling upwards; the reef fish sleep, hardly moving.
+
+```
+sky        23:00 23:00
+underwater lamp 1 blue
+reef       50 in -6 -10 6 -3 fluoresce
+nightdive  glow 2 spawn 2 18
+```
+
+**A kelp forest: `kelpforest N in X0 Z0 X1 Z1`.** Giant kelp: N stalks from holdfasts on the seabed all the way to the surface, a blade a metre or so long every third of a
+metre with a gas bladder at its base, the last metres lying along the surface in a canopy that shades the water under it. It sways with the swell and the current.
+
+**Camera work: `divecam [A]`, `follow NAME`.** `divecam` (a shot's word): a diver's camera, rising on each breath in and sinking as it goes out, the view tipping with it and
+swaying slowly (A 0 to 4). `follow` follows a diver by name, as it follows a character, and schools, swimmers and big animals by their line: `follow school1`,
+`follow swimmers2`, `follow bigfish1` (the first animal of that line, a school's middle). A slow rise to the surface with the camera keys ends half above it when the last key is
+at the surface (round 14's waterline).
+
+Metal (the Mac) still reads a projector's slide at 64 x 64.
+
+### Under the sea, round 16 (2026-10-30)
+
+Ten more things for films under the water. As in rounds 14 and 15, the heights on these lines are above the seabed (a terrain's ground, or the plain floor 15 m under
+the surface when there is none); x and z are pbrt's, as on the round-14 and 15 lines.
+
+**Cartoon characters under the water.** (nothing to write) A character brought in under the surface (its height 0.3 m or more below it) swims: its walks are swims at its
+own height, the body laid level along its way with a breaststroke and a flutter kick, bobbing gently; standing still it treads water upright. Its hair floats up and sways
+in the current. While it talks bubbles burble up from its mouth, and its voice is muffled - the high sounds gone, a little more echo.
+
+**A boat overhead: `boat X Z [toward A] [length L] [speed S] [during T0 T1] [anchor T] [seed K]`.** (film_boat.h) A boat on the surface (L 3 to 60 m, 8) going its way at S
+metres a second (2): seen from below, the hull - red under the waterline - and its shadow on the sand, the propeller's trail of bubbles behind it. `anchor T`: it eases to
+a stop and drops its anchor, which falls on its chain and lands in a puff of silt. Its engine is heard, a low drone from where it is, quieter at anchor.
+
+**A sardine run: `sardinerun X Y Z [radius R] [gannets N] [dolphins N] [from T] [seed K]`.** A bait ball of sardines (R 3) herded by dolphins, sharks striking through it
+every few seconds; from T gannets fold their wings and plunge in one after another, each splash leaving a column of bubbles. The dolphins whistle and click, each gannet
+cracks into the water.
+
+**Hydrothermal vents: `vents N in X0 Z0 X1 Z1 [seed K]`.** (film_vents.h) Black smokers: chimneys of mineral rock two to six metres tall, crusted yellow at the mouth, each
+pouring a black plume that billows up and spreads (stopping short of the surface in a shallow sea); the water over the mouth shimmers in the heat; round the foot, tube
+worms with red plumes, pale crabs and swarming shrimp. Film it deep, with a lamp.
+
+**Silt and murk: `murk X Y Z [radius R] [green|grey] [density D]`, `silt X Z at T [size S]`.** A ball of murky water - coastal green or grey with silt - thickest in the
+middle, in patches, and fading out at its edge so it has none; `silt`: a puff of silt kicked up from the bed at T that billows out and settles. A diver finning within a
+metre of the bed kicks up silt behind them on their own.
+
+**Inside a wreck: `wreckroom X Z [toward A] [length L]`.** (film_seabed.h) A corridor of rusted plates to swim along (L 4 to 60 m, 12): portholes letting in shafts of the
+light outside, a hatch overhead, debris and silt on the floor. Take a lamp in: `underwater lamp 1`.
+
+**Behaviour: `cleaningstation X Y Z`, `tornado N at X Y Z [around NAME] [radius R] [height H]`, `playmate X Y Z [with NAME]`, `damselfish N at X Y Z [radius R]`.**
+(film_behaviour.h) A cleaning station: a grouper hanging still over a coral head, mouth open, while cleaner wrasse dart over it and in at its mouth, other fish
+circling for their turn. A barracuda tornado: N fish (10 to 600) circling in
+a column round a point - or round a diver, following them. A playful sea lion that loops and rolls round a diver and blows bubbles at them. Territorial damselfish that
+dart at anyone - the camera, a diver - who comes near their patch.
+
+**Close up.** (nothing to write) With the camera within a metre and a half of the sand, the sand where it looks is grains in their own colours, bits of broken shell and
+pebbles, fixed in place as the camera moves; plain sand, seen close, is speckled. The caustic slide is now aimed where the sun's beam reaches the camera (before, deep down
+it lit the sand metres off and a macro shot could be outside it). Nudibranchs come in five colour schemes, with spots; seahorses are bigger on thinner stalks.
+
+**The sounds of the sea.** (with `ambience reef` and `ambience sea`) Under the water the reef's hush and crackle, above it the waves' wash, switching as the camera crosses
+the waterline. Boats' engines, dolphins' whistles and clicks, the humpbacks' song and the gannets' plunges are heard from where they are.
+
+**A real underwater camera: `underwater ... [port flat|dome] [filter red|magenta]`.** Behind a flat port the field of view is a third narrower (the water makes things look
+a third nearer) and the picture bends and fringes with colour towards its edges; a dome port (the default) does neither. A red filter (blue water) or a magenta one (green
+water) puts back the warm colours the water takes away.
+
+```
+underwater clarity 2  colour teal  port flat  filter red
+boat       0 -14  toward 90  length 10  speed 2  during 6 40  anchor 13
+sardinerun 0 6 -30  gannets 8  dolphins 3  from 22
+vents      3 in -6 -46 6 -40
+murk       14 3 -20  radius 6  green
+tornado    150 at 0 3 -8  around Ana
+wreckroom  30 -20  length 12
+```
+
+The GPU's wavefront renderer now draws a fog, smoke or ink volume inside another one - the murk, the vents' plumes, round 14's octopus ink, all inside the sea round the
+camera: before, it sampled the inner one only beyond the outer one's far side, so the inner showed only as its shadow. Its light's shadow rays take the inner one in place
+of the sea too (they had counted both, and a murk cast a dark disc on the sand even when thin). And a camera at the waterline stays a little under the surface at its lens
+with the waves (at nine tenths of the wave it was above the water in a trough, and the picture's lower half showed the surface's top).
+
+The lines of rounds 14 to 16 (divers, schools, boats, vents, murk, the seabed's life and places, bubbles, `waterline` shots...) need an `underwater` line: without one the
+film is not read, where before they were left out of the picture without a word. `tornado ... around NAME` and `playmate ... with NAME` name a diver of the film, matched
+exactly. An underwater film is heard as a reef under the water and as the sea's waves above it, unless its `ambience` lines say otherwise. A boat's wake and a swimmer's
+trail are bubbles left where they were shed, rising, as the boat goes on. A school is worked out once for a film and kept in its cache folder (each frame renders in a
+process of its own, and working a big school out again in every one cost seconds a frame).
 
 ## Examples
 

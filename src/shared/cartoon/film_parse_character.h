@@ -12,9 +12,12 @@ namespace cartoon {
 namespace film_file {
 
 namespace detail {
-// `VERB [NAME] ...`: the character a line names (t[1], when it is one brought in already: then i moves past it), "" for every character.
-inline std::string characterNamed(const Spec &s, const std::vector<std::string> &t, std::size_t &i) {
-	if (i < t.size() && std::any_of(s.characters.begin(), s.characters.end(), [&](const Character &c) { return c.name == t[i]; })) return t[i++];
+// `VERB [NAME] VALUE ...`: the character a line names (t[i], when it is one brought in already and a value of the line follows it: then i moves past it), "" for every
+// character. The value test keeps a character called like a value from taking the line: with one called `short`, `hair short` is every character's short hair and
+// `hair short long` is its long hair.
+template <typename IsValue>
+inline std::string characterNamed(const Spec &s, const std::vector<std::string> &t, std::size_t &i, IsValue isValue) {
+	if (i + 1 < t.size() && isValue(t[i + 1]) && std::any_of(s.characters.begin(), s.characters.end(), [&](const Character &c) { return c.name == t[i]; })) return t[i++];
 	return "";
 }
 }  // namespace detail
@@ -27,7 +30,10 @@ inline std::string characterLine(Spec &s, const std::string &verb, const std::st
 		const std::vector<std::string> t = detail::tokens(line);
 		std::size_t i = 1;
 		motion::Amount a;
-		a.who = detail::characterNamed(s, t, i);
+		a.who = detail::characterNamed(s, t, i, [](const std::string &w) {
+			double v = 0.0;
+			return detail::number(w, v);
+		});
 		if (i + 1 != t.size() || !number(t[i], a.amount) || a.amount < 0.0 || a.amount > 6.0)
 			return "`skin-light [NAME] D`: light goes D times a cartoon skin's depth into the skin (0 painted, 1 the usual, up to 6), for one character or (no NAME) every one";
 		s.skinLight.push_back(a);
@@ -37,7 +43,7 @@ inline std::string characterLine(Spec &s, const std::string &verb, const std::st
 		const std::vector<std::string> t = detail::tokens(line);
 		std::size_t i = 1;
 		motion::Amount a;
-		a.who = detail::characterNamed(s, t, i);
+		a.who = detail::characterNamed(s, t, i, [](const std::string &w) { return w == "real" || w == "painted"; });
 		if (i + 1 != t.size() || (t[i] != "real" && t[i] != "painted"))
 			return "`eyes [NAME] real|painted`: real eyes have a clear cornea over the iris, a wet rim and pupils that size with the light";
 		a.amount = t[i] == "real" ? 1.0 : 0.0;
@@ -48,7 +54,7 @@ inline std::string characterLine(Spec &s, const std::string &verb, const std::st
 		const std::vector<std::string> t = detail::tokens(line);
 		std::size_t i = 1;
 		motion::Amount a;
-		a.who = detail::characterNamed(s, t, i);
+		a.who = detail::characterNamed(s, t, i, [](const std::string &w) { return w == "ground" || w == "flat"; });
 		if (i + 1 != t.size() || (t[i] != "ground" && t[i] != "flat"))
 			return "`footing [NAME] ground|flat`: ground stands it on the floor under it (a slope, a stair, a rock), each foot on the floor under that foot, tilted to it, its hips down "
 				   "to the lower foot; flat (the default) keeps its feet level at its own height";
@@ -61,7 +67,7 @@ inline std::string characterLine(Spec &s, const std::string &verb, const std::st
 		const char *usage = "`hair [NAME] short|bob|long|ponytail|curly|mop|off [length L] [density D] [curl C] [frizz F] [clump C] [colour C] [width W]`";
 		std::size_t i = 1;
 		hair::Groom g;
-		g.who = detail::characterNamed(s, t, i);
+		g.who = detail::characterNamed(s, t, i, [](const std::string &w) { return w == "off" || std::find(hair::styles().begin(), hair::styles().end(), w) != hair::styles().end(); });
 		if (i >= t.size()) return usage;
 		g.style = t[i++];
 		if (g.style != "off" && std::find(hair::styles().begin(), hair::styles().end(), g.style) == hair::styles().end()) return usage;

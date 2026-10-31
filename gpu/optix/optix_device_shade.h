@@ -496,7 +496,7 @@ __device__ __forceinline__ void shade_conductor(ShadeState& s) {
 	float c_G1_wi  = c_dist.G1(cwi_x, cwi_y, cwi_z);
 	float c_G_wowi = c_dist.G(cwo_x, cwo_y, cwo_z, cwi_x, cwi_y, cwi_z);
 	float c_weight = (c_G1_wi > 1e-8f) ? c_G_wowi / c_G1_wi : 0.0f;
-	float3 c_F = FrConductorRGB(c_dot, mat.eta_c.x, mat.eta_c.y, mat.eta_c.z, mat.k_c.x, mat.k_c.y, mat.k_c.z);
+	float3 c_F = FrConductorRGB(c_dot, mat.eta_c.x, mat.eta_c.y, mat.eta_c.z, mat.k_c.x, mat.k_c.y, mat.k_c.z, mat.filmThickness, mat.filmEta);
 	attenuation = c_rej ? make_float3(0.0f, 0.0f, 0.0f) : make_float3(c_F.x * c_weight, c_F.y * c_weight, c_F.z * c_weight);
 	scattered_dir = c_rej ? cn : normalize(cwo_x*ctan + cwo_y*cbitan + cwo_z*cn);
 	scattered     = true;
@@ -517,7 +517,7 @@ __device__ __forceinline__ void shade_conductor(ShadeState& s) {
 		is_specular = false;
 		ConductorBxDF<float> c_bxdf{ mat.eta_c.x, mat.eta_c.y, mat.eta_c.z,
 									  mat.k_c.x, mat.k_c.y, mat.k_c.z,
-									  c_alpha_x, c_alpha_y };
+									  c_alpha_x, c_alpha_y, mat.filmThickness, mat.filmEta };
 		brdf_pdf_override = c_rej ? -1.0f : c_bxdf.pdf(cwi_x, cwi_y, cwi_z, cwo_x, cwo_y, cwo_z);
 
 		{
@@ -1158,7 +1158,8 @@ __device__ __forceinline__ void shade_material(
 	if (lamp_scatters(mat)) {
 		MaterialData *view = ::new (static_cast<void *>(viewStorage)) MaterialData(mat);
 		view->type = lamp_glass(mat) ? MaterialType::Dielectric : MaterialType::Lambertian;   // (glass: `ior` and `transmission_filter` are already the glass's)
-		view->textureIdx = -1;   // (the texture of a lamp is its emission, not its reflectance)
+		view->textureIdx = mat.lampAlbedoTexIdx;   // (the texture of a lamp is its emission; its reflectance's picture, if any, is this)
+		view->emissionScale = mat.lampAlbedoTexScale;
 		emission = make_float3(0.0f, 0.0f, 0.0f);
 		use = view;
 	} else if (mat.roughTexIdx >= 0 || mat.condRoughTexIdx >= 0) {

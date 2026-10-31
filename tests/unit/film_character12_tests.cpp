@@ -387,3 +387,90 @@ TEST(FilmCharacter12AutoRig, AnUnriggedModelIsRiggedWithClipsAndWalksInAFilm) {
 	ASSERT_EQ(loadFilm("autorig", "scene s.pbrt\nlength 4\nrigged fig fig.obj\ncharacter f fig at 0 0 0\nwalk f 1 1  0 0  0 2\ngesture f \"wave\" 0.2 0.4 0.8 1\n", film, d), "");
 	EXPECT_NE(film.sceneAt(0.1), film.sceneAt(0.6));
 }
+
+// ---- the review's fixes (2026-10-30) ----
+// What a character wears and has drawn by it is where its body is drawn: with `footing ground` its hips come down to the lower foot in that moment too.
+TEST(FilmCharacter12Review, WhatItWearsUsesTheMomentItIsDrawnIn) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("standing", "scene s.pbrt\nlength 3\ncharacter ann person at 0.4 0 0.05 facing 90\nfooting ground\ncloth skirt on ann\n", film), "");
+	const ff::Character &c = film.spec.characters[0];
+	const double acting = cartoon::transformPoint(film.actingMoment(c, 1.0).frame, {0.0, 0.0, 0.0}).y, standing = cartoon::transformPoint(film.standingMoment(c, 1.0).frame, {0.0, 0.0, 0.0}).y;
+	EXPECT_LT(standing, acting - 0.1) << "down to the foot on the floor below the step";
+	EXPECT_EQ(count(film.sceneAt(1.0), "nan"), 0u);
+}
+// `footing ground` on a film's land far above where it was put stands it on the land.
+TEST(FilmCharacter12Review, FootingFindsTheLandHoweverFarAway) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("land", "scene s.pbrt\nlength 2\nterrain mountains size 300 height 120 seed 3\ncharacter ann person at 20 0 10\nfooting ground\n", film), "");
+	const double y = film.spec.characters[0].start[1];
+	const double land = cartoon::terrain::fieldOf(film.spec.terrain)->heightAt(20.0, 10.0);
+	EXPECT_GT(std::abs(land), 1.0) << "(the test needs land well off y 0)";
+	EXPECT_NEAR(y, land, 0.5);
+}
+// `act` on a kind with no face is refused, as `feel` is.
+TEST(FilmCharacter12Review, ActingNeedsAFace) {
+	const std::filesystem::path d = dirFor("noface");
+	std::ofstream(d / "me.face", std::ios::binary) << "names jawOpen\n0 0\n1 1\n";
+	ff::DataFilm film;
+	EXPECT_NE(loadFilm("noface", "scene s.pbrt\nlength 4\ncharacter n nomai-explorer at 0 0 0\nact n me.face at 1\n", film, d).find("no face"), std::string::npos);
+}
+// Auto-rigging a model scaled by its node turns and scales its morph targets with it.
+TEST(FilmCharacter12Review, AutoRiggingScalesMorphTargetsWithTheModel) {
+	namespace ar = cartoon::auto_rig;
+	gltf_skin::Rig rig;
+	gltf_skin::Node node;
+	node.rest.s[0] = node.rest.s[1] = node.rest.s[2] = 0.01;   // (a model in centimetres under a node scaled to metres)
+	rig.nodes.push_back(node);
+	rig.order.push_back(0);
+	gltf_skin::Piece piece;
+	std::vector<double> delta;
+	for (const ar::V3 &p : figure(false)) {
+		piece.positions.insert(piece.positions.end(), {p.x * 100.0, p.y * 100.0, p.z * 100.0});
+		piece.normals.insert(piece.normals.end(), {0.0, 1.0, 0.0});
+		delta.insert(delta.end(), {0.0, -3.0, 0.0});   // (3 cm down, in centimetres)
+	}
+	for (std::size_t i = 0; i + 2 < piece.positions.size() / 3; i += 3) piece.indices.insert(piece.indices.end(), {static_cast<uint32_t>(i), static_cast<uint32_t>(i + 1), static_cast<uint32_t>(i + 2)});
+	piece.node = 0;
+	piece.morphIndex.push_back(0);
+	piece.morphPositions.push_back(delta);
+	piece.morphNormals.push_back({});
+	rig.pieces.push_back(piece);
+	rig.morphs = {"jawOpen"};
+	rig.morphRest = {0.0};
+	ASSERT_EQ(ar::rig(rig), "");
+	EXPECT_NEAR(rig.pieces[0].morphPositions[0][1], -0.03, 1e-9) << "3 cm, in metres now";
+}
+// An edited skirt's flare starts its cloth again within the same process: the kept simulation is keyed by it.
+TEST(FilmCharacter12Review, AnEditedFlareStartsTheClothAgain) {
+	namespace cl = cartoon::cloth;
+	cl::Cloth c;
+	c.kind = "curtain", c.at = {0.0, 2.0, 0.0}, c.width = 1.0, c.height = 1.0, c.line = 7;
+	const cl::World w;
+	const auto kept = [] {
+		std::size_t n = 0;
+		for (const auto &[key, state] : cl::detail::kept().states) n += key.rfind("flare-test#", 0) == 0 ? 1 : 0;
+		return n;
+	};
+	cl::simulate("flare-test", c, w, 0.2);
+	c.flare = 0.9;
+	cl::simulate("flare-test", c, w, 0.3);
+	EXPECT_EQ(kept(), 2u) << "two flares, two simulations";
+}
+// A material is skin by the words of its name, not by a word hidden in another.
+TEST(FilmCharacter12Review, SkinIsFoundByWholeWordsAndNotInClothes) {
+	namespace rg = cartoon::film_file::rigged;
+	for (const char *yes : {"Wolf3D_Body", "Ch03_Body", "N00_000_00_Body_00_SKIN", "skin", "FaceSkin", "Hands"}) EXPECT_TRUE(rg::isSkin(yes)) << yes;
+	for (const char *no : {"BodyArmor", "Headband", "Handbag", "Wolf3D_Outfit_Top", "Bodysuit", "eyeWhite", "Body_Shirt"}) EXPECT_FALSE(rg::isSkin(no)) << no;
+}
+// A character called like a value of a line does not take the line from every character.
+TEST(FilmCharacter12Review, ACharacterCalledLikeAValueDoesNotTakeTheLine) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("names", "scene s.pbrt\nlength 2\ncharacter short person at 0 0 0\ncharacter real person at 1 0 0\nhair short\nhair short long\neyes real\n", film), "");
+	ASSERT_EQ(film.spec.grooms.size(), 2u);
+	EXPECT_EQ(film.spec.grooms[0].who, "");
+	EXPECT_EQ(film.spec.grooms[0].style, "short");
+	EXPECT_EQ(film.spec.grooms[1].who, "short");
+	EXPECT_EQ(film.spec.grooms[1].style, "long");
+	ASSERT_EQ(film.spec.realEyes.size(), 1u);
+	EXPECT_EQ(film.spec.realEyes[0].who, "") << "every character's eyes";
+}

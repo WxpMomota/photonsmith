@@ -1,6 +1,6 @@
 #pragma once
 // film_wildlife.h -- animals for a film file (film_file.h `flock`, `herd`): a murmuration of starlings, a skein of geese in a V, a school of fish, butterflies over a meadow,
-// eagles circling up a thermal, a herd of deer, horses or wolves crossing the land.
+// eagles circling up a thermal, a herd of deer, horses, wolves, lions, zebras, giraffes, elephants, bears or foxes crossing the land.
 //
 // How they move:
 //   starlings, fish   flocking (boids): each keeps apart from the nearest, turns as its seven nearest neighbours turn, closes on them, and is drawn to a centre that wanders
@@ -37,7 +37,7 @@ inline const std::vector<std::string> &flockKinds() {
 	return k;
 }
 inline const std::vector<std::string> &herdKinds() {
-	static const std::vector<std::string> k = {"deer", "horses", "wolves"};
+	static const std::vector<std::string> k = {"deer", "horses", "wolves", "lions", "zebras", "giraffes", "elephants", "bears", "foxes", "rabbits", "penguins", "snakes"};
 	return k;
 }
 
@@ -61,6 +61,19 @@ struct Herd {
 	double fx = 0.0, fz = 0.0, tx = 0.0, tz = 0.0, speed = 0.0, t0 = 0.0, flee = -1.0;
 	int seed = 1;
 	double fur = 0.0;   // (film_fur.h) how much fur, 0 none
+	std::string coat;   // (film_coats.h) its coat's pattern: zebra, tiger, cheetah, leopard, giraffe, shade, plain ("": its kind's own)
+	int heroes = 0;     // (`hero N`) the first N animals get fur of real strands (film_animals.h heroFur) for close-ups
+	double heroFur = 1.0;
+	std::string name;   // (`name N`) what a `hunt` line calls it
+	int young = 0;      // (`young N`) young ones, each following its mother (half her size)
+};
+// A hunt (`hunt PREDATORS PREY at T [stalk S] [catch]`, round 13): from T the predators creep towards the prey, then sprint at the nearest; the prey bolt away from the
+// nearest predator, swerving; a predator that reaches its quarry brings it down (with `catch`).
+struct Hunt {
+	std::string predators, prey;
+	double at = 0.0, stalk = 3.0;
+	bool kill = false;
+	int line = 0;
 };
 
 namespace detail {
@@ -353,6 +366,7 @@ struct Animal {
 	Going going;
 	std::string clip;     // its gait's clip while it moves ("" when it has stopped)
 	double cycles = 0.0;  // how many cycles of that clip it has made (with its own offset): its footfalls
+	bool fallen = false;  // (a hunt's quarry, brought down: on its side)
 };
 inline Animal animalAt(const Herd &h, const animals::Species &sp, int i, double t, const terrain::Field *ground) {
 	Animal a;
@@ -389,29 +403,309 @@ inline Animal animalAt(const Herd &h, const animals::Species &sp, int i, double 
 	return a;
 }
 
+// A hunt at t: where every predator and every one of the prey is (each herd's own animals, from where its walk had them at the hunt's start), stepped a 24th of a second at
+// a time - steering: a predator turns at most 140 degrees a second, leads its quarry by 0.4 s, and after the stalk rushes a quarter faster than its quarry can flee, tiring after 8 s; a prey animal is alarmed as
+// the stalk ends (or a predator comes within 25 m) and runs from the nearest predator, swerving, turning 200 degrees a second.
+inline void huntAt(const Hunt &hu, const Herd &pred, const Herd &prey, double t, const terrain::Field *ground, std::vector<Animal> &P, std::vector<Animal> &Q) {
+	const animals::Species *sp = animals::species(pred.kind), *sq = animals::species(prey.kind);
+	P.clear(), Q.clear();
+	if (!sp || !sq) return;
+	for (int i = 0; i < pred.count; ++i) P.push_back(animalAt(pred, *sp, i, hu.at, ground));
+	for (int i = 0; i < prey.count; ++i) Q.push_back(animalAt(prey, *sq, i, hu.at, ground));
+	std::vector<double> vp(P.size(), 0.0), vq(Q.size(), 0.0);
+	std::vector<int> target(P.size(), -1);
+	std::vector<bool> alarmed(Q.size(), false);
+	const auto strideOf = [](const animals::Species &s, double v) { return v < s.trotFrom ? s.walkStride : v < s.runFrom ? s.trotStride : s.runStride; };
+	const auto turnTo = [](Vec3 dir, Vec3 want, double most) {   // (at most `most` radians towards `want`)
+		want.y = 0.0;
+		if (length(want) < 1e-9) return dir;
+		want = normalize(want);
+		const double a = std::atan2(dir.x * want.z - dir.z * want.x, dir.x * want.x + dir.z * want.z), d = std::clamp(a, -most, most);
+		return Vec3{dir.x * std::cos(d) - dir.z * std::sin(d), 0.0, dir.x * std::sin(d) + dir.z * std::cos(d)};
+	};
+	const double dt = 1.0 / 24.0, sizeP = sp->length;
+	for (double x = hu.at; x < t - 1e-9; x += dt) {
+		const double el = x - hu.at, h = std::min(dt, t - x);
+		int killed = -1;   // (once one is down the hunt is over: the pride gathers at it)
+		for (std::size_t j = 0; j < Q.size(); ++j)
+			if (Q[j].fallen) killed = static_cast<int>(j);
+		for (std::size_t i = 0; i < P.size(); ++i) {   // the predators
+			int &k = target[i];
+			if (killed >= 0) {
+				k = killed;
+				const Vec3 to = Q[static_cast<std::size_t>(k)].at - P[i].at;
+				const double want = length(to) > 2.0 * sizeP ? 0.3 * sp->fleeSpeed : 0.0;
+				vp[i] += std::clamp(want - vp[i], -8.0 * h, 6.0 * h);
+				P[i].dir = turnTo(P[i].dir, to, 2.44 * h);
+				continue;
+			}
+			if (k < 0 || Q[static_cast<std::size_t>(k)].fallen) {
+				double best = 1e30;
+				for (std::size_t j = 0; j < Q.size(); ++j)
+					if (!Q[j].fallen && length(Q[j].at - P[i].at) < best) best = length(Q[j].at - P[i].at), k = static_cast<int>(j);
+			}
+			if (k < 0) {
+				vp[i] = std::max(0.0, vp[i] - 6.0 * h);
+			} else {
+				const Animal &q = Q[static_cast<std::size_t>(k)];
+				const Vec3 lead = q.at + q.dir * (vq[static_cast<std::size_t>(k)] * 0.4) - P[i].at;
+				// (the sprint: a burst faster than its quarry's flight - a predator wins on its rush, not its staying power - tiring after 8 s)
+				const double burst = std::max(sp->fleeSpeed, 1.25 * sq->fleeSpeed) * (0.95 + 0.1 * hash01(static_cast<int>(i), pred.seed + 41));
+				const double want = el < hu.stalk ? 0.35 * sp->walkSpeed : el < hu.stalk + 8.0 ? burst : 0.5 * sp->fleeSpeed;
+				vp[i] += std::clamp(want - vp[i], -8.0 * h, 6.0 * h);
+				P[i].dir = turnTo(P[i].dir, lead, 2.44 * h);
+				if (hu.kill && el > hu.stalk)   // (whichever it reaches: a charge through the herd takes the one in its way)
+					for (std::size_t j = 0; j < Q.size() && killed < 0; ++j)
+						if (length(Q[j].at - P[i].at) < 1.2 * sizeP) Q[j].fallen = true, killed = static_cast<int>(j);
+			}
+		}
+		for (std::size_t j = 0; j < Q.size(); ++j) {   // the prey
+			if (Q[j].fallen) {
+				vq[j] = 0.0;
+				continue;
+			}
+			double nearest = 1e30;
+			Vec3 from{};
+			for (const Animal &p : P)
+				if (length(Q[j].at - p.at) < nearest) nearest = length(Q[j].at - p.at), from = p.at;
+			// (alarmed when the charge comes - a beat after it starts - or a stalker is in its face: a stalk is unseen until then, which is how it gets close)
+			alarmed[j] = alarmed[j] || el > hu.stalk + 0.3 * hash01(static_cast<int>(j), prey.seed + 43) || nearest < 8.0;
+			if (!alarmed[j]) continue;
+			const Vec3 away = Q[j].at - from;
+			const double swerve = 0.6 * std::sin(1.7 * el + 2.3 * static_cast<double>(j));
+			const Vec3 want{away.x * std::cos(swerve) - away.z * std::sin(swerve), 0.0, away.x * std::sin(swerve) + away.z * std::cos(swerve)};
+			vq[j] += std::clamp(sq->fleeSpeed * (0.9 + 0.15 * hash01(static_cast<int>(j), prey.seed + 44)) - vq[j], -8.0 * h, 7.0 * h);
+			Q[j].dir = turnTo(Q[j].dir, want, 3.5 * h);
+		}
+		const auto move = [&](Animal &a, double v, const animals::Species &s) {
+			a.at = a.at + a.dir * (v * h);
+			a.at.y = ground ? ground->heightAt(a.at.x, a.at.z) : 0.0;
+			a.cycles += v * h / strideOf(s, v);
+			a.going.speed = v, a.going.paused = v < 0.05;
+			a.going.still = a.going.paused ? 1.0 : 0.0;
+			a.clip = a.going.paused ? std::string() : v < s.trotFrom ? "walk" : v < s.runFrom ? "trot" : "run";
+		};
+		for (std::size_t i = 0; i < P.size(); ++i) move(P[i], vp[i], *sp);
+		for (std::size_t j = 0; j < Q.size(); ++j) {
+			if (alarmed[j] || Q[j].fallen) move(Q[j], vq[j], *sq);
+		}
+	}
+}
+
+// ---- a flight (round 13: `flight KIND COUNT from X Y Z to X Y Z at T ...`) ----
+// Birds perched at `from` (wings folded, looking round) that take off at T one after another - hard wingbeats, climbing - fly to `to` on an arc (flapping while they climb or
+// are slow, gliding when they come down), and land there: a flare, the body pitched up and the wings high, beating back, as the speed falls away; then perched again.
+// Perches are the film's to choose: a branch's top, a rock, the water (a goose coming down onto a lake).
+struct Flight {
+	std::string kind = "eagles";
+	int count = 1;
+	Vec3 from, to;
+	double at = 0.0, speed = 0.0, feathers = 0.0;
+	int seed = 1;
+};
+inline std::string flightText(const Flight &f, double t, animals::Poses &poses) {
+	const animals::Species *sp = animals::species(f.kind);
+	if (!sp) return std::string();
+	std::string out = "# a flight of " + f.kind + " (film_wildlife.h)\n";
+	const Vec3 way = f.to - f.from, flat = normalize(Vec3{way.x, 0.0, way.z} + Vec3{1e-9, 0.0, 0.0}), side{-flat.z, 0.0, flat.x};
+	const double D = length(way), v = f.speed > 0.0 ? f.speed : sp->walkSpeed, rise = std::min(30.0, 0.12 * D);
+	const double takeoff = 1.5, landing = 1.6, T = takeoff + D / v + 0.5 * landing;   // (its whole flight's seconds)
+	const auto at = [&](double u) {   // (where it is a share u of the way: an eased run along it, an arc up and down)
+		const double e = u * u * (3.0 - 2.0 * u) * 0.35 + u * 0.65;
+		return f.from + way * e + Vec3{0.0, 4.0 * rise * u * (1.0 - u), 0.0};
+	};
+	for (int i = 0; i < f.count; ++i) {
+		const int s = f.seed * 71 + i;
+		const Vec3 off = side * ((i - 0.5 * (f.count - 1)) * 1.6 * sp->length + 0.3 * (hash01(s, 1) - 0.5));
+		const double rel = t - f.at - 0.4 * i;
+		std::string clip;
+		int k = 0;
+		Vec3 p, fwd = flat;
+		if (rel <= 0.0 || rel >= T) {   // perched: before it goes, and where it has come down
+			p = (rel <= 0.0 ? f.from : f.to) + off;
+			clip = "perch", k = static_cast<int>(std::floor((t / 5.0 + hash01(s, 2)) * animals::posesOf("perch")));
+			fwd = normalize(flat + Vec3{0.0, 0.6, 0.0});   // (sitting up on its perch)
+		} else {
+			const double u = rel / T, du = 0.02;
+			p = at(u) + off;
+			const Vec3 vel = at(std::min(1.0, u + du)) - at(std::max(0.0, u - du));
+			fwd = normalize(vel + Vec3{1e-9, 0.0, 0.0});
+			if (rel < takeoff) {
+				clip = "flap", k = static_cast<int>(std::floor(rel * 3.2 * animals::posesOf("flap")));
+				fwd = normalize(fwd + Vec3{0.0, 0.5 * (1.0 - rel / takeoff), 0.0});   // (pitched up, climbing away)
+			} else if (rel > T - landing) {
+				clip = "flare", k = static_cast<int>(std::floor(rel * 2.5 * animals::posesOf("flare")));
+				fwd = normalize(Vec3{fwd.x, 0.0, fwd.z} + Vec3{0.0, 0.6, 0.0});   // (the body up, braking on its wings)
+			} else {
+				const bool climbing = vel.y > 0.004 * D;
+				clip = climbing ? "flap" : "glide";
+				k = climbing ? static_cast<int>(std::floor(rel * 2.4 * animals::posesOf("flap"))) : static_cast<int>(std::floor(rel / 4.0 * animals::posesOf("glide")));
+			}
+		}
+		const std::string pose = poses.poseName(f.kind, clip, k, out, f.feathers);
+		const Vec3 storyAt{-p.x, p.y, p.z}, storyFwd{-fwd.x, fwd.y, fwd.z};
+		out += nature::placeObject(pose, mul(translate(storyAt), detail::facing(storyFwd, Vec3{0, 1, 0}), scale(0.92 + 0.16 * hash01(s, 3))));
+	}
+	return out;
+}
+
+// ---- animals and water (round 13) ----
+// Where an animal is in the water (the ground under it below `level`: a lake, a sea, a flooded channel), it throws spray as it goes - drops of water flung from its legs,
+// up and out, falling back on their arcs (more and higher the faster it goes; spawned every 30th of a second over the last 0.6 s, each where the time puts it) - and leaves
+// a wake of foam rings widening behind it. Out of the water it is wet for six seconds: its coat dark and glossy (film_animals.h), drops falling from its belly, and a
+// shake (its body rolling to and fro four times a second, flinging a ring of spray) from 0.8 s to 2 s after it climbs out.
+namespace detail {
+inline std::string drop(Vec3 p, double r) {
+	char buf[140];
+	std::snprintf(buf, sizeof buf, "AttributeBegin\n  Translate %.4f %.4f %.4f\n  Shape \"sphere\" \"float radius\" [ %.4f ]\nAttributeEnd\n", p.x, p.y, p.z, r);
+	return buf;
+}
+}  // namespace detail
+inline std::string splashText(Vec3 at, Vec3 dir, double speed, double size, double level, double t, int seed) {
+	if (speed < 0.2) return std::string();
+	std::string out;
+	const Vec3 side{-dir.z, 0.0, dir.x};
+	const double rate = 30.0, spread = 0.6;
+	const int per = std::clamp(static_cast<int>(2.0 + speed * 1.6), 2, 24);
+	for (int k = 0; k < static_cast<int>(spread * rate); ++k) {
+		const double born = std::floor(t * rate) / rate - k / rate, age = t - born;
+		const int sk = static_cast<int>(std::lround(born * rate)) * 977 + seed;
+		for (int j = 0; j < per; ++j) {
+			const double leg = hash01(sk + j, 1) < 0.5 ? 0.45 : -0.45, across = hash01(sk + j, 2) < 0.5 ? 0.18 : -0.18;
+			const Vec3 origin = Vec3{at.x, level, at.z} + dir * (leg * size) + side * (across * size);
+			const double up = (0.8 + 0.25 * speed) * (0.6 + 0.8 * hash01(sk + j, 3)), out1 = (0.5 + 0.15 * speed) * (hash01(sk + j, 4) - 0.5) * 2.0;
+			const Vec3 v = Vec3{0.0, up, 0.0} + side * out1 + dir * (0.4 * speed * hash01(sk + j, 5));
+			const Vec3 p = origin + v * age + Vec3{0.0, -4.9 * age * age, 0.0};
+			if (p.y < level) continue;
+			out += detail::drop(p, 0.028 * size * (0.5 + hash01(sk + j, 6)) * (1.0 - 0.5 * age / spread));
+		}
+	}
+	return out;
+}
+inline std::string wakeText(Vec3 at, Vec3 dir, double speed, double size, double level, double t, int seed) {
+	Mesh m;
+	for (int j = 1; j <= 8; ++j) {   // (rings left at its places of the last two seconds, each widening and thinning)
+		const double age = j * 0.25 + std::fmod(t, 0.25);
+		const Vec3 c = at - dir * (speed * age);
+		const double r = 0.35 * size + 0.9 * age, w = 0.09 * size * (1.0 - age / 2.3);
+		if (w <= 0.0) continue;
+		const int base = static_cast<int>(m.verts.size()), n = 40;
+		for (int k = 0; k <= n; ++k) {
+			const double a = 2.0 * kPi * k / n, wob = 1.0 + 0.06 * std::sin(5.0 * a + seed + j);
+			for (const double rr : {r * wob - w, r * wob + w}) {
+				m.verts.push_back({-(c.x + rr * std::cos(a)), level + 0.08, c.z + rr * std::sin(a)});   // (above the small waves' crests)
+				m.normals.push_back({0.0, 1.0, 0.0});
+			}
+		}
+		for (int k = 0; k < n; ++k) {
+			const int a0 = base + 2 * k;
+			m.tris.push_back({a0, a0 + 2, a0 + 1}), m.tris.push_back({a0 + 1, a0 + 2, a0 + 3});
+		}
+	}
+	return m.tris.empty() ? std::string() : attr(diffuseMaterial({0.85, 0.88, 0.88}), emitMesh(m, identity()));
+}
+
 // A herd at t, as scene text: each animal walking from `from` towards `to` in a loose bunch, standing on the land, stopping now and then to graze (wolves: to look round),
 // fleeing at a gallop from `flee` on; its pose from its kind's clips (film_animals.h) through `poses`.
-inline std::string herdText(const Herd &h, double t, const terrain::Field *ground, animals::Poses &poses) {
+inline std::string herdText(const Herd &h, double t, const terrain::Field *ground, animals::Poses &poses, const std::vector<Herd> &herds = {}, const std::vector<Hunt> &hunts = {},
+						   double waterLevel = -1e30) {
 	const animals::Species *sp = animals::species(h.kind);
 	if (!sp) return std::string();
+	// in a hunt that has begun: its animals where the chase has them (now and a tenth of a second ago, for the lean)
+	std::vector<Animal> chased, chasedBefore;
+	for (const Hunt &hu : hunts) {
+		if (h.name.empty() || t < hu.at || (hu.predators != h.name && hu.prey != h.name)) continue;
+		const Herd *pr = nullptr, *py = nullptr;
+		for (const Herd &o : herds) {
+			if (o.name == hu.predators) pr = &o;
+			if (o.name == hu.prey) py = &o;
+		}
+		if (!pr || !py) continue;
+		std::vector<Animal> P, Q, P0, Q0;
+		huntAt(hu, *pr, *py, t, ground, P, Q);
+		huntAt(hu, *pr, *py, std::max(hu.at, t - 0.1), ground, P0, Q0);
+		chased = hu.predators == h.name ? P : Q, chasedBefore = hu.predators == h.name ? P0 : Q0;
+	}
 	std::string out = "# a herd of " + h.kind + " (film_wildlife.h)\n";
-	for (int i = 0; i < h.count; ++i) {
-		const int s = h.seed * 61 + i;
-		const Animal a = animalAt(h, *sp, i, t, ground);
+	const std::string pattern = h.coat.empty() ? coats::defaultFor(h.kind) : h.coat == "plain" ? std::string() : h.coat;   // (each animal one of three variants of it)
+	for (int i = 0; i < h.count + h.young; ++i) {
+		const bool child = i >= h.count;   // (a young one: following its mother, half her size, its legs stepping twice as often)
+		const int mother = child ? (i - h.count) % h.count : i, s = h.seed * 61 + i;
+		Animal a = static_cast<std::size_t>(mother) < chased.size() ? chased[static_cast<std::size_t>(mother)] : animalAt(h, *sp, mother, t, ground);
+		if (child) {
+			const Vec3 side{-a.dir.z, 0.0, a.dir.x};
+			a.at = a.at - a.dir * (1.1 * sp->length) + side * ((hash01(s, 21) < 0.5 ? -1.0 : 1.0) * 0.6 * sp->length);
+			a.at.y = ground ? ground->heightAt(a.at.x, a.at.z) : 0.0;
+			a.cycles = 1.8 * a.cycles + hash01(s, 22);
+		}
 		const Vec3 p = a.at, dir = a.dir;
 		const auto groundAt = [&](const Vec3 &q) { return ground ? ground->heightAt(q.x, q.z) : 0.0; };
 		const double pitch = std::atan2(groundAt(p + dir * (0.5 * sp->length)) - groundAt(p - dir * (0.5 * sp->length)), sp->length) * 180.0 / kPi;   // (to the slope)
-		std::string pose;
+		std::string pose, clip;
+		int k = 0;
 		const double turn = (6.0 + 44.0 * a.going.still) * (hash01(s, 7) - 0.5);   // (turned further aside as it settles to graze: it snapped 22 degrees in a frame)
 		if (a.going.paused) {
-			const std::string clip = sp->grazes ? "graze" : "idle";
+			clip = sp->grazes ? "graze" : "idle";
 			const double len = clip == "graze" ? 4.0 : 5.0;
-			pose = poses.poseName(h.kind, clip, static_cast<int>(std::floor((t / len + hash01(s, 11)) * animals::posesOf(clip))), out, h.fur);
+			k = static_cast<int>(std::floor((t / len + hash01(s, 11)) * animals::posesOf(clip)));
 		} else {
-			pose = poses.poseName(h.kind, a.clip, static_cast<int>(std::floor(a.cycles * animals::posesOf(a.clip))), out, h.fur);
+			clip = a.clip;
+			k = static_cast<int>(std::floor(a.cycles * animals::posesOf(a.clip)));
 		}
+		const bool hero = i < h.heroes;   // (a hero's fur is its strands, not the herd's ribbons)
+		// the water: in it (spray and a wake), or just out of it (wet, dripping, shaking itself)
+		double wet = 0.0, shake = 0.0;
+		std::string watery, spray;   // (water's: a wake and clear drops; spray: the white of water thrown up)
+		if (waterLevel > -1e29) {
+			const auto depthAt = [&](Vec3 q) { return waterLevel - (ground ? ground->heightAt(q.x, q.z) : 0.0); };
+			const double size = sp->length * (child ? 0.5 : 1.0);
+			if (depthAt(p) > 0.05) {
+				spray += splashText(p, dir, a.going.speed, size, waterLevel, t, s);
+				watery += wakeText(p, dir, a.going.speed, size, waterLevel, t, s);
+			} else {
+				double out0 = -1.0;   // (how long since it came out: looking back along its way)
+				for (double back = 0.25; back <= 6.0; back += 0.25)
+					if (depthAt(p - dir * (a.going.speed * back)) > 0.1) {
+						out0 = back;
+						break;
+					}
+				if (out0 >= 0.0) {
+					wet = 1.0 - out0 / 6.0;
+					const double since = out0;
+					if (since > 0.8 && since < 2.0) {   // the shake, and its ring of spray
+						shake = 22.0 * std::sin(2.0 * kPi * 4.0 * (since - 0.8)) * std::sin(kPi * (since - 0.8) / 1.2);
+						for (int j = 0; j < 40; ++j) {
+							const double ang = 2.0 * kPi * hash01(s * 41 + j, 7), age = std::fmod(since - 0.8 + 0.05 * j, 0.5), v = 2.5 + 1.5 * hash01(s * 41 + j, 8);
+							const Vec3 o = p + Vec3{0.0, 0.7 * sp->length * (child ? 0.5 : 1.0), 0.0};
+							watery += detail::drop(o + Vec3{std::cos(ang) * v * age, 0.6 * age - 4.9 * age * age, std::sin(ang) * v * age}, 0.008 * size);
+						}
+					}
+					for (int j = 0; j < static_cast<int>(12 * wet); ++j) {   // drops falling from its belly and legs
+						const double age = std::fmod(t * 1.7 + hash01(s * 43 + j, 9), 1.0) * 0.45;
+						const Vec3 o = p + dir * ((hash01(s * 43 + j, 10) - 0.5) * size) + Vec3{0.0, 0.45 * size, 0.0};
+						watery += detail::drop(o + Vec3{0.0, -4.9 * age * age, 0.0}, 0.006 * size);
+					}
+				}
+			}
+		}
+		pose = poses.poseName(h.kind, clip, k, out, hero ? 0.0 : h.fur, pattern, i % 3, wet > 0.0);
 		const Vec3 storyAt{-p.x, p.y, p.z}, storyFwd{-dir.x, 0.0, dir.z};
-		out += nature::placeObject(pose, mul(translate(storyAt), detail::facing(storyFwd, {0, 1, 0}), rotate({0, 1, 0}, turn), rotate({1, 0, 0}, -pitch), scale(0.9 + 0.2 * hash01(s, 8))));
+		// leaning into a turn, as a running animal does (its weight against the turn: tan(lean) = v w / g, its speed times how fast it turns)
+		double lean = 0.0;
+		if (t > 0.1) {
+			const Animal before = static_cast<std::size_t>(mother) < chasedBefore.size() ? chasedBefore[static_cast<std::size_t>(mother)] : animalAt(h, *sp, mother, t - 0.1, ground);
+			const double w = std::atan2(before.dir.x * dir.z - before.dir.z * dir.x, before.dir.x * dir.x + before.dir.z * dir.z) / 0.1, v = length(p - before.at) / 0.1;
+			lean = std::clamp(std::atan(v * w / 9.81) * 180.0 / kPi, -25.0, 25.0);
+		}
+		const Mat4 placing = mul(translate(storyAt), detail::facing(storyFwd, {0, 1, 0}), rotate({0, 1, 0}, turn), rotate({0, 0, 1}, a.fallen ? 80.0 : lean + shake), rotate({1, 0, 0}, -pitch), scale((child ? 0.5 : 1.0) * (0.9 + 0.2 * hash01(s, 8))));
+		out += nature::placeObject(pose, placing);
+		if (!watery.empty()) out += "AttributeBegin\nMaterial \"dielectric\" \"float eta\" [ 1.33 ]\n" + watery + "AttributeEnd\n";   // (water: its wake and drops)
+		if (!spray.empty()) out += "AttributeBegin\nMaterial \"diffuse\" \"rgb reflectance\" [ 0.9 0.92 0.93 ]\n" + spray + "AttributeEnd\n";   // (spray: white with the air in it)
+		if (hero) {
+			const Mat4 mirror = scale(-1.0, 1.0, 1.0);
+			k = ((k % animals::posesOf(clip)) + animals::posesOf(clip)) % animals::posesOf(clip);
+			out += animals::heroFur(h.kind, clip, k, pattern, i % 3, h.heroFur, mul(mirror, placing), s);   // (the object's meshes are mirrored as emitMesh writes them: the fur is placed as they end up)
+		}
 	}
 	return out;
 }

@@ -20,7 +20,7 @@
 // wf_dc_*/dc_* split, so no wavefront-native duplicate of it is needed here).
 //
 // restir.h's temporal_update()/spatial_merge() explicitly do NOT implement
-// the reweighting needed for unbiased reuse (that header's own TODO comment:
+// the reweighting needed for unbiased reuse (that header's own note:
 // "for full unbiasedness, re-evaluate p_hat for each neighbor's sample at
 // this pixel's context and call reservoir_ucw() with the corrected value").
 // restir_reservoir_combine() below IS that missing piece: every reuse (this
@@ -123,7 +123,7 @@ constexpr float kVolumeSpatialDistScale = 3.0f;
 // why no separate Jacobian multiply is needed here for correctness: cosine
 // and distance are recomputed fresh at the new origin, which already IS the
 // full geometric correction ReSTIR's unbiased reuse requires (restir.h's own
-// TODO wording: "re-evaluate p_hat ... at this pixel's context").
+// note: "re-evaluate p_hat ... at this pixel's context").
 //
 // Returns false (out_geom_pdf left at 0) if the sample is degenerate from
 // this origin (grazing angle, coincident points, or - Sphere only - the

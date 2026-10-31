@@ -4,6 +4,7 @@
 // land in action, slow motion, time-lapse and exposure. parse() hands every line to natureLine() first.
 
 #include "film_parse_space.h"   // (and film_spec.h)
+#include "film_parse_sea.h"
 
 namespace cartoon {
 namespace film_file {
@@ -363,6 +364,278 @@ inline std::string groundLine(Spec &s, const std::string &verb, const std::strin
 	s.tracks.push_back(k);
 	return std::string();
 }
+// `flock`, `herd`, `flight`, `hunt`: animals (film_wildlife.h, film_animals.h)
+inline std::string animalLine(Spec &s, const std::string &verb, const std::string &line) {
+	using detail::number;
+	const auto fail = [](const std::string &what) { return what; };
+	if (verb == "flock") {
+		const std::vector<std::string> t = detail::tokens(line);
+		wildlife::Flock f;
+		double count = 0.0;
+		if (t.size() < 3 || std::find(wildlife::flockKinds().begin(), wildlife::flockKinds().end(), t[1]) == wildlife::flockKinds().end() || !number(t[2], count) || count < 1 || count > 3000)
+			return fail("`flock KIND COUNT ...`: starlings, geese, fish, butterflies or eagles, 1 to 3000 of them (`at X Y Z` and `radius R`; geese `from X Y Z to X Y Z`; butterflies `in X0 Z0 X1 Z1`)");
+		f.kind = t[1];
+		f.count = static_cast<int>(count);
+		if (f.kind == "fish") f.radius = 6.0;
+		if (f.kind == "eagles") f.radius = 60.0;
+		bool where = false;
+		for (std::size_t i = 3; i < t.size();) {
+			double a = 0.0, b = 0.0, c = 0.0, d = 0.0;
+			if ((t[i] == "at" || t[i] == "from" || t[i] == "to") && i + 3 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && number(t[i + 3], c)) {
+				(t[i] == "at" ? f.at : t[i] == "from" ? f.from : f.to) = Vec3{a, b, c};
+				where = where || t[i] != "to";
+				i += 4;
+			} else if (t[i] == "in" && i + 4 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && number(t[i + 3], c) && number(t[i + 4], d)) {
+				f.x0 = std::min(a, c), f.z0 = std::min(b, d), f.x1 = std::max(a, c), f.z1 = std::max(b, d);
+				where = true;
+				i += 5;
+			} else if (t[i] == "during" && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && b > a) {
+				f.t0 = a, f.t1 = b;
+				i += 3;
+			} else if (i + 1 < t.size() && number(t[i + 1], a)) {
+				if (t[i] == "radius" && a > 0.0) f.radius = a;
+				else if (t[i] == "speed" && a > 0.0) f.speed = a;
+				else if (t[i] == "height") f.at.y = a;
+				else if (t[i] == "seed") f.seed = static_cast<int>(a);
+				else if (t[i] == "feathers" && (f.kind == "eagles" || f.kind == "geese") && a >= 0.0 && a <= 4.0) f.feathers = a;
+				else return fail("\"" + t[i] + "\": a flock takes at X Y Z, from X Y Z, to X Y Z, in X0 Z0 X1 Z1, radius, speed, height, during T0 T1 and seed (eagles and geese: feathers 0 to 4)");
+				i += 2;
+			} else {
+				return fail("\"" + t[i] + "\": a flock takes at X Y Z, from X Y Z, to X Y Z, in X0 Z0 X1 Z1, radius, speed, height, during T0 T1 and seed");
+			}
+		}
+		if (!where) return fail(f.kind == "geese" ? "geese fly `from X Y Z to X Y Z`" : f.kind == "butterflies" ? "butterflies flit `in X0 Z0 X1 Z1`" : "a flock needs its `at X Y Z`");
+		s.flocks.push_back(f);
+	} else if (verb == "herd") {
+		const std::vector<std::string> t = detail::tokens(line);
+		wildlife::Herd h;
+		double count = 0.0;
+		if (t.size() < 9 || std::find(wildlife::herdKinds().begin(), wildlife::herdKinds().end(), t[1]) == wildlife::herdKinds().end() || !number(t[2], count) || count < 1 || count > 500 ||
+			t[3] != "from" || !number(t[4], h.fx) || !number(t[5], h.fz) || t[6] != "to" || !number(t[7], h.tx) || !number(t[8], h.tz))
+			return fail("`herd KIND COUNT from X Z to X Z [speed S] [start T] [flee T] [seed N]`: deer, horses, wolves, lions, zebras, giraffes, elephants, bears, foxes, rabbits, penguins or snakes, 1 to 500 of them");
+		h.kind = t[1];
+		h.count = static_cast<int>(count);
+		for (std::size_t i = 9; i < t.size(); i += 2) {
+			double a = 0.0;
+			if (t[i] == "name" && i + 1 < t.size()) {   // what a `hunt` calls it
+				h.name = t[i + 1];
+				continue;
+			}
+			if (t[i] == "young" && i + 1 < t.size()) {
+				if (!number(t[i + 1], a) || a < 0.0 || a > 200.0) return fail("a herd's `young N`: how many young ones follow their mothers, 0 to 200");
+				h.young = static_cast<int>(a);
+				continue;
+			}
+			if (t[i] == "hero" && i + 1 < t.size()) {   // its first N animals with fur of real strands, for close-ups (film_animals.h heroFur)
+				if (!number(t[i + 1], a) || a < 0.0 || a > 10.0) return fail("a herd's `hero N`: how many of it get fur of strands, 0 to 10");
+				h.heroes = static_cast<int>(a);
+				continue;
+			}
+			if (t[i] == "herofur" && i + 1 < t.size()) {
+				if (!number(t[i + 1], a) || a <= 0.0 || a > 4.0) return fail("a herd's `herofur A`: how thick its heroes' fur is, 0 to 4 (1 the usual)");
+				h.heroFur = a;
+				continue;
+			}
+			if (t[i] == "coat" && i + 1 < t.size()) {   // its coat's pattern (film_coats.h)
+				if (std::find(coats::patterns().begin(), coats::patterns().end(), t[i + 1]) == coats::patterns().end())
+					return fail("a herd's `coat` is zebra, tiger, cheetah, leopard, giraffe, shade or plain");
+				h.coat = t[i + 1];
+				continue;
+			}
+			if (i + 1 >= t.size() || !number(t[i + 1], a)) return fail("\"" + t[i] + "\": a herd takes speed, start, flee and seed, each with a number");
+			if (t[i] == "speed" && a > 0.0) h.speed = a;
+			else if (t[i] == "start") h.t0 = a;
+			else if (t[i] == "flee" && a >= 0.0) h.flee = a;
+			else if (t[i] == "seed") h.seed = static_cast<int>(a);
+			else if (t[i] == "fur" && a >= 0.0 && a <= 4.0) h.fur = a;
+			else return fail("\"" + t[i] + "\": a herd takes speed, start, flee (when it bolts), fur (0 to 4), coat PATTERN and seed");
+		}
+		s.herds.push_back(h);
+	} else if (verb == "flight") {   // flight KIND COUNT from X Y Z to X Y Z at T [speed S] [feathers A] [seed N] (film_wildlife.h flightText)
+		const std::vector<std::string> t = detail::tokens(line);
+		const char *usage = "`flight eagles|geese COUNT from X Y Z to X Y Z at T [speed S] [feathers A] [seed N]`: birds taking off from a perch, flying and landing on another";
+		wildlife::Flight fl;
+		double count = 0.0;
+		if (t.size() < 13 || (t[1] != "eagles" && t[1] != "geese") || !number(t[2], count) || count < 1 || count > 40 || t[3] != "from" || t[7] != "to" || t[11] != "at" ||
+			!number(t[4], fl.from.x) || !number(t[5], fl.from.y) || !number(t[6], fl.from.z) || !number(t[8], fl.to.x) || !number(t[9], fl.to.y) || !number(t[10], fl.to.z) || !number(t[12], fl.at))
+			return fail(usage);
+		fl.kind = t[1], fl.count = static_cast<int>(count);
+		for (std::size_t i = 13; i < t.size(); i += 2) {
+			double a = 0.0;
+			if (i + 1 >= t.size() || !number(t[i + 1], a)) return fail(usage);
+			if (t[i] == "speed" && a > 0.0) fl.speed = a;
+			else if (t[i] == "feathers" && a >= 0.0 && a <= 4.0) fl.feathers = a;
+			else if (t[i] == "seed") fl.seed = static_cast<int>(a);
+			else return fail(usage);
+		}
+		if (length(fl.to - fl.from) < 1.0) return fail("a flight's `from` and `to` are at least a metre apart");
+		s.flights.push_back(fl);
+	} else if (verb == "hunt") {   // hunt PREDATORS PREY at T [stalk S] [catch] (film_wildlife.h huntAt)
+		const std::vector<std::string> t = detail::tokens(line);
+		const char *usage = "`hunt PREDATORS PREY at T [stalk S] [catch]`: two herds named before it (`herd ... name N`)";
+		wildlife::Hunt hu;
+		if (t.size() < 5 || t[3] != "at" || !number(t[4], hu.at)) return fail(usage);
+		hu.predators = t[1], hu.prey = t[2];
+		const auto named = [&](const std::string &n) { return std::any_of(s.herds.begin(), s.herds.end(), [&](const wildlife::Herd &h) { return h.name == n; }); };
+		if (!named(hu.predators) || !named(hu.prey) || hu.predators == hu.prey) return fail(usage);
+		for (std::size_t i = 5; i < t.size(); ++i) {
+			if (t[i] == "catch") hu.kill = true;
+			else if (t[i] == "stalk" && i + 1 < t.size() && number(t[i + 1], hu.stalk) && hu.stalk >= 0.0) ++i;
+			else return fail(usage);
+		}
+		s.hunts.push_back(hu);
+	}
+	return std::string();
+}
+// `night`, `cameratrap`, `shimmer`: night shots and the long lens (film_night.h)
+inline std::string nightLine(Spec &s, const std::string &verb, const std::string &line) {
+	using detail::number;
+	const auto fail = [](const std::string &what) { return what; };
+	const std::vector<std::string> t = detail::tokens(line);
+	night::Night &n = s.night;
+	if (verb == "shimmer") {
+		double a = 0.0;
+		if (t.size() != 2 || !number(t[1], a) || a <= 0.0 || a > 0.05) return fail("`shimmer A`: heat shimmer, A a share of the picture's height (0.002 light to 0.006 strong; up to 0.05)");
+		n.shimmer = a;
+		return std::string();
+	}
+	if (verb == "night") {
+		const char *usage = "`night [eyeshine E] [flash F]`: eyes shining back (E 0 to 10) and a flash on the camera (F 0 to 20)";
+		for (std::size_t i = 1; i < t.size(); i += 2) {
+			double a = 0.0;
+			if (i + 1 >= t.size() || !number(t[i + 1], a)) return fail(usage);
+			if (t[i] == "eyeshine" && a >= 0.0 && a <= 10.0) n.eyeshine = a;
+			else if (t[i] == "flash" && a >= 0.0 && a <= 20.0) n.flash = a;
+			else return fail(usage);
+		}
+		if (t.size() == 1) n.eyeshine = 1.0;
+		return std::string();
+	}
+	const char *usage = "`cameratrap [ir] [name WORDS...] [clock HH:MM] [date YYYY-MM-DD] [temp C]`: a trail camera's picture";
+	n.trap = true;
+	for (std::size_t i = 1; i < t.size();) {
+		double a = 0.0;
+		int hh = 0, mm = 0, y = 0, mo = 0, d = 0;
+		if (t[i] == "ir") {
+			n.ir = true, ++i;
+		} else if (t[i] == "clock" && i + 1 < t.size() && std::sscanf(t[i + 1].c_str(), "%d:%d", &hh, &mm) == 2 && hh >= 0 && hh < 24 && mm >= 0 && mm < 60) {
+			n.clockMinutes = hh * 60 + mm, i += 2;
+		} else if (t[i] == "date" && i + 1 < t.size() && std::sscanf(t[i + 1].c_str(), "%d-%d-%d", &y, &mo, &d) == 3 && mo >= 1 && mo <= 12 && d >= 1 && d <= 31) {
+			n.date = t[i + 1], i += 2;
+		} else if (t[i] == "temp" && i + 1 < t.size() && number(t[i + 1], a) && a > -90.0 && a < 70.0) {
+			n.temp = a, i += 2;
+		} else if (t[i] == "name" && i + 1 < t.size()) {   // (its words up to the next of the line's own)
+			std::string name;
+			for (++i; i < t.size() && t[i] != "ir" && t[i] != "clock" && t[i] != "date" && t[i] != "temp"; ++i) name += (name.empty() ? "" : " ") + t[i];
+			n.name = name.substr(0, 24);
+		} else {
+			return fail(usage);
+		}
+	}
+	return std::string();
+}
+// `insects`, `dew`: the small world close up (film_macro.h)
+inline std::string macroLine(Spec &s, const std::string &verb, const std::string &line) {
+	using detail::number;
+	const auto fail = [](const std::string &what) { return what; };
+	const std::vector<std::string> t = detail::tokens(line);
+	const std::string usage = verb == "insects" ? "`insects bees|dragonflies|beetles N in X0 Y0 Z0 X1 Y1 Z1 [size S] [film NM] [seed K]` (1 to 200)"
+											   : "`dew N in X0 Z0 X1 Z1 [size S] [seed K]` (1 to 5000 blades)";
+	std::size_t i = verb == "insects" ? 2 : 1;
+	double v[6] = {0, 0, 0, 0, 0, 0}, count = 0.0;
+	const int box = verb == "insects" ? 6 : 4;
+	if (verb == "insects" && (t.size() < 2 || std::find(macro::kinds().begin(), macro::kinds().end(), t[1]) == macro::kinds().end())) return fail(usage);
+	if (i + 2 + box > t.size() || !number(t[i], count) || count < 1 || count > (verb == "insects" ? 200 : 5000) || t[i + 1] != "in") return fail(usage);
+	for (int k = 0; k < box; ++k)
+		if (!number(t[i + 2 + k], v[k])) return fail(usage);
+	i += 2 + box;
+	macro::Insects in;
+	macro::Dew dw;
+	for (; i < t.size(); i += 2) {
+		double a = 0.0;
+		if (i + 1 >= t.size() || !number(t[i + 1], a)) return fail(usage);
+		if (t[i] == "size" && a > 0.0 && a <= 100.0) in.size = dw.size = a;
+		else if (t[i] == "seed") in.seed = dw.seed = static_cast<int>(a);
+		else if (verb == "insects" && t[i] == "film" && a >= 0.0 && a <= 2000.0) in.film = a;
+		else return fail(usage);
+	}
+	if (verb == "insects") {
+		in.kind = t[1], in.count = static_cast<int>(count);
+		in.lo = {std::min(v[0], v[3]), std::min(v[1], v[4]), std::min(v[2], v[5])}, in.hi = {std::max(v[0], v[3]), std::max(v[1], v[4]), std::max(v[2], v[5])};
+		s.macro.insects.push_back(in);
+	} else {
+		dw.count = static_cast<int>(count);
+		dw.x0 = std::min(v[0], v[2]), dw.z0 = std::min(v[1], v[3]), dw.x1 = std::max(v[0], v[2]), dw.z1 = std::max(v[1], v[3]);
+		s.macro.dews.push_back(dw);
+	}
+	return std::string();
+}
+// `baitball`, `reeffish`, `jellyfish`, `seaturtles`: life under the sea (film_sealife.h)
+inline std::string seaLifeLine(Spec &s, const std::string &verb, const std::string &line) {
+	using detail::number;
+	const auto fail = [](const std::string &what) { return what; };
+	const std::vector<std::string> t = detail::tokens(line);
+	const std::string usage = verb == "baitball" ? "`baitball X Y Z [count N] [radius R] [strike T]... [hunter sharks|dolphins] [seed S]`"
+							  : verb == "seaturtles" ? "`seaturtles N at X Y Z [radius R] [seed S]`"
+													 : "`" + verb + " N in X0 Y0 Z0 X1 Y1 Z1" + (verb == "jellyfish" ? " [glow G]" : "") + " [seed S]`";
+	std::vector<double> v;
+	std::size_t i = 1;
+	const auto numbers = [&](std::size_t n) {   // (the next n numbers, or false)
+		v.assign(n, 0.0);
+		for (std::size_t k = 0; k < n; ++k)
+			if (i + k >= t.size() || !number(t[i + k], v[k])) return false;
+		i += n;
+		return true;
+	};
+	double count = 0.0;
+	if (verb == "baitball") {
+		sealife::BaitBall b;
+		if (!numbers(3)) return fail(usage);
+		b.at = {v[0], v[1], v[2]};
+		while (i < t.size()) {
+			const std::string w = t[i++];
+			if (w == "hunter" && i < t.size() && (t[i] == "sharks" || t[i] == "dolphins")) b.hunter = t[i++];
+			else if (!numbers(1)) return fail(usage);
+			else if (w == "count" && v[0] >= 10 && v[0] <= 3000) b.count = static_cast<int>(v[0]);
+			else if (w == "radius" && v[0] > 0.2 && v[0] <= 30.0) b.radius = v[0];
+			else if (w == "strike" && b.strikes.size() < 32) b.strikes.push_back(v[0]);
+			else if (w == "seed") b.seed = static_cast<int>(v[0]);
+			else return fail(usage);
+		}
+		s.sealife.balls.push_back(b);
+		return std::string();
+	}
+	if (!numbers(1) || (count = v[0]) < 1 || count > 500) return fail(usage + " (1 to 500)");
+	if (verb == "seaturtles") {
+		sealife::Turtles tu;
+		tu.count = static_cast<int>(count);
+		if (i >= t.size() || t[i++] != "at" || !numbers(3)) return fail(usage);
+		tu.at = {v[0], v[1], v[2]};
+		while (i < t.size()) {
+			const std::string w = t[i++];
+			if (!numbers(1)) return fail(usage);
+			if (w == "radius" && v[0] > 0.5) tu.radius = v[0];
+			else if (w == "seed") tu.seed = static_cast<int>(v[0]);
+			else return fail(usage);
+		}
+		s.sealife.turtles.push_back(tu);
+		return std::string();
+	}
+	if (i >= t.size() || t[i++] != "in" || !numbers(6)) return fail(usage);
+	const Vec3 lo{std::min(v[0], v[3]), std::min(v[1], v[4]), std::min(v[2], v[5])}, hi{std::max(v[0], v[3]), std::max(v[1], v[4]), std::max(v[2], v[5])};
+	int seed = 1;
+	double glow = 1.0;
+	while (i < t.size()) {
+		const std::string w = t[i++];
+		if (!numbers(1)) return fail(usage);
+		if (w == "seed") seed = static_cast<int>(v[0]);
+		else if (verb == "jellyfish" && w == "glow" && v[0] >= 0.0 && v[0] <= 20.0) glow = v[0];
+		else return fail(usage);
+	}
+	if (verb == "reeffish") s.sealife.reefs.push_back({lo, hi, static_cast<int>(count), seed});
+	else s.sealife.jellies.push_back({lo, hi, static_cast<int>(count), seed, glow});
+	return std::string();
+}
 
 // One line of a film file, if it is a nature line: what it says goes into `s`. `handled` is false when `verb` is not a nature word (the line is parse()'s); the
 // result is "" or what is wrong with the line (parse() adds the file and the line).
@@ -598,64 +871,14 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 			}
 		}
 		s.meadows.push_back(m);
-	} else if (verb == "flock") {
-		const std::vector<std::string> t = detail::tokens(line);
-		wildlife::Flock f;
-		double count = 0.0;
-		if (t.size() < 3 || std::find(wildlife::flockKinds().begin(), wildlife::flockKinds().end(), t[1]) == wildlife::flockKinds().end() || !number(t[2], count) || count < 1 || count > 3000)
-			return fail("`flock KIND COUNT ...`: starlings, geese, fish, butterflies or eagles, 1 to 3000 of them (`at X Y Z` and `radius R`; geese `from X Y Z to X Y Z`; butterflies `in X0 Z0 X1 Z1`)");
-		f.kind = t[1];
-		f.count = static_cast<int>(count);
-		if (f.kind == "fish") f.radius = 6.0;
-		if (f.kind == "eagles") f.radius = 60.0;
-		bool where = false;
-		for (std::size_t i = 3; i < t.size();) {
-			double a = 0.0, b = 0.0, c = 0.0, d = 0.0;
-			if ((t[i] == "at" || t[i] == "from" || t[i] == "to") && i + 3 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && number(t[i + 3], c)) {
-				(t[i] == "at" ? f.at : t[i] == "from" ? f.from : f.to) = Vec3{a, b, c};
-				where = where || t[i] != "to";
-				i += 4;
-			} else if (t[i] == "in" && i + 4 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && number(t[i + 3], c) && number(t[i + 4], d)) {
-				f.x0 = std::min(a, c), f.z0 = std::min(b, d), f.x1 = std::max(a, c), f.z1 = std::max(b, d);
-				where = true;
-				i += 5;
-			} else if (t[i] == "during" && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && b > a) {
-				f.t0 = a, f.t1 = b;
-				i += 3;
-			} else if (i + 1 < t.size() && number(t[i + 1], a)) {
-				if (t[i] == "radius" && a > 0.0) f.radius = a;
-				else if (t[i] == "speed" && a > 0.0) f.speed = a;
-				else if (t[i] == "height") f.at.y = a;
-				else if (t[i] == "seed") f.seed = static_cast<int>(a);
-				else if (t[i] == "feathers" && (f.kind == "eagles" || f.kind == "geese") && a >= 0.0 && a <= 4.0) f.feathers = a;
-				else return fail("\"" + t[i] + "\": a flock takes at X Y Z, from X Y Z, to X Y Z, in X0 Z0 X1 Z1, radius, speed, height, during T0 T1 and seed (eagles and geese: feathers 0 to 4)");
-				i += 2;
-			} else {
-				return fail("\"" + t[i] + "\": a flock takes at X Y Z, from X Y Z, to X Y Z, in X0 Z0 X1 Z1, radius, speed, height, during T0 T1 and seed");
-			}
-		}
-		if (!where) return fail(f.kind == "geese" ? "geese fly `from X Y Z to X Y Z`" : f.kind == "butterflies" ? "butterflies flit `in X0 Z0 X1 Z1`" : "a flock needs its `at X Y Z`");
-		s.flocks.push_back(f);
-	} else if (verb == "herd") {
-		const std::vector<std::string> t = detail::tokens(line);
-		wildlife::Herd h;
-		double count = 0.0;
-		if (t.size() < 9 || std::find(wildlife::herdKinds().begin(), wildlife::herdKinds().end(), t[1]) == wildlife::herdKinds().end() || !number(t[2], count) || count < 1 || count > 500 ||
-			t[3] != "from" || !number(t[4], h.fx) || !number(t[5], h.fz) || t[6] != "to" || !number(t[7], h.tx) || !number(t[8], h.tz))
-			return fail("`herd KIND COUNT from X Z to X Z [speed S] [start T] [flee T] [seed N]`: deer, horses or wolves, 1 to 500 of them");
-		h.kind = t[1];
-		h.count = static_cast<int>(count);
-		for (std::size_t i = 9; i < t.size(); i += 2) {
-			double a = 0.0;
-			if (i + 1 >= t.size() || !number(t[i + 1], a)) return fail("\"" + t[i] + "\": a herd takes speed, start, flee and seed, each with a number");
-			if (t[i] == "speed" && a > 0.0) h.speed = a;
-			else if (t[i] == "start") h.t0 = a;
-			else if (t[i] == "flee" && a >= 0.0) h.flee = a;
-			else if (t[i] == "seed") h.seed = static_cast<int>(a);
-			else if (t[i] == "fur" && a >= 0.0 && a <= 4.0) h.fur = a;
-			else return fail("\"" + t[i] + "\": a herd takes speed, start, flee (when it bolts), fur (0 to 4) and seed");
-		}
-		s.herds.push_back(h);
+	} else if (verb == "flock" || verb == "herd" || verb == "flight" || verb == "hunt") {   // animals (film_wildlife.h)
+		return animalLine(s, verb, line);
+	} else if (verb == "baitball" || verb == "reeffish" || verb == "jellyfish" || verb == "seaturtles") {   // life under the sea (film_sealife.h)
+		return seaLifeLine(s, verb, line);
+	} else if (verb == "insects" || verb == "dew") {   // the small world close up (film_macro.h)
+		return macroLine(s, verb, line);
+	} else if (verb == "night" || verb == "cameratrap" || verb == "shimmer") {   // night shots and the long lens (film_night.h)
+		return nightLine(s, verb, line);
 	} else if (verb == "aurora" || verb == "lightning" || verb == "meteors" || verb == "rainbow") {
 		const std::vector<std::string> t = detail::tokens(line);
 		skyfx::Aurora au;
@@ -867,15 +1090,8 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 			}
 		}
 		s.fog.on = true;
-	} else if (verb == "underwater") {
-		const std::vector<std::string> t = detail::tokens(line);
-		for (std::size_t i = 1; i < t.size(); i += 2) {
-			double v = 0.0;
-			if (i + 1 < t.size() && t[i] == "clarity" && number(t[i + 1], v) && v > 0.05 && v <= 10.0) s.underwater.clarity = v;
-			else if (i + 1 < t.size() && t[i] == "colour" && std::find(underwater::colours().begin(), underwater::colours().end(), t[i + 1]) != underwater::colours().end()) s.underwater.colour = t[i + 1];
-			else return fail("`underwater [clarity C] [colour blue|green|teal]`: the camera is under the film's `water` (clarity 1 a clear sea, 2 tropical, 0.5 murky)");
-		}
-		s.hasUnderwater = true;
+	} else if (underseaVerb(verb) || barracudaTornado(verb, line)) {   // under the sea: the water, its flow, bubbles, the deep, the seabed and its places (film_parse_sea.h)
+		return underseaLine(s, verb, line);
 	} else if (verb == "kelp" || verb == "coral") {
 		const std::vector<std::string> t = detail::tokens(line);
 		underwater::Kelp kp;

@@ -18,7 +18,7 @@
 // wavefront_restir_helpers.h's own header comment gives.
 //
 // restir.h's temporal_update()/spatial_merge() explicitly do NOT implement
-// the reweighting needed for unbiased reuse (that header's own TODO comment:
+// the reweighting needed for unbiased reuse (that header's own note:
 // "for full unbiasedness, re-evaluate p_hat for each neighbor's sample at
 // this pixel's context and call reservoir_ucw() with the corrected value").
 // restir_reservoir_combine() below IS that missing piece - every caller

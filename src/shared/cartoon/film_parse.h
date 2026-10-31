@@ -126,7 +126,8 @@
 //     flowers  poppies 3000  in -20 -20 20 20  bloom 2 10       # poppies, daisies, lupins or sunflowers (turning to the sun), opening each in its own time; `close T0 T1`
 //     flock    starlings 300  at 0 80 -200  radius 40           # animals (film_wildlife.h): starlings or fish (flocking round `at`), geese (`from X Y Z to X Y Z`, in
 //                                                               # a V), butterflies (`in X0 Z0 X1 Z1`); `speed S`, `during T0 T1`, `seed N`; on a terrain Y is above it
-//     herd     deer 12  from -200 0  to 200 -150  speed 1.1     # deer, horses or wolves (rigged: film_animals.h) walking over the land, grazing now and then;
+//     herd     deer 12  from -200 0  to 200 -150  speed 1.1     # deer, horses, wolves, lions, zebras, giraffes, elephants, bears or foxes (rigged: film_animals.h)
+//                                                              # walking over the land, grazing now and then;
 //                                                               # `flee T` (they bolt and gallop away), `start T`, `seed N`; `flock eagles` circle a thermal
 //     aurora   green  brightness 1.2  during 4 30               # the sky's spectacles (film_skyfx.h): curtains of light (green, red or violet; `facing D`, `distance M`),
 //     lightning 5  at 0 -3000  radius 2000  during 2 20         # strikes with their flash and thunder (`base H`, `seed N`), shooting stars (`meteors COUNT`), and
@@ -148,6 +149,36 @@
 //     fire     at 0 0 -4  size 1.2                              # fire (film_fire.h): flames (glowing volumes, flickering, a light among them, sparks) with smoke above;
 //     lava     from 120 -300  width 6                           # lava creeping down the land from a vent; a volcano raised in the land (`volcano at X Z [height H]
 //     herd     deer 12 from 0 0 to 100 0  fur 1                # fur on a herd, `feathers A` on eagles and geese (film_fur.h): strands over the body
+//     herd     zebras 30 from 0 0 to 80 0  coat zebra  hero 1  young 4  name grazers   # real animals (round 13): a coat's pattern (film_coats.h), real fur on
+//                                                               # the first N (`hero`), young following their mothers; also rabbits, penguins, snakes
+//     hunt     pride grazers at 6  stalk 3  catch               # a hunt between two named herds: the stalk, the charge, the prey scattering, a catch
+//     flight   eagles 1  from 0 12 0  to 60 3 -20  at 2         # birds taking off from a perch, flying and landing on another (eagles or geese)
+//     baitball 0 6 -10  count 500  strike 4  hunter sharks      # life under the sea (film_sealife.h): a bait ball split by sharks or dolphins;
+//     reeffish 40  in -6 1 -14 6 4 4                            # reef fish in their colours; `jellyfish N in X0 Y0 Z0 X1 Y1 Z1 [glow G]`;
+//                                                               # `seaturtles N at X Y Z [radius R]`
+//     insects  bees 3  in -0.1 0.05 -0.1 0.1 0.12 0.1           # the small world (film_macro.h): bees, dragonflies (blurred wings), beetles
+//     dew      400  in -0.25 -0.25 0.25 0.25                    # (iridescent: a thin film); dewy grass; use with a close `key` and a lens
+//     night    eyeshine 1  flash 1                              # night (film_night.h): eyes shining back, a flash; `cameratrap [ir] [name W]
+//     shimmer  0.004                                            # [clock HH:MM] [date D] [temp C]`: a trail camera's picture; heat shimmer
+//     underwater  lamp 1  ripples                               # under the sea, round 14: a diver's lamp, rippled sand; looking up, Snell's window
+//     waterline                                                 # (a shot's word: its camera floats at the surface, half above it, drops on its dome)
+//     current  0.3 toward 90  surge 6                           # the water's flow (film_undersea.h): kelp, grass, snow, bubbles, fish all in it
+//     bubbles  stream 2 0 -6  rate 8                            # bubbles rising (Boyle's law): `breath X Y Z [every P]`, `net X Z at T`, `ring X Y Z at T`
+//     halocline -9                                              # a boundary between two waters: it shimmers, and mirrors at a glancing look
+//     deepsea  lanternfish 60  in -4 2 -8 4 4 -3                # the deep (film_deepsea.h): anglerfish, lanternfish, combjellies, siphonophores; `deepsea sparks`
+//     octopus  0 0 -3  toward 90  hide 6  jet 12  ink 11.8      # an octopus crawling, hiding, jetting off, inking; `cuttlefish N at X Y Z`
+//     swimmers mantas 2  at 0 6 -12  radius 8                   # mantas, eaglerays, stingrays (`rise T`), sealions, penguins, otters
+//     seabed   anemones 6  in -3 -6 3 -3                        # life on the seabed (film_seabed.h): anemones, seagrass, starfish, urchins, crabs, gardeneels
+//     wreck    0 -20  toward 60  length 28  list 18             # places: a wreck, `arch X Z`, `cenote X Z [radius R] [depth D]`, `reefwall X Z [length L] [height H]`
+//     diver    Ana from -6 3 -2 to 6 3 -10  lamp  ok 30          # round 15 (film_diver.h): a scuba diver on a path, breathing bubbles; `divecam` (a shot's word)
+//     school   sardines 600 at 0 4 -12  strike 20                # a school that parts round the camera and bolts from a hunter (film_school.h)
+//     bigfish  whaleshark 1 at 0 6 -20                           # whaleshark, hammerheads, reefsharks, dolphins, humpbacks
+//     reef     60 in -8 -14 8 -4  fluoresce                      # a coral reef (film_reef.h); `critters nudibranchs|seahorses|shrimp|mantisshrimp N in ...`
+//     nightdive glow 2  spawn 2 18                               # the water lighting up round what moves, corals spawning; `kelpforest N in X0 Z0 X1 Z1`
+//     boat     0 -14  toward 90  speed 2  anchor 13              # round 16 (film_boat.h): a boat overhead, its wake, its anchor; `sardinerun X Y Z [gannets N]`
+//     vents    3 in -6 -46 6 -40                                 # black smokers (film_vents.h); `murk X Y Z [radius R] [green|grey]`, `silt X Z at T`
+//     tornado  150 at 0 3 -8  around Ana                         # barracuda (film_behaviour.h); `cleaningstation`, `playmate X Y Z with NAME`, `damselfish N at`
+//     wreckroom 30 -20  length 12                                # inside a wreck; `underwater port flat filter red`: a camera's housing
 //     space    stars 1  milkyway 1  sun 60 15                   # the universe (film_space.h, round 10): a set in space - the stars all round, the Milky Way, the sun a
 //                                                               # glowing ball at a bearing and an elevation; no sky, no air
 //     planet   home ocean  at 0 0 -20000  radius 6000           # a planet (film_planets.h): rocky, desert, ice, ocean, gas or lava; `tilt`, `spin SECONDS`

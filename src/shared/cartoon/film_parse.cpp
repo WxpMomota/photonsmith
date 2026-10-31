@@ -849,7 +849,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, set, cast, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, spacecam, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, mute, music, toon, voices, acting, lighting, terrain, water, river, waterfall, clouds, fogbank, forest, flock, herd, whale, dolphins, bioluminescence, fireflies, fungi, glacier, iceberg, seaice, wind, tornado, optics, caustics, closeup, tracks, space, planet, moon, nebula, galaxy, star, blackhole, comet, asteroids, remnant, ship, astronaut, descent, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst, mark, cloth, animate, squash, jiggle, smear, anticipate, rigid, terminator, face-normals, mocap, matte)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, set, cast, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, spacecam, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, mute, music, toon, voices, acting, lighting, terrain, water, river, waterfall, clouds, fogbank, forest, flock, herd, whale, dolphins, bioluminescence, fireflies, fungi, glacier, iceberg, seaice, wind, tornado, optics, caustics, closeup, tracks, space, planet, moon, nebula, galaxy, star, blackhole, comet, asteroids, remnant, ship, astronaut, descent, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, waterline, kelp, coral, current, bubbles, halocline, deepsea, octopus, cuttlefish, swimmers, seabed, wreck, arch, cenote, reefwall, diver, divecam, school, bigfish, reef, critters, nightdive, kelpforest, boat, sardinerun, vents, murk, silt, cleaningstation, playmate, damselfish, wreckroom, fire, lava, volcano, wildfire, weather, particles, burst, mark, cloth, animate, squash, jiggle, smear, anticipate, rigid, terminator, face-normals, mocap, matte)");
 		}
 	}
 	n = shotLine;
@@ -1013,18 +1013,8 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 		n = 0;
 		return fail("a rainbow is opposite the sun: the film needs a `sky` line");
 	}
-	if (s.hasUnderwater) {   // under the film's water: its surface seen from below
-		if (s.seas.empty()) {
-			n = 0;
-			return fail("`underwater` puts the camera under the film's water: it needs a `water ... level Y` line");
-		}
-		if (s.hasMist || s.fog.on) {
-			n = 0;
-			return fail(std::string("`underwater` and `") + (s.hasMist ? "mist" : "fog") + "` both fill the air round the camera: use one");
-		}
-		s.seas[0].fromBelow = true;
-		s.seas[0].foam = false;
-	}
+	if (const std::string why = underseaProblems(s); !why.empty()) return n = 0, fail(why);   // (film_parse_sea.h)
+	if (s.hasUnderwater) s.seas[0].fromBelow = true, s.seas[0].foam = false;   // (under the film's water: its surface seen from below)
 	if ((!s.whales.empty() || !s.pods.empty()) && (s.seas.empty() || s.seas[0].kind == "lake")) {
 		n = 0;
 		return fail("whales and dolphins swim in the sea: the film needs a `water sea` line");
@@ -1165,7 +1155,8 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 	const auto hears = [&](const std::string &kind) { return std::any_of(s.ambience.begin(), s.ambience.end(), [&](const dressing::Ambience &a) { return a.kind == kind; }); };
 	// (water is heard, unless the film file says how: a sea's wash - only its wash where `surf` breaks, the soundscape's crashes being the waves; a river's rush. A waterfall
 	// is heard from its pool, placed: soundscape())
-	if (!s.seas.empty() && s.seas[0].kind == "sea" && !hears("sea")) s.ambience.push_back({s.swell.on ? "seawash" : "sea", 0.8});
+	if (!s.seas.empty() && s.hasUnderwater && !hears("reef")) s.ambience.push_back({"reef", 0.8});   // (under the water its hush and the reef's crackle as well: seaSounds plays one or the other by the camera's side of the surface)
+	if (!s.seas.empty() && !hears("sea") && !hears("seawash") && s.seas[0].kind == "sea") s.ambience.push_back({s.swell.on ? "seawash" : "sea", 0.8});
 	if (!s.rivers.empty() && !hears("water")) s.ambience.push_back({"water", 0.7});
 	if (std::any_of(s.flocks.begin(), s.flocks.end(), [](const wildlife::Flock &f) { return f.kind == "geese"; }) && !hears("geese")) s.ambience.push_back({"geese", 0.8});
 	if (s.muteBirds) {   // (the night's owl too: crickets alone)

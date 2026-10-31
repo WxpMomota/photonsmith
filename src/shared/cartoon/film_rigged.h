@@ -15,6 +15,7 @@
 #include <fstream>
 #include <memory>
 #include <mutex>
+#include <set>
 
 #include "../gltf_skin.h"
 #include "../ply_mesh.h"
@@ -173,12 +174,29 @@ inline std::shared_ptr<const Kept> kept(const std::string &path, const RigOption
 	return k;
 }
 
-// Whether a material of the model is its skin, by its name (skin, body, face, head, hand: as Mixamo, VRoid and Ready Player Me name them).
-inline bool isSkin(std::string name) {
-	for (char &ch : name) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
-	for (const char *w : {"skin", "body", "face", "head", "hand"})
-		if (name.find(w) != std::string::npos) return true;
-	return false;
+// Whether a material of the model is its skin, by the words of its name (split at anything not a letter or digit and where a capital follows a small letter): a word
+// skin, body, face, head or hand(s), as Mixamo, VRoid and Ready Player Me name them ("Wolf3D_Body", "Ch03_Body", "Body_00_SKIN"), and no word of clothing - "BodyArmor",
+// "Headband", "Handbag" and "Wolf3D_Outfit_Top" are not skin.
+inline bool isSkin(const std::string &name) {
+	std::vector<std::string> words(1);
+	for (std::size_t i = 0; i < name.size(); ++i) {
+		const unsigned char ch = static_cast<unsigned char>(name[i]);
+		if (!std::isalnum(ch)) {
+			if (!words.back().empty()) words.emplace_back();
+			continue;
+		}
+		if (std::isupper(ch) && i > 0 && std::islower(static_cast<unsigned char>(name[i - 1])) && !words.back().empty()) words.emplace_back();
+		words.back() += static_cast<char>(std::tolower(ch));
+	}
+	static const std::set<std::string> skin = {"skin", "body", "face", "head", "hand", "hands"},
+										clothes = {"armor", "armour", "cloth", "clothes", "outfit", "shirt", "top", "suit", "wear", "hat", "helmet", "glove", "gloves", "shoe",
+												   "shoes", "boot", "boots", "pants", "trousers", "dress", "jacket", "coat", "hair", "eye", "eyes", "teeth", "tongue", "brow", "lash"};
+	bool found = false;
+	for (const std::string &w : words) {
+		if (clothes.count(w)) return false;
+		found = found || skin.count(w) > 0;
+	}
+	return found;
 }
 // The model at a moment, as scene text (story space through the toolkit's emitMesh).
 inline std::string textOf(const Kept &k, const std::string &kind, const RigOptions &o, const CharacterMoment &m) {
@@ -196,6 +214,8 @@ inline std::string textOf(const Kept &k, const std::string &kind, const RigOptio
 	// its face: the clips' own morph weights, then a blink, the feeling and the mouth on top (face_morphs.h)
 	std::vector<double> morphs = rig.morphRest;
 	if (k.idle >= 0 && m.going < 1.0) gltf_skin::applyMorphs(rig, rig.clips[static_cast<std::size_t>(k.idle)], m.t, morphs);
+	if (moving >= 0 && m.going > 0.0)   // (the walk's own face, faded in as the skeleton's walk is)
+		gltf_skin::applyMorphs(rig, rig.clips[static_cast<std::size_t>(moving)], m.steps * 0.5 * rig.clips[static_cast<std::size_t>(moving)].length, morphs, m.going);
 	if (m.gestures)
 		for (const rig::Gesture &g : *m.gestures) {
 			const double w = rig::gestureWeight(g, m.t);

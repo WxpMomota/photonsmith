@@ -136,6 +136,8 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 		m.aspect = static_cast<double>(w) / h;
 	}
 	for (Spec::FaceAct &a : spec.faceActs) {   // the faces' acting from videos (face_track.h): beside the film, else in the library
+		if (const Character *c = character(a.who); c && characterKinds().count(c->kind) && !characterKinds().at(c->kind).face)
+			return filePath + ":" + std::to_string(a.line) + ": " + a.who + " is a " + c->kind + ", which has no face to act with (a rigged model needs face morphs)";
 		std::filesystem::path file = std::filesystem::path(a.file).is_absolute() ? std::filesystem::path(a.file) : (a.dir.empty() ? base : a.dir) / a.file;
 		std::error_code ec;
 		if (!std::filesystem::exists(file, ec) && !std::filesystem::path(a.file).is_absolute())
@@ -420,7 +422,15 @@ void DataFilm::heightsOfWalks() {
 			for (const auto &[x, z] : w.points) x0 = std::min(x0, x), x1 = std::max(x1, x), z0 = std::min(z0, z), z1 = std::max(z1, z);
 		const double half = std::min(30.0, 0.5 * std::max(x1 - x0, z1 - z0) + 2.0);
 		auto terrain = std::make_shared<film_paths::Terrain>(film_paths::terrainOf(flat, 0.5 * (x0 + x1), 0.5 * (z0 + z1), half, 0.1, c.start[1]));
-		if (grounded(c)) c.start[1] = terrain->floorAt(c.start[0], c.start[2], c.start[1], std::max(0.6, stepOf(c)));   // (`footing ground`: it stands on the floor under it)
+		if (grounded(c)) {   // (`footing ground`: it stands on the floor under it - one near where it was put, else the film's land however far above or below)
+			const double nearby = terrain->floorAt(c.start[0], c.start[2], c.start[1], std::max(0.6, stepOf(c)));   // (not `near`: a Windows macro)
+			if (nearby != c.start[1] || !spec.hasTerrain) {
+				c.start[1] = nearby;
+			} else if (const std::shared_ptr<const terrain::Field> land = terrain::fieldOf(spec.terrain); land->inside(c.start[0], c.start[2])) {
+				c.start[1] = land->heightAt(c.start[0], c.start[2]);
+				terrain = std::make_shared<film_paths::Terrain>(film_paths::terrainOf(flat, 0.5 * (x0 + x1), 0.5 * (z0 + z1), half, 0.1, c.start[1]));   // (its floors searched from there)
+			}
+		}
 		double y = c.start[1];
 		bool uneven = false;
 		const double step = stepOf(c);
@@ -836,6 +846,44 @@ double DataFilm::natureAt(double t) const {
 }
 
 bool DataFilm::wildSubject(const std::string &who, double t, Vec3 &feet, Vec3 &front, Vec3 &chest) const {
+	{   // under the sea (round 15): a diver by name, or schoolN, swimmersN, bigfishN (the Nth line of that word: its first animal, or a school's middle)
+		const double nt = natureAt(t);
+		const auto lift = [&](Vec3 p) { return Vec3{p.x, p.y + seabedAt(p.x, p.z), p.z}; };
+		Vec3 at, way{0, 0, 1};
+		bool found = false;
+		for (const diver::Diver &d : spec.divers)
+			if (d.name == who) {
+				diver::Diver l = d;
+				for (Vec3 &p : l.path) p = lift(p);
+				at = diver::diverAt(l, nt, &way), found = true;
+			}
+		double n = 0.0;
+		const auto numbered = [&](const char *word) {
+			const std::size_t w = std::char_traits<char>::length(word);
+			return who.size() > w && who.compare(0, w, word) == 0 && detail::number(who.substr(w), n) && n >= 1.0 && n == std::floor(n);
+		};
+		if (!found && numbered("school") && static_cast<std::size_t>(n) <= spec.schools.size()) {
+			const school::School &sc = schoolsSwum()[static_cast<std::size_t>(n) - 1];
+			Vec3 sum{0, 0, 0}, vel{0, 0, 0}, v;
+			for (int i = 0; i < sc.count; ++i) sum = sum + school::fishAt(sc, i, nt, &v), vel = vel + v;
+			at = sum * (1.0 / std::max(1, sc.count)), way = vel, found = true;
+		} else if (!found && numbered("swimmers") && static_cast<std::size_t>(n) <= spec.deep.swimmers.size()) {
+			deepsea::Swimmers g = spec.deep.swimmers[static_cast<std::size_t>(n) - 1];
+			if (g.kind != "otters") g.at = lift(g.at);
+			double roll = 0.0;
+			at = deepsea::swimmerAt(g, 0, nt, way, roll, spec.seas.empty() ? 0.0 : spec.seas[0].level), found = true;
+		} else if (!found && numbered("bigfish") && static_cast<std::size_t>(n) <= spec.bigFish.size()) {
+			school::BigFish b = spec.bigFish[static_cast<std::size_t>(n) - 1];
+			b.at = lift(b.at);
+			at = school::bigAt(b, 0, nt, way), found = true;
+		}
+		if (found) {
+			way.y = 0.0;
+			way = length(way) > 1e-9 ? normalize(way) : Vec3{0, 0, 1};
+			feet = story(at.x, at.y, at.z), front = story(way.x, 0.0, way.z), chest = feet;
+			return true;
+		}
+	}
 	const bool herd = who.rfind("herd", 0) == 0, flock = who.rfind("flock", 0) == 0;
 	if (!herd && !flock) return false;
 	double n = 0.0;
@@ -990,7 +1038,13 @@ CharacterMoment DataFilm::momentOf(const Character &c, double t, Vec3 *at) const
 		gait = w.gait;
 		if (moving) break;
 	}
+	double swim = 0.0;   // (round 16) under the water a walk is a swim: at its own height, bobbing, its feet on nothing (film_kinds.h strokes it, castAt lays it level)
+	if (swimming(c)) {
+		swim = 1.0, airborne = true;
+		where.y = c.start[1] + 0.06 * c.scale * std::sin(2.0 * kPi * t / 3.2 + seedOf(c.name));
+	}
 	CharacterMoment m;
+	m.swim = swim;
 	m.running = running;
 	m.gait = moving || going > 0.0 ? gait : motion::Gait::Plain;
 	m.crouch = std::max(crouch, motion::gaitCrouch(m.gait) * going);   // (a sneak goes crouched)
@@ -1070,6 +1124,15 @@ void DataFilm::footOnGround(const Character &c, CharacterMoment &m) const {
 		m.frame = mul(translate(Vec3{0.0, -drop, 0.0}), m.frame);
 		for (int s = 0; s < feet; ++s) m.lockedFeet[s] = m.lockedFeet[s] + Vec3{0.0, drop, 0.0};
 	}
+}
+
+// A character at t as it is drawn - acting, its feet locked where they came down and (`footing ground`) on the floor under them, its hips down to the lower one - so what
+// it wears, holds or has drawn by it is where its body is.
+CharacterMoment DataFilm::standingMoment(const Character &c, double t) const {
+	CharacterMoment m = actingMoment(c, t);
+	lockFeet(c, t, m);
+	footOnGround(c, m);
+	return m;
 }
 
 Vec3 DataFilm::trailOf(const Character &c, double t, const CharacterMoment &m) const {
@@ -1320,8 +1383,19 @@ void DataFilm::speak(audio::Mix &mix) const {
 		const CameraView view{eye, target, fov, 0.0, 0};
 		const Vec3 at = chestOf(c, t0);
 		const double gain = std::max(0.35, audibility(length(at - eye)));
-		if (const music_cues::Recording *r = recordingOf(i)) mix.put(t0, r->sound, 0.8 * gain, panOf(view, at) * 0.6, 0.2);   // (a computer's voice: its recording)
-		else mix.put(t0, speech::speak(spoken[i], t0, voiceOf(c), static_cast<unsigned>(i + 1)), 0.55 * gain, panOf(view, at) * 0.6, 0.25);
+		std::vector<float> sound = recordingOf(i) ? recordingOf(i)->sound : speech::speak(spoken[i], t0, voiceOf(c), static_cast<unsigned>(i + 1));
+		// (round 16) under the water a voice is muffled - its highs gone, a little louder below, bubbling (the speaker's bubbles are drawn: castAt) - when the one speaking
+		// or the ears are under it
+		const bool under = swimming(c) || (spec.hasUnderwater && !spec.seas.empty() && eye.y < spec.seas[0].level);
+		if (under) {
+			const double k = 1.0 - std::exp(-2.0 * kPi * 650.0 / audio::kRate);   // (two passes of a one-pole low-pass at 650 Hz)
+			for (int pass = 0; pass < 2; ++pass) {
+				double y = 0.0;
+				for (float &v : sound) y += k * (v - y), v = static_cast<float>(1.3 * y);
+			}
+		}
+		if (recordingOf(i)) mix.put(t0, sound, 0.8 * gain, panOf(view, at) * 0.6, under ? 0.45 : 0.2);   // (a computer's voice: its recording)
+		else mix.put(t0, sound, 0.55 * gain, panOf(view, at) * 0.6, under ? 0.45 : 0.25);
 	}
 }
 
@@ -1736,6 +1810,11 @@ void DataFilm::cameraAt(double t, std::string &lookAt, std::string &camera, int 
 		const double dz = std::sin(0.97 * t + 3.0 * p), tx = std::sin(1.13 * t + 5.0 * p) + 0.4 * std::sin(4.1 * t + p), ty = std::sin(1.57 * t + 4.0 * p);
 		key.pos[0] += 0.012 * a * dx, key.pos[1] += 0.010 * a * dy, key.pos[2] += 0.008 * a * dz;
 		key.target[0] += 0.03 * a * tx, key.target[1] += 0.025 * a * ty;
+	}
+	if (shot.divecam > 0.0) {   // a diver's camera (round 15): rising on each breath in and sinking as it goes out, the view tipping a little with it, a slow sway
+		const double a = shot.divecam, breath = std::sin(2.0 * kPi * t / diver::kBreath), sway = std::sin(0.43 * t + 1.1) + 0.5 * std::sin(1.07 * t);
+		key.pos[1] += 0.06 * a * breath, key.pos[0] += 0.03 * a * sway, key.pos[2] += 0.02 * a * std::sin(0.31 * t);
+		key.target[1] += 0.1 * a * breath, key.target[0] += 0.05 * a * sway;
 	}
 	double quaking = 0.0;   // an earthquake: the camera shaken, fast and jolting
 	for (const geology::Quake &q : spec.quakes) quaking = std::max(quaking, q.levelAt(t));

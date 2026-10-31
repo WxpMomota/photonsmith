@@ -244,7 +244,7 @@ inline CharacterKind pipKind() {
 		actor::Pose p = pipWalk(m.steps);
 		p.stepAmount *= runWidth(m);
 		placeOf(m.frame, p.pos, p.yaw);
-		p.blink = rig::blink(m.t, m.seed);
+		p.blink = m.faceShapes.empty() ? rig::blink(m.t, m.seed) : 0.0;   // (a face acted from a video blinks when the actor did: face_track.h)
 		p.squash = actor::breathe(m.t);
 		p.earSwing = m.jiggle;   // (its antennae swing behind its head: film_motion.h `jiggle`)
 		pipFace(m.face, p);
@@ -389,7 +389,7 @@ inline CharacterKind personKind() {
 		human::HumanPose p = personWalk(m.steps);
 		p.walkAmount *= runWidth(m);
 		placeOf(m.frame, p.pos, p.yaw);
-		p.blink = rig::blink(m.t, m.seed);
+		p.blink = m.faceShapes.empty() ? rig::blink(m.t, m.seed) : 0.0;   // (a face acted from a video blinks when the actor did: face_track.h)
 		personFace(m.face, p);
 		speakWith(m, p.mouthOpen, p.smile);
 		reachWith(m, p.handL, p.handWeightL, p.handR, p.handWeightR);
@@ -421,6 +421,25 @@ inline CharacterKind personKind() {
 			p.feetHeld = true;
 			p.crouch = std::max(p.crouch, hips * m.sit);
 			p.lean -= 4.0 * m.sit;
+		}
+		if (m.swim > 0.0) {   // swimming (round 16): castAt lays the whole body level in the water round its chest as it goes, so "up" here is the way it swims
+			// a breaststroke - the hands reaching out past the head, sweeping wide and pulling back in - and a flutter kick; still, it treads water: the hands sculling at the
+			// waist, the legs slowly cycling
+			const double u = std::fmod(m.t / (m.going > 0.3 ? 1.7 : 2.6) + 0.13 * m.seed, 1.0), go = m.going;
+			const auto stroke = [&](double side) {
+				const Vec3 glide{side * 0.1, 1.98, 0.12}, wide{side * 0.55, 1.75, 0.18}, pull{side * 0.22, 1.38, 0.3};
+				const Vec3 swim = u < 0.4 ? lerp(pull, glide, smoothstep(0.0, 0.4, u)) : u < 0.7 ? lerp(glide, wide, smoothstep(0.4, 0.7, u)) : lerp(wide, pull, smoothstep(0.7, 1.0, u));
+				const Vec3 scull{side * (0.35 + 0.12 * std::sin(2.0 * kPi * u)), 1.0, 0.25 + 0.08 * std::cos(2.0 * kPi * u)};
+				return transformPoint(m.frame, lerp(scull, swim, go));
+			};
+			p.walkAmount = 0.0, p.crouch = 0.0;
+			p.handL = stroke(1.0), p.handR = stroke(-1.0), p.handWeightL = p.handWeightR = 1.0;
+			const double kick = std::sin(2.0 * kPi * m.t / (go > 0.3 ? 0.8 : 1.6));
+			for (int s = 0; s < 2; ++s) {
+				const double side = s == 0 ? 0.12 : -0.12, phase = s == 0 ? kick : -kick;
+				p.heldFoot[s] = transformPoint(m.frame, Vec3{side, 0.06 + 0.06 * (1.0 - go) * (phase + 1.0), 0.18 * phase * (0.4 + 0.6 * go)});
+			}
+			p.feetHeld = true;
 		}
 		return m.gestures && !m.gestures->empty() ? rig::act(p, *m.gestures, m.t, personPoses()) : p;
 	};
@@ -526,7 +545,7 @@ inline CharacterKind turtleKind() {
 		turtle::TurtlePose p = turtleWalk(m.steps);
 		p.walkAmount *= runWidth(m);
 		placeOf(m.frame, p.pos, p.yaw);
-		p.blink = rig::blink(m.t, m.seed);
+		p.blink = m.faceShapes.empty() ? rig::blink(m.t, m.seed) : 0.0;   // (a face acted from a video blinks when the actor did: face_track.h)
 		turtleFace(m.face, p);
 		speakWith(m, p.mouthOpen, p.smile);
 		reachWith(m, p.frontL, p.frontWeightL, p.frontR, p.frontWeightR);

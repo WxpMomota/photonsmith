@@ -81,9 +81,9 @@ class Builder:
 class Mesh:
     """Vertices with their normals, joints and weights (up to four), triangles; one per material."""
     def __init__(self):
-        self.pos, self.nor, self.joints, self.weights, self.idx = [], [], [], [], []
+        self.pos, self.nor, self.joints, self.weights, self.idx, self.uv = [], [], [], [], [], []
 
-    def vertex(self, p, n, skin):
+    def vertex(self, p, n, skin, uv=(0.995, 0.995)):
         skin = sorted(skin, key=lambda jw: -jw[1])[:4]
         total = sum(w for _, w in skin) or 1.0
         j = [jw[0] for jw in skin] + [0] * (4 - len(skin))
@@ -92,11 +92,13 @@ class Mesh:
         self.nor.append(norm(n))
         self.joints.append(j)
         self.weights.append(w)
+        self.uv.append(uv)
         return len(self.pos) - 1
 
 
-def tube(mesh, centres, radii, skins, sides=14, up=(0, 1, 0), caps=True):
-    """A tube through `centres`, its cross-section at each an ellipse of radii (across, up), each ring skinned as `skins` says ([(joint, weight)...])."""
+def tube(mesh, centres, radii, skins, sides=14, up=(0, 1, 0), caps=True, rect=None):
+    """A tube through `centres`, its cross-section at each an ellipse of radii (across, up), each ring skinned as `skins` says ([(joint, weight)...]).
+    `rect` (x0, y0, x1, y1): its place in the coat's picture (x along the tube, y round it from the underside: the seam is under the belly); none: no pattern."""
     rings = []
     n = len(centres)
     for i in range(n):
@@ -107,22 +109,23 @@ def tube(mesh, centres, radii, skins, sides=14, up=(0, 1, 0), caps=True):
         u = norm(u)
         v = cross(t, u)
         ring = []
-        for k in range(sides):
-            a = 2 * math.pi * k / sides
+        for k in range(sides + 1):   # (the first point again at the end: the picture's seam)
+            a = 2 * math.pi * k / sides - math.pi / 2
             off = add(mul(u, math.cos(a) * radii[i][0]), mul(v, math.sin(a) * radii[i][1]))
             nrm = add(mul(u, math.cos(a) / max(1e-6, radii[i][0])), mul(v, math.sin(a) / max(1e-6, radii[i][1])))
-            ring.append(mesh.vertex(add(centres[i], off), nrm, skins[i]))
+            uv = (rect[0] + (rect[2] - rect[0]) * i / max(1, n - 1), rect[1] + (rect[3] - rect[1]) * k / sides) if rect else (0.995, 0.995)
+            ring.append(mesh.vertex(add(centres[i], off), nrm, skins[i], uv))
         rings.append(ring)
     for i in range(n - 1):
         for k in range(sides):
-            a, b, c, d = rings[i][k], rings[i][(k + 1) % sides], rings[i + 1][(k + 1) % sides], rings[i + 1][k]
+            a, b, c, d = rings[i][k], rings[i][k + 1], rings[i + 1][k + 1], rings[i + 1][k]
             mesh.idx += [a, c, b, a, d, c]
     if caps:
         for end, sign in ((0, -1), (n - 1, 1)):
             t = norm(sub(centres[min(end + 1, n - 1)], centres[max(end - 1, 0)]))
-            centre = mesh.vertex(centres[end], mul(t, sign), skins[end])
+            centre = mesh.vertex(centres[end], mul(t, sign), skins[end], mesh.uv[rings[end][0]])
             for k in range(sides):
-                a, b = rings[end][k], rings[end][(k + 1) % sides]
+                a, b = rings[end][k], rings[end][k + 1]
                 mesh.idx += [centre, b, a] if sign > 0 else [centre, a, b]
 
 
@@ -150,6 +153,7 @@ def write(path, joints, meshes, materials, clips, b):
                 "NORMAL": b.floats(flat(mesh.nor), "VEC3", 3),
                 "JOINTS_0": b.add(struct.pack("<%dH" % (len(mesh.joints) * 4), *flat(mesh.joints)), 5123, "VEC4", len(mesh.joints)),
                 "WEIGHTS_0": b.floats(flat(mesh.weights), "VEC4", 4),
+                "TEXCOORD_0": b.floats(flat(mesh.uv), "VEC2", 2),
             },
             "indices": b.add(struct.pack("<%dI" % len(mesh.idx), *mesh.idx), 5125, "SCALAR", len(mesh.idx)),
             "material": m,
@@ -209,13 +213,38 @@ def material(name, colour, roughness=0.8, metallic=0.0):
 # ---- quadrupeds ---------------------------------------------------------------------------------------------------------------------------------------------------------
 # Each in metres: shoulder height (H), body length (shoulder to hip, Lb), barrel radii (across, up), neck length and how upright (degrees above level), head length,
 # tail length and thickness, ears (length), hooves or paws, antlers, mane; colours (body, belly/legs, hooves, extras); and the gaits' swing (degrees).
+# (round 13) each kind's eyes: the iris's colour and the pupil's shape - a grazer's a horizontal bar (a wide view of the horizon), a fox's a vertical slit,
+# the rest round.
+EYES = {"deer": ("bar", (0.16, 0.09, 0.04)), "horse": ("bar", (0.14, 0.07, 0.03)), "zebra": ("bar", (0.14, 0.08, 0.04)), "giraffe": ("bar", (0.18, 0.1, 0.05)),
+        "elephant": ("round", (0.25, 0.15, 0.07)), "wolf": ("round", (0.75, 0.6, 0.2)), "lion": ("round", (0.72, 0.48, 0.12)), "fox": ("slit", (0.8, 0.45, 0.1)),
+        "bear": ("round", (0.3, 0.16, 0.06)), "rabbit": ("round", (0.22, 0.11, 0.05))}
+
 SPECIES = {
     "deer": dict(H=1.0, Lb=0.95, barrel=(0.2, 0.25), neck=0.55, neckUp=55, head=0.3, headR=0.08, tail=0.14, tailR=0.04, ears=0.13, hoof=True, antlers=True, mane=False,
                  body=(0.36, 0.21, 0.11), legs=(0.30, 0.19, 0.11), feet=(0.05, 0.04, 0.035), extra=(0.42, 0.36, 0.28), swing=(22, 26, 34)),
     "horse": dict(H=1.55, Lb=1.35, barrel=(0.3, 0.37), neck=0.85, neckUp=45, head=0.6, headR=0.12, tail=0.7, tailR=0.08, ears=0.14, hoof=True, antlers=False, mane=True,
                   body=(0.28, 0.13, 0.06), legs=(0.20, 0.10, 0.05), feet=(0.06, 0.05, 0.045), extra=(0.04, 0.03, 0.025), swing=(20, 25, 33)),
     "wolf": dict(H=0.8, Lb=0.8, barrel=(0.15, 0.2), neck=0.32, neckUp=25, head=0.3, headR=0.09, tail=0.45, tailR=0.07, ears=0.11, hoof=False, antlers=False, mane=False,
-                 body=(0.33, 0.30, 0.26), legs=(0.42, 0.39, 0.34), feet=(0.12, 0.11, 0.1), extra=(0.08, 0.07, 0.06), swing=(22, 26, 36)),
+                 body=(0.33, 0.30, 0.26), legs=(0.42, 0.39, 0.34), feet=(0.12, 0.11, 0.1), extra=(0.08, 0.07, 0.06), swing=(22, 26, 36), tailHang=False, bushy=1.6),
+    # (round 13) the savanna's and the forest's: each with the parts that make it what it is
+    "lion": dict(H=1.05, Lb=1.1, barrel=(0.24, 0.29), neck=0.36, neckUp=22, head=0.38, headR=0.14, tail=0.85, tailR=0.04, ears=0.07, hoof=False, antlers=False, mane=False,
+                 body=(0.72, 0.52, 0.28), legs=(0.70, 0.52, 0.30), feet=(0.55, 0.40, 0.25), extra=(0.40, 0.22, 0.10), swing=(22, 26, 38), tailHang=True, lionMane=True, tuft=True,
+                 flexRun=14, gaits={"walk": ((0.0, 0.25, 0.5, 0.75), 0.65), "trot": ((0.0, 0.5, 0.5, 0.0), 0.45), "run": ((0.0, 0.5, 0.1, 0.6), 0.28)}),
+    "zebra": dict(H=1.35, Lb=1.15, barrel=(0.27, 0.33), neck=0.72, neckUp=45, head=0.52, headR=0.11, tail=0.5, tailR=0.05, ears=0.15, hoof=True, antlers=False, mane=True,
+                  body=(0.93, 0.92, 0.88), legs=(0.92, 0.91, 0.87), feet=(0.05, 0.05, 0.045), extra=(0.05, 0.05, 0.05), swing=(20, 25, 33), tuft=True),
+    "giraffe": dict(H=2.6, Lb=1.3, barrel=(0.3, 0.42), neck=1.9, neckUp=62, head=0.6, headR=0.11, tail=0.9, tailR=0.04, ears=0.14, hoof=True, antlers=False, mane=True,
+                    body=(0.86, 0.68, 0.40), legs=(0.88, 0.75, 0.52), feet=(0.12, 0.09, 0.07), extra=(0.40, 0.25, 0.12), swing=(18, 22, 30), ossicones=True, tuft=True),
+    "elephant": dict(H=2.7, Lb=1.9, barrel=(0.72, 0.85), neck=0.35, neckUp=8, head=0.75, headR=0.42, tail=0.9, tailR=0.04, ears=0.0, hoof=False, antlers=False, mane=False,
+                     body=(0.42, 0.40, 0.38), legs=(0.40, 0.38, 0.36), feet=(0.30, 0.28, 0.26), extra=(0.93, 0.88, 0.76), swing=(16, 20, 24), trunk=True, tusks=True, bigEars=True,
+                     pillar=True, tuft=True, legThick=0.6),
+    "bear": dict(H=1.0, Lb=1.15, barrel=(0.38, 0.44), neck=0.3, neckUp=12, head=0.4, headR=0.15, tail=0.08, tailR=0.05, ears=0.07, hoof=False, antlers=False, mane=False,
+                 body=(0.28, 0.18, 0.11), legs=(0.24, 0.15, 0.09), feet=(0.10, 0.07, 0.05), extra=(0.20, 0.13, 0.08), swing=(20, 24, 32), tailHang=False, roundEars=True),
+    "fox": dict(H=0.38, Lb=0.45, barrel=(0.085, 0.10), neck=0.15, neckUp=30, head=0.17, headR=0.05, tail=0.42, tailR=0.045, ears=0.08, hoof=False, antlers=False, mane=False,
+                body=(0.80, 0.36, 0.10), legs=(0.20, 0.12, 0.08), feet=(0.10, 0.07, 0.05), extra=(0.95, 0.93, 0.90), swing=(22, 26, 38), tailHang=False, bushy=2.2,
+                whiteTip=True, flexRun=11),
+    "rabbit": dict(H=0.2, Lb=0.24, barrel=(0.07, 0.085), neck=0.05, neckUp=35, head=0.09, headR=0.04, tail=0.035, tailR=0.03, ears=0.11, hoof=False, antlers=False, mane=False,
+                   body=(0.48, 0.40, 0.32), legs=(0.45, 0.38, 0.30), feet=(0.85, 0.82, 0.78), extra=(0.95, 0.94, 0.92), swing=(28, 34, 42), tailHang=False, whiteTail=True,
+                   gaits={"walk": ((0.0, 0.3, 0.0, 0.3), 0.55), "trot": ((0.0, 0.4, 0.0, 0.4), 0.4), "run": ((0.0, 0.45, 0.04, 0.5), 0.3)}, hop=True, flexRun=14),
 }
 GAITS = {   # (each foot's start of stance as a share of the cycle: left hind, left fore, right hind, right fore), the share of the cycle a foot is down
     "walk": ((0.0, 0.25, 0.5, 0.75), 0.65),
@@ -245,7 +274,7 @@ def quadruped(name, s):
         legLen[leg] = top[1]
     J = {n: i for i, (n, _, _) in enumerate(joints)}
     P = {n: p for n, _, p in joints}
-    body, belly, feet, extra, eyes = Mesh(), Mesh(), Mesh(), Mesh(), Mesh()
+    body, belly, feet, extra, eyes, pupil = Mesh(), Mesh(), Mesh(), Mesh(), Mesh(), Mesh()
 
     # the barrel: from behind the hips to before the chest, deepest at the girth, the belly line a little up towards the flank
     centres, radii, skins = [], [], []
@@ -261,7 +290,7 @@ def quadruped(name, s):
         radii.append((rx * shape * (0.9 + 0.1 * girth), ry * shape * girth))
         wc = min(1.0, max(0.0, (u - 0.35) / 0.3))
         skins.append([(J["pelvis"], 1 - wc), (J["chest"], wc)])
-    tube(body, centres, radii, skins, sides=16)
+    tube(body, centres, radii, skins, sides=16, rect=(0.0, 0.0, 0.5, 0.5))
     # the neck: from the top of the chest up to the head, thick at its base
     centres, radii, skins = [], [], []
     for i in range(7):
@@ -271,7 +300,7 @@ def quadruped(name, s):
         centres.append(p)
         radii.append(r)
         skins.append([(J["chest"], max(0.0, 1 - 2.5 * u)), (J["neck"], min(1.0, 2.5 * u) * (1 - max(0.0, (u - 0.7) / 0.3))), (J["head"], max(0.0, (u - 0.7) / 0.3))])
-    tube(body, centres, radii, skins, sides=12)
+    tube(body, centres, radii, skins, sides=12, rect=(0.5, 0.0, 0.5 + 0.25 * min(1.0, s["neck"] / 0.8), 0.5))
     # the head: forward and down from the top of the neck to the muzzle
     hd = [0, -math.sin(math.radians(35)), math.cos(math.radians(35))]
     centres, radii = [], []
@@ -280,13 +309,51 @@ def quadruped(name, s):
         centres.append(add(headPos, mul(hd, (u - 0.15) * s["head"])))
         k = 1.0 - 0.45 * u
         radii.append((s["headR"] * k * (0.9 if u > 0.1 else 1.0), s["headR"] * 1.15 * k))
-    tube(body, centres, radii, [[(J["head"], 1.0)]] * 6, sides=12)
+    tube(body, centres, radii, [[(J["head"], 1.0)]] * 6, sides=12, rect=(0.75, 0.0, 1.0, 0.25))
+    if s.get("trunk"):   # an elephant's trunk: on from the muzzle, hanging, curling a little forward at its tip
+        m0 = centres[-1]
+        trunk = [m0, add(m0, [0, -0.25 * H, 0.06 * H]), add(m0, [0, -0.5 * H, 0.08 * H]), add(m0, [0, -0.68 * H, 0.06 * H]), add(m0, [0, -0.76 * H, 0.1 * H])]
+        tr = [(0.12 * H, 0.11 * H), (0.085 * H, 0.08 * H), (0.06 * H, 0.055 * H), (0.045 * H, 0.04 * H), (0.035 * H, 0.03 * H)]
+        tube(body, trunk, tr, [[(J["head"], 1.0)]] * 5, sides=12, rect=(0.75, 0.25, 1.0, 0.5))
+    if s.get("tusks"):
+        for side in (1, -1):
+            b0 = add(centres[-2], [side * s["headR"] * 0.45, -s["headR"] * 0.35, 0])
+            tube(extra, [b0, add(b0, [side * 0.03 * H, -0.12 * H, 0.1 * H]), add(b0, [side * 0.05 * H, -0.16 * H, 0.22 * H]), add(b0, [side * 0.05 * H, -0.12 * H, 0.3 * H])],
+                 [(0.035 * H, 0.035 * H), (0.03 * H, 0.03 * H), (0.022 * H, 0.022 * H), (0.004 * H, 0.004 * H)], [[(J["head"], 1.0)]] * 4, sides=8)
+    if s.get("bigEars"):   # an elephant's ears: great flaps from the sides of the head, hanging back over the neck
+        for side in (1, -1):
+            e0 = add(headPos, [side * s["headR"] * 0.8, s["headR"] * 0.2, -0.05])
+            panel(body, [e0, add(e0, [side * 0.1 * H, 0.12 * H, -0.12 * H]), add(e0, [side * 0.16 * H, -0.05 * H, -0.3 * H]), add(e0, [side * 0.12 * H, -0.32 * H, -0.22 * H]),
+                         add(e0, [side * 0.04 * H, -0.3 * H, -0.05 * H])], 0.02 * H, [[(J["head"], 1.0)]] * 5, [side, 0, 0.25])
+    if s.get("ossicones"):   # a giraffe's horns: two short furred knobs on its crown
+        for side in (1, -1):
+            o0 = add(headPos, [side * s["headR"] * 0.4, s["headR"] * 0.85, -0.03])
+            tube(extra, [o0, add(o0, [side * 0.01, 0.11, -0.02]), add(o0, [side * 0.012, 0.13, -0.022])], [(0.022, 0.022), (0.018, 0.018), (0.028, 0.028)], [[(J["head"], 1.0)]] * 3, sides=8)
+    if s.get("lionMane"):   # a lion's mane: a shaggy ruff round the head and down the neck, longer under the chin
+        for i in range(36):
+            a = 2 * math.pi * i / 36
+            for ring, (u, length) in enumerate(((0.85, 0.22), (0.55, 0.26), (0.25, 0.2))):
+                base = lerp(add(neckBase, [0, -0.02 * H, -0.04 * H]), headPos, u)
+                d = norm([math.cos(a), math.sin(a) * 0.9 - 0.15, -0.35])
+                r = 0.6 * rx * (1 - 0.3 * u) + 0.02
+                root = add(base, mul([math.cos(a), math.sin(a), 0], r))
+                l = length * H * (1.25 if math.sin(a) < -0.3 else 1.0) * (0.8 + 0.4 * ((i * 7 + ring * 3) % 5) / 4)
+                tube(extra, [root, add(root, mul(d, l * 0.6)), add(root, add(mul(d, l), [0, -0.05 * l, -0.1 * l]))], [(0.05 * H, 0.03 * H), (0.035 * H, 0.02 * H), (0.004, 0.004)],
+                     [[(J["neck"], 1.0 - u), (J["head"], u)]] * 3, sides=5)
     for side in (1, -1):   # eyes and ears
         e = add(headPos, add(mul(hd, 0.12 * s["head"]), [side * s["headR"] * 0.85, s["headR"] * 0.35, 0]))
         tube(eyes, [add(e, [-side * 0.006, 0, 0]), add(e, [side * 0.006, 0, 0])], [(0.016 * H, 0.016 * H)] * 2, [[(J["head"], 1.0)]] * 2, sides=8)
+        shape = EYES.get(name, ("round", None))[0]   # its pupil: a thin disc on the eye's outer face, (across, up) in the shape of its kind's
+        r = 0.016 * H
+        pr = {"bar": (0.75 * r, 0.24 * r), "slit": (0.13 * r, 0.78 * r)}.get(shape, (0.5 * r, 0.5 * r))
+        tube(pupil, [add(e, [side * 0.0061, 0, 0]), add(e, [side * 0.0068, 0, 0])], [pr] * 2, [[(J["head"], 1.0)]] * 2, sides=12)
         eb = add(headPos, [side * s["headR"] * 0.6, s["headR"] * 0.9, -0.05 * s["head"]])
         et = add(eb, [side * 0.35 * s["ears"], 0.9 * s["ears"], -0.15 * s["ears"]])
-        tube(body, [eb, lerp(eb, et, 0.5), et], [(0.25 * s["ears"], 0.12 * s["ears"]), (0.22 * s["ears"], 0.1 * s["ears"]), (0.02 * s["ears"], 0.02 * s["ears"])], [[(J["head"], 1.0)]] * 3, sides=8)
+        if s["ears"] > 0 and s.get("roundEars"):   # (a bear's: small and round)
+            tube(body, [eb, lerp(eb, et, 0.5), lerp(eb, et, 0.8)], [(0.3 * s["ears"], 0.15 * s["ears"]), (0.35 * s["ears"], 0.15 * s["ears"]), (0.12 * s["ears"], 0.1 * s["ears"])],
+                 [[(J["head"], 1.0)]] * 3, sides=8)
+        elif s["ears"] > 0:
+            tube(body, [eb, lerp(eb, et, 0.5), et], [(0.25 * s["ears"], 0.12 * s["ears"]), (0.22 * s["ears"], 0.1 * s["ears"]), (0.02 * s["ears"], 0.02 * s["ears"])], [[(J["head"], 1.0)]] * 3, sides=8)
     if s["antlers"]:   # a deer's antlers: a beam back and up from each side of the crown, with tines forward
         for side in (1, -1):
             base = add(headPos, [side * s["headR"] * 0.45, s["headR"] * 1.0, 0.0])
@@ -301,38 +368,51 @@ def quadruped(name, s):
             p = lerp(add(neckBase, [0, 0.1 * H, -0.06 * H]), add(headPos, [0, 0.06, -0.05]), u)
             tube(extra, [add(p, [0, -0.02, 0]), add(p, [0, 0.09, -0.07])], [(0.025, 0.05), (0.01, 0.02)], [[(J["neck"], 1.0 - u), (J["head"], u)]] * 2, sides=6)
     # the tail
-    tip = add(tailBase, [0, -s["tail"] * (0.85 if name != "wolf" else 0.6), -s["tail"] * (0.35 if name != "wolf" else 0.75)])
+    hang = s.get("tailHang", True)
+    tip = add(tailBase, [0, -s["tail"] * (0.85 if hang else 0.6), -s["tail"] * (0.35 if hang else 0.75)])
     centres = [lerp(tailBase, tip, u / 5.0) for u in range(6)]
-    radii = [(s["tailR"] * (1.0 - 0.5 * u / 5.0) * (1.6 if name == "wolf" and 1 <= u <= 4 else 1.0),) * 2 for u in range(6)]
-    tube(extra if name == "horse" else body, centres, radii, [[(J["tail"], 1.0)]] * 6, sides=8)
+    bushy = s.get("bushy", 1.0)
+    radii = [(s["tailR"] * (1.0 - 0.5 * u / 5.0) * (bushy if 1 <= u <= 4 else 1.0),) * 2 for u in range(6)]
+    tube(extra if name in ("horse", "zebra") else body, centres, radii, [[(J["tail"], 1.0)]] * 6, sides=8, rect=None if name in ("horse", "zebra") else (0.75, 0.25, 1.0, 0.5))
+    if s.get("tuft"):   # a tuft at the tail's tip (a lion's, a zebra's, a giraffe's, an elephant's)
+        tube(extra, [tip, add(tip, [0, -0.06 * H, -0.02 * H]), add(tip, [0, -0.11 * H, -0.03 * H])], [(s["tailR"] * 1.2,) * 2, (s["tailR"] * 1.6,) * 2, (0.005,) * 2], [[(J["tail"], 1.0)]] * 3, sides=6)
+    if s.get("whiteTail"):   # a rabbit's white scut
+        tube(extra, [add(tailBase, [0, -0.01, 0.01]), tip, add(tip, [0, 0.01, -0.02])], [(s["tailR"] * 1.3,) * 2, (s["tailR"] * 1.5,) * 2, (0.004,) * 2], [[(J["tail"], 1.0)]] * 3, sides=8)
+    if s.get("whiteTip"):   # a fox's white tail tip
+        tube(extra, [lerp(tailBase, tip, 0.8), tip, add(tip, mul(norm(sub(tip, tailBase)), 0.04))], [(s["tailR"] * bushy * 0.8,) * 2, (s["tailR"] * 0.9,) * 2, (0.004,) * 2],
+             [[(J["tail"], 1.0)]] * 3, sides=8)
     # the legs: the upper leg (muscled, inside the body at its top), the lower leg, the foot, a hoof or a paw
     for leg, fore, side in LEGS:
         top, knee, foot = P[leg + ".upper"], P[leg + ".lower"], P[leg + ".foot"]
         ground = [foot[0], 0.0, foot[2] + (0.03 * H if fore > 0 else 0.02 * H)]
         upperTop = add(top, [0, 0.16 * H, 0])
-        thick = rx * (0.55 if fore > 0 else 0.75)
+        thick = rx * (0.55 if fore > 0 else 0.75) * s.get("legThick", 1.0)
         centres = [upperTop, lerp(upperTop, knee, 0.45), add(knee, [0, 0.03 * H, 0]), knee, lerp(knee, foot, 0.5), foot, lerp(foot, ground, 0.6)]
         radii = [(thick, thick * 1.3), (thick * 0.8, thick * 1.0), (0.32 * thick, 0.4 * thick), (0.3 * thick, 0.35 * thick), (0.2 * thick, 0.22 * thick), (0.2 * thick, 0.22 * thick),
                  (0.17 * thick, 0.19 * thick)]
         u_, l_, f_ = J[leg + ".upper"], J[leg + ".lower"], J[leg + ".foot"]
         parentJ = J["chest"] if fore > 0 else J["pelvis"]
         skins = [[(parentJ, 0.5), (u_, 0.5)], [(u_, 1.0)], [(u_, 0.7), (l_, 0.3)], [(u_, 0.3), (l_, 0.7)], [(l_, 1.0)], [(l_, 0.5), (f_, 0.5)], [(f_, 1.0)]]
-        tube(belly, centres, radii, skins, sides=10, up=(0, 0, 1))
+        if s.get("pillar"):   # (an elephant's legs: pillars, hardly narrowing to the foot)
+            radii = [(r[0] * 1.0, r[1] * 1.0) for r in radii[:2]] + [(0.75 * thick, 0.8 * thick)] * 5
+        legIndex = [l for l, _, _ in LEGS].index(leg)
+        tube(belly, centres, radii, skins, sides=10, up=(0, 0, 1), rect=(0.0, 0.5 + 0.125 * legIndex, 0.5, 0.5 + 0.125 * (legIndex + 1)))
         if s["hoof"]:
             tube(feet, [add(ground, [0, 0.07 * H, -0.01 * H]), add(ground, [0, 0.002, 0.012 * H])], [(0.21 * thick, 0.2 * thick), (0.26 * thick, 0.28 * thick)], [[(f_, 1.0)]] * 2, sides=10, up=(0, 0, 1))
         else:   # a paw: a pad forward of the foot
             tube(feet, [add(ground, [0, 0.03 * H, -0.03 * H]), add(ground, [0, 0.025 * H, 0.06 * H])], [(0.25 * thick, 0.14 * thick), (0.2 * thick, 0.1 * thick)], [[(f_, 1.0)]] * 2, sides=10)
     materials = [material("coat", s["body"]), material("legs", s["legs"]), material("hooves", s["feet"], 0.5), material("extra", s["extra"], 0.6),
-                 material("eyes", (0.02, 0.015, 0.01), 0.15)]
-    meshes = [body, belly, feet, extra, eyes]
+                 material("eyes", EYES.get(name, (None, (0.02, 0.015, 0.01)))[1], 0.15), material("pupil", (0.004, 0.004, 0.004), 0.1)]
+    meshes = [body, belly, feet, extra, eyes, pupil]
 
     # ---- the clips ----
     clips = []
     swings = dict(zip(("walk", "trot", "run"), s["swing"]))
+    gaits = s.get("gaits", GAITS)
     n = 16
     times = [i / n for i in range(n + 1)]
     pelvisRest, chestRest = pelvis, chest
-    for gait, (starts, duty) in GAITS.items():
+    for gait, (starts, duty) in gaits.items():
         A = swings[gait]
         tracks = []
         for (leg, fore, side), start in zip(LEGS, starts):
@@ -351,10 +431,13 @@ def quadruped(name, s):
                 lo.append(quat(X, flex if fore > 0 else -1.4 * flex))
                 ft.append(quat(X, (0.6 * flex if fore > 0 else 0.7 * flex)))
             tracks += [(leg + ".upper", "rotation", times, up), (leg + ".lower", "rotation", times, lo), (leg + ".foot", "rotation", times, ft)]
-        beats = 1 if gait == "run" else 2   # (the body bobs once a step: twice a cycle in the walk and trot, once in the gallop)
-        bob = [[pelvisRest[0], pelvisRest[1] + (0.03 if gait == "run" else 0.012) * H * math.cos(2 * math.pi * beats * t), pelvisRest[2]] for t in times]
+        beats = 1 if gait == "run" or s.get("hop") else 2   # (the body bobs once a step: twice a cycle in the walk and trot, once in the gallop and a hop)
+        if s.get("hop"):   # (a hop: up off the hind feet and down onto the fore)
+            bob = [[pelvisRest[0], pelvisRest[1] + (0.35 if gait == "run" else 0.25) * H * max(0.0, math.sin(2 * math.pi * t)), pelvisRest[2]] for t in times]
+        else:
+            bob = [[pelvisRest[0], pelvisRest[1] + (0.03 if gait == "run" else 0.012) * H * math.cos(2 * math.pi * beats * t), pelvisRest[2]] for t in times]
         tracks.append(("pelvis", "translation", times, bob))
-        flexA = 7 if gait == "run" else 1.5   # the spine flexing (the gallop's gathering and stretching)
+        flexA = s.get("flexRun", 7) if gait == "run" or s.get("hop") else 1.5   # the spine flexing (the gallop's gathering and stretching: deep in a cat's bound)
         tracks.append(("pelvis", "rotation", times, [quat(X, flexA * math.sin(2 * math.pi * t)) for t in times]))
         tracks.append(("chest", "rotation", times, [quat(X, -2 * flexA * math.sin(2 * math.pi * t)) for t in times]))
         nod = 9 if gait == "run" else 4 if gait == "walk" else 2
@@ -378,8 +461,91 @@ def quadruped(name, s):
         ("head", "rotation", it, [quat(Y, 15 * math.sin(2 * math.pi * t / 5.0 + 0.8)) for t in it]),
         ("tail", "rotation", it, [quat(Y, 15 * math.sin(2 * math.pi * t / 1.25) ** 7) for t in it]),
     ]))
-    strides = {g: 2 * legLen["fl"] * math.sin(math.radians(swings[g])) / GAITS[g][1] for g in GAITS}
+    strides = {g: 2 * legLen["fl"] * math.sin(math.radians(swings[g])) / gaits[g][1] for g in gaits}
     return joints, meshes, materials, clips, strides
+
+
+# ---- a penguin: upright, waddling on short legs, its flippers held out ---------------------------------------------------------------------------------------------------
+def penguin():
+    H = 0.75
+    joints = [("body", -1, [0, 0.12, 0]), ("head", 0, [0, 0.62, 0.02]), ("flipper.L", 0, [0.11, 0.48, 0]), ("flipper.R", 0, [-0.11, 0.48, 0]),
+              ("leg.L", 0, [0.06, 0.12, 0.02]), ("leg.R", 0, [-0.06, 0.12, 0.02])]
+    J = {n: i for i, (n, _, _) in enumerate(joints)}
+    back, front, beak, feet, eyes = Mesh(), Mesh(), Mesh(), Mesh(), Mesh()
+    centres = [[0, 0.06 + 0.56 * u / 8.0, -0.01] for u in range(9)]
+    radii = [(0.14 * math.sin(math.pi * (0.08 + 0.84 * u / 8.0)) ** 0.7, 0.13 * math.sin(math.pi * (0.08 + 0.84 * u / 8.0)) ** 0.7) for u in range(9)]
+    tube(back, centres, radii, [[(J["body"], 1.0 - max(0.0, u / 8.0 - 0.7) / 0.3), (J["head"], max(0.0, u / 8.0 - 0.7) / 0.3)] for u in range(9)], sides=16, up=(0, 0, 1))
+    fc = [[0, 0.1 + 0.42 * u / 6.0, 0.03] for u in range(7)]
+    tube(front, fc, [(0.11 * math.sin(math.pi * (0.1 + 0.8 * u / 6.0)) ** 0.7, 0.1 * math.sin(math.pi * (0.1 + 0.8 * u / 6.0)) ** 0.7) for u in range(7)], [[(J["body"], 1.0)]] * 7, sides=14, up=(0, 0, 1))
+    hp = joints[J["head"]][2]
+    tube(beak, [add(hp, [0, 0.0, 0.07]), add(hp, [0, -0.02, 0.15])], [(0.018, 0.014), (0.003, 0.003)], [[(J["head"], 1.0)]] * 2, sides=8)
+    for side in (1, -1):
+        e = add(hp, [side * 0.05, 0.02, 0.06])
+        tube(eyes, [add(e, [-side * 0.004, 0, 0]), add(e, [side * 0.004, 0, 0])], [(0.008, 0.008)] * 2, [[(J["head"], 1.0)]] * 2, sides=6)
+        f0 = joints[J["flipper." + ("L" if side > 0 else "R")]][2]
+        panel(back, [f0, add(f0, [side * 0.05, -0.04, 0.02]), add(f0, [side * 0.07, -0.3, -0.01]), add(f0, [side * 0.02, -0.24, -0.03])], 0.016,
+              [[(J["flipper." + ("L" if side > 0 else "R")], 1.0)]] * 4, [side, 0, 0])
+        l0 = joints[J["leg." + ("L" if side > 0 else "R")]][2]
+        tube(feet, [l0, add(l0, [0, -0.1, 0.02]), add(l0, [0, -0.115, 0.09])], [(0.02, 0.02), (0.018, 0.012), (0.03, 0.006)], [[(J["leg." + ("L" if side > 0 else "R")], 1.0)]] * 3, sides=8)
+    materials = [material("coat", (0.04, 0.04, 0.05), 0.5), material("belly", (0.93, 0.92, 0.9), 0.6), material("beak", (0.9, 0.5, 0.1), 0.4), material("feet", (0.85, 0.45, 0.15), 0.6),
+                 material("eyes", (0.02, 0.015, 0.01), 0.15)]
+    n = 16
+    times = [i / n for i in range(n + 1)]
+    walk = [  # the waddle: rolled side to side onto each foot in turn, the feet stepping, the flippers out for balance
+        ("body", "rotation", times, [qmul(quat(Z, 11 * math.sin(2 * math.pi * t)), quat(Y, 5 * math.sin(2 * math.pi * t))) for t in times]),
+        ("body", "translation", times, [[0.02 * math.sin(2 * math.pi * t), 0.12 + 0.012 * abs(math.cos(2 * math.pi * t)), 0] for t in times]),
+        ("leg.L", "rotation", times, [quat(X, -22 * math.sin(2 * math.pi * t)) for t in times]),
+        ("leg.R", "rotation", times, [quat(X, 22 * math.sin(2 * math.pi * t)) for t in times]),
+        ("flipper.L", "rotation", times, [quat(Z, 25 + 6 * math.sin(2 * math.pi * t)) for t in times]),
+        ("flipper.R", "rotation", times, [quat(Z, -25 + 6 * math.sin(2 * math.pi * t)) for t in times]),
+    ]
+    it = [i * 0.25 for i in range(21)]
+    idle = [("head", "rotation", it, [quat(Y, 30 * math.sin(2 * math.pi * t / 5.0)) for t in it]),
+            ("flipper.L", "rotation", it, [quat(Z, 10 + 25 * max(0.0, math.sin(2 * math.pi * t / 2.5)) ** 6) for t in it]),
+            ("flipper.R", "rotation", it, [quat(Z, -10 - 25 * max(0.0, math.sin(2 * math.pi * t / 2.5)) ** 6) for t in it])]
+    clips = [("walk", walk), ("trot", walk), ("run", walk), ("idle", idle), ("graze", idle)]
+    return joints, [back, front, beak, feet, eyes], materials, clips, {"walk": 0.24, "trot": 0.24, "run": 0.24}
+
+
+# ---- a snake: a chain of segments that slithers, a wave running back along it --------------------------------------------------------------------------------------
+def snake():
+    L, N = 1.6, 14
+    seg = L / N
+    joints = [("seg0", -1, [0, 0.03, L / 2])]
+    for i in range(1, N + 1):
+        joints.append(("seg%d" % i, i - 1, [0, 0.03, L / 2 - seg * i]))
+    J = {n: i for i, (n, _, _) in enumerate(joints)}
+    body, belly, eyes = Mesh(), Mesh(), Mesh()
+    centres, radii, skins = [], [], []
+    for k in range(4 * N + 1):
+        u = k / (4.0 * N)
+        z = L / 2 - L * u
+        r = 0.035 * (min(1.0, u / 0.08) ** 0.5) * (1.0 - 0.85 * max(0.0, (u - 0.55) / 0.45))
+        centres.append([0, 0.03, z + 0.04 * (1 - min(1.0, u / 0.04))])
+        radii.append((max(0.004, r * 1.1), max(0.004, r * 0.85)))
+        f = u * N
+        i0 = min(N, int(f))
+        w = f - i0
+        skins.append([(J["seg%d" % i0], 1.0 - w), (J["seg%d" % min(N, i0 + 1)], w)])
+    tube(body, centres, radii, skins, sides=12, rect=(0.0, 0.0, 0.5, 0.5))
+    for side in (1, -1):
+        e = [side * 0.026, 0.045, L / 2 - 0.02]
+        tube(eyes, [add(e, [-side * 0.003, 0, 0]), add(e, [side * 0.003, 0, 0])], [(0.006, 0.006)] * 2, [[(J["seg0"], 1.0)]] * 2, sides=6)
+    materials = [material("coat", (0.30, 0.34, 0.14), 0.45), material("legs", (0.82, 0.78, 0.55)), material("eyes", (0.02, 0.015, 0.01), 0.15)]
+    n = 16
+    times = [i / n for i in range(n + 1)]
+    A, waves = 32.0, 1.4
+    absolute = lambda i, t: A * math.sin(2 * math.pi * (t + waves * i / N)) * min(1.0, 0.4 + i / N)
+    slither = []
+    for i in range(N + 1):   # each segment's own turn: the difference of the wave's heading from its neighbour's (a chain's joints turn relative to their parents)
+        slither.append(("seg%d" % i, "rotation", times, [quat(Y, absolute(i, t) - (absolute(i - 1, t) if i > 0 else 0.0)) for t in times]))
+    it = [i * 0.25 for i in range(21)]
+    rest = [("seg%d" % i, "rotation", it, [quat(Y, 8 * math.sin(2 * math.pi * (t / 5.0 + i / N)) - (8 * math.sin(2 * math.pi * (t / 5.0 + (i - 1) / N)) if i > 0 else 0.0)) for t in it])
+            for i in range(N + 1)]
+    rest.append(("seg0", "translation", it, [[0, 0.03 + 0.04 * max(0.0, math.sin(2 * math.pi * t / 5.0)) ** 2, L / 2] for t in it]))   # (lifting its head to look)
+    clips = [("walk", slither), ("trot", slither), ("run", slither), ("idle", rest), ("graze", rest)]
+    wave = L / waves
+    return joints, [body, belly, eyes], materials, clips, {"walk": 0.7 * wave, "trot": 0.7 * wave, "run": 0.7 * wave}
 
 
 # ---- birds --------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -454,13 +620,32 @@ def bird(name, s):
         glide.append(("wing." + tag, "rotation", gtimes, [quat(Z, side * (8 + 2 * math.sin(2 * math.pi * t / 4.0 + side))) for t in gtimes]))
         glide.append(("hand." + tag, "rotation", gtimes, [quat(Z, side * (-5 + 2 * math.sin(2 * math.pi * t / 2.0))) for t in gtimes]))
     glide.append(("tail", "rotation", gtimes, [quat(Y, 4 * math.sin(2 * math.pi * t / 4.0)) for t in gtimes]))
-    return joints, meshes, materials, [("flap", flap), ("glide", glide)]
+    # (round 13) perched: the wings folded down and back along the body, the head looking round; the flare of a landing: the wings high and swept forward, beating back
+    ptimes = [i * 0.5 for i in range(11)]
+    perch = []
+    for tag, side in (("L", 1), ("R", -1)):
+        perch.append(("wing." + tag, "rotation", ptimes, [qmul(quat(Y, side * 85), quat(Z, -side * 12)) for t in ptimes]))   # (the arm back along the body)
+        perch.append(("fore." + tag, "rotation", ptimes, [quat(Y, -side * 165) for t in ptimes]))   # (the forearm forward over it)
+        perch.append(("hand." + tag, "rotation", ptimes, [quat(Y, side * 165) for t in ptimes]))    # (the hand back again: a folded wing's Z)
+    perch.append(("head", "rotation", ptimes, [quat(Y, 35 * math.sin(2 * math.pi * t / 5.0)) for t in ptimes]))
+    perch.append(("tail", "rotation", ptimes, [quat(X, -20) for t in ptimes]))
+    ftimes = [i / 16.0 for i in range(17)]
+    flare = []
+    for tag, side in (("L", 1), ("R", -1)):
+        flare.append(("wing." + tag, "rotation", ftimes, [qmul(quat(Z, side * (55 + 25 * math.cos(2 * math.pi * t))), quat(Y, side * 20)) for t in ftimes]))
+        flare.append(("hand." + tag, "rotation", ftimes, [quat(Y, side * 15 * math.sin(2 * math.pi * t)) for t in ftimes]))
+    flare.append(("tail", "rotation", ftimes, [quat(X, 25) for t in ftimes]))
+    return joints, meshes, materials, [("flap", flap), ("glide", glide), ("perch", perch), ("flare", flare)]
 
 
 def main():
     os.makedirs(OUT, exist_ok=True)
     for name, s in SPECIES.items():
         joints, meshes, materials, clips, strides = quadruped(name, s)
+        write(os.path.join(OUT, name + ".glb"), joints, meshes, materials, clips, Builder())
+        print("   strides (m a cycle): " + ", ".join("%s %.3f" % (g, v) for g, v in strides.items()))
+    for name, make in (("penguin", penguin), ("snake", snake)):
+        joints, meshes, materials, clips, strides = make()
         write(os.path.join(OUT, name + ".glb"), joints, meshes, materials, clips, Builder())
         print("   strides (m a cycle): " + ", ".join("%s %.3f" % (g, v) for g, v in strides.items()))
     for name, s in BIRDS.items():

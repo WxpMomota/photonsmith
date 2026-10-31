@@ -207,8 +207,11 @@ class conductor : public material {
           alpha_y(TrowbridgeReitz<double>::RoughnessToAlpha(std::fmax(v_roughness, 1e-4))) {}
 
     BxDF get_bxdf(const MaterialContext<double>& ctx) const {
-        return BxDF{ eta_r, eta_g, eta_b, k_r, k_g, k_b, alpha_x, alpha_y };
+        return BxDF{ eta_r, eta_g, eta_b, k_r, k_g, k_b, alpha_x, alpha_y, film_nm, film_eta };
     }
+
+    // A thin film on the metal ("float filmthickness" nanometres, "float filmeta"): its interference colours (fresnel.h FrThinFilm).
+    void set_film(double nm, double eta) { film_nm = nm; film_eta = eta; }
 
     // Real NEE/MIS below the roughness threshold (see rough_metal's own
     // comment). Unlike rough_metal's flat albedo, real per-channel complex
@@ -225,7 +228,7 @@ class conductor : public material {
         auto ctx   = MaterialContext<double>::from_hit(rec, r_in);
         double ex = do_regularize ? regularize_alpha(alpha_x) : alpha_x;
         double ey = do_regularize ? regularize_alpha(alpha_y) : alpha_y;
-        BxDF bxdf{ eta_r, eta_g, eta_b, k_r, k_g, k_b, ex, ey };
+        BxDF bxdf{ eta_r, eta_g, eta_b, k_r, k_g, k_b, ex, ey, film_nm, film_eta };
         auto frame = ShadingFrame<double>::from_dpdu(ctx.dpdu_x, ctx.dpdu_y, ctx.dpdu_z, ctx.nx, ctx.ny, ctx.nz);
 
         double wi_x, wi_y, wi_z;
@@ -247,9 +250,7 @@ class conductor : public material {
         }
 
         double fr_view = std::max(0.0, wi_z);
-        srec.attenuation = color(FrComplex(fr_view, eta_r, k_r),
-                                  FrComplex(fr_view, eta_g, k_g),
-                                  FrComplex(fr_view, eta_b, k_b));
+        srec.attenuation = fresnel_at(fr_view);
         srec.pdf_ptr      = make_shared<ggx_reflection_pdf>(
             rec.normal, vec3(ctx.wo_x, ctx.wo_y, ctx.wo_z), alpha_x, alpha_y);
         srec.skip_pdf     = false;
@@ -291,15 +292,11 @@ class conductor : public material {
         const double hlen = std::sqrt(hx * hx + hy * hy + hz * hz);
         if (hlen < 1e-12) return srec_attenuation;
         const double c = std::fabs((wi_x * hx + wi_y * hy + wi_z * hz) / hlen);
-        return color(FrComplex(c, eta_r, k_r), FrComplex(c, eta_g, k_g), FrComplex(c, eta_b, k_b));
+        return fresnel_at(c);
     }
 
     double get_roughness()  const { return alpha_x * alpha_x; }
-    color  get_fresnel_normal() const {
-        return color(FrComplex(1.0, eta_r, k_r),
-                     FrComplex(1.0, eta_g, k_g),
-                     FrComplex(1.0, eta_b, k_b));
-    }
+    color  get_fresnel_normal() const { return fresnel_at(1.0); }
 
     // Delegates to the single effectively_smooth() helper below, the same
     // one scatter()'s own branch consults - see material::is_delta_bsdf()'s
@@ -310,10 +307,16 @@ class conductor : public material {
     // The ONE place this class decides smooth-vs-glossy - see
     // rough_metal::effectively_smooth()'s own comment.
     bool effectively_smooth() const { return TrowbridgeReitz<double>(alpha_x, alpha_y).EffectivelySmooth(); }
+    color fresnel_at(double c) const {
+        double fr, fg, fb;
+        BxDF{ eta_r, eta_g, eta_b, k_r, k_g, k_b, alpha_x, alpha_y, film_nm, film_eta }.fresnel(c, fr, fg, fb);
+        return color(fr, fg, fb);
+    }
 
     double eta_r, eta_g, eta_b;
     double k_r,   k_g,   k_b;
     double alpha_x, alpha_y;
+    double film_nm = 0.0, film_eta = 1.33;
 };
 
 

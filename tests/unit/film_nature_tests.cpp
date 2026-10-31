@@ -535,7 +535,7 @@ TEST(FilmAnimals, RiggedAnimalsWalkWithoutSlidingGrazeAndBoltAndEaglesCircle) {
 	const std::string sky = wildlife::flockText(film.spec.flocks[0], 5.0, ground.get(), birds);
 	EXPECT_NE(sky.find("anim_eagles_"), std::string::npos);
 	ff::DataFilm bad;
-	EXPECT_NE(loadNature("animals_bad", "scene s.pbrt\nlength 4\nherd lions 5 from 0 0 to 10 0\n", bad).find("deer, horses or wolves"), std::string::npos);
+	EXPECT_NE(loadNature("animals_bad", "scene s.pbrt\nlength 4\nherd unicorns 5 from 0 0 to 10 0\n", bad).find("penguins or snakes"), std::string::npos);
 }
 
 // ---- the sky's spectacles ------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -735,7 +735,7 @@ TEST(FilmUnderwater, TheCameraIsInTheSeaUnderAThinSurfaceWithCausticsShaftsKelpA
 	EXPECT_NE(scene.find("# kelp"), std::string::npos);
 	EXPECT_NE(scene.find("# coral"), std::string::npos);
 	EXPECT_NE(scene.find("# marine snow"), std::string::npos);
-	EXPECT_NE(film.sceneAt(2.0).find(underwater::causticPicture(film.spec.key, underwater::causticFrame(2.0), 512)), std::string::npos);
+	EXPECT_NE(film.sceneAt(2.0).find(underwater::causticPicture(film.spec.key, underwater::causticFrame(2.0), 512, false, underwater::causticBand(15.0))), std::string::npos) << "(a bed 15 m down: the net fainter)";
 	EXPECT_EQ(underwater::causticFrame(0.05), underwater::causticFrame(2.45)) << "the net loops every 2.4 s";
 	EXPECT_NE(underwater::kelpText(film.spec.kelps[0], 0.0, [](double, double) { return -15.0; }), underwater::kelpText(film.spec.kelps[0], 1.0, [](double, double) { return -15.0; })) << "kelp sways";
 	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"underwater", "needs a `water ... level Y` line"},
