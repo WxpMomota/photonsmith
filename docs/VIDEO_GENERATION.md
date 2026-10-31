@@ -2617,6 +2617,8 @@ uvs (its surface cut into near-flat charts along its creases, each laid flat and
 
 **Lights with a size, panels the camera does not see.** (pbrt_light_size.h; our extensions to pbrt's format) `LightSource "point"` or `"spot"` with `"float radius" R [ "integer samples" N ]` is a light of that size: at load time it becomes N lights (16) spread through its ball, or over a disk across a spot's axis, so its shadows are soft. `AreaLightSource "diffuse" ... "bool camera" false [ "integer samples" N ]` is a panel that lights the scene and is not seen: its triangles are taken out and N wide soft spots stand in for them with the same L x area. Both work on every renderer because they become ordinary lights. They are approximations: N shadows that read as one soft one under the denoiser, N small highlights on a shiny surface, and a hidden panel does not show in mirrors. The Blender import uses both.
 
+**Matching a reference: `tools/blender_import/match_lights.py SCENE.pbrt REFERENCE.png [--view filmic|srgb] [--exe PATH]`.** Eevee and a path tracer spread light differently, so an imported scene rarely balances by itself. This groups the scene's lights by kind and colour, renders once per group with the others off and once with all off, and solves for the gains that best add up to the reference: non-negative least squares, weighted so a dark sky counts as much as a bright fire, leaving out pixels that clipped. It prints the gains and writes `SCENE_matched.pbrt`. On the production scene it was tried on, it beat a careful hand balance (mean difference from the Eevee frame 11.5 against 13.2 out of 255).
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)
