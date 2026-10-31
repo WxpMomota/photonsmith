@@ -2611,6 +2611,8 @@ uvs (its surface cut into near-flat charts along its creases, each laid flat and
 
 **Acting verbs for any block or group.** `hop NAME T SECONDS by X Y Z [height H] [feet X Y Z]` is an arc from where it is; with `feet`, it squashes before, stretches in the air and squashes on landing. `blink NAME about X Y Z [shut S] T T T ...` shuts it along y at those times. `gaze NAME [about X Y Z] [forward X Y Z] at X Y Z|WHO [offset X Y Z] [max DEG] [from T0 T1] [to T2 T3]` turns it to keep looking at a point, or at a block, group, placement or character as it moves, eased in and out.
 
+**Thousands of glowing things in one line: `swarm`.** (film_swarm.h) `swarm NAME COUNT from X Y Z [radius R]|after BLOCK during T0 T1`, then either `to X Y Z [radius R] [arrive S] [orbit W] [into X Y Z at T0 T1 [keep K]] [settle R]` (they stream to a point, circle it and dive into it; the first K stay and drift off to hover) or `[velocity X Y Z] [spread S] [gravity G] [life L]` (a fountain, or with `after` a trail behind something moving); and `[colour R G B] [bright B] [size S] [pulse HZ] [glow K] [seed N]`. They are little discs turned to the camera in a few meshes, marked `"bool sampled" false`, so they add almost nothing to the light sampler however many there are; `glow K` adds the one real light they cast, at their middle, as bright as there are of them. Mark any glow the same way in a pbrt scene (`AreaLightSource ... "bool sampled" false`): the camera sees it, next-event estimation leaves it out.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

@@ -7,6 +7,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -191,6 +192,50 @@ TEST(FilmActing, GroupsParentsHopsBlinksAndGazes) {
 	EXPECT_NE(load("parent a to b\nparent b to a", bad), "") << "not onto itself";
 	ff::DataFilm bad2;
 	EXPECT_NE(load("gaze a at nobody", bad2), "");
+}
+
+// A swarm: each particle a function of its number and the time; it flies in, circles, dives and is gone, the kept ones hover; a fountain falls; none of it is a sampled light.
+TEST(FilmSwarm, FliesCirclesDivesAndCostsNoLightSampling) {
+	namespace sw = cartoon::swarm;
+	sw::Swarm s;
+	ASSERT_EQ(sw::parse({"swarm", "f", "100", "from", "0", "1", "0", "radius", "20", "during", "1", "2", "to", "0", "5", "0", "radius", "3", "arrive", "2", "orbit", "2", "into", "0", "1", "0", "at", "6", "7", "keep", "20", "settle", "9"}, s), "");
+	EXPECT_NE(sw::parse({"swarm", "f", "100", "from", "0", "1", "0"}, *std::make_unique<sw::Swarm>()), "") << "`during` is needed";
+	const auto alive = [&](double t) {
+		int n = 0;
+		V3 p;
+		double b = 0.0;
+		for (int k = 0; k < s.count; ++k) n += sw::at(s, k, t, nullptr, p, b) ? 1 : 0;
+		return n;
+	};
+	EXPECT_EQ(alive(0.5), 0);
+	EXPECT_EQ(alive(5.0), 100);
+	EXPECT_EQ(alive(9.0), 20) << "the rest have dived";
+	V3 a, c;
+	double b1 = 0.0, b2 = 0.0;
+	ASSERT_TRUE(sw::at(s, 50, 4.0, nullptr, a, b1));
+	EXPECT_LT(cartoon::length(a - V3{0, 5, 0}), 3.5) << "circling the point";
+	ASSERT_TRUE(sw::at(s, 50, 4.0, nullptr, c, b2));
+	EXPECT_EQ(a.x, c.x) << "a fixed function of the time";
+	ASSERT_TRUE(sw::at(s, 5, 12.0, nullptr, a, b1));
+	EXPECT_GT(cartoon::length(V3{a.x, 0, a.z}), 0.0);
+	EXPECT_LT(cartoon::length(V3{a.x, 0, a.z}), 9.5) << "a kept one hovering within its settle";
+
+	sw::Swarm f;
+	ASSERT_EQ(sw::parse({"swarm", "s", "50", "from", "0", "1", "0", "during", "0", "0.1", "velocity", "0", "5", "0", "gravity", "2", "life", "3", "colour", "1", "0.5", "0.1", "bright", "10", "glow", "4"}, f), "");
+	ASSERT_TRUE(sw::at(f, 3, 1.0, nullptr, a, b1));
+	EXPECT_GT(a.y, 2.0) << "thrown up";
+	const std::string text = sw::text(f, 1.0, V3{0, 2, 20}, nullptr);
+	EXPECT_NE(text.find("\"bool sampled\" false"), std::string::npos) << "no light to aim at";
+	EXPECT_NE(text.find("LightSource \"point\""), std::string::npos) << "its one real light";
+	EXPECT_EQ(text.find("\"sphere\""), std::string::npos) << "discs in a mesh, not a shape each";
+	const std::string one = sw::text(f, 1.0, V3{0, 2, 20}, nullptr);
+	EXPECT_EQ(text, one) << "frames in any order";
+	EXPECT_EQ(sw::text(f, -1.0, V3{0, 2, 20}, nullptr), "");
+	// a trail follows what it comes from
+	sw::Swarm tr;
+	ASSERT_EQ(sw::parse({"swarm", "t", "10", "after", "star", "during", "0", "2", "life", "5"}, tr), "");
+	ASSERT_TRUE(sw::at(tr, 9, 3.0, [](double when) { return V3{when * 10.0, 0, 0}; }, a, b1));
+	EXPECT_GT(a.x, 10.0) << "born where the block was by then";
 }
 
 TEST(FilmModel3, ASkinnedCharacterWalksAndFeels) {

@@ -980,6 +980,10 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		}
 		if (!(wt.amount > 0.0 && wt.amount <= 4.0) || wt.t1 <= wt.t0) return fail("a weather's amount is from 0 to 4 and its end after its start");
 		s.weather.push_back(wt);
+	} else if (verb == "swarm") {
+		swarm::Swarm sw;
+		if (const std::string e = swarm::parse(detail::tokens(line), sw); !e.empty()) return fail(e);
+		s.swarms.push_back(sw);
 	} else if (verb == "particles" || verb == "burst") {
 		const std::vector<std::string> t = detail::tokens(line);
 		particles::Emitter e;

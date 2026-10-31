@@ -6,6 +6,8 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **Films: `swarm` (2026-10-31).** Thousands of glowing particles as one line: streaming in, circling, diving and hovering, fountains, trails behind a moving block; each a fixed function of its number and the time, in a few meshes left out of the light sampling.
+
 * **Films: parents, groups and acting verbs (2026-10-31).** `parent CHILD to OTHER` and `group NAME of A B C` for any block or placement (moves, turns, hides and lights carry down), `hop` with automatic squash and stretch, `blink` and `gaze` (looking at a point or at something that moves).
 
 * **Films: bones of your own, squash and stretch (2026-10-31).** `bone ... parent P radius R` and `pose ID BONE ...` bend any placed model's skin near a bone, imported meshes included (they keep their pictures now when reshaped), with no seams; `stretch` (volume kept) and `resize` (per axis) on any block or placement. Windows builds no longer rewrite the package's shaders when they have not changed (a running render could read a half-written file).

@@ -123,6 +123,8 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 		}
 	for (const auto &[child, over] : spec.parents)
 		if (!animatable(child) || !animatable(over)) return filePath + ": `parent` or `group`: no block, group or placement is called " + (animatable(child) ? over : child);
+	for (const swarm::Swarm &sw : spec.swarms)
+		if (!sw.after.empty() && !animatable(sw.after)) return filePath + ": `swarm " + sw.name + " after " + sw.after + "`: no block, group or placement has that name";
 	for (const auto &[name, line] : spec.physicsLines)
 		if (std::find(scene.names.begin(), scene.names.end(), name) == scene.names.end())
 			return detail::lineWhere(spec, filePath, line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + name + "`";

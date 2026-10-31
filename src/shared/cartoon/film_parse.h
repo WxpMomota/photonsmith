@@ -268,6 +268,11 @@
 //       fly  -800 200  0 -100  600 -600  height 80  look 0 40 -900   # (instead of `key` lines) a drone over waypoints at a height above the land, smoothed, looking ahead and
 //                                                               # down (or at a point; `fov F`)
 //
+// Swarms (film_swarm.h) - thousands of little glowing things, one line, no cost to the light sampler:
+//     swarm flies 200 from 1 5 -19 radius 20 during 62 68 to 1 7 -19 radius 3 orbit 2 into 1 1 -19 at 70 72 keep 50 settle 16 glow 2    # stream in, circle, dive; 50 drift off and hover
+//     swarm sparks 60 from 1 1.6 -19 radius 0.2 during 72 74 velocity 0 5 0 spread 1.6 gravity 1.1 life 2 colour 1 0.45 0.1 bright 10 size 0.04   # a fountain
+//     swarm dust 80 after star during 10 13 life 1.6 gravity 0.5 pulse 1          # a trail behind a moving block
+//
 // Weather and particles (film_particles.h):
 //
 //     weather   rain 0.8 from 4 to 14                          # rain, snow or leaves over the set round the camera (amount 1 a good shower; eased in and out; `ground Y`)

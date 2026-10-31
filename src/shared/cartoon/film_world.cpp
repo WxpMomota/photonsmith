@@ -686,6 +686,16 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 	}
 	out += dressingAt(t);
 	out += modelsAt(header, t);   // the film's own models where they are placed (film_model.h)
+	if (!spec.swarms.empty()) {   // (film_swarm.h)
+		Vec3 eye, target;
+		double fov = 40.0;
+		film_subjects::cameraOf(header, eye, target, fov);
+		for (const swarm::Swarm &sw : spec.swarms) {
+			std::function<Vec3(double)> origin;
+			if (!sw.after.empty()) origin = [this, &sw](double at) { return transformPoint(animMatrix(sw.after, at), Vec3{0.0, 0.0, 0.0}); };
+			out += swarm::text(sw, t, Vec3{-eye.x, eye.y, eye.z}, origin);
+		}
+	}
 	if (!spec.weather.empty() || !spec.emitters.empty()) {   // weather round the camera, and particles (film_particles.h)
 		Vec3 eye, target;
 		double fov = 40.0;
