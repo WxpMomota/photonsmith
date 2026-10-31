@@ -337,6 +337,8 @@ class DataFilm {
 	// The recording of line i in a computer's voice (film_tts.h), made when it is first needed; null when it is said in the babble voice (asked for, or no speech engine, or
 	// not made yet in a program that cannot make it). A small creature's voice (its kind's above 200 Hz) is raised towards its own, by up to 9 semitones.
 	const music_cues::Recording *recordingOf(std::size_t i) const;
+	// How strong NAME's `light` tracks (its own and what it rides on) make its lights at t; below 0 when it has none. (A cue's `follow NAME`: music_cues.h)
+	double lightLevel(const std::string &name, double t) const;
 	// When line i ends: the last sound of its recording, or its last syllable. (Kept once known: it is asked for every 1/100 s of the film by the music's ducking.)
 	double lineEnd(std::size_t i) const;
 	// A character's mouth and voice at t from its lines (a line in a computer's voice: its recording's mouth shapes and loudness).

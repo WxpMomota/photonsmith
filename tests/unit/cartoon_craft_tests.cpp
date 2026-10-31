@@ -718,6 +718,75 @@ TEST(MusicCues, TheFileIsReadAndEachCueIsPlacedByItsShot) {
 
 // The cues go on the soundtrack at their times, with the film's own instruments or the generic ones; a film with a cues file and no score of its own gets a soundtrack
 // from the cues, read when it is made.
+// Working on a recording: what `trim`, `fade`, `loop`, `curve` and `follow` do to the sound itself.
+TEST(MusicCues, ARecordingIsWorkedOnAsItPlays) {
+	namespace mc = cartoon::music_cues;
+	const mc::Sheet sheet = mc::parse(
+		"1.0 sample a.wav trim 1 2 gain 0.5\n"
+		"1.0 sample a.wav fade 0.5 0.5\n"
+		"1.0 sample a.wav loop length 5\n"
+		"1.0 sample a.wav curve 0 0  1 1  2 0.5 gain 0.5\n"
+		"1.0 sample a.wav follow fire\n"
+		"1.0 sample a.wav loop\n"
+		"1.0 bell C4 fade 1 1\n"
+		"1.0 sample a.wav trim 2 1\n"
+		"1.0 sample a.wav curve 1 1  0 0\n");
+	ASSERT_EQ(sheet.cues.size(), 5u) << (sheet.problems.empty() ? "" : sheet.problems[0]);
+	EXPECT_EQ(sheet.problems.size(), 4u) << "a loop with no length, a bell faded, a trim backwards, a curve backwards";
+	EXPECT_DOUBLE_EQ(sheet.cues[3].gain, 0.5) << "the words after a curve are still read";
+
+	const int rate = cartoon::audio::kRate;
+	const std::vector<float> sound(3 * rate, 1.0f);
+	const auto at = [&](const std::vector<float> &s, double seconds) { return s[static_cast<std::size_t>(seconds * rate)]; };
+
+	const std::vector<float> trimmed = mc::worked(sound, sheet.cues[0], 0.0, {});
+	EXPECT_NEAR(static_cast<double>(trimmed.size()), rate, 2.0);
+	EXPECT_LT(trimmed.front(), 0.01f) << "cut in the middle of a sound, it does not click";
+	EXPECT_FLOAT_EQ(at(trimmed, 0.5), 1.0f);
+
+	const std::vector<float> faded = mc::worked(sound, sheet.cues[1], 0.0, {});
+	EXPECT_LT(at(faded, 0.05), 0.05f);
+	EXPECT_NEAR(at(faded, 0.25), 0.5f, 0.01f);
+	EXPECT_FLOAT_EQ(at(faded, 1.5), 1.0f);
+	EXPECT_LT(faded.back(), 0.01f);
+
+	const std::vector<float> looped = mc::worked(sound, sheet.cues[2], 0.0, {});
+	EXPECT_EQ(looped.size(), static_cast<std::size_t>(5 * rate));
+	for (double t : {2.99, 3.0, 3.01, 4.0}) EXPECT_NEAR(at(looped, t), 1.0f, 1e-3f) << "constant through the join, at " << t;
+
+	const std::vector<float> curved = mc::worked(sound, sheet.cues[3], 0.0, {});
+	EXPECT_NEAR(at(curved, 0.5), 0.5f, 1e-3f);
+	EXPECT_NEAR(at(curved, 1.5), 0.75f, 1e-3f);
+	EXPECT_NEAR(at(curved, 2.5), 0.5f, 1e-3f) << "flat after the last pair";
+
+	const std::vector<float> followed = mc::worked(sound, sheet.cues[4], 10.0, [](const std::string &name, double t) { return name == "fire" ? 12.0 - t : -1.0; });
+	EXPECT_NEAR(at(followed, 1.0), 1.0f, 1e-3f) << "film time 11: as strong as the track then";
+	EXPECT_NEAR(at(followed, 2.5), 0.0f, 1e-3f) << "the track gone below nothing is silence";
+
+	cartoon::audio::Mix mix(4.0);
+	std::vector<std::string> problems;
+	mc::play(mix, sheet, {}, {}, {}, problems, [](const std::string &, double) { return -1.0; });
+	std::size_t noTrack = 0;
+	for (const std::string &p : problems) noTrack += p.find("no `light fire` track") != std::string::npos;
+	EXPECT_EQ(noTrack, 1u);
+}
+
+// Another kind of sound file comes through ffmpeg (the test is skipped on a machine without it).
+TEST(MusicCues, ARecordingOfAnotherKindIsRead) {
+	namespace mc = cartoon::music_cues;
+	const std::filesystem::path d = std::filesystem::temp_directory_path() / "photonsmith_cue_formats_test";
+	std::filesystem::create_directories(d);
+	const std::string mp3 = (d / "tone.mp3").generic_string();
+	const std::string make = "ffmpeg -v quiet -y -f lavfi -i \"sine=frequency=440:duration=1\" -ar 44100 \"" + mp3 + "\"";
+	if (std::system(make.c_str()) != 0) GTEST_SKIP() << "no ffmpeg";
+	const mc::Recording &r = mc::recording(mp3);
+	EXPECT_EQ(r.why, "");
+	EXPECT_NEAR(static_cast<double>(r.sound.size()), cartoon::audio::kRate, cartoon::audio::kRate * 0.1);
+	const mc::Recording &missing = mc::recording((d / "no-such.ogg").generic_string());
+	EXPECT_TRUE(missing.sound.empty());
+	EXPECT_NE(missing.why, "");
+}
+
 TEST(MusicCues, AFilmsCuesAreHeardAtTheirTimesOnItsSoundtrack) {
 	const std::filesystem::path dir = std::filesystem::temp_directory_path() / "rt_music_cues_test";
 	std::filesystem::remove_all(dir);

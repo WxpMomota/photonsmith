@@ -153,13 +153,13 @@ Film withFilmFiles(Film f) {
 	f.headerAt = wrap(f.headerAt);
 	const std::string cues = music_cues::fileOf(key);
 	if (!cues.empty()) {
-		f.soundtrack = [base = f.soundtrack, starts = f.shotStarts, names, own = f.instruments, cues, speech = f.speechAt, muffle = f.musicCutoffs](audio::Mix &m) {
+		f.soundtrack = [base = f.soundtrack, starts = f.shotStarts, names, own = f.instruments, cues, speech = f.speechAt, muffle = f.musicCutoffs, track = f.trackAt](audio::Mix &m) {
 			if (base) base(m);
 			const music_cues::Sheet sheet = music_cues::read(cues);
 			std::vector<std::string> problems = sheet.problems;
 			// the cues on a mix of their own, ducked under the characters' lines (down by up to two thirds, in 0.06 s and back over 0.5 s) and laid on the film's sound
 			audio::Mix music(m.seconds());
-			music_cues::play(music, sheet, own ? own() : std::map<std::string, CueInstrument>(), starts ? starts() : std::vector<double>(), names, problems);
+			music_cues::play(music, sheet, own ? own() : std::map<std::string, CueInstrument>(), starts ? starts() : std::vector<double>(), names, problems, track);
 			if (muffle) music.lowPass(muffle());   // (round 17: muffled while the camera is under the water)
 			m.add(music, speech ? music_cues::duckingOf(speech, m.seconds() + 4.0) : std::vector<float>());
 			for (const std::string &problem : problems) std::cerr << "[cues] " << cues << ": " << problem << std::endl;
@@ -227,6 +227,7 @@ Film filmOf(Registry &r, const film_file::DataFilm &d, bool drafted, int id, con
 	}
 	// how loud its characters speak (its music is ducked under it)
 	if (!d.spec.lines.empty() || !d.spec.characters.empty()) f.speechAt = [p](double t) { return p->speechAt(t); };
+	f.trackAt = [p](const std::string &name, double t) { return p->lightLevel(name, t); };
 	if (d.spec.hasUnderwater) f.musicCutoffs = [p]() { return p->musicCutoffs(); };   // (round 17: its music muffled while the camera is under the water)
 	// every film file has a soundtrack: its set's sound and its rain, its footsteps, touches and lines, and its music - its cues file's (withFilmFiles) or, when it has none,
 	// the score drafted from what happens in it (film_score.h; `music none` leaves it out), ducked under the lines as a cues file's music is. (One with no music and nothing

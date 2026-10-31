@@ -1839,19 +1839,8 @@ std::string DataFilm::transformsAt(const std::string &name, double t) const {
 }
 
 std::string DataFilm::lightsScaled(const std::string &name, const std::string &body, double t) const {
-	double k = 1.0;
-	bool any = false;
-	for (std::string who = name;;) {   // (its own and what it rides on)
-		for (const Anim &a : spec.anims)
-			if (a.kind == Kind::Light && a.name == who) {
-				k *= std::max(0.0, progress(a, t, 0));
-				any = true;
-			}
-		const auto up = spec.parents.find(who);
-		if (up == spec.parents.end()) break;
-		who = up->second;
-	}
-	if (!any) return body;
+	const double k = lightLevel(name, t);
+	if (k < 0.0) return body;
 	static const std::regex scaleParam("(\"float\\s+scale\"\\s*\\[\\s*)([-+0-9.eE]+)");
 	std::string out;
 	for (const std::string &line : detail::splitLines(body)) {

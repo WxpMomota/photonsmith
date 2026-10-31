@@ -645,6 +645,8 @@ struct Film {
 	std::function<std::string(double)> sceneAcross;
 	// (empty: none) how loud its characters are speaking at t, 0..1: its music cues are ducked under it.
 	std::function<double(double)> speechAt;
+	// (empty: none) how strong a `light NAME` track is at t, below 0 when there is none: a cue's `follow NAME` (music_cues.h).
+	std::function<double(const std::string &, double)> trackAt;
 	// (empty: none) the music heard from under the water (round 17): a low-pass cutoff in Hz each 1/100 s, low while the camera is under it (audio::Mix::lowPass).
 	std::function<std::vector<float>()> musicCutoffs;
 	// (empty: t) the time whose shot's camera sceneAcross(t) uses: what a cameras file changes of that shot is changed on the other side of the cut too.

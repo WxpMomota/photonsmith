@@ -1645,6 +1645,22 @@ std::string DataFilm::swarmsAt(const std::string &header, double t) const {
 }
 // A `gaze` line's turn at t: about its pivot, far enough that what faces `forward` at rest looks at the target (a point, or something moving: where its rest place is now),
 // no further than `most`, by how much the line's fade says. All worked out inside `outer`, what the block rides on, so it looks from where it is.
+double DataFilm::lightLevel(const std::string &name, double t) const {
+	double k = 1.0;
+	bool any = false;
+	for (std::string who = name;;) {   // (its own and what it rides on)
+		for (const Anim &a : spec.anims)
+			if (a.kind == Kind::Light && a.name == who) {
+				k *= std::max(0.0, progress(a, t, 0));
+				any = true;
+			}
+		const auto up = spec.parents.find(who);
+		if (up == spec.parents.end()) break;
+		who = up->second;
+	}
+	return any ? k : -1.0;
+}
+
 Mat4 DataFilm::gazeMatrix(const Anim &a, double t, const Mat4 &outer) const {
 	const Vec3 pivot{a.about[0], a.about[1], a.about[2]};
 	Vec3 at{a.point[0], a.point[1], a.point[2]};

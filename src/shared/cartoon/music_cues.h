@@ -20,11 +20,21 @@
 //
 // A recording: `3.0  sample voices/hello.wav  gain 0.8  by kai` plays a WAV file (beside the cues file; any rate, mono or stereo: audio::readWav). `by NAME` makes it that
 // character's voice: voiceAt() is how loud it is at a moment (0..1, the loudest of the line 1), for the film's code to open a mouth by - or, behind a mask, to light up.
+// Any other kind of sound file (MP3, OGG, FLAC ...) is turned into a WAV by ffmpeg, on the PATH as for a video's assembly.
+//
+// A recording can be worked on as it plays:
+//     trim 2.0 9.5               only those seconds of it
+//     fade 0.5 2.0               in over 0.5 s, out over 2 s
+//     loop length 40             over and over for 40 s, each join crossfaded (`length` says how long)
+//     curve 0 0  3 1  30 1  34 0.2      how loud at each time after the cue starts: pairs of time and level, straight lines between them
+//     follow fire                as loud as the film's `light fire ...` track, so a crackle dies with the flame (a film file's; with `curve`, the two multiplied)
 
 #include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -53,6 +63,10 @@ struct Cue {
 	std::vector<double> notes;
 	double length = 2.0, gain = 0.1, pan = 0.0, send = 0.3, spread = 0.0;
 	bool everyCut = false;   // `oncuts`: played at every cut (its time after the cut)
+	double trim0 = 0.0, trim1 = -1.0, fadeIn = 0.0, fadeOut = 0.0;   // `trim A B`, `fade IN OUT` (a recording's; trim1 < 0: to its end)
+	bool loop = false, hasLength = false;                            // `loop`: over and over for `length`
+	std::vector<std::pair<double, double>> curve;                    // `curve T K ...`: its level K at T seconds after it starts
+	std::string follow;                                              // `follow NAME`: its level the film's `light NAME` track
 	int line = 0;
 };
 struct Sheet {
@@ -79,6 +93,32 @@ inline bool noteOf(const std::string &word, double &midi) {
 	if (word.find_first_not_of("-0123456789", i) != std::string::npos) return false;
 	midi = 12.0 * (octave + 1) + n;
 	return true;
+}
+
+// A word for working on a recording and what follows it on the line. "" or what is wrong with it.
+inline std::string recordingWord(Cue &c, const std::string &w, std::istringstream &words) {
+	if (w == "loop") return c.loop = true, std::string();
+	if (w == "follow") return words >> c.follow ? std::string() : "`follow` needs the name of a `light` track";
+	if (w == "trim") return words >> c.trim0 >> c.trim1 && c.trim0 >= 0.0 && c.trim1 > c.trim0 ? std::string() : "`trim FROM TO`: seconds of the recording, going up";
+	if (w == "fade") return words >> c.fadeIn >> c.fadeOut && c.fadeIn >= 0.0 && c.fadeOut >= 0.0 ? std::string() : "`fade IN OUT`: seconds";
+	for (;;) {   // (`curve`: pairs up to the next word)
+		const std::streampos before = words.tellg();
+		std::string first, second;
+		char *end = nullptr, *end2 = nullptr;
+		if (!(words >> first)) break;
+		const double at = std::strtod(first.c_str(), &end);
+		if (*end != '\0') {
+			words.clear();
+			words.seekg(before);
+			break;
+		}
+		if (!(words >> second)) return "`curve` takes pairs of time and level";
+		const double level = std::strtod(second.c_str(), &end2);
+		if (*end2 != '\0' || level < 0.0 || (!c.curve.empty() && at <= c.curve.back().first)) return "`curve T K T K ...`: times going up, levels of 0 or more";
+		c.curve.push_back({at, level});
+	}
+	if (c.curve.empty()) words.clear();
+	return c.curve.empty() ? "`curve` takes pairs of time and level" : std::string();
 }
 
 inline Sheet parse(const std::string &text) {
@@ -152,6 +192,11 @@ inline Sheet parse(const std::string &text) {
 					break;
 				}
 				(w == "length" ? c.length : w == "gain" ? c.gain : w == "pan" ? c.pan : w == "send" ? c.send : c.spread) = v;
+				c.hasLength = c.hasLength || w == "length";
+			} else if (w == "trim" || w == "fade" || w == "loop" || w == "curve" || w == "follow") {
+				const std::string e = c.instrument == "sample" ? recordingWord(c, w, words) : "'" + w + "' is for a `sample`";
+				if (!e.empty()) s.problems.push_back(where + e);
+				ok = e.empty();
 			} else if (!c.notes.empty() && w.find('.') != std::string::npos && std::strtod(w.c_str(), nullptr) > 0.0) {
 				c.length = std::strtod(w.c_str(), nullptr);   // (a number with a point after the notes: the length, "piano D4 3.0"; whole numbers are notes)
 			} else if (noteOf(w, v)) {
@@ -161,7 +206,8 @@ inline Sheet parse(const std::string &text) {
 				ok = false;
 			}
 		}
-		if (ok) s.cues.push_back(c);
+		if (ok && c.loop && !c.hasLength) s.problems.push_back(where + "`loop` needs a `length`: how long to go on for");
+		if (ok && (!c.loop || c.hasLength)) s.cues.push_back(c);
 	}
 	return s;
 }
@@ -237,6 +283,19 @@ inline bool timeOf(const Cue &c, const std::vector<double> &starts, const std::v
 	return false;
 }
 
+// A sound file of another kind: ffmpeg makes a WAV of it, for audio::readWav. False, with why, when it cannot.
+inline bool readOther(const std::string &path, std::vector<float> &out, std::string *why) {
+	if (path.find_first_of("\"$`") != std::string::npos) return *why = "has a name that cannot be passed to ffmpeg", false;
+	std::error_code ec;
+	if (!std::filesystem::exists(path, ec)) return *why = "is not there", false;
+	const std::filesystem::path wav = std::filesystem::temp_directory_path(ec) / ("rt_cue_" + std::to_string(std::hash<std::string>{}(path)) + ".wav");
+	const std::string command = "ffmpeg -v error -y -i \"" + path + "\" -ar " + std::to_string(audio::kRate) + " \"" + wav.string() + "\"";
+	const bool made = std::system(command.c_str()) == 0 && audio::readWav(wav.string(), out, why);
+	std::filesystem::remove(wav, ec);
+	if (!made && why) *why = "could not be read as a WAV, nor by ffmpeg (is it on the PATH?)";
+	return made;
+}
+
 // A recording: its sound (audio::readWav, one channel at audio::kRate), its loudness each 1/100 s (RMS, the loudest 1), or why it could not be read.
 struct Recording {
 	std::filesystem::file_time_type time;
@@ -256,7 +315,9 @@ inline const Recording &recording(const std::string &path) {
 	if (it == kept.end() || it->second.time != time) {
 		Kept k;
 		k.time = time;
-		if (audio::readWav(path, k.sound, &k.why)) {
+		std::string kind = std::filesystem::path(path).extension().string();
+		for (char &ch : kind) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+		if (kind == ".wav" ? audio::readWav(path, k.sound, &k.why) : readOther(path, k.sound, &k.why)) {
 			const std::size_t window = audio::kRate / 100;
 			double loudest = 1e-9;
 			for (std::size_t at = 0; at < k.sound.size(); at += window) {
@@ -292,9 +353,55 @@ inline std::vector<float> duckingOf(const std::function<double(double)> &speech,
 	return gain;
 }
 
+// A `follow`ed track: how strong `name` is at a film time, below 0 when it has no such track.
+using Track = std::function<double(const std::string &name, double t)>;
+
+// What a `sample` cue at film time t plays: the recording trimmed, looped, faded and made louder and quieter over time.
+inline std::vector<float> worked(const std::vector<float> &sound, const Cue &c, double t, const Track &track) {
+	const auto samples = [](double seconds) { return static_cast<std::size_t>(std::max(0.0, seconds) * audio::kRate); };
+	const std::size_t from = std::min(sound.size(), samples(c.trim0)), to = c.trim1 < 0.0 ? sound.size() : std::max(from, std::min(sound.size(), samples(c.trim1)));
+	std::vector<float> out(sound.begin() + static_cast<std::ptrdiff_t>(from), sound.begin() + static_cast<std::ptrdiff_t>(to));
+	if (c.loop && !out.empty()) {
+		const std::vector<float> once = out;
+		const std::size_t total = samples(c.length), join = std::min(samples(0.05), once.size() / 2);
+		while (out.size() < total) {
+			for (std::size_t i = 0; i < join; ++i) {   // (the end of one going over into the start of the next)
+				const float k = (static_cast<float>(i) + 0.5f) / static_cast<float>(join);
+				float &tail = out[out.size() - join + i];
+				tail = tail * (1.0f - k) + once[i] * k;
+			}
+			out.insert(out.end(), once.begin() + static_cast<std::ptrdiff_t>(join), once.end());
+		}
+		out.resize(total);
+	}
+	// (a recording cut in the middle of a sound would click: 5 ms even when no fade is asked for)
+	const std::size_t in = std::min(out.size(), samples(c.trim0 > 0.0 ? std::max(c.fadeIn, 0.005) : c.fadeIn));
+	const std::size_t away = std::min(out.size(), samples(c.trim1 >= 0.0 || c.loop ? std::max(c.fadeOut, 0.005) : c.fadeOut));
+	const auto smooth = [](double x) { return static_cast<float>(x * x * (3.0 - 2.0 * x)); };
+	for (std::size_t i = 0; i < in; ++i) out[i] *= smooth(static_cast<double>(i) / static_cast<double>(in));
+	for (std::size_t i = 0; i < away; ++i) out[out.size() - 1 - i] *= smooth(static_cast<double>(i) / static_cast<double>(away));
+	if (c.curve.empty() && c.follow.empty()) return out;
+	const auto level = [&](double s) {
+		double k = 1.0;
+		if (!c.curve.empty()) {
+			std::size_t seg = 0;
+			while (seg + 1 < c.curve.size() && c.curve[seg + 1].first <= s) ++seg;
+			k = s <= c.curve.front().first || seg + 1 == c.curve.size() ? c.curve[s <= c.curve.front().first ? 0 : seg].second
+																		: c.curve[seg].second + (c.curve[seg + 1].second - c.curve[seg].second) * (s - c.curve[seg].first) / (c.curve[seg + 1].first - c.curve[seg].first);
+		}
+		return !c.follow.empty() && track ? k * std::max(0.0, track(c.follow, t + s)) : k;
+	};
+	constexpr std::size_t step = audio::kRate / 100;   // (a track is worked out each 1/100 s and joined up)
+	for (std::size_t at = 0; at < out.size(); at += step) {
+		const double a = level(static_cast<double>(at) / audio::kRate), b = level(static_cast<double>(at + step) / audio::kRate);
+		for (std::size_t i = at; i < std::min(out.size(), at + step); ++i) out[i] *= static_cast<float>(a + (b - a) * static_cast<double>(i - at) / step);
+	}
+	return out;
+}
+
 // The cues on a mix: each at its time with its instrument (the film's own, else a generic one). What cannot be played is added to `problems`.
 inline void play(audio::Mix &m, const Sheet &sheet, const std::map<std::string, CueInstrument> &own, const std::vector<double> &starts, const std::vector<std::string> &names,
-				 std::vector<std::string> &problems) {
+				 std::vector<std::string> &problems, const Track &track = {}) {
 	std::vector<Cue> cues;   // (an `oncuts` cue made into one at each cut)
 	for (const Cue &c : sheet.cues) {
 		if (!c.everyCut) {
@@ -317,8 +424,9 @@ inline void play(audio::Mix &m, const Sheet &sheet, const std::map<std::string, 
 		}
 		if (c.instrument == "sample") {   // a recording: as it is, at its gain and pan
 			const Recording &r = recording(recordingPath(sheet, c.file));
+			if (!c.follow.empty() && (!track || track(c.follow, t) < 0.0)) problems.push_back("line " + std::to_string(c.line) + ": the film has no `light " + c.follow + "` track to follow");
 			if (r.sound.empty()) problems.push_back("line " + std::to_string(c.line) + ": the recording " + c.file + " " + (r.why.empty() ? "is empty" : r.why));
-			else m.put(t, r.sound, c.gain, c.pan, c.send);
+			else m.put(t, worked(r.sound, c, t, track), c.gain, c.pan, c.send);
 			continue;
 		}
 		auto it = own.find(c.instrument);
@@ -384,9 +492,9 @@ inline double voiceAt(const std::string &key, const std::string &speaker, double
 		if (c.instrument != "sample" || c.by != speaker || loudest <= 0.0) continue;
 		double t0 = 0.0;
 		std::string why;
-		if (!timeOf(c, starts, names, t0, why) || t < t0) continue;
+		if (!timeOf(c, starts, names, t0, why) || t < t0 || (c.trim1 >= 0.0 && t - t0 + c.trim0 > c.trim1)) continue;
 		const Recording &r = recording(recordingPath(sheet, c.file));
-		const std::size_t k = static_cast<std::size_t>((t - t0) * 100.0);
+		const std::size_t k = static_cast<std::size_t>((t - t0 + c.trim0) * 100.0);
 		if (k < r.loudness.size()) v = std::max(v, r.loudness[k] * c.gain / loudest);
 		if (mouth && k < r.mouth.size()) {
 			const double share = std::min(1.0, c.gain / loudest);

@@ -2625,6 +2625,8 @@ uvs (its surface cut into near-flat charts along its creases, each laid flat and
 
 **A backdrop for a scene made for one camera: `surround FILE [radius R] [height H] [repeat N] [bright B] [ground R G B] [at X Z]`.** A scene modelled for a single view is empty everywhere else. This puts a ring of a panorama round the set (the picture beside the film or in the library, its left edge meeting its right, `repeat` times round), glowing a little and left out of the light sampling, its top carried on upwards so a low camera cannot see out over it, and a plain ground under the set out past the ring. The defaults (radius 115, height 62, repeat 3, bright 0.35) suit a set some tens of metres across.
 
+**Working on a recording in the cues file.** A `sample` cue used to play a recording as it was. It now takes `trim FROM TO` (only those seconds), `fade IN OUT`, `loop length L` (over and over for L seconds, each join crossfaded), `curve T K T K ...` (its level at times after the cue starts, straight lines between) and `follow NAME` (as loud as the film's `light NAME` track, so a fire's crackle dies with the flame; with a `curve` the two are multiplied): `0 sample wind.mp3 loop length 60 fade 3 4 gain 0.3` and `@12 sample crackle.wav loop length 40 follow fire gain 0.6`. The file can be an MP3, OGG, FLAC or anything else ffmpeg reads, as long as ffmpeg is on the PATH.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)
