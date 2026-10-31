@@ -140,10 +140,9 @@ inline std::vector<CutIssue> screenDirection(const Film &film) {
 
 // ---- the camera inside a medium's sphere ----
 // Smoke, flames, a volcano's plume and clouds are media filling a sphere round their box (`Material "interface"`, `MediumInterface "NAME" ""`), the outside being the air.
-// The CPU and the wavefront GPU renderer (which the default one hands a frame with anything inside a volume to) sample a volume along each ray up to the nearest surface, so a
-// camera inside the sphere is in the smoke, as it should be. The Mac's Metal renderer still samples a volume only where a ray meets its sphere: from inside, the smoke in
-// front of anything else inside the sphere is missing. (Mist and the sea round the camera are spheres of the camera's own medium: not reported.) `ray_tracer --film-media
-// <key>`; the film doctor warns on it on a Mac.
+// The CPU, the wavefront GPU renderer (which the default one hands a frame with anything inside a volume to) and, since 2026-10-30, Metal sample a volume along each ray up to
+// the nearest surface, so a camera inside the sphere is in the smoke, as it should be. (Mist and the sea round the camera are spheres of the camera's own medium: not reported.)
+// `ray_tracer --film-media <key>` lists the moments; the film doctor no longer warns on them.
 struct MediumSphere {
 	std::string name;
 	Vec3 centre;   // pbrt's

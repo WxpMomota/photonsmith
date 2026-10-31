@@ -369,6 +369,10 @@ struct Uniforms {
     // --exposure: the flat multiplier the picture gets, which decides how visible a pixel's noise is to the adaptive-sampling rule (pixelConverged below). adaptiveThreshold is that rule's noise
     // in display units.
     float adaptiveExposure;
+    // The volumes (fog, smoke and cloud spheres) whose flight the kernel samples up to the nearest surface, instead of only where a ray meets the boundary sphere: their sphere indices, as floats,
+    // are mediumListCount entries of the shared float buffer (rgbGridData) from element mediumListOffset. SphereData::listedMedium marks the same spheres.
+    uint mediumListOffset;
+    uint mediumListCount;
 };
 
 // Blinn/pbrt-v4's own smooth cone falloff: 0 outside the outer cone, 1
@@ -997,6 +1001,11 @@ inline bool clippedSphereRejects(float3 oro, float3 ord, float tt, float r, floa
     return phi > phiMax;
 }
 
+// The fraction of light a shadow ray gets through a cloud (materialType 29) or RGB grid (30) sphere's medium, estimated by ratio tracking from a seed; defined with the media in
+// metal_poc_materials_medium.metal. Grey in the colour channels (their mean): the ray is only blocked or not.
+inline float volumeShadowPass(uint materialType, TriangleMaterial vm, float3 center, float radius, float3 origin, float3 dir, float tMax, uint seed,
+                              device const GpuCloudMedium* cloudMediums, device const GpuRgbGridMedium* rgbGridMediums, device const float* rgbGridData);
+
 [[intersection(bounding_box, triangle_data, instancing)]]
 SphereIntersectionResult sphereIntersectionFunction(
     float3 origin [[origin]],
@@ -1013,7 +1022,11 @@ SphereIntersectionResult sphereIntersectionFunction(
     // buffer(4), matching every other custom-primitive geometry's own
     // "intersection functions have their own independent argument
     // table" convention (this struct's own comment above).
-    device const TriangleMaterial* sphereMaterials [[buffer(3)]])
+    device const TriangleMaterial* sphereMaterials [[buffer(3)]],
+    // The media a shadow ray crosses (cloud and RGB grid spheres): read through the function table's own buffers 7 (the shared float buffer), 9 and 10.
+    device const float* rgbGridData [[buffer(7)]],
+    device const GpuRgbGridMedium* rgbGridMediums [[buffer(9)]],
+    device const GpuCloudMedium* cloudMediums [[buffer(10)]])
 {
     SphereIntersectionResult result;
     result.accept = false;
@@ -1030,7 +1043,23 @@ SphereIntersectionResult sphereIntersectionFunction(
     // so it's unaffected by this check.
     {
         uint mt = sphereMaterials[primitiveIndex].materialType;
-        if (payload.isShadowRay && (mt == 29u || mt == 30u)) return result;   // (a shadow ray passes through a medium trigger sphere; a subsurface surface blocks it, as in pbrt)
+        if (!payload.isShadowRay && spheres[primitiveIndex].listedMedium > 0.5f) return result;   // a volume of the list: the kernel samples its part of each flight itself
+        if (payload.isShadowRay && (mt == 29u || mt == 30u)) {
+            // A cloud or grid volume attenuates a shadow ray like a homogeneous one (below): blocked with probability 1 - its transmittance along the part of the ray inside the sphere,
+            // so a surface inside it, or lit through it, is shadowed by the medium as in pbrt. (A shadow ray from a scatter point inside the volume is attenuated here too,
+            // not in shadeCloudMediumSphere / shadeRgbGridMediumSphere.)
+            const SphereData vs = spheres[primitiveIndex];
+            const float3 vc = float3(vs.center) + payload.shutterT * float3(vs.centerDelta1);
+            uint vh = as_type<uint>(origin.x) * 73856093u ^ as_type<uint>(origin.y) * 19349663u ^ as_type<uint>(origin.z) * 83492791u
+                    ^ as_type<uint>(direction.x) * 2654435761u ^ as_type<uint>(direction.y) * 40503u ^ as_type<uint>(direction.z) * 668265263u ^ primitiveIndex * 374761393u;
+            const float pass = volumeShadowPass(mt, sphereMaterials[primitiveIndex], vc, vs.radius, origin, direction, maxDistance, vh, cloudMediums, rgbGridMediums, rgbGridData);
+            vh ^= vh >> 16; vh *= 0x7feb352du; vh ^= vh >> 15; vh *= 0x846ca68bu; vh ^= vh >> 16;
+            if (float(vh >> 8) * (1.0 / 16777216.0) < pass) return result;   // passed through: not blocked
+            if (!(pass < 1.0f)) return result;
+            result.accept = true;
+            result.distance = max(minDistance, 0.0f);
+            return result;
+        }
         // A glass sphere that bounds a medium is NOT in this list: like every pbrt-v4 surface with a material it is opaque to NEE
         // shadow rays (VolPathIntegrator::SampleLd), so a scatter vertex inside it cannot see a light through its own shell and the fog is
         // lit only along specular chains - the same rule the CPU and both OptiX backends follow (commit 2f8dc3d). A boundary that should

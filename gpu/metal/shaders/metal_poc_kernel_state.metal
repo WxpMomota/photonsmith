@@ -102,6 +102,11 @@ struct BounceState {
     float3 mediumOriginBefore = float3(0.0);
     bool scatteredInMedium = false;
     bool passedThroughMediumSphere = false;
+    // The listed volume (Uniforms::mediumListCount) this flight enters first, and the part of the flight inside it: [listedStart, listedEnd] along the ray, up to the nearest surface (findListedVolume).
+    // listedStart is INFINITY when the flight meets none.
+    float listedStart = INFINITY;
+    float listedEnd = 0.0;
+    uint listedPrim = 0u;
     uint primId = 0u;
     float3 hitPoint = float3(0.0);
     bool isBoundingBox = false;
@@ -198,6 +203,9 @@ struct BounceState {
     thread float3& mediumOriginBefore = (B).mediumOriginBefore; \
     thread bool& scatteredInMedium = (B).scatteredInMedium; \
     thread bool& passedThroughMediumSphere = (B).passedThroughMediumSphere; \
+    thread float& listedStart = (B).listedStart; \
+    thread float& listedEnd = (B).listedEnd; \
+    thread uint& listedPrim = (B).listedPrim; \
     thread uint& primId = (B).primId; \
     thread float3& hitPoint = (B).hitPoint; \
     thread bool& isBoundingBox = (B).isBoundingBox; \

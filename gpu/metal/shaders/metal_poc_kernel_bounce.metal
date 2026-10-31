@@ -240,6 +240,7 @@ inline bool traceBounce(thread const KernelRes& R, thread PathState& P) {
     mediumOriginBefore = rayOrigin;
     scatteredInMedium = false;
     passedThroughMediumSphere = false;
+    findListedVolume(R, P, B);
     if (!traverseBoundedMedia(R, P, B)) return false;
     if (scatteredInMedium) fromMediumScatter = false;   // a bounded medium samples the image sky itself
     P.nullCrossing = passedThroughMediumSphere;
@@ -247,6 +248,13 @@ inline bool traceBounce(thread const KernelRes& R, thread PathState& P) {
     else if (scatteredInMedium) mediumSkippedDist = 0.0;
 
     if (!scatterInGlobalMedium(R, P, B)) return false;
+    if (!scatteredInMedium && !passedThroughMediumSphere) {   // the camera fog (up to where a listed volume begins) let the flight through
+        if (!traverseListedVolume(R, P, B)) return false;
+        if (scatteredInMedium) fromMediumScatter = false;   // a volume samples the image sky itself
+        P.nullCrossing = passedThroughMediumSphere;
+        if (passedThroughMediumSphere) mediumSkippedDist += length(rayOrigin - mediumOriginBefore);
+        else if (scatteredInMedium) mediumSkippedDist = 0.0;
+    }
 
     if (scatteredInMedium) mediumSkippedDist = 0.0;  // global-fog scatter: new segment
     if (scatteredInMedium) { CENSUS_PUSH(100u); }

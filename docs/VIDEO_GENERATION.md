@@ -391,9 +391,8 @@ in space and the canyon dropped to a quarter (no visible change, side by side) a
 
 **A camera inside smoke or a cloud.** Smoke, flames, a volcano's plume and clouds are media that fill a sphere round their box, the air outside. On Windows the CPU and the
 GPU sample such a volume along each ray up to the nearest surface (the default GPU renderer hands a frame with something inside a volume to the wavefront renderer), so a camera can fly into
-smoke or through a cloud, and the ground, trees and animals inside a volume are in it as they should be. The Mac's renderer still samples a volume only where a ray meets its
-sphere: from inside, it misses the smoke in front of anything else inside the sphere. `ray_tracer --film-media <key>` samples each shot five times (no render) and lists the
-moments the camera is inside a medium that is not its own (mist round the camera and the sea are its own, and fine); the doctor warns on each when it runs on a Mac.
+smoke or through a cloud, and the ground, trees and animals inside a volume are in it as they should be. The Mac's renderer (Metal) does the same since 2026-10-30. `ray_tracer --film-media <key>` samples each shot five times (no render) and lists the
+moments the camera is inside a medium that is not its own (mist round the camera and the sea are its own, and fine).
 
 **Feet that slide, and flicker: the doctor watches the motion.** A film can report its characters' feet (its row's `feetAt(t)`: each foot's place and whether the walk means
 it to be on the ground; a film_kit shot sets `f.feet`, the Nomai explorer's are `explorerFeet(pose, frame)`). `src/shared/cartoon/film_checks.h` samples every shot at the

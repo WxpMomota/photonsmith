@@ -237,6 +237,8 @@ struct Uniforms {
     PackedFloat3 fogBoundCenter{0, 0, 0};   // see the shader's copy
     float fogBoundRadius = 0.0f;
     float adaptiveExposure = 1.0f;   // see the shader's copy
+    uint32_t mediumListOffset = 0;   // see the shader's copy
+    uint32_t mediumListCount = 0;
 };
 
 // AreaLightData/buildPowerLightSampler now live in metal_poc_host_math.h

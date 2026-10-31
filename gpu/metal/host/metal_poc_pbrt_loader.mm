@@ -189,6 +189,7 @@ void PbrtSceneLoader::loadPbrtScene() {
     loadPbrtDisks(scene, toWorld, materialFor, sceneScale);
     loadPbrtCylinders(scene, toWorld, materialFor, sceneScale);
     loadPbrtObjectInstances(scene, toWorld, materialFor, sceneScale);
+    listMediumVolumes();
     loadPbrtPunctualLights(scene, toWorld, sceneScale);
     loadPbrtMedium(scene, sceneScale);
     pbrtFogBoundRadius = 0.0f;
@@ -944,6 +945,24 @@ void PbrtSceneLoader::loadPbrtSpheres(const pbrt_flatten::FlatScene& scene, cons
         TriangleMaterial mat = sphereMaterial(scene, s, toWorld, materialFor, sceneScale);
         emitSphereLight(scene, s, sd, center, mat);
         sphereMaterials.push_back(mat);
+    }
+}
+
+// The fog, smoke and cloud spheres (materialType 28 with some density, 29, 30) that are whole and still: the kernel samples the part of each ray's flight inside them up to the nearest surface, as pbrt
+// and the CPU do, so the ground and the objects inside a volume stop the flight, and a ray that starts inside one (the camera's, or a bounce off something in it) is in it from its origin.
+// A moving or clipped sphere, an instanced one, and a zero-density interface keep the old way: a medium only where a ray meets its boundary.
+void PbrtSceneLoader::listMediumVolumes() {
+    mediumListOffset = (uint32_t)rgbGridData.size();
+    mediumListCount = 0;
+    for (size_t i = 0; i < spheres.size(); ++i) {
+        const TriangleMaterial& m = sphereMaterials[i];
+        SphereData& sd = spheres[i];
+        const bool still = sd.clipped < 0.5f && sd.centerDelta1.x == 0.0f && sd.centerDelta1.y == 0.0f && sd.centerDelta1.z == 0.0f;
+        const bool dense = m.materialType == METAL_MAT_MEDIUM_HOMOGENEOUS
+            ? (m.ior > 0.0f || m.conductorEta.x > 0.0f || m.conductorEta.y > 0.0f || m.conductorEta.z > 0.0f)
+            : (m.materialType == METAL_MAT_MEDIUM_HETEROGENEOUS || m.materialType == METAL_MAT_MEDIUM_RGB_GRID);
+        sd.listedMedium = (still && dense) ? 1.0f : 0.0f;
+        if (sd.listedMedium > 0.5f) { rgbGridData.push_back((float)i); ++mediumListCount; }
     }
 }
 

@@ -405,13 +405,8 @@ def cmd_doctor(args):
         if worst > SLIDE_NOTE:
             findings.append(("warn" if worst > SLIDE_WARN else "note", shot, "middle", when,
                              "a planted foot slides %.2f m/s at worst (%.2f on average)%s" % (worst, mean, "" if worst > SLIDE_WARN else ": slightly")))
-    # the camera inside smoke, a flame or a cloud (no render): only the Mac's renderer misses some of it from in there - on Windows the CPU and the GPU sample a volume
-    # along each ray up to the nearest surface
-    for shot, when, medium, radius, inside in (film_media(args, info["key"]) if sys.platform == "darwin" else []):
-        if only is not None and shot not in only:
-            continue
-        findings.append(("warn", shot, "middle", when, "the camera is %.2f inside the sphere of the medium \"%s\" (radius %.2f): on the Mac the smoke in front of anything else "
-                         "inside it is not drawn" % (inside, medium, radius)))
+    # (A camera inside smoke, a flame or a cloud is no finding any more: the CPU, the wavefront GPU renderer and, since 2026-10-30, Metal sample a volume along each ray up to
+    # the nearest surface. `ray_tracer --film-media <key>` still lists the moments.)
     # screen direction across the cuts: from the film's own subjects and cameras, no render
     def way(v):
         return "left to right" if v > 0 else "right to left"
