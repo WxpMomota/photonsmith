@@ -7,7 +7,12 @@
 namespace film_info {
 
 const std::vector<Film> &all() {
-	static const std::vector<Film> films = parse(SceneMetadataClient::filmTable().toStdString());
+	static std::vector<Film> films;
+	static int read = -1;
+	if (const int found = SceneMetadataClient::scenesFound(); found != read) {   // (a film file saved while the program runs)
+		read = found;
+		films = parse(SceneMetadataClient::filmTable().toStdString());
+	}
 	return films;
 }
 

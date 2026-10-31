@@ -6,6 +6,8 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **Refresh button for the scene list (2026-10-31).** A film file saved while the GUI runs is listed without a restart.
+
 * **Sound automation in the cues file (2026-10-31).** A `sample` cue takes `trim`, `fade`, `loop length L`, `curve T K ...` and `follow NAME` (as loud as a film's `light` track), and can be an MP3 or anything else ffmpeg reads.
 
 * **Camera keys by time, block subjects, a surround backdrop (2026-10-31).** `key ... at T` reaches a key at a time rather than pacing by distance, so a focus pull works with the camera standing still. A shot's `subject NAME at X Y Z` makes a block, group or placement something the film doctor checks. `surround FILE ...` puts a panorama ring and a ground round a scene built for one camera.

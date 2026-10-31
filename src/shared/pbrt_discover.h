@@ -130,6 +130,7 @@ struct Discovered {
 // Scenes the program writes itself rather than reads from a folder of the user's: the stills of the cartoon films (src/shared/cartoon/cartoon_scenes.cpp). Each is described from a header
 // alone, and its file is written the first time something loads it. Defined in cartoon_scenes.cpp, which carries the film code, so the many files that include this header do not.
 void listGenerated(std::vector<Discovered> &out);   // appends one Discovered for each generated scene (its path is where its file will be)
+void listNewGenerated(std::vector<Discovered> &out);   // the same for those that have come since: a film file saved while the program runs (cartoon::readNewFilmFiles)
 void materializeGenerated(const std::string &path);   // writes `path` when it is a generated scene's file that is missing or out of date; any other path is left alone
 const char *filmTable();   // the films compiled in here, one line each, for the GUI (which does not compile them: qt_gui/film_info.h reads the lines)
 const char *filmProblems();   // the film files that were left out and why ("file:line: what"), one line each: what the GUI shows of them
@@ -337,7 +338,7 @@ inline Discovered describe(const std::string &path, const std::string &text) {
 		d.cartoonKey = tags.cartoon;
 		d.gpuCompatible = tags.gpuCompatible;
 	}
-	{
+	if (d.cartoonKey.empty()) {   // (a film's still goes by the film's name, whatever scene it is built on)
 		scene_doc::Document builderDoc;
 		std::string ignored;
 		if (scene_doc::fromPbrt(text, builderDoc, ignored)) d.title = builderDoc.title;

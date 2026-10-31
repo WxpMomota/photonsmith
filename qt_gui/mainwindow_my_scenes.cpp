@@ -64,10 +64,12 @@ void MainWindow::updateMyScenesButtons(const QString &category) {
 // Moves `files` to the trash. Returns how many were moved; a file that cannot be moved there is reported, never erased behind the user's back.
 static int moveFilesToTrash(const QStringList &files, QStringList *failed) {
 	int moved = 0;
-	// (Under the self-test the files are erased instead: the Trash belongs to the real user, and a test must not fill it.)
-	const bool eraseInstead = qEnvironmentVariableIsSet("RT_GUI_SELFTEST");
+	// (Under the self-test the files are erased instead: the Trash belongs to the real user, and a test must not fill it. And an erased file is gone, so only the test's own
+	// throwaway folder's: main.cpp makes it. Anything else is refused.)
+	const bool selfTest = qEnvironmentVariableIsSet("RT_GUI_SELFTEST");
+	const QString ownFolder = QDir(qEnvironmentVariable("RAY_TRACER_USER_ASSETS")).absolutePath() + QLatin1Char('/');
 	for (const QString &path : files) {
-		if (eraseInstead ? QFile::remove(path) : QFile::moveToTrash(path)) {
+		if (selfTest ? path.startsWith(ownFolder) && QFile::remove(path) : QFile::moveToTrash(path)) {
 			++moved;
 			AppLog::info(QStringLiteral("scenes"), QStringLiteral("moved %1 to the trash").arg(path));
 		} else {
@@ -80,6 +82,21 @@ static int moveFilesToTrash(const QStringList &files, QStringList *failed) {
 
 // After files were removed: list what is left, drop the removed scenes' thumbnails, and select a neighbour (or the first scene of the whole list when none of the
 // user's scenes remain: the My Scenes tab is gone then).
+QPushButton *MainWindow::makeRefreshScenesButton(QWidget *parent) {
+	auto *button = new QPushButton(tr("Refresh"), parent);
+	button->setAutoDefault(false);
+	button->setToolTip(tr("Look for film files and scenes saved since the program started, and list them now"));
+	connect(button, &QPushButton::clicked, this, &MainWindow::onRefreshSceneList);
+	return button;
+}
+
+void MainWindow::onRefreshSceneList() {
+	const int added = SceneMetadataClient::refreshUserScenes();
+	for (const QString &p : SceneMetadataClient::filmProblems()) onLogMessage(tr("Warning: a film file was left out - %1").arg(p));
+	if (added > 0 && !m_isRendering) selectSceneById(SceneMetadataClient::sceneIdAtIndex(SceneMetadataClient::sceneCount() - 1));   // (what was found is at the end)
+	statusBar()->showMessage(added > 0 ? tr("%n new film(s) or scene(s) listed.", "", added) : tr("Nothing new to list."), 6000);
+}
+
 void MainWindow::afterUserScenesRemoved(const QStringList &removedIds, const QString &nextHintId) {
 	for (const QString &id : removedIds) QFile::remove(thumbnailCachePath(id));   // before the registry forgets the id (the cache is keyed by its slug)
 	SceneMetadataClient::refreshUserScenes();

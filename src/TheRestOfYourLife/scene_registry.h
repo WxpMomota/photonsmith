@@ -1260,6 +1260,10 @@ inline int refresh_user_scenes(bool prune = false) {
             break;
         }
     }
+    std::vector<pbrt_discover::Discovered> films;   // (a film file saved while the program runs: a scene of its own, in the films' place)
+    pbrt_discover::listNewGenerated(films);
+    for (const pbrt_discover::Discovered& d : films)
+        if (registry.size() < registry.capacity() && pbrt_scene_registry::appendOne(registry, d, nextNumber, takenSlugs, legacy_id)) ++added;
     return added;
 }
 

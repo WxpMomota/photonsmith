@@ -340,6 +340,31 @@ void addFilmFile(Registry &r, const std::string &file) {
 	r.all.push_back(&r.made.back());
 }
 
+// Every film file there is, each once, sorted.
+static std::vector<std::string> filmFilesFound() {
+	std::vector<std::string> files;
+	for (const std::string &dir : filmFileDirs()) {
+		std::error_code ec;
+		for (const auto &entry : std::filesystem::directory_iterator(dir, ec)) {
+			if (ec) break;
+			if (entry.path().extension() != ".film") continue;
+			const std::string canonical = std::filesystem::weakly_canonical(entry.path(), ec).string();
+			if (std::find(files.begin(), files.end(), canonical) == files.end()) files.push_back(canonical);
+		}
+	}
+	std::sort(files.begin(), files.end());
+	return files;
+}
+
+// A film file into the list, with what came of it kept (readNewFilmFiles).
+static void readFilmFile(Registry &r, const std::string &file) {
+	const std::size_t before = r.all.size();
+	std::error_code ec;
+	r.tried[file] = std::filesystem::last_write_time(file, ec);
+	addFilmFile(r, file);
+	if (r.all.size() > before) r.listed.insert(file);
+}
+
 Registry &registry() {
 	static Registry *r = [] {
 		Registry *reg = new Registry();   // (lives as long as the program: films hand out pointers into it)
@@ -350,28 +375,18 @@ Registry &registry() {
 			reg->made.push_back(withFilmFiles(f));
 			reg->all.push_back(&reg->made.back());
 		}
-		std::vector<std::string> files;
-		for (const std::string &dir : filmFileDirs()) {
-			std::error_code ec;
-			for (const auto &entry : std::filesystem::directory_iterator(dir, ec)) {
-				if (ec) break;
-				if (entry.path().extension() != ".film") continue;
-				const std::string canonical = std::filesystem::weakly_canonical(entry.path(), ec).string();
-				if (std::find(files.begin(), files.end(), canonical) == files.end()) files.push_back(canonical);
-			}
-		}
-		std::sort(files.begin(), files.end());
+		std::vector<std::string> files = filmFilesFound();
 		// RAY_TRACER_ONLY_FILM=KEY (what a video's frame runs and workers are given: launcher/video_render.h): only the film file named after it is read, when it holds that
 		// film - every frame's process read every film file (and worked out their schools), for one film's frame. Any other way, every file is read.
 		if (const char *only = std::getenv("RAY_TRACER_ONLY_FILM"); only && *only) {
 			std::vector<std::string> mine;
 			for (const std::string &file : files)
 				if (std::filesystem::path(file).stem().string() == only) mine.push_back(file);
-			for (const std::string &file : mine) addFilmFile(*reg, file);
+			for (const std::string &file : mine) readFilmFile(*reg, file);
 			if (std::any_of(reg->all.begin(), reg->all.end(), [only](const Film *f) { return std::strcmp(f->key, only) == 0; })) return reg;
 			files.erase(std::remove_if(files.begin(), files.end(), [&mine](const std::string &f) { return std::find(mine.begin(), mine.end(), f) != mine.end(); }), files.end());
 		}
-		for (const std::string &file : files) addFilmFile(*reg, file);
+		for (const std::string &file : files) readFilmFile(*reg, file);
 		return reg;
 	}();
 	return *r;
@@ -380,6 +395,19 @@ Registry &registry() {
 }  // namespace detail
 
 const std::vector<const Film *> &films() { return detail::registry().all; }
+int readNewFilmFiles() {
+	if (const char *only = std::getenv("RAY_TRACER_ONLY_FILM"); only && *only) return 0;   // (a frame's process: its film is read)
+	detail::Registry &r = detail::registry();
+	const std::size_t before = r.all.size();
+	for (const std::string &file : detail::filmFilesFound()) {
+		std::error_code ec;
+		const auto tried = r.tried.find(file);
+		if (r.listed.count(file) || (tried != r.tried.end() && tried->second == std::filesystem::last_write_time(file, ec))) continue;
+		r.problems.erase(std::remove_if(r.problems.begin(), r.problems.end(), [&file](const std::string &p) { return p.rfind(file, 0) == 0; }), r.problems.end());
+		detail::readFilmFile(r, file);
+	}
+	return static_cast<int>(r.all.size() - before);
+}
 const std::vector<std::string> &filmFileProblems() { return detail::registry().problems; }
 std::string whyNoFilm(std::string key) {
 	const std::string prefix = kCameraPathPrefix;

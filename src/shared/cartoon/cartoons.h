@@ -46,6 +46,8 @@ inline constexpr FilmTable kFilms{};
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Where film files (*.film) are looked for: the folders scenes are (RAY_TRACER_PBRT_DIR, pbrt_scenes beside the program or up from it, the per-user scenes folder).
 std::vector<std::string> filmFileDirs();
+// Reads the film files saved since the list was made, and those left out for a mistake that have been saved since, adding their films at the end of films(). How many it added.
+int readNewFilmFiles();
 
 // Every film: the built-in ones in the table's order, then those made from film files (in the order of their file names).
 const std::vector<const Film *> &films();

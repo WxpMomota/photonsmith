@@ -5,6 +5,7 @@
 // available in this build.
 #include "mainwindow.h"
 #include "app_log.h"
+#include "film_info.h"
 #include "gpu_warmup.h"
 #include "../src/shared/pbrt_asset_check.h"
 
@@ -76,6 +77,20 @@ const QString updated = sb->addToSceneList(&again, /*update=*/true);
 check(updated == second, "'update the existing one' rewrites the listing it was added as");
 SceneMetadataClient::refreshUserScenes();
 check(SceneMetadataClient::sceneName(SceneMetadataClient::sceneIdForFile(second)) == QString("Renamed room"), "the scene list shows the new name without a restart");
+// A film file saved while the program runs: the Refresh button lists it, and the film table knows it, without a restart.
+const QString filmFile = QFileInfo(second).absolutePath() + "/selftest-refresh.film";
+{
+	QFile film(filmFile);
+	check(film.open(QIODevice::WriteOnly), "a film file can be saved beside the scene");
+	film.write(("film selftest-refresh\nname Refresh test\nscene " + QFileInfo(second).fileName() + "\nlength 2\nshot 0 S\n  key 0 1.5 5  0 0.8 0  45\n").toUtf8());
+}
+check(!film_info::find("selftest-refresh"), "the film is not known before the refresh");
+onRefreshSceneList();
+const QStringList filmProblems = SceneMetadataClient::filmProblems();
+check(film_info::find("selftest-refresh") != nullptr, "the Refresh button lists a new film without a restart" + (filmProblems.isEmpty() ? QString() : " (" + filmProblems.join("; ") + ")"));
+const QString newest = SceneMetadataClient::sceneIdAtIndex(SceneMetadataClient::sceneCount() - 1);
+check(SceneMetadataClient::sceneName(m_sceneCombo->currentData().toString()).contains("Refresh test"), "and selects it: " + SceneMetadataClient::sceneName(m_sceneCombo->currentData().toString()) + " (the list ends with " + newest + ", " + SceneMetadataClient::sceneName(newest) + ", " + SceneMetadataClient::sceneCategory(newest) + "; rendering: " + (m_isRendering ? "yes" : "no") + ")");
+QFile::remove(filmFile);
 QFile::remove(second);
 QFile::remove(listed);
 }

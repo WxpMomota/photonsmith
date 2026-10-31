@@ -227,9 +227,17 @@ int sceneCount() {
 	return handle().countFn();
 }
 
+static int s_scenesFound = 0;
+
+int scenesFound() {
+	return s_scenesFound;
+}
+
 int refreshUserScenes() {
 	if (!ensureLoaded() || !handle().refreshFn) return 0;
-	return handle().refreshFn();
+	const int added = handle().refreshFn();
+	if (added > 0) ++s_scenesFound;
+	return added;
 }
 
 QString sceneIdForFile(const QString& path) {

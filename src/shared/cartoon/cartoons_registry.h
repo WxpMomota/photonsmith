@@ -3,7 +3,10 @@
 // here for what builds a list of its own (the film-file tests); everything else asks cartoons.h's films().
 
 #include <deque>
+#include <filesystem>
 #include <functional>
+#include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -19,6 +22,8 @@ struct Registry {
 	std::deque<std::string> strings;
 	std::vector<const Film *> all;
 	std::vector<std::string> problems;
+	std::set<std::string> listed;                                    // the film files that made a film
+	std::map<std::string, std::filesystem::file_time_type> tried;    // and the time of each file when it was read (one left out is read again once it has been saved)
 	const char *keep(std::string s) {
 		strings.push_back(std::move(s));
 		return strings.back().c_str();

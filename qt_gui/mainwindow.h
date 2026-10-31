@@ -1611,6 +1611,8 @@ private:
 	// Delete the scenes the user made (mainwindow_my_scenes.cpp): the Settings tab shows these buttons under the My Scenes category.
 	denoiser_installer::Installer *m_denoiserInstaller = nullptr;
 	QWidget *m_myScenesRow = nullptr; QPushButton *m_deleteSceneButton = nullptr, *m_deleteAllScenesButton = nullptr;
+	void onRefreshSceneList();     // the Refresh button: film files and scenes saved since the program started (mainwindow_my_scenes.cpp)
+	QPushButton *makeRefreshScenesButton(QWidget *parent);
 	void onImportBlenderScene();   // File > Import Blender Scene (mainwindow_blender_import.cpp)
 	void importBlendFile(const QString &blend, const std::function<void(const QString &)> &done = {});
 	QString userSceneFileForId(const QString &id) const;

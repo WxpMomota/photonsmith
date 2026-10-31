@@ -296,13 +296,13 @@ void MainWindow::buildSceneGroup(QWidget *basicTab, QVBoxLayout *layout) {
 		"of, the availability and category tabs above.\n\n"
 		"Clear it (the small \"x\" inside the field) to see every scene "
 		"in the current category again.")));
-
 	m_sceneViewToggle = new QPushButton(basicTab);
 	m_sceneViewToggle->setAutoDefault(false);
 	m_sceneViewToggle->setCheckable(true);
 	m_sceneViewToggle->setText(tr("Grid"));
 	m_sceneViewToggle->setToolTip(tr("Switch between the dropdown list and a thumbnail gallery grid"));
 	searchRow->addWidget(m_sceneViewToggle);
+	searchRow->addWidget(makeRefreshScenesButton(basicTab));
 	sceneGroupLayout->addLayout(searchRow);
 
 	m_sceneViewStack = new QStackedWidget(basicTab);

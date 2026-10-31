@@ -188,7 +188,8 @@ void SceneBuilderWidget::onSaveAsClicked() {
 // program's own folder (a macOS .app bundle's seal breaks if you do; a disk image is read-only). A scene saved into the program's pbrt_scenes folder would
 // only be listed after a restart, and its id would shift the ids of the scenes found after it. RAY_TRACER_PBRT_DIR still names a folder to use instead.
 QString SceneBuilderWidget::sceneListFolder() {
-	const QString env = qEnvironmentVariable("RAY_TRACER_PBRT_DIR");
+	// (A self-test saves scenes here and deletes them, every one in the folder: never a real collection, whatever RAY_TRACER_PBRT_DIR says.)
+	const QString env = qEnvironmentVariableIsSet("RT_GUI_SELFTEST") ? QString() : qEnvironmentVariable("RAY_TRACER_PBRT_DIR");
 	if (!env.isEmpty() && QDir(env).exists() && QFileInfo(env).isWritable()) return QDir(env).absolutePath();
 	const QString user = QString::fromStdString(pbrt_asset_check::userSceneDir());
 	if (!user.isEmpty() && QDir().mkpath(user)) return user;

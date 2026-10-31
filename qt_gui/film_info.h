@@ -3,7 +3,7 @@
 // compiled copy of the films. The GUI used to compile every film (src/shared/cartoon/), so a GUI not rebuilt with a new film gave its video the wrong length, and every edit
 // of a film rebuilt most of the GUI; now adding a film needs only the renderer rebuilt.
 //
-// parse() is plain C++ (the unit tests check it against cartoon::filmTable()); all() and find() read the table once through SceneMetadataClient (film_info.cpp).
+// parse() is plain C++ (the unit tests check it against cartoon::filmTable()); all() and find() read the table through SceneMetadataClient, once and again when the list has grown (film_info.cpp).
 
 #include <cmath>
 #include <cstdlib>

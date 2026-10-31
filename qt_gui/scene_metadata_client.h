@@ -92,6 +92,8 @@ int sceneCount();
 // shows up without a restart. Returns how many were added: the new scenes are appended at the end, so every existing position and id is unchanged. 0
 // when there was nothing new, or when the library predates this export.
 int refreshUserScenes();
+// How many times refreshUserScenes() has found something: what the film table says may have changed when this does.
+int scenesFound();
 
 // The id of the scene loaded from the .pbrt file `path`, or "" if the registry does not list it.
 QString sceneIdForFile(const QString& path);

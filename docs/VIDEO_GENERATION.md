@@ -2627,6 +2627,8 @@ uvs (its surface cut into near-flat charts along its creases, each laid flat and
 
 **Working on a recording in the cues file.** A `sample` cue used to play a recording as it was. It now takes `trim FROM TO` (only those seconds), `fade IN OUT`, `loop length L` (over and over for L seconds, each join crossfaded), `curve T K T K ...` (its level at times after the cue starts, straight lines between) and `follow NAME` (as loud as the film's `light NAME` track, so a fire's crackle dies with the flame; with a `curve` the two are multiplied): `0 sample wind.mp3 loop length 60 fade 3 4 gain 0.3` and `@12 sample crackle.wav loop length 40 follow fire gain 0.6`. The file can be an MP3, OGG, FLAC or anything else ffmpeg reads, as long as ffmpeg is on the PATH.
 
+**A new film without a restart.** The Refresh button beside the scene search reads any film file saved since the program started, and any scene added to My Scenes, lists it and selects it. A film file left out for a mistake is read again once it has been saved, and what is wrong with it goes to the log. Refresh does not take in changes to a film that is already listed.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

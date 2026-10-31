@@ -40,6 +40,18 @@ void listGenerated(std::vector<Discovered> &out) {
 	}
 }
 
+void listNewGenerated(std::vector<Discovered> &out) {
+	if (skipGenerated()) return;
+	const std::size_t before = cartoon::films().size();
+	if (cartoon::readNewFilmFiles() == 0) return;
+	const std::string dir = cacheDir();
+	const std::vector<const cartoon::Film *> &all = cartoon::films();
+	for (std::size_t i = before; i < all.size(); ++i) {
+		Discovered d = describe(pathOf(dir, *all[i]), cartoon_stills::headerText(*all[i]));
+		if (d.ok) out.push_back(std::move(d));
+	}
+}
+
 void materializeGenerated(const std::string &path) {
 	const std::string dir = cacheDir();
 	std::error_code ec;   // (a file outside the stills' folder - which may not be made yet - is no still: the films, every film file read, are not asked)
@@ -61,21 +73,24 @@ std::string &tableProblem() {   // why the films could not be listed at all ("":
 }  // namespace
 
 const char *filmTable() {
-	static const std::string table = [] {
-		try {
-			return cartoon::filmTable();
-		} catch (const std::exception &e) {   // (the GUI would show no films and not say why: filmProblems says it)
-			tableProblem() = std::string("the films could not be listed: ") + e.what();
-		} catch (...) {
-			tableProblem() = "the films could not be listed (an unknown error)";
+	static std::string table;
+	static std::size_t listed = 0;   // (how many it has: more can be read while the program runs)
+	try {
+		if (const std::size_t n = cartoon::films().size(); n != listed) {
+			table = cartoon::filmTable();
+			listed = n;
 		}
-		return std::string();
-	}();
+	} catch (const std::exception &e) {   // (the GUI would show no films and not say why: filmProblems says it)
+		tableProblem() = std::string("the films could not be listed: ") + e.what();
+	} catch (...) {
+		tableProblem() = "the films could not be listed (an unknown error)";
+	}
 	return table.c_str();
 }
 
 const char *filmProblems() {
-	static const std::string text = [] {
+	static std::string text;
+	text = [] {
 		(void)filmTable();   // (so a failure to list them is known)
 		std::string out = tableProblem().empty() ? std::string() : tableProblem() + "\n";
 		try {
