@@ -296,28 +296,21 @@ def quadruped(name, s):
         mid = lerp(pelvis, chest, u)[1] - 0.03 * H
         top = mid + ry * shape * (1.0 + line * (0.1 * bump(u, 0.74, 0.1) - 0.1 * bump(u, 0.5, 0.17) + 0.07 * bump(u, 0.2, 0.12)))    # (withers, the dip of the back, the croup)
         under = mid - ry * shape * (1.0 + line * (0.2 * bump(u, 0.68, 0.17) - 0.25 * bump(u, 0.27, 0.13)))                           # (the deep girth, the tucked flank)
-        width = rx * shape * (1.0 + line * (0.07 * bump(u, 0.2, 0.13) - 0.14 * bump(u, 0.38, 0.1) + 0.08 * bump(u, 0.62, 0.14)))     # (the hips, the flank, the ribs)
+        width = rx * shape * (1.0 + line * (0.13 * bump(u, 0.2, 0.13) - 0.14 * bump(u, 0.4, 0.09) + 0.08 * bump(u, 0.62, 0.12) + 0.09 * bump(u, 0.8, 0.08)))   # (the haunches, the flank, the ribs, the shoulders)
         centres.append([0, 0.5 * (top + under), z])
         radii.append((width, 0.5 * (top - under)))
         wc = min(1.0, max(0.0, (u - 0.35) / 0.3))
         skins.append([(J["pelvis"], 1 - wc), (J["chest"], wc)])
     tube(body, centres, radii, skins, sides=24, rect=(0.0, 0.0, 0.5, 0.5))
-    # the shoulder and the haunch: the muscle over each leg's top that breaks the barrel's smooth side
-    if not s.get("pillar"):
-        for side in (1, -1):
-            for at, depth, wide, tall, joint in (([side * rx * 0.68, hipY - 0.13 * H, -Lb / 2 + 0.04 * H], 0.2 * H, 0.46 * rx, 0.25 * H, J["pelvis"]),
-                                                 ([side * rx * 0.72, shoulderY - 0.17 * H, Lb / 2 - 0.02 * H], 0.14 * H, 0.38 * rx, 0.24 * H, J["chest"])):
-                muscle = [add(at, [0, tall * (0.5 - k / 5.0), 0]) for k in range(6)]
-                round_ = [(wide * (0.3 + 0.7 * math.sin(math.pi * (0.1 + 0.8 * k / 5.0))), depth * (0.3 + 0.7 * math.sin(math.pi * (0.1 + 0.8 * k / 5.0)))) for k in range(6)]
-                tube(body, muscle, round_, [[(joint, 1.0)]] * 6, sides=12, up=(0, 0, 1), rect=(0.2, 0.235, 0.3, 0.265))   # (a little of the flank's picture: it reads as the same hide)
     # the neck: an arched crest from the withers to the poll, deep at its base and narrowing to the throat
     centres, radii, skins = [], [], []
-    neckStart = add(neckBase, [0, -0.08 * H, -0.05 * H])
+    neckStart = add(neckBase, [0, -0.16 * H, -0.14 * H])
     crown = add(lerp(neckStart, headPos, 0.55), [0, 0.1 * s["neck"], -0.05 * s["neck"]])
     for i in range(13):
         u = i / 12.0
         p = add(mul(neckStart, (1 - u) ** 2), add(mul(crown, 2 * u * (1 - u)), mul(headPos, u * u)))
-        r = (0.58 * rx * (1 - 0.55 * u ** 0.8), 0.86 * ry * (1 - 0.62 * u ** 0.75))
+        grows = min(1.0, 0.45 + 3.0 * u)   # (out of the chest, with no collar where it meets it)
+        r = (0.58 * rx * grows * (1 - 0.55 * u ** 0.8), 0.86 * ry * grows * (1 - 0.62 * u ** 0.75))
         centres.append(p)
         radii.append(r)
         skins.append([(J["chest"], max(0.0, 1 - 2.5 * u)), (J["neck"], min(1.0, 2.5 * u) * (1 - max(0.0, (u - 0.7) / 0.3))), (J["head"], max(0.0, (u - 0.7) / 0.3))])
@@ -409,10 +402,10 @@ def quadruped(name, s):
     if name == "horse":   # a horse's tail: a short dock, and a fall of hair from it
         tube(extra, centres[:3], [(s["tailR"] * 0.8,) * 2, (s["tailR"] * 0.7,) * 2, (s["tailR"] * 0.4,) * 2], [[(J["tail"], 1.0)]] * 3, sides=8)
         for i in range(44):
-            a, r = 2.0 * math.pi * hash01(i, 3), s["tailR"] * math.sqrt(hash01(i, 4))
+            a, r = 2.0 * math.pi * hash01(i, 3), 0.7 * s["tailR"] * math.sqrt(hash01(i, 4))
             at = add(centres[1], [r * math.cos(a), r * math.sin(a) * 0.6, 0.0])
             reach = s["tail"] * (0.7 + 0.45 * hash01(i, 5))
-            wander = 0.14 * reach * (hash01(i, 6) - 0.5)
+            wander = 0.1 * reach * (hash01(i, 6) - 0.5)
             strand = [at, add(at, [wander * 0.2, -0.05 * reach, -0.12 * reach]), add(at, [wander * 0.6, -0.5 * reach, -0.25 * reach]), add(at, [wander, -1.0 * reach, -0.2 * reach])]
             tube(extra, strand, [(0.013, 0.013), (0.015, 0.015), (0.012, 0.012), (0.002, 0.002)], [[(J["tail"], 1.0)]] * 4, sides=5)
     else:
@@ -428,13 +421,13 @@ def quadruped(name, s):
     for leg, fore, side in LEGS:
         top, knee, foot = P[leg + ".upper"], P[leg + ".lower"], P[leg + ".foot"]
         ground = [foot[0], 0.0, foot[2] + (0.03 * H if fore > 0 else 0.02 * H)]
-        upperTop = add(top, [0, 0.16 * H, 0])
+        upperTop = [top[0] * 0.55, top[1] + 0.09 * H, top[2]]   # (well inside the body: the leg grows out of it, and its top never shows)
         thick = rx * (0.55 if fore > 0 else 0.75) * s.get("legThick", 1.0)
         u_, l_, f_ = J[leg + ".upper"], J[leg + ".lower"], J[leg + ".foot"]
         parentJ = J["chest"] if fore > 0 else J["pelvis"]
         # a leg's own shape: the muscle of the upper leg running out into tendon above the knee (the hock behind), the joint itself standing out, the thin straight bone of the
         # cannon, the fetlock's knob, the pastern down to the foot. Each ring: where it is, how wide, how deep (front to back), what moves it.
-        rings = [(upperTop, 1.0, 1.3, [(parentJ, 0.5), (u_, 0.5)]), (lerp(upperTop, knee, 0.22), 0.98, 1.28, [(parentJ, 0.2), (u_, 0.8)]), (lerp(upperTop, knee, 0.45), 0.8, 1.04, [(u_, 1.0)]),
+        rings = [(upperTop, 0.25, 0.32, [(parentJ, 0.7), (u_, 0.3)]), (lerp(upperTop, knee, 0.1), 0.7, 0.9, [(parentJ, 0.5), (u_, 0.5)]), (lerp(upperTop, knee, 0.25), 0.92, 1.18, [(parentJ, 0.2), (u_, 0.8)]), (lerp(upperTop, knee, 0.45), 0.8, 1.04, [(u_, 1.0)]),
                  (lerp(upperTop, knee, 0.66), 0.56, 0.74, [(u_, 1.0)]), (lerp(upperTop, knee, 0.84), 0.36, 0.48, [(u_, 0.85), (l_, 0.15)]), (add(knee, [0, 0.03 * H, 0]), 0.33, 0.43, [(u_, 0.65), (l_, 0.35)]),
                  (knee, 0.38, 0.5, [(u_, 0.35), (l_, 0.65)]), (lerp(knee, foot, 0.18), 0.27, 0.34, [(l_, 1.0)]), (lerp(knee, foot, 0.5), 0.2, 0.25, [(l_, 1.0)]),
                  (lerp(knee, foot, 0.82), 0.2, 0.24, [(l_, 0.8), (f_, 0.2)]), (foot, 0.28, 0.33, [(l_, 0.5), (f_, 0.5)]), (lerp(foot, ground, 0.35), 0.2, 0.23, [(f_, 1.0)]), (lerp(foot, ground, 0.7), 0.18, 0.21, [(f_, 1.0)])]
@@ -467,9 +460,11 @@ def quadruped(name, s):
             up, lo, ft = [], [], []
             for t in times:
                 u = (t - start) % 1.0
-                if u < duty:   # down: the foot travels back under the body at an even pace
+                load = 0.0
+                if u < duty:   # down: the foot travels back under the body at an even pace, the fetlock sinking as the weight comes onto it
                     phi = A * (1 - 2 * u / duty)
                     flex = 0.0
+                    load = math.sin(math.pi * u / duty) ** 2
                 else:          # up: swung forward, the lower leg folded to clear the ground
                     v = (u - duty) / (1 - duty)
                     phi = -A + 2 * A * (0.5 - 0.5 * math.cos(math.pi * v))
@@ -477,7 +472,7 @@ def quadruped(name, s):
                 # (a rotation about +x turns a leg's foot back: the forward swing is a negative angle) the fore cannon folds back, the hind one forward
                 up.append(quat(X, -phi + (0.25 * flex if fore < 0 else 0.0)))
                 lo.append(quat(X, flex if fore > 0 else -1.4 * flex))
-                ft.append(quat(X, (0.6 * flex if fore > 0 else 0.7 * flex)))
+                ft.append(quat(X, (0.6 * flex if fore > 0 else 0.7 * flex) - (20.0 if gait == "run" else 11.0) * load))
             tracks += [(leg + ".upper", "rotation", times, up), (leg + ".lower", "rotation", times, lo), (leg + ".foot", "rotation", times, ft)]
         beats = 1 if gait == "run" or s.get("hop") else 2   # (the body bobs once a step: twice a cycle in the walk and trot, once in the gallop and a hop)
         if s.get("hop"):   # (a hop: up off the hind feet and down onto the fore)
@@ -486,11 +481,16 @@ def quadruped(name, s):
             bob = [[pelvisRest[0], pelvisRest[1] + (0.03 if gait == "run" else 0.012) * H * math.cos(2 * math.pi * beats * t), pelvisRest[2]] for t in times]
         tracks.append(("pelvis", "translation", times, bob))
         flexA = s.get("flexRun", 7) if gait == "run" or s.get("hop") else 1.5   # the spine flexing (the gallop's gathering and stretching: deep in a cat's bound)
-        tracks.append(("pelvis", "rotation", times, [quat(X, flexA * math.sin(2 * math.pi * t)) for t in times]))
-        tracks.append(("chest", "rotation", times, [quat(X, -2 * flexA * math.sin(2 * math.pi * t)) for t in times]))
+        # the weight going from side to side: the hips dropping over the leg that is off the ground, the shoulders the other way
+        sway = 3.0 if gait == "run" else 2.6 if gait == "walk" else 1.6
+        tracks.append(("pelvis", "rotation", times, [qmul(quat(X, flexA * math.sin(2 * math.pi * t)), quat(Z, sway * math.sin(2 * math.pi * t + 0.5))) for t in times]))
+        tracks.append(("chest", "rotation", times, [qmul(quat(X, -2 * flexA * math.sin(2 * math.pi * t)), quat(Z, -1.5 * sway * math.sin(2 * math.pi * t + 0.5))) for t in times]))
         nod = 9 if gait == "run" else 4 if gait == "walk" else 2
         tracks.append(("neck", "rotation", times, [quat(X, nod * math.sin(2 * math.pi * beats * t + 0.6)) for t in times]))
-        tracks.append(("tail", "rotation", times, [quat(X, -(20 if gait == "run" else 6)) for t in times]))
+        # an animal holds its head steadier than its neck: its eyes stay on what is ahead
+        tracks.append(("head", "rotation", times, [quat(X, -0.7 * nod * math.sin(2 * math.pi * beats * t + 0.6)) for t in times]))
+        # the tail: swinging with the hips at a walk, streaming out and rippling at a gallop
+        tracks.append(("tail", "rotation", times, [qmul(quat(X, -(24 + 9 * math.sin(4 * math.pi * t)) if gait == "run" else -6), quat(Y, (4 if gait == "run" else 9) * math.sin(2 * math.pi * t + 1.0))) for t in times]))
         clips.append((gait, tracks))
     # graze: the neck down so the muzzle is in the grass, nibbling, the head lifting a little
     gt = [i * 0.25 for i in range(17)]
@@ -499,7 +499,7 @@ def quadruped(name, s):
         ("neck", "rotation", gt, [quat(X, -down - 6 * max(0.0, math.sin(2 * math.pi * t / 4.0)) ** 4) for t in gt]),
         ("head", "rotation", gt, [quat(X, 25 + 6 * math.sin(2 * math.pi * t * 1.5)) for t in gt]),
         ("tail", "rotation", gt, [quat(Y, 12 * math.sin(2 * math.pi * t / 2.0) ** 9) for t in gt]),
-        ("chest", "rotation", gt, [quat(X, 4) for t in gt]),
+        ("chest", "rotation", gt, [quat(X, 4 + 0.8 * math.sin(2 * math.pi * t / 2.0)) for t in gt]),   # (breathing)
         ("fl.upper", "rotation", gt, [quat(X, -8) for t in gt]), ("fr.upper", "rotation", gt, [quat(X, -8) for t in gt]),
     ]))
     # idle: standing, looking round (the head turning), the tail flicking
@@ -508,6 +508,8 @@ def quadruped(name, s):
         ("neck", "rotation", it, [qmul(quat(Y, 20 * math.sin(2 * math.pi * t / 5.0)), quat(X, -3 * math.sin(2 * math.pi * t / 2.5))) for t in it]),
         ("head", "rotation", it, [quat(Y, 15 * math.sin(2 * math.pi * t / 5.0 + 0.8)) for t in it]),
         ("tail", "rotation", it, [quat(Y, 15 * math.sin(2 * math.pi * t / 1.25) ** 7) for t in it]),
+        ("chest", "rotation", it, [quat(X, 1.0 * math.sin(2 * math.pi * t / 2.5)) for t in it]),       # (breathing)
+        ("pelvis", "rotation", it, [quat(Z, 1.6 * math.sin(2 * math.pi * t / 5.0)) for t in it]),      # (easing its weight from one hind leg to the other)
     ]))
     strides = {g: 2 * legLen["fl"] * math.sin(math.radians(swings[g])) / gaits[g][1] for g in gaits}
     return joints, meshes, materials, clips, strides

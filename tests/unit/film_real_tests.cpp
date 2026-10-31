@@ -294,3 +294,45 @@ TEST(FilmReal, AWoodFormsAsWoodsDo) {
 	EXPECT_GT(logs, 3);
 	EXPECT_GT(largest / smallest, 3.0) << "saplings and giants";
 }
+
+// Close to the camera an animal is drawn with real hair, wherever it has got to and with no line in the film saying so; in rain a coat goes dark and glossy; a nose is dark.
+TEST(FilmReal, AnAnimalCloseToTheCameraHasRealHairAndRainWetsItsCoat) {
+	namespace wildlife = cartoon::wildlife;
+	namespace animals = cartoon::animals;
+	wildlife::Herd h;
+	h.kind = "horses", h.count = 4, h.fx = -5, h.tx = 40, h.name = "herd1";
+	const auto draw = [&](const V3 *eye, double rain) {
+		animals::Poses own;
+		return wildlife::herdText(h, 2.0, nullptr, own, {}, {}, -1e30, eye, rain);
+	};
+	const V3 far_{0.0, 2.0, 500.0}, by{0.0, 2.0, 5.0};
+	const std::string distant = draw(&far_, 0.0), close = draw(&by, 0.0);
+	EXPECT_EQ(distant.find("\"hair\""), std::string::npos) << "ribbons of fur far off";
+	EXPECT_NE(close.find("\"hair\""), std::string::npos) << "real strands close up";
+	EXPECT_EQ(draw(nullptr, 0.0).find("\"hair\""), std::string::npos);
+	EXPECT_NE(draw(&far_, 0.8).find("_wet"), std::string::npos) << "out in the rain";
+	EXPECT_EQ(distant.find("_wet"), std::string::npos);
+	namespace coats = cartoon::coats;
+	const V3 cheek = coats::colourAt("natural", 0, {0.4, 0.25, 0.14}, {0.4, 0.25, 0.14}, 0.8, 0.1), nose = coats::colourAt("natural", 0, {0.4, 0.25, 0.14}, {0.4, 0.25, 0.14}, 0.995, 0.1);
+	EXPECT_LT(nose.x + nose.y + nose.z, 0.4 * (cheek.x + cheek.y + cheek.z));
+}
+
+// An animal moves as a body with weight: the hips and shoulders tip against each other as it goes, its head steadier than its neck, its tail alive, and it breathes standing still.
+TEST(FilmReal, TheAnimalsClipsMoveTheWholeBody) {
+	const auto model = cartoon::animals::modelOf("horses");
+	ASSERT_TRUE(model);
+	const auto trackOf = [&](const char *clip, const char *joint) {
+		const int c = model->clip(clip);
+		EXPECT_GE(c, 0) << clip;
+		int count = 0;
+		for (const auto &ch : model->rig.clips[static_cast<std::size_t>(c)].channels) count += model->rig.nodes[static_cast<std::size_t>(ch.node)].name == joint;
+		return count;
+	};
+	for (const char *gait : {"walk", "trot", "run"}) {
+		EXPECT_GE(trackOf(gait, "head"), 1) << gait << ": its head";
+		EXPECT_GE(trackOf(gait, "tail"), 1) << gait;
+		EXPECT_GE(trackOf(gait, "chest"), 1) << gait;
+	}
+	EXPECT_GE(trackOf("idle", "chest"), 1) << "it breathes";
+	EXPECT_GE(trackOf("idle", "pelvis"), 1) << "and eases its weight";
+}

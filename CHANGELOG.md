@@ -6,6 +6,8 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **Animals up close and in motion (2026-10-31).** The animals nearest the camera get real hair by themselves, coats go dark and glossy in rain, noses are dark and damp, and an animal tilts with the ground under it. The clips now move the whole body: weight shifting from side to side, fetlocks sinking under load, the head held steadier than the neck, a tail that swings and streams, and breathing when it stands still.
+
 * **Trees grown as trees grow (2026-10-31).** Crowns are grown by space colonisation, so branches fork and compete and every outline is its own, not a ball of leaves on a stick. Bark is a real-sized tiling picture with relief, different for each species, and roots run into the ground. A wood stands in groves and glades, with saplings near their parents, a spread of ages, and dead trees standing and fallen.
 
 * **Animals with anatomy (2026-10-31).** The generated quadrupeds have a real top line (withers, a dip in the back, a croup), a belly that tucks up to the flank, an arched neck, a head with a jaw and a muzzle, legs with knees, hocks and fetlocks, muscle at the shoulder and haunch, and a horse's mane and tail are strands of hair. Their joints did not move, so every walk and run stays as it was.

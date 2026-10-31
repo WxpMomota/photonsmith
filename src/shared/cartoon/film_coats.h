@@ -177,6 +177,11 @@ inline Vec3 colourAt(const std::string &pattern, int variant, Vec3 coat, Vec3 le
 			c = lerp(c, c * 0.42, smoothstep(0.4, 0.9, down));
 			c = lerp(c, Vec3{0.30, 0.24, 0.17}, 0.5 * smoothstep(0.78, 1.0, down) * (0.6 + 0.8 * patches));
 		}
+		if (ax >= 0.75 && ay < 0.25) {   // (the head: from the poll to a dark, damp nose, the jaw a little paler)
+			const double along = (ax - 0.75) / 0.25;
+			c = lerp(c, Vec3{0.045, 0.04, 0.04}, smoothstep(0.78, 0.95, along));
+			c = lerp(c, c * 1.25, 0.6 * under);
+		}
 	}
 	return lerp(c, ink, d);
 }
@@ -184,7 +189,7 @@ inline Vec3 colourAt(const std::string &pattern, int variant, Vec3 coat, Vec3 le
 // The coat's picture of a kind in a pattern and variant (its scene path), from its model's coat and leg colours.
 inline std::string picture(const std::string &pattern, const std::string &kind, int variant, Vec3 coat, Vec3 legs) {
 	char name[160];
-	std::snprintf(name, sizeof name, "coat_v4_%s_%s_%d_%.3f_%.3f_%.3f", pattern.c_str(), kind.c_str(), variant, coat.x, coat.y, coat.z);
+	std::snprintf(name, sizeof name, "coat_v5_%s_%s_%d_%.3f_%.3f_%.3f", pattern.c_str(), kind.c_str(), variant, coat.x, coat.y, coat.z);
 	return film_sky::picture("_coats", name, kSize, kSize, [&](std::vector<float> &rgb) {
 		for (int y = 0; y < kSize; ++y)
 			for (int x = 0; x < kSize; ++x) {

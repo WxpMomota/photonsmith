@@ -2647,6 +2647,10 @@ uvs (its surface cut into near-flat charts along its creases, each laid flat and
 
 **Coats.** (film_coats.h) An animal with no pattern of its own now wears `natural`, the default for horses, deer, wolves, foxes, bears, lions, rabbits and elephants: darker along the back, paler under it, the colour wandering in soft patches and with the lie of the hair, the legs darkening towards the ground and dusty at the foot. No two of a herd are alike: horses come in six colours from bay to grey, and any other kind varies a little. A herd has fur unless it says `fur 0`.
 
+**Animals close up.** (film_wildlife.h, film_coats.h) The two animals of a herd nearest the camera, within 14 m, are drawn with real strands of hair by themselves, with no `hero` line; any others keep the herd's ribbons. A coat out in the rain goes dark and glossy. A natural coat has a dark, damp nose and a paler jaw. An animal tilts with the slope across its body as well as along it.
+
+**Animals in motion.** (scripts/make_rigged_animals.py) The clips move the whole body: the hips and shoulders tip against each other as the weight goes from side to side, the fetlock sinks under load, the head stays steadier than the neck, and the tail swings at a walk and streams and ripples at a gallop. Standing still an animal breathes and eases its weight from one hind leg to the other.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

@@ -753,7 +753,11 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 		poses.eyeshine = spec.night.eyeshine;
 		for (const wildlife::Flock &f : spec.flocks)
 			if (t >= f.t0 && t <= f.t1) out += wildlife::flockText(f, f.kind == "eagles" || f.kind == "geese" ? nt : t, ground.get(), poses, first(f.kind));
-		for (const wildlife::Herd &h : spec.herds) out += wildlife::herdText(h, nt, ground.get(), poses, spec.herds, spec.hunts, spec.seas.empty() ? -1e30 : spec.seas[0].level);
+		Vec3 herdEye, herdTarget;
+		double herdFov = 40.0;
+		const bool seen = film_subjects::cameraOf(header, herdEye, herdTarget, herdFov);
+		herdEye.x = -herdEye.x;   // (pbrt's)
+		for (const wildlife::Herd &h : spec.herds) out += wildlife::herdText(h, nt, ground.get(), poses, spec.herds, spec.hunts, spec.seas.empty() ? -1e30 : spec.seas[0].level, seen ? &herdEye : nullptr, weatherAt(t).wet);
 		for (const wildlife::Flight &f : spec.flights) out += wildlife::flightText(f, nt, poses);
 	}
 	if (spec.sealife.any()) {   // life under the sea (film_sealife.h)
