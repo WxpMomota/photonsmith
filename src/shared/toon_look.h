@@ -63,6 +63,7 @@ struct Style {
 	double inner = 1.0;                         // the lines inside a shape (creases, materials, objects) as a share of the silhouette's width
 	bool materials = false;                     // lines where materials meet (the ID passes)
 	bool objects = false;                       // lines where objects meet with no depth jump (the ID passes)
+	std::vector<std::string> noInk;             // `noink NAME`: objects (link groups) drawn with no lines on or round them - a film's bubbles (round 17)
 	ink_strokes::Params strokes;                // the lines as drawn by hand (line-depth, wobble, seed, pen, pen-amount)
 	bool boil = false;                          // a film draws the wobble afresh every other frame (its frames' `seed`)
 	double inkTint = 0.0;                       // 0..1: the lines coloured from the surface they edge
@@ -95,7 +96,7 @@ struct Style {
 	double highlight = 0.0;
 	double highlightColour[3] = {1.0, 1.0, 1.0};
 	std::vector<Ramp> ramps;                     // `material NAME ...` / `object NAME ...`
-	bool needsIds() const { return materials || objects || !ramps.empty() || celOn != "all" || (paint > 0.0 && paintOn != "all") || (rim > 0.0 && rimOn != "all"); }
+	bool needsIds() const { return materials || objects || !noInk.empty() || !ramps.empty() || celOn != "all" || (paint > 0.0 && paintOn != "all") || (rim > 0.0 && rimOn != "all"); }
 	// The picture's own ramp.
 	Ramp base() const {
 		Ramp r;
@@ -170,6 +171,8 @@ inline std::string parse(const std::string &words, Style &s) {
 		} else if (w == "inner") {
 			if (!isNumber || x < 0 || x > 1) return "inner is the lines inside a shape as a share of the outline's width, from 0 (none) to 1";
 			s.inner = x;
+		} else if (w == "noink") {
+			s.noInk.push_back(v);
 		} else if (w == "materials" || w == "objects") {
 			if (v != "on" && v != "off") return w + " is on or off";
 			(w == "materials" ? s.materials : s.objects) = v == "on";
@@ -256,6 +259,7 @@ inline std::string tagOf(const Style &s) {
 	}
 	if (s.materials) tag += " materials on";
 	if (s.objects) tag += " objects on";
+	for (const std::string &name : s.noInk) tag += " noink " + name;
 	const auto numberWord = [&](const char *word, double v) {
 		std::snprintf(buf, sizeof buf, " %s %g", word, v);
 		return std::string(buf);
@@ -572,6 +576,10 @@ inline void apply(std::vector<float> &rgb, int w, int h, const std::vector<std::
 	std::vector<float> edge(n, 0.0f), innerEdge(n, 0.0f);   // the silhouette's, and the lines inside a shape (the same map when they are as wide)
 	const bool apart = st.inner != 1.0;
 	const bool ids = planes.size() >= 12 && planes[10].size() >= n && planes[11].size() >= n;
+	// (`noink`: the pixels of those objects get no lines, and their neighbours see through them - the pixel itself stands in for one of them)
+	std::vector<float> noInkIds;
+	for (const std::string &name : st.noInk) noInkIds.push_back(cryptomatte::idToFloat(cryptomatte::murmur3_32(name)));
+	const auto inked = [&](std::size_t i) { return noInkIds.empty() || !ids || std::find(noInkIds.begin(), noInkIds.end(), planes[10][i]) == noInkIds.end(); };
 	const auto inv = [&](int x, int y) {
 		const std::size_t i = static_cast<std::size_t>(y) * w + x;
 		return covered(i) ? 1.0 / depth[i] : 0.0;
@@ -579,13 +587,16 @@ inline void apply(std::vector<float> &rgb, int w, int h, const std::vector<std::
 	for (int y = 1; y + 1 < h; ++y)
 		for (int x = 1; x + 1 < w; ++x) {
 			const std::size_t i = static_cast<std::size_t>(y) * w + x;
-			if (!covered(i)) continue;
-			const std::size_t nb[4] = {i - 1, i + 1, i - static_cast<std::size_t>(w), i + static_cast<std::size_t>(w)};
+			if (!covered(i) || !inked(i)) continue;
+			std::size_t nb[4] = {i - 1, i + 1, i - static_cast<std::size_t>(w), i + static_cast<std::size_t>(w)};
+			for (std::size_t &j : nb)
+				if (!inked(j)) j = i;
 			double e = 0.0;
 			for (std::size_t j : nb)
 				if (!covered(j)) e = 1.0;   // against the background
 			// the depth: a jump in its inverse, drawn on the nearer side
-			const double c = inv(x, y), l = inv(x - 1, y), r = inv(x + 1, y), u = inv(x, y - 1), d = inv(x, y + 1);
+			const auto invAt = [&](std::size_t j) { return covered(j) ? 1.0 / depth[j] : 0.0; };
+			const double c = inv(x, y), l = invAt(nb[0]), r = invAt(nb[1]), u = invAt(nb[2]), d = invAt(nb[3]);
 			const double bend = std::max(std::abs(l + r - 2.0 * c), std::abs(u + d - 2.0 * c)) / c;
 			if (c >= 0.5 * std::min(l + r, u + d)) e = std::max(e, smoothstep(0.04, 0.12, bend));
 			// a crease

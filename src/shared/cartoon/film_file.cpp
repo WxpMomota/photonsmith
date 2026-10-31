@@ -58,8 +58,12 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 	if (!p.ok) return p.error;
 	spec = p.spec;
 	spec.version = std::to_string(std::hash<std::string>{}(text));
-	for (auto &b : spec.bounces) b.second.gravity = spec.gravity;   // (the film's gravity on what falls and topples: `gravity`)
-	for (auto &tp : spec.topples) tp.second.gravity = spec.gravity;
+	for (auto &b : spec.bounces) b.second.gravity = fallGravity();   // (the film's gravity on what falls and topples: `gravity`, less under the water)
+	for (auto &tp : spec.topples) tp.second.gravity = fallGravity();
+	if (spec.hasUnderwater && spec.storm.on && !spec.current.on)   // (round 17: a storm overhead rocks the water below in a slow surge - the kelp, the silt, the bubbles)
+		spec.current.on = true, spec.current.speed = 0.15 * spec.storm.strength, spec.current.toward = spec.storm.wind, spec.current.surge = 7.0;
+	if (spec.hasUnderwater)   // (round 17: under the water a bounce is soft and a roll soon stops)
+		for (auto &b : spec.bounces) b.second.restitution *= 0.45, b.second.rolling *= 3.0;
 	for (const std::string &who : spec.footprints)   // (`footprints NAME`: a character of the film)
 		if (who != "*" && std::none_of(spec.characters.begin(), spec.characters.end(), [&](const Character &c) { return c.name == who; }))
 			return filePath + ": footprints of \"" + who + "\": no character of that name";
@@ -1282,20 +1286,7 @@ std::vector<FilmEvent> DataFilm::events() const {
 		out.push_back(e);
 	}
 	// the props' landings (pbrt's coordinates: x mirrored for the story-space camera)
-	std::vector<physics::Impact> impacts;
-	for (const auto &[block, b] : spec.bounces) {
-		const std::vector<physics::Impact> i = physics::impactsOf(b);
-		impacts.insert(impacts.end(), i.begin(), i.end());
-	}
-	for (const auto &[block, p] : spec.topples) {
-		const std::vector<physics::Impact> i = physics::impactsOf(p);
-		impacts.insert(impacts.end(), i.begin(), i.end());
-	}
-	if (!spec.rigids.empty()) {   // (the rigid-body world's hard landings)
-		const std::vector<physics::Impact> &i = rigidRun()->impacts;
-		impacts.insert(impacts.end(), i.begin(), i.end());
-	}
-	for (const physics::Impact &i : impacts) {
+	for (const physics::Impact &i : landings()) {
 		FilmEvent e;
 		e.t = i.t;
 		e.kind = EventKind::Impact;
@@ -1397,6 +1388,23 @@ speech::Voice DataFilm::voiceOf(const Character &c) const {
 	return v;
 }
 
+std::vector<float> DataFilm::musicCutoffs() const {
+	std::vector<float> out;
+	if (!spec.hasUnderwater || spec.seas.empty()) return out;
+	// the camera's side of the surface ten times a second; the cutoff eased between (no click at the waterline): 900 Hz under, 18 kHz (as good as none) above
+	const int n = static_cast<int>(std::ceil((std::max(spec.length, spec.storyEnd) + 4.0) * 10.0));
+	double fc = 18000.0;
+	for (int k = 0; k <= n; ++k) {
+		Vec3 eye, target;
+		double fov = 40.0;
+		film_subjects::cameraOf(headerAt(k / 10.0), eye, target, fov);
+		const double goal = eye.y < spec.seas[0].level ? 900.0 : 18000.0;
+		fc = std::exp(std::log(fc) + (std::log(goal) - std::log(fc)) * 0.6);
+		for (int j = 0; j < 10; ++j) out.push_back(static_cast<float>(fc));
+	}
+	return out;
+}
+
 void DataFilm::speak(audio::Mix &mix) const {
 	for (std::size_t i = 0; i < spec.lines.size(); ++i) {
 		const Character &c = *character(spec.lines[i].who);
@@ -1410,7 +1418,7 @@ void DataFilm::speak(audio::Mix &mix) const {
 		std::vector<float> sound = recordingOf(i) ? recordingOf(i)->sound : speech::speak(spoken[i], t0, voiceOf(c), static_cast<unsigned>(i + 1));
 		// (round 16) under the water a voice is muffled - its highs gone, a little louder below, bubbling (the speaker's bubbles are drawn: castAt) - when the one speaking
 		// or the ears are under it
-		const bool under = swimming(c) || (spec.hasUnderwater && !spec.seas.empty() && eye.y < spec.seas[0].level);
+		const bool under = underwater(c) || (spec.hasUnderwater && !spec.seas.empty() && eye.y < spec.seas[0].level);
 		if (under) {
 			const double k = 1.0 - std::exp(-2.0 * kPi * 650.0 / audio::kRate);   // (two passes of a one-pole low-pass at 650 Hz)
 			for (int pass = 0; pass < 2; ++pass) {
@@ -1439,6 +1447,7 @@ std::vector<Caption> DataFilm::lineCaptions() const {
 		cap.fade = 0.15;
 		cap.centreY = 0.88;
 		cap.width = 0.72;
+		if (const Character *who = character(l.who); who && underwater(*who)) cap.bubble = true, cap.centreY = 0.84, cap.width = 0.6;   // (round 17: said under the water, in a bubble)
 		CaptionLine text;
 		text.text = l.text;
 		text.size = 0.042;
@@ -1597,6 +1606,23 @@ std::string DataFilm::terminated(std::string text) const {
 	return withMaterialWords(text, words);
 }
 
+std::vector<physics::Impact> DataFilm::landings() const {
+	std::vector<physics::Impact> impacts;
+	for (const auto &[block, b] : spec.bounces) {
+		const std::vector<physics::Impact> i = physics::impactsOf(b);
+		impacts.insert(impacts.end(), i.begin(), i.end());
+	}
+	for (const auto &[block, p] : spec.topples) {
+		const std::vector<physics::Impact> i = physics::impactsOf(p);
+		impacts.insert(impacts.end(), i.begin(), i.end());
+	}
+	if (!spec.rigids.empty()) {   // (the rigid-body world's hard landings)
+		const std::vector<physics::Impact> &i = rigidRun()->impacts;
+		impacts.insert(impacts.end(), i.begin(), i.end());
+	}
+	return impacts;
+}
+
 std::shared_ptr<const rigid::Run> DataFilm::rigidRun() const {
 	// the characters push what is in their way: each a mover of its body and (a kind that says where its feet are) its two feet, sampled 120 times a second
 	return rigid::runFor(spec.rigids, std::max(spec.length, spec.storyEnd) + 1.0, spec.version, [this] {
@@ -1618,7 +1644,7 @@ std::shared_ptr<const rigid::Run> DataFilm::rigidRun() const {
 			if (kind.footAt) out.push_back(feet[0]), out.push_back(feet[1]);
 		}
 		return out;
-	}, spec.gravity);
+	}, fallGravity(), spec.hasUnderwater ? 1.6 : 0.0);   // (round 17: under the water things sink slowly and the water slows them)
 }
 
 std::string DataFilm::withMaterialWords(const std::string &text, const std::string &words) {

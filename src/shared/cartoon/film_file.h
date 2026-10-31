@@ -279,6 +279,7 @@ class DataFilm {
 	std::string overlaysAt(const std::string &header, double t, double nt) const;   // (round 11: an explainer's drawings, film_explain.h)
 	std::string aboardAt(const std::string &header, double t, double nt) const;     // (round 11: footprints, floating things, interiors, holograms, screens, drawings)
 	std::string castAt(double t) const;                                               // (the characters, as their kinds draw them)
+	std::string waterPlay(const Character &c, const CharacterKind &kind, double t) const;   // (round 17: a character and the water - splashes, bubbles, drips, silt: film_world.cpp)
 	std::string marksAt(const std::string &header, double t) const;
 	// Where a character looks of itself while someone speaks (CharacterMoment::look): at the speaker, turning to them just after they begin and back a little after they end
 	// (the look moves smoothly from one speaker to the next); and while it speaks, at the nearest of those who listen. A `look` line is on top of this.
@@ -373,6 +374,11 @@ class DataFilm {
 		if (!spec.toon.on) return std::string();
 		toon_look::Style st = spec.toon;
 		if (st.boil) st.strokes.seed = 1 + static_cast<int>(std::floor(std::max(0.0, t) * std::max(1, spec.fps) / 2.0 + 1e-6));
+		if (spec.hasUnderwater) {   // (round 17, under the water: the far lines thin away into it and take the colour of what they edge, unless the film says how)
+			if (st.strokes.depthThin <= 0.0) st.strokes.depthThin = 0.75;
+			if (st.inkTint <= 0.0) st.inkTint = 0.5;
+			if (std::find(st.noInk.begin(), st.noInk.end(), "fx/bubbles") == st.noInk.end()) st.noInk.push_back("fx/bubbles");   // (no ink round the bubbles: worldAt groups them)
+		}
 		return toon_look::tagOf(st);
 	}
 
@@ -383,6 +389,10 @@ class DataFilm {
 	static std::string withMaterialWords(const std::string &text, const std::string &words);
 	// The film's rigid-body world (rigid, rigid_world.h), with its characters' bodies and feet pushing what is in their way.
 	std::shared_ptr<const rigid::Run> rigidRun() const;
+	std::vector<physics::Impact> landings() const;   // (the props' and the rigid world's: pbrt's coordinates)
+	std::vector<float> musicCutoffs() const;   // (round 17: the music's low-pass each 1/100 s, audio::Mix::lowPass - muffled while the camera is under the water)
+	// How strongly props and the rigid world fall: the film's `gravity`, under the water (round 17) less its buoyancy - a stone's weight in water, about half.
+	double fallGravity() const { return spec.hasUnderwater ? 0.5 * spec.gravity : spec.gravity; }
 
 	// ---- how shots give way to each other ----
 	std::vector<Transition> transitions() const;
@@ -410,7 +420,13 @@ class DataFilm {
 	// worked out (film_school.h prepare: once, the first time they are asked for, keeping clear of the camera and the divers).
 	double seabedAt(double x, double z) const;
 	// (round 16) whether a character is under the water - brought in 0.3 m or more below its surface - and so swims, talks in bubbles and is heard muffled.
-	bool swimming(const Character &c) const { return spec.hasUnderwater && !spec.seas.empty() && c.start[1] < spec.seas[0].level - 0.3; }
+	bool underwater(const Character &c) const { return spec.hasUnderwater && !spec.seas.empty() && c.start[1] < spec.seas[0].level - 0.3; }
+	// (and swims there - not a kind that walks on the seabed, a crab: CharacterKind::crawls)
+	bool swimming(const Character &c) const {
+		if (!underwater(c)) return false;
+		const auto kind = characterKinds().find(c.kind);
+		return kind == characterKinds().end() || !kind->second.crawls;
+	}
 	const std::vector<school::School> &schoolsSwum() const;
 	// The shot's own lighting at t (`lighting`: shot_lighting.h): round the character it is on, or what the camera looks at, from where the camera is.
 	std::string shotLightsAt(const std::string &header, double t) const;

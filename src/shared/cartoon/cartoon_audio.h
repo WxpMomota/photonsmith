@@ -376,6 +376,24 @@ class Mix {
 		}
 	}
 
+	// A low-pass over the whole mix (two passes of a one-pole), its cutoff in Hz one value each 1/100 s, eased between them (past the end the last): music heard from under
+	// the water (round 17). Empty: nothing done.
+	void lowPass(const std::vector<float> &cutoff) {
+		if (cutoff.empty()) return;
+		const std::size_t hop = static_cast<std::size_t>(kRate / 100);
+		for (int c = 0; c < 2; ++c)
+			for (std::vector<float> *buf : {&dry_[c], &wet_[c]}) {
+				double y1 = 0.0, y2 = 0.0;
+				for (std::size_t i = 0; i < buf->size(); ++i) {
+					const std::size_t k = std::min(i / hop, cutoff.size() - 1), k1 = std::min(k + 1, cutoff.size() - 1);
+					const double u = static_cast<double>(i % hop) / hop, fc = cutoff[k] + (cutoff[k1] - cutoff[k]) * u;
+					const double a = 1.0 - std::exp(-kTau * fc / kRate);
+					y1 += a * ((*buf)[i] - y1), y2 += a * (y1 - y2);
+					(*buf)[i] = static_cast<float>(y2);
+				}
+			}
+	}
+
 	// Another mix laid on this one from `t` seconds (a part of a film on the whole film's mix): faded in over `fadeIn` seconds from its start and out over `fadeOut` before its
 	// own end, and nothing of it after that end (so one part's sound gives way to the next's at the cut between them).
 	void addAt(const Mix &other, double t, double fadeIn = 0.0, double fadeOut = 0.0) {

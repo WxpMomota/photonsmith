@@ -11,7 +11,7 @@ namespace film_file {
 inline bool underseaVerb(const std::string &verb) {
 	static const std::vector<std::string> k = {"underwater", "waterline", "current", "bubbles", "halocline", "deepsea", "octopus", "cuttlefish", "swimmers", "seabed", "wreck", "arch", "cenote", "reefwall",
 											   "diver", "divecam", "school", "bigfish", "reef", "critters", "nightdive", "kelpforest", "boat", "sardinerun", "vents", "murk", "silt",
-											   "cleaningstation", "playmate", "damselfish", "wreckroom"};
+											   "cleaningstation", "playmate", "damselfish", "wreckroom", "seacave", "ruins"};
 	return std::find(k.begin(), k.end(), verb) != k.end();
 }
 // A barracuda tornado's line (`tornado N at X Y Z ...`, round 16) - not the wind's (`tornado from X Z to X Z ...`, film_wind.h), which shares the word.
@@ -293,6 +293,113 @@ inline std::string underseaLine16(Spec &s, const std::string &verb, const std::s
 	else s.behaviours.damsels.push_back(dm);
 	return std::string();
 }
+// Round 17's lines: the comic sea life (film_vignettes.h), the ice overhead (film_undersea.h), treasure and things let go in the water (film_treasure.h), the moon
+// (film_sealight.h): into `s`, "" or what is wrong with it.
+inline bool underseaVerb17(const std::string &verb) {
+	static const std::vector<std::string> k = {"clownfish", "pufferfish", "flounder", "moray", "cleanershrimp", "dugong", "icecap", "chest", "clam", "bottle", "shells", "sink", "moonlight"};
+	return std::find(k.begin(), k.end(), verb) != k.end();
+}
+inline std::string underseaLine17(Spec &s, const std::string &verb, const std::string &line) {
+	using detail::number;
+	const std::vector<std::string> t = detail::tokens(line);
+	std::vector<double> v;
+	std::size_t i = 1;
+	const auto numbers = [&](std::size_t n) {   // (the next n numbers, or false)
+		v.assign(n, 0.0);
+		for (std::size_t k = 0; k < n; ++k)
+			if (i + k >= t.size() || !number(t[i + k], v[k])) return false;
+		i += n;
+		return true;
+	};
+	const std::string usage = verb == "clownfish"	   ? "`clownfish X Y Z [count N] [seed K]` (1 to 4 fish)"
+							  : verb == "pufferfish"   ? "`pufferfish X Y Z [at T]... [seed K]`"
+							  : verb == "flounder"	   ? "`flounder X Z [at T] [seed K]`"
+							  : verb == "moray"		   ? "`moray X Y Z [toward A] [at T]... [seed K]`"
+							  : verb == "cleanershrimp" ? "`cleanershrimp NAME [from T0] [to T1]` (NAME: a character of the film)"
+							  : verb == "dugong"	   ? "`dugong X Z [radius R] [seed K]` (R 2 to 60 m)"
+							  : verb == "icecap"	   ? "`icecap [thickness T] [holes N] [hole X Z]... [seed K]` (T 0.2 to 6 m, N 0 to 4 holes in each 30 m square)"
+							  : verb == "chest"		   ? "`chest X Z [toward A] [open T] [seed K]`"
+							  : verb == "clam"		   ? "`clam X Z [shut T]... [nopearl] [seed K]`"
+							  : verb == "bottle"	   ? "`bottle X Y Z [seed K]` (Y above the seabed: at the surface it floats)"
+							  : verb == "shells"	   ? "`shells N in X0 Z0 X1 Z1 [seed K]` (1 to 400)"
+							  : verb == "sink"		   ? "`sink coin|anchor|rock|ball X Y Z at T [seed K]` (Y above the seabed: above the water, dropped in)"
+													   : "`moonlight [elevation E] [toward A] [bright B]` (E 2 to 90 degrees, B 0.05 to 20)";
+	const auto fail = [&]() { return usage; };
+	int seed = 1;
+	std::vector<double> times;
+	std::map<std::string, double> opt;
+	std::set<std::string> flags;
+	std::vector<std::pair<double, double>> holes;
+	// the leading fields, then `word value` options (`at` and `shut` repeatable), a few bare words
+	if (verb == "cleanershrimp") {
+		if (t.size() < 2) return fail();
+		vignettes::Shrimp sh;
+		sh.on = t[1], i = 2;
+		while (i < t.size()) {
+			const std::string w = t[i++];
+			if (!numbers(1)) return fail();
+			if (w == "from") sh.t0 = v[0];
+			else if (w == "to") sh.t1 = v[0];
+			else return fail();
+		}
+		if (sh.t1 <= sh.t0) return fail();
+		s.vignettes.shrimps.push_back(sh);
+		return std::string();
+	}
+	std::string kind;
+	if (verb == "sink") {
+		if (t.size() < 2 || (t[1] != "coin" && t[1] != "anchor" && t[1] != "rock" && t[1] != "ball")) return fail();
+		kind = t[1], i = 2;
+	}
+	int count = 0;
+	if (verb == "shells") {
+		if (!numbers(1) || v[0] < 1 || v[0] > 400 || i >= t.size() || t[i++] != "in") return fail();
+		count = static_cast<int>(v[0]);
+	}
+	const std::size_t lead = verb == "icecap" || verb == "moonlight" ? 0 : verb == "flounder" || verb == "dugong" || verb == "chest" || verb == "clam" ? 2 : verb == "shells" ? 4 : 3;
+	std::vector<double> at;
+	if (lead > 0) {
+		if (!numbers(lead)) return fail();
+		at = v;
+	}
+	while (i < t.size()) {
+		const std::string w = t[i++];
+		if (w == "nopearl" && verb == "clam") {
+			flags.insert(w);
+			continue;
+		}
+		if (w == "hole" && verb == "icecap") {
+			if (!numbers(2)) return fail();
+			holes.push_back({v[0], v[1]});
+			continue;
+		}
+		if (!numbers(1)) return fail();
+		if (w == "seed") seed = detail::seedOf(v[0]);
+		else if ((w == "at" && (verb == "pufferfish" || verb == "moray" || verb == "flounder" || verb == "sink")) || (w == "shut" && verb == "clam")) times.push_back(v[0]);
+		else if ((w == "count" && verb == "clownfish" && v[0] >= 1 && v[0] <= 4) || (w == "toward" && (verb == "moray" || verb == "chest" || verb == "moonlight")) ||
+				 (w == "radius" && verb == "dugong" && v[0] >= 2.0 && v[0] <= 60.0) || (w == "thickness" && verb == "icecap" && v[0] >= 0.2 && v[0] <= 6.0) ||
+				 (w == "holes" && verb == "icecap" && v[0] >= 0 && v[0] <= 4) || (w == "open" && verb == "chest") ||
+				 (w == "elevation" && verb == "moonlight" && v[0] >= 2.0 && v[0] <= 90.0) || (w == "bright" && verb == "moonlight" && v[0] >= 0.05 && v[0] <= 20.0))
+			opt[w] = v[0];
+		else return fail();
+	}
+	const auto option = [&](const std::string &w, double fallback) { return opt.count(w) ? opt[w] : fallback; };
+	if ((verb == "flounder" && times.size() > 1) || (verb == "sink" && times.size() != 1)) return fail();
+	const Vec3 p = lead == 3 ? Vec3{at[0], at[1], at[2]} : lead == 2 ? Vec3{at[0], 0.0, at[1]} : Vec3{};
+	if (verb == "clownfish") s.vignettes.clownfish.push_back({p, static_cast<int>(option("count", 2)), seed});
+	else if (verb == "pufferfish") s.vignettes.puffers.push_back({p, times, seed});
+	else if (verb == "flounder") s.vignettes.flounders.push_back({p.x, p.z, times.empty() ? 1e30 : times[0], seed});
+	else if (verb == "moray") s.vignettes.morays.push_back({p, option("toward", 0.0), times, seed});
+	else if (verb == "dugong") s.vignettes.dugongs.push_back({p, option("radius", 6.0), seed});
+	else if (verb == "icecap") s.iceCap = {true, option("thickness", 1.2), static_cast<int>(option("holes", 2)), seed, holes};
+	else if (verb == "chest") s.treasure.chests.push_back({p.x, p.z, option("toward", 0.0), option("open", 1e30), seed});
+	else if (verb == "clam") s.treasure.clams.push_back({p.x, p.z, times, flags.count("nopearl") == 0, seed});
+	else if (verb == "bottle") s.treasure.bottles.push_back({p, seed});
+	else if (verb == "shells") s.treasure.shells.push_back({count, std::min(at[0], at[2]), std::min(at[1], at[3]), std::max(at[0], at[2]), std::max(at[1], at[3]), seed});
+	else if (verb == "sink") s.treasure.sinks.push_back({kind, p, times[0], seed});
+	else s.moon = {true, option("elevation", 35.0), option("toward", 180.0), option("bright", 1.0)};
+	return std::string();
+}
 // One of those lines into `s`: "" or what is wrong with it.
 inline std::string underseaLine(Spec &s, const std::string &verb, const std::string &line) {
 	using detail::number;
@@ -310,6 +417,7 @@ inline std::string underseaLine(Spec &s, const std::string &verb, const std::str
 	const auto oneOf = [](const std::string &w, const std::vector<std::string> &kinds) { return std::find(kinds.begin(), kinds.end(), w) != kinds.end(); };
 	if (verb == "diver" || verb == "divecam" || verb == "school" || verb == "bigfish" || verb == "reef" || verb == "critters" || verb == "nightdive" || verb == "kelpforest")
 		return underseaLine15(s, verb, line);
+	if (underseaVerb17(verb)) return underseaLine17(s, verb, line);
 	if (verb == "boat" || verb == "sardinerun" || verb == "vents" || verb == "murk" || verb == "silt" || verb == "cleaningstation" || verb == "tornado" || verb == "playmate" ||
 		verb == "damselfish")
 		return underseaLine16(s, verb, line);
@@ -507,10 +615,13 @@ inline std::string underseaLine(Spec &s, const std::string &verb, const std::str
 							  : verb == "arch" ? "`arch X Z [toward A] [size S]` (S 0.2 to 10)"
 							  : verb == "cenote" ? "`cenote X Z [radius R] [depth D]` (R 3 to 60 m, D 5 to 120 m)"
 							  : verb == "wreckroom" ? "`wreckroom X Z [toward A] [length L]` (inside a wreck: L 4 to 60 m)"
+							  : verb == "seacave" ? "`seacave X Z [toward A] [radius R]` (a sea cave, its mouth towards A: R 3 to 30 m)"
+							  : verb == "ruins" ? "`ruins X Z [toward A] [length L]` (a sunken city: L 6 to 60 m)"
 												 : "`reefwall X Z [toward A] [length L] [height H]` (L 4 to 200 m, H 2 to 120 m)";
 	seabed::Place p;
 	p.kind = verb;
-	if (verb == "wreckroom") p.length = 12.0;
+	if (verb == "wreckroom" || verb == "ruins") p.length = 12.0;
+	if (verb == "seacave") p.radius = 6.0;
 	if (!numbers(2)) return fail(usage);
 	p.x = v[0], p.z = v[1];
 	while (i < t.size()) {
@@ -520,6 +631,8 @@ inline std::string underseaLine(Spec &s, const std::string &verb, const std::str
 		else if (w == "length" && verb == "wreck" && v[0] >= 5.0 && v[0] <= 150.0) p.length = v[0];
 		else if (w == "length" && verb == "reefwall" && v[0] >= 4.0 && v[0] <= 200.0) p.length = v[0];
 		else if (w == "length" && verb == "wreckroom" && v[0] >= 4.0 && v[0] <= 60.0) p.length = v[0];
+		else if (w == "length" && verb == "ruins" && v[0] >= 6.0 && v[0] <= 60.0) p.length = v[0];
+		else if (w == "radius" && verb == "seacave" && v[0] >= 3.0 && v[0] <= 30.0) p.radius = v[0];
 		else if (w == "list" && verb == "wreck" && std::abs(v[0]) <= 80.0) p.list = v[0];
 		else if (w == "size" && verb == "arch" && v[0] >= 0.2 && v[0] <= 10.0) p.size = v[0];
 		else if (w == "radius" && verb == "cenote" && v[0] >= 3.0 && v[0] <= 60.0) p.radius = v[0];
@@ -531,15 +644,18 @@ inline std::string underseaLine(Spec &s, const std::string &verb, const std::str
 	return std::string();
 }
 
-// What is wrong with a whole film's lines under the sea, or "": `underwater` needs a `water` line and no mist or fog; the lines of rounds 14 to 16 are drawn only for a camera under the water (without `underwater` they
+// What is wrong with a whole film's lines under the sea, or "": `underwater` needs a `water` line and no mist or fog; the lines of rounds 14 to 17 are drawn only for a camera under the water (without `underwater` they
 // would be dropped without a word), and a barracuda tornado `around` a diver or a sea lion playing `with` one names a diver of the film.
 inline std::string underseaProblems(const Spec &s) {
 	if (s.hasUnderwater && s.seas.empty()) return "`underwater` puts the camera under the film's water: it needs a `water ... level Y` line";
 	if (s.hasUnderwater && (s.hasMist || s.fog.on)) return std::string("`underwater` and `") + (s.hasMist ? "mist" : "fog") + "` both fill the air round the camera: use one";
 	if (!s.hasUnderwater && (s.undersea.any() || s.deep.any() || s.seabed.any() || !s.divers.empty() || !s.schools.empty() || !s.bigFish.empty() || s.reefLife.any() || !s.boats.empty() ||
-							 !s.sardineRuns.empty() || !s.vents.empty() || !s.murks.empty() || !s.silts.empty() || s.behaviours.any() ||
+							 !s.sardineRuns.empty() || !s.vents.empty() || !s.murks.empty() || !s.silts.empty() || s.behaviours.any() || s.vignettes.any() || s.iceCap.on || s.treasure.any() ||
 							 std::any_of(s.shots.begin(), s.shots.end(), [](const Shot &sh) { return sh.waterline; })))
-		return "divers, schools, boats, vents, murk, the seabed's life and places, bubbles and `waterline` shots are under the sea: the film needs an `underwater` line (and a `water` one)";
+		return "divers, schools, boats, vents, murk, the seabed's life and places, sea life, treasure, ice, bubbles and `waterline` shots are under the sea: the film needs an `underwater` line (and a `water` one)";
+	for (const vignettes::Shrimp &sh : s.vignettes.shrimps)
+		if (std::none_of(s.characters.begin(), s.characters.end(), [&](const Character &c) { return c.name == sh.on; }))
+			return "`cleanershrimp " + sh.on + "`: there is no character called " + sh.on + " (a `character NAME ...` line; names are matched exactly)";
 	const auto aDiver = [&](const std::string &name) { return std::any_of(s.divers.begin(), s.divers.end(), [&](const diver::Diver &d) { return d.name == name; }); };
 	for (const behaviour::Tornado &tn : s.behaviours.tornadoes)
 		if (!tn.around.empty() && !aDiver(tn.around)) return "`tornado ... around " + tn.around + "`: there is no diver called " + tn.around + " (a `diver NAME ...` line; names are matched exactly)";

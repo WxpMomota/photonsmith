@@ -348,6 +348,38 @@ inline std::string bubblesText(const std::vector<Bubble> &bubbles) {
 	if (!big.tris.empty()) out += detail::noShadow(emitMesh(big, identity()));
 	return out + "AttributeEnd\n";
 }
+// (round 17) `text` with the shapes of its bubbles (each `# bubbles` block bubblesText made) in link group "fx/bubbles": a toon film draws no ink round them
+// (toon_look.h `noink`; the toon line of a film under the water names it) - each bubble a speck, its outline had made it a black dot. A shape in a group already keeps it.
+inline std::string bubblesGrouped(const std::string &text) {
+	static const std::string head = "# bubbles (film_undersea.h)\nAttributeBegin";
+	std::string out;
+	std::size_t from = 0;
+	for (std::size_t at = text.find(head); at != std::string::npos; at = text.find(head, from)) {
+		// to the block's own AttributeEnd, past the nested ones of its spheres
+		std::size_t end = at + head.size();
+		for (int depth = 1; depth > 0 && end != std::string::npos;) {
+			const std::size_t b = text.find("AttributeBegin", end), e = text.find("AttributeEnd", end);
+			if (e == std::string::npos) end = std::string::npos;
+			else if (b != std::string::npos && b < e) ++depth, end = b + 14;
+			else --depth, end = e + 12;
+		}
+		if (end == std::string::npos) break;
+		out.append(text, from, at - from);
+		for (std::size_t p = at; p < end;) {
+			const std::size_t s = text.find("Shape \"", p);
+			if (s == std::string::npos || s >= end) {
+				out.append(text, p, end - p);
+				break;
+			}
+			const std::size_t typeEnd = text.find('"', s + 7);
+			out.append(text, p, typeEnd + 1 - p);
+			if (text.compare(typeEnd + 1, 19, " \"string linkgroup\"") != 0) out += " \"string linkgroup\" \"fx/bubbles\"";
+			p = typeEnd + 1;
+		}
+		from = end;
+	}
+	return out + text.substr(from);
+}
 // A stream's bubbles at t: one let go every 1/rate seconds (a little irregularly), of a millimetre or two times `size`.
 inline void streamBubbles(const Stream &s, double t, double level, const underwater::Current &c, std::vector<Bubble> &out) {
 	const double rate = std::clamp(s.rate, 0.05, 200.0), life = std::max(0.0, level - s.at.y) / riseSpeed(0.0015 * s.size) + 1.0;
@@ -426,6 +458,73 @@ inline std::string text(const Sea &sea, double t, double level, const underwater
 	for (const Layer &l : sea.layers) out += layerText(l, t, eye);
 	return out;
 }
+// ---- under the ice (round 17 `icecap [thickness T] [holes N] [hole X Z]... [seed K]`) ----
+// A sheet of sea ice over the water: its underside lumpy and pale, glowing where the light comes through it - brighter where it is thin, darker under the thick, snowy
+// floes - and breathing holes (in each 30 m square of the world one with a chance of N in 4, and one at each `hole X Z`) where the sun comes down in a beam. Seals come up to
+// them (`swimmers sealions ...`).
+struct IceCap {
+	bool on = false;
+	double thickness = 1.2;
+	int holes = 2, seed = 1;
+	std::vector<std::pair<double, double>> placed;   // (`hole X Z`: pbrt's x z, 2.5 m across)
+};
+// The hole of the 30 m cell (i, j), if it has one: its middle and radius (pbrt's x z).
+inline bool iceHoleOf(const IceCap &ice, int i, int j, double &cx, double &cz, double &r) {
+	const int key = i * 73856093 ^ j * 19349663 ^ ice.seed;
+	if (hash01(key, 1) * 4.0 >= ice.holes) return false;
+	cx = (i + 0.2 + 0.6 * hash01(key, 2)) * 30.0, cz = (j + 0.2 + 0.6 * hash01(key, 3)) * 30.0, r = 1.5 + 2.0 * hash01(key, 4);
+	return true;
+}
+// The hole (x, z) is in, if any: its middle and radius.
+inline bool iceHoleAt(const IceCap &ice, double x, double z, double &cx, double &cz, double &r) {
+	for (const auto &[hx, hz] : ice.placed)
+		if (std::hypot(x - hx, z - hz) < 2.5) return cx = hx, cz = hz, r = 2.5, true;
+	const int i0 = static_cast<int>(std::floor(x / 30.0)), j0 = static_cast<int>(std::floor(z / 30.0));
+	for (int j = j0 - 1; j <= j0 + 1; ++j)
+		for (int i = i0 - 1; i <= i0 + 1; ++i)
+			if (iceHoleOf(ice, i, j, cx, cz, r) && std::hypot(x - cx, z - cz) < r) return true;
+	return false;
+}
+inline bool inIceHole(const IceCap &ice, double x, double z) {
+	double cx = 0.0, cz = 0.0, r = 0.0;
+	return iceHoleAt(ice, x, z, cx, cz, r);
+}
+// The ice round the camera (pbrt's eye), 120 m across, at the surface `level`.
+inline std::string iceCapText(const IceCap &ice, const Vec3 &eye, double level) {
+	if (!ice.on) return std::string();
+	const double half = 60.0, step = 0.75;
+	const double x0 = std::floor((eye.x - half) / step) * step, z0 = std::floor((eye.z - half) / step) * step;
+	const int n = static_cast<int>(2.0 * half / step);
+	const auto underY = [&](double x, double z) {
+		return level - ice.thickness * (0.55 + 0.9 * nature::noise2(x * 0.07, z * 0.07, ice.seed)) - 0.2 * nature::noise2(x * 0.6, z * 0.6, ice.seed + 3);
+	};
+	// (a point inside a hole is moved out to its rim, so the holes are round and not the grid's squares)
+	std::vector<Vec3> verts;
+	verts.reserve(static_cast<std::size_t>(n + 1) * (n + 1));
+	for (int j = 0; j <= n; ++j)
+		for (int i = 0; i <= n; ++i) {
+			double x = x0 + i * step, z = z0 + j * step, cx = 0.0, cz = 0.0, r = 0.0;
+			if (iceHoleAt(ice, x, z, cx, cz, r)) {
+				const double d = std::max(1e-6, std::hypot(x - cx, z - cz));
+				x = cx + (x - cx) * r / d, z = cz + (z - cz) * r / d;
+			}
+			verts.push_back({-x, underY(x, z), z});
+		}
+	Mesh thin, thick;
+	for (Mesh *m : {&thin, &thick}) m->verts = verts, m->normals.assign(verts.size(), Vec3{0.0, -1.0, 0.0});
+	for (int j = 0; j < n; ++j)
+		for (int i = 0; i < n; ++i) {
+			const double x = x0 + (i + 0.5) * step, z = z0 + (j + 0.5) * step;
+			if (inIceHole(ice, x, z)) continue;
+			Mesh &m = nature::noise2(x * 0.09, z * 0.09, ice.seed + 7) > 0.55 ? thick : thin;   // (floes under snow, and clearer ice between)
+			const int a = j * (n + 1) + i, b = a + 1, c = a + n + 1, d = c + 1;
+			m.tris.push_back({a, c, b}), m.tris.push_back({b, c, d});
+		}
+	sdf::computeNormals(thin), sdf::computeNormals(thick);
+	// translucent: the sun comes through it dimmed and blue (through the thick floes less), and through the holes in full
+	return "# sea ice overhead (film_undersea.h)\n" + attr(translucentMaterial({0.75, 0.85, 0.92}, {0.2, 0.32, 0.4}), emitMesh(thin, identity())) +
+		   attr(translucentMaterial({0.82, 0.88, 0.93}, {0.06, 0.1, 0.14}), emitMesh(thick, identity()));
+}
 // ---- silt and murk (round 16) ----
 // A puff of silt kicked up from the seabed at pbrt's `at` (on the sand) `age` seconds ago, `size` times a fin's kick (1: an anchor landing, 0.3 a fin): fine grains
 // thrown up and out in a billow, hanging, spreading and settling over twenty seconds.
@@ -459,6 +558,14 @@ inline std::string housingLook(const underwater::Water &w) {
 	if (w.filter == "red") out += " gain 1.55 0.98 0.82";
 	else if (w.filter == "magenta") out += " gain 1.35 0.82 1.15";
 	return out;
+}
+// (round 17) A cartoon's colour script under the water by the camera's depth: a bright turquoise near the surface, deeper down bluer and a little richer (lens_look
+// `tint`, `saturation`) - the picture says how deep it is, as a painted film's colour keys do.
+inline std::string toonDepthLook(double depth) {
+	const double f = std::clamp(depth / 25.0, 0.0, 1.0);
+	char buf[120];
+	std::snprintf(buf, sizeof buf, " tint %.3f %.3f %.3f saturation %.3f", 1.0 - 0.1 * f, 1.03 - 0.06 * f, 1.0 + 0.08 * f, 1.2 + 0.1 * f);
+	return buf;
 }
 // A frame header seen through a flat port: the field of view a third narrower (through a flat window the water makes things look a third nearer).
 inline std::string throughFlatPort(const std::string &header) {

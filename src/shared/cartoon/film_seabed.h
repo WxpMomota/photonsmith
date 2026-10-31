@@ -328,6 +328,65 @@ inline std::string placeText(const std::string &film, const Place &p, int index,
 		}
 		return out + attr(coated({0.25, 0.18, 0.12}, 0.8), emitMesh(roots, frame));
 	}
+	if (p.kind == "seacave") {   // (round 17) a sea cave: a dome of rock with its mouth towards +z and holes in its roof that the light comes down through in beams
+		const double R = p.radius;
+		std::snprintf(name, sizeof name, "seacave_%d_%d", static_cast<int>(R * 10), index);
+		out += film_cache::part(film, name, rock, frame, [&] {
+			const auto f = [R](Vec3 q) {
+				const Vec3 e{q.x, q.y / 0.7, q.z};
+				double shell = sdf::smax(length(e) - 1.15 * R, -(length(e) - R), 0.3);
+				shell = sdf::smax(shell, -sdf::capsule(q, {0.0, 0.25 * R, 0.6 * R}, {0.0, 0.25 * R, 1.6 * R}, 0.38 * R), 0.2);   // (its mouth)
+				double holes = 1e9;
+				for (int k = 0; k < 4; ++k) {
+					const double a = 2.0 * kPi * (k + 0.3 * hash01(k, 41)) / 4.0, r = R * (0.25 + 0.3 * hash01(k, 42));
+					holes = std::min(holes, sdf::capsule(q, {r * std::cos(a), 0.3 * R, r * std::sin(a)}, {r * std::cos(a), 1.2 * R, r * std::sin(a)}, R * (0.07 + 0.06 * hash01(k, 43))));
+				}
+				return std::max(sdf::smax(shell, -holes, 0.1), -q.y);
+			};
+			return rockMesh(f, {-1.35 * R, -0.3, -1.35 * R}, {1.35 * R, 0.95 * R, 1.75 * R}, std::max(0.12, R / 30.0), 31, 0.06 * R);
+		});
+		return out;
+	}
+	if (p.kind == "ruins") {   // (round 17) a sunken city: broken paving, columns standing and fallen, an archway and a statue, all grown over
+		const double L = p.length;
+		std::snprintf(name, sizeof name, "ruins_%d_%d", static_cast<int>(L * 10), index);
+		out += film_cache::part(film, name, coated({0.7, 0.66, 0.58}, 0.65), frame, [&] {
+			Mesh m;
+			const int n = std::max(2, static_cast<int>(L / 2.0));
+			for (int j = 0; j < n; ++j)   // the paving: slabs, some gone, some tipped
+				for (int i = 0; i < n; ++i) {
+					const int k = j * n + i;
+					if (hash01(k, 51) < 0.18) continue;
+					deepsea::detail::add(m, box(1.85, 0.16, 1.85), mul(translate(-0.5 * L + (i + 0.5) * L / n, 0.05, -0.5 * L + (j + 0.5) * L / n), rotate({1, 0, 0}, 8.0 * (hash01(k, 52) - 0.5)), rotate({0, 0, 1}, 8.0 * (hash01(k, 53) - 0.5))));
+				}
+			const Mesh column = lathe({{0.0, 0.0}, {0.45, 0.0}, {0.45, 0.25}, {0.33, 0.35}, {0.3, 3.2}, {0.4, 3.35}, {0.4, 3.55}, {0.0, 3.55}}, 16);
+			for (int c = 0; c < 8; ++c) {   // two rows of columns: most standing, some broken off short
+				const double x = (c % 2 ? 1.0 : -1.0) * 0.3 * L, z = -0.35 * L + 0.7 * L * (c / 2) / 3.0;
+				const double h = hash01(c, 54) < 0.35 ? 0.25 + 0.4 * hash01(c, 55) : 1.0;
+				deepsea::detail::add(m, column, mul(translate(x, 0.1, z), scale(1.0, h, 1.0)));
+			}
+			deepsea::detail::add(m, column, mul(translate(0.05 * L, 0.45, 0.05 * L), rotate({0, 1, 0}, 35.0), rotate({0, 0, 1}, 88.0)));   // (one fallen across)
+			for (const double side : {-1.0, 1.0}) deepsea::detail::add(m, box(0.7, 4.5, 0.7), translate(side * 1.6, 2.25, 0.45 * L));   // an archway at the end
+			deepsea::detail::add(m, sdf::tubeMesh({{-1.6, 4.3, 0.45 * L}, {0.0, 5.3, 0.45 * L}, {1.6, 4.3, 0.45 * L}}, 0.4, 1.0, 8));
+			deepsea::detail::add(m, box(1.2, 1.0, 1.2), translate(0.0, 0.5, 0.0));   // a statue on its plinth: a robed figure, an arm raised
+			deepsea::detail::add(m, sdf::tubeMesh({{0.0, 1.0, 0.0}, {0.0, 1.9, 0.0}, {0.0, 2.6, 0.02}}, 0.32, 0.6, 12));
+			deepsea::detail::add(m, uvSphere(0.2, 14, 10), translate(0.0, 2.85, 0.03));
+			deepsea::detail::add(m, sdf::tubeMesh({{0.18, 2.45, 0.0}, {0.45, 2.9, 0.1}, {0.5, 3.4, 0.15}}, 0.07, 0.8, 8));
+			return m;
+		});
+		Mesh weed, sponges;   // grown over: tufts of weed between the slabs, sponges on the stones
+		for (int k = 0; k < static_cast<int>(L * L / 3.0); ++k) {
+			const double x = (hash01(k, 61) - 0.5) * L, z = (hash01(k, 62) - 0.5) * L;
+			if (k % 3) {
+				for (int b = 0; b < 4; ++b)
+					deepsea::detail::add(weed, sdf::tubeMesh({{x, 0.1, z}, {x + 0.05 * std::cos(b * 1.6), 0.35 + 0.2 * hash01(k + b, 63), z + 0.05 * std::sin(b * 1.6)}}, 0.015, 0.3, 4));
+			} else {
+				deepsea::detail::add(sponges, uvSphere(0.08 + 0.12 * hash01(k, 64), 10, 6), translate(x, 0.2, z));
+			}
+		}
+		out += attr(coated({0.25, 0.42, 0.18}, 0.5), emitMesh(weed, frame)) + attr(coated({0.85, 0.5, 0.25}, 0.6), emitMesh(sponges, frame));
+		return out;
+	}
 	if (p.kind == "wreckroom") {   // (round 16) inside a wreck: a corridor of rusted plates to swim along, its length along +z of its frame
 		const double L = p.length, W = 2.4, H = 2.2, wall = 0.15;
 		std::snprintf(name, sizeof name, "wreckroom_%d_%d", static_cast<int>(L * 10), index);

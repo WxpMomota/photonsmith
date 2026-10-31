@@ -274,6 +274,53 @@ inline Picture textPicture(const cartoon::Caption &c, int w, int h) {
 	return pic;
 }
 
+// (round 17) A caption in a bubble, for a line spoken under the water: the words inside a round, glassy bubble - a faint blue fill, a bright rim, a highlight up on its left -
+// with three small bubbles rising to it from below, where the speaker is. `frameH`: the frame's height (the rim's width follows it).
+inline Picture bubbled(const Picture &text, int frameH) {
+	if (text.w <= 0) return text;
+	const double rx = 0.5 * text.w * 1.18 + 0.01 * frameH, ry = 0.5 * text.h * 1.5 + 0.01 * frameH, tail = 0.9 * ry, rim = (std::max)(1.5, 0.0028 * frameH);
+	Picture out;
+	out.w = static_cast<int>(std::ceil(2.0 * rx + 2.0 * rim)) + 4;
+	out.h = static_cast<int>(std::ceil(2.0 * ry + 2.0 * rim + tail)) + 4;
+	out.rgba.assign(static_cast<std::size_t>(out.w) * out.h * 4, 0.0f);
+	const double cx = out.w / 2.0, cy = rim + 2.0 + ry;
+	struct Ball {
+		double x, y, rx, ry;
+	};
+	const Ball balls[] = {{cx, cy, rx, ry}, {cx - 0.35 * rx, cy + ry + 0.3 * tail, 0.16 * ry, 0.16 * ry}, {cx - 0.45 * rx, cy + ry + 0.62 * tail, 0.1 * ry, 0.1 * ry},
+						  {cx - 0.5 * rx, cy + ry + 0.86 * tail, 0.06 * ry, 0.06 * ry}};
+	// (straight alpha laid over straight alpha)
+	const auto lay = [&out](std::size_t i, cartoon::Vec3 c, double a) {
+		float *d = &out.rgba[i * 4];
+		const double da = d[3], oa = a + da * (1.0 - a);
+		if (oa <= 0.0) return;
+		for (int k = 0; k < 3; ++k) d[k] = static_cast<float>(((k == 0 ? c.x : k == 1 ? c.y : c.z) * a + d[k] * da * (1.0 - a)) / oa);
+		d[3] = static_cast<float>(oa);
+	};
+	for (int y = 0; y < out.h; ++y)
+		for (int x = 0; x < out.w; ++x) {
+			const std::size_t i = static_cast<std::size_t>(y) * out.w + x;
+			for (const Ball &b : balls) {
+				const double dx = (x + 0.5 - b.x) / b.rx, dy = (y + 0.5 - b.y) / b.ry, d = std::sqrt(dx * dx + dy * dy);
+				const double fromRim = (d - 1.0) * (std::min)(b.rx, b.ry);   // (pixels outside the rim; negative inside)
+				if (d < 1.0) lay(i, {0.72, 0.88, 1.0}, 0.22 * (0.6 + 0.4 * d * d));   // (the fill, a little stronger towards the rim)
+				const double ring = 1.0 - std::abs(fromRim) / rim;
+				if (ring > 0.0) lay(i, {0.92, 0.97, 1.0}, 0.85 * ring);
+				const double ang = std::atan2(dy, dx), shine = std::exp(-std::pow((ang + 2.3) / 0.35, 2.0)) * (d > 0.7 && d < 0.88 ? 1.0 : 0.0);   // (up on its left)
+				if (shine > 0.02) lay(i, {1.0, 1.0, 1.0}, 0.6 * shine);
+			}
+		}
+	const int x0 = static_cast<int>(std::lround(cx - text.w / 2.0)), y0 = static_cast<int>(std::lround(cy - text.h / 2.0));
+	for (int y = 0; y < text.h; ++y)
+		for (int x = 0; x < text.w; ++x) {
+			const int ox = x0 + x, oy = y0 + y;
+			if (ox < 0 || oy < 0 || ox >= out.w || oy >= out.h) continue;
+			const float *s = &text.rgba[(static_cast<std::size_t>(y) * text.w + x) * 4];
+			if (s[3] > 0.0f) lay(static_cast<std::size_t>(oy) * out.w + ox, {s[0], s[1], s[2]}, s[3]);
+		}
+	return out;
+}
+
 // The captions with text as a subtitle file (SubRip, .srt) for the video: the same words, for a player to show or a site to read. False when there are none or it cannot be written.
 inline bool writeSrt(const std::vector<cartoon::Caption> &captions, const std::filesystem::path &path) {
 	std::string out;
@@ -372,7 +419,7 @@ inline std::string wordsKey(const std::vector<std::pair<const cartoon::Caption *
 	std::string s;
 	char b[160];
 	for (const auto &[c, a] : here) {
-		std::snprintf(b, sizeof b, "%s|%.4f|%.6g|%.6g|%.6g\n", c->image.c_str(), a, c->centreY, c->width, c->lineGap);
+		std::snprintf(b, sizeof b, "%s|%.4f|%.6g|%.6g|%.6g|%d\n", c->image.c_str(), a, c->centreY, c->width, c->lineGap, c->bubble ? 1 : 0);
 		s += b;
 		for (const cartoon::CaptionLine &l : c->lines) {
 			std::snprintf(b, sizeof b, "|%d|%.6g|%.6g|%.6g|%.6g|%.6g|", l.fontIndex, l.size, l.colour.x, l.colour.y, l.colour.z, l.weight);
@@ -468,7 +515,7 @@ inline int apply(const cartoon::Film &film, const std::filesystem::path &dir, in
 		for (const auto &[c, a] : here) {
 			if (!c->lines.empty()) {   // text: set at this frame's size, once a caption and size
 				const std::string key = "text|" + std::to_string(c - captions.data()) + "|" + std::to_string(w) + "|" + std::to_string(h);
-				if (!sized.count(key)) sized[key] = textPicture(*c, w, h);
+				if (!sized.count(key)) sized[key] = c->bubble ? bubbled(textPicture(*c, w, h), h) : textPicture(*c, w, h);
 				const Picture &pic = sized[key];
 				if (pic.w > 0) over(frame, w, h, pic, (w - pic.w) / 2, static_cast<int>(std::lround(c->centreY * h - pic.h / 2.0)), a);
 				continue;

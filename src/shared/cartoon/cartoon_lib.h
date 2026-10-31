@@ -555,6 +555,10 @@ struct FilmMeta {
 	bool wavefront = false;
 	// The picture's own size: what its Film line says and what the GUI sets the render size to when the film is picked (a still or a video of it).
 	int width = 1280, height = 720;
+	// (round 17) Its video's frames are denoised with their neighbours unless the run says otherwise (--temporal-denoise R, or --no-temporal-denoise): R, 0 for none. A film
+	// under the water has 1 - its open water, smooth and still, "boils" from frame to frame (each frame's denoiser leaves blotches of its own), and the neighbours calm it.
+	// (Last: the films' tables fill the fields above by position.)
+	int temporal = 0;
 };
 
 // One line of a caption's text and how it is set: a font file (found as launcher/film_captions.h says; `fontIndex` picks a face of a .ttc), its height as a share of the frame's
@@ -579,6 +583,7 @@ struct Caption {
 	double width = 0.66;
 	std::vector<CaptionLine> lines;
 	double lineGap = 0.3;   // between two lines, as a share of the taller one's height
+	bool bubble = false;    // (round 17) the words in a glassy bubble with little bubbles rising to it: a line spoken under the water (film_captions.h bubbled)
 };
 
 // How one shot gives way to the next (Film::transitions), at the cut `at` over `length` seconds centred on it: a dissolve (the two pictures blended), a fade (to black and up
@@ -640,6 +645,8 @@ struct Film {
 	std::function<std::string(double)> sceneAcross;
 	// (empty: none) how loud its characters are speaking at t, 0..1: its music cues are ducked under it.
 	std::function<double(double)> speechAt;
+	// (empty: none) the music heard from under the water (round 17): a low-pass cutoff in Hz each 1/100 s, low while the camera is under it (audio::Mix::lowPass).
+	std::function<std::vector<float>()> musicCutoffs;
 	// (empty: t) the time whose shot's camera sceneAcross(t) uses: what a cameras file changes of that shot is changed on the other side of the cut too.
 	std::function<double(double)> acrossShotTime;
 	// True when sceneAt and headerAt already have its cameras file's changes (a film made from a single film file: DataFilm::headerAt makes them before the world round the

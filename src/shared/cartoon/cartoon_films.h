@@ -23,6 +23,7 @@
 #include "film_file.h"
 #include "film_kinds.h"
 #include "film_aliens.h"
+#include "film_sea_kinds.h"
 #include "film_parts.h"
 #include "film_score.h"
 #include "caption_file.h"

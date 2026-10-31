@@ -71,8 +71,10 @@
 #include "film_school.h"
 #include "film_seabed.h"
 #include "film_sealight.h"
+#include "film_treasure.h"
 #include "film_vents.h"
 #include "film_undersea.h"
+#include "film_vignettes.h"
 #include "film_macro.h"
 #include "film_night.h"
 #include "film_water.h"
@@ -234,6 +236,9 @@ struct CharacterKind {
 	std::vector<std::string> poses;   // its library's poses (a gesture naming another is an error when the film is loaded)
 	speech::Voice voice;              // how its `say` lines sound (its pitch is moved a little for each character, by its name)
 	bool face = true;                 // whether it has a face to show a feeling on (the masked explorer has not)
+	// (round 17, film_sea_kinds.h) a sea creature: `aquatic` swims level as it is (castAt does not lay it flat as it lays a person); `crawls` walks on the seabed
+	// under the water instead of swimming
+	bool aquatic = false, crawls = false;
 	// (for props) where a hand of it is at a moment, in the world (its arm's reach decides: a prop held follows it), where it carries a prop (body space, scale 1, the left
 	// hand's: the right's is mirrored) and which hand it uses (0 the left, 1 the right); (for `look`) its head, body space at scale 1
 	std::function<Vec3(const CharacterMoment &, int)> handAt;
@@ -473,6 +478,13 @@ struct Spec {
 	std::vector<undersea::Murk> murks;
 	std::vector<undersea::Silt> silts;
 	behaviour::World behaviours;
+	// round 17: comic sea life (`clownfish`, `pufferfish`, `flounder`, `moray`, `cleanershrimp`, `dugong`: film_vignettes.h), the ice overhead (`icecap`: film_undersea.h),
+	// treasure and things let go (`chest`, `clam`, `bottle`, `shells`, `sink`: film_treasure.h), the moon (`moonlight`: film_sealight.h - above the water too); `seacave`
+	// and `ruins` are seabed places
+	vignettes::World vignettes;
+	undersea::IceCap iceCap;
+	treasure::World treasure;
+	sealight::Moon moon;
 	// fire, lava and smoke (`fire`, `lava`, `volcano`, `wildfire`)
 	std::vector<fire::Fire> fires;
 	std::vector<fire::Lava> lavas;

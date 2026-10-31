@@ -279,7 +279,14 @@ static std::string universeText(const Spec &spec, const std::string &header, dou
 // Under the sea (film_underwater.h, round 14's film_undersea.h, film_deepsea.h, film_seabed.h): the water round the camera - the camera in it, or at its surface half above
 // it, or above it - the light coming down through it and the mirror beyond Snell's window, what drifts, grows, swims and bubbles in it, and the seabed's places. `out` is the
 // frame so far (its Camera line: the water's medium goes before it); the look's words for a camera at the waterline are added last of all (worldAt).
-static std::string underTheSea(const Spec &spec, std::string out, const std::string &header, double t, double nt, const std::vector<school::School> &schools) {
+// The film's characters as the sea's life sees them (round 17, pbrt's): where each one's chest is now (a clownfish hides from it), and each one's hand (a cleaner shrimp
+// walks on it).
+struct SeaCast {
+	std::vector<Vec3> chests;
+	std::map<std::string, Vec3> hands;
+};
+static std::string underTheSea(const Spec &spec, std::string out, const std::string &header, double t, double nt, const std::vector<school::School> &schools,
+							   const std::vector<physics::Impact> &landings, const SeaCast &cast) {
 	Vec3 eye, target;
 	double fov = 40.0;
 	film_subjects::cameraOf(header, eye, target, fov);
@@ -309,7 +316,8 @@ static std::string underTheSea(const Spec &spec, std::string out, const std::str
 	if (!slide) out += underwater::shaftsText(film, nt, eyeP, sea.level, bedDepth);
 	const Vec3 flow = spec.current.velocity(nt), drift = spec.current.drift(nt);
 	if (wl.where != undersea::Waterline::Above) {
-		out += underwater::snowText(nt, eye, drift, wl.where == undersea::Waterline::At ? wl.surface : 1e30);   // (in nature's time, as the current that carries it)
+		if (!spec.toon.on)   // (round 17: not in a toon film - the ink outlines every fleck, and the water fills with black dots)
+			out += underwater::snowText(nt, eye, drift, wl.where == undersea::Waterline::At ? wl.surface : 1e30);   // (in nature's time, as the current that carries it)
 		out += undersea::windowText(sea, nt, eyeP);   // (round 14: the mirror beyond Snell's window)
 	}
 	if (spec.underwater.lamp > 0.0) out += undersea::lampText(spec.underwater.lamp, eyeP, targetP, spec.underwater.lampBlue) + undersea::backscatterText(nt, eye, drift);
@@ -359,6 +367,9 @@ static std::string underTheSea(const Spec &spec, std::string out, const std::str
 		out += undersea::murkText(m, static_cast<int>(i), spec.underwater);
 	}
 	for (const undersea::Silt &sl : spec.silts) out += undersea::siltText({sl.x, bedAt(sl.x, sl.z), sl.z}, nt - sl.at, sl.size, static_cast<int>(sl.x * 13.0 + sl.z * 7.0));
+	for (const physics::Impact &i : landings)   // (round 17: a prop or rigid body landing hard on the sand throws up silt)
+		if (i.speed > 0.3 && t >= i.t && t - i.t < 20.0 && i.at.y - bedAt(i.at.x, i.at.z) < 0.3)
+			out += undersea::siltText({i.at.x, bedAt(i.at.x, i.at.z), i.at.z}, t - i.t, std::min(1.0, 0.25 * i.speed), static_cast<int>(i.t * 97.0 + i.at.x * 13.0));
 	for (const diver::Diver &d : divers)   // a diver finning within a metre of the bottom kicks up silt behind
 		for (int k = 0; k < 10; ++k) {
 			const double when = std::floor(nt / 2.5) * 2.5 - 2.5 * k;
@@ -385,6 +396,28 @@ static std::string underTheSea(const Spec &spec, std::string out, const std::str
 		for (const behaviour::Playmate &pm : w.playmates) out += behaviour::playmateText(pm, nt, sea.level, spec.current, who(pm.with, pm.at));
 		for (const behaviour::Damsels &dm : w.damsels) out += behaviour::damselText(dm, nt, intruders);
 	}
+	// round 17: comic sea life, treasure and things let go, the ice overhead (film_vignettes.h, film_treasure.h, film_undersea.h)
+	if (spec.vignettes.any()) {
+		const vignettes::World w = vignettes::lifted(spec.vignettes, groundAt);
+		std::vector<Vec3> them{eyeP};
+		for (const diver::Diver &d : divers) them.push_back(diver::diverAt(d, nt));
+		them.insert(them.end(), cast.chests.begin(), cast.chests.end());
+		for (const vignettes::Clownfish &c : w.clownfish) out += vignettes::clownfishText(c, nt, bedAt, them);
+		for (const vignettes::Puffer &p : w.puffers) out += vignettes::pufferText(p, nt, them);
+		for (const vignettes::Flounder &f : w.flounders) out += vignettes::flounderText(f, nt, bedAt, spec.current);
+		for (const vignettes::Moray &mo : w.morays) out += vignettes::morayText(mo, nt, bedAt);
+		for (const vignettes::Dugong &d : w.dugongs) out += vignettes::dugongText(d, nt, bedAt);
+		for (const vignettes::Shrimp &sh : w.shrimps)
+			if (const auto h = cast.hands.find(sh.on); h != cast.hands.end()) out += vignettes::shrimpText(sh, t, h->second);
+	}
+	if (spec.treasure.any()) out += treasure::text(treasure::lifted(spec.treasure, groundAt), nt, sea.level, bedAt, spec.current);
+	out += undersea::iceCapText(spec.iceCap, eyeP, sea.level);
+	if (const double storm = spec.storm.levelAt(t); storm > 0.3)   // (a storm overhead: each surge stirs the silt along the bottom, every seven seconds)
+		for (int k = 0; k < 3; ++k) {
+			const double when = std::floor(nt / 7.0) * 7.0, a = 2.0 * kPi * hash01(static_cast<int>(when) * 7 + k, 41);
+			const Vec3 at = targetP + Vec3{4.0 * std::cos(a), 0.0, 4.0 * std::sin(a)};
+			out += undersea::siltText({at.x, bedAt(at.x, at.z), at.z}, nt - when, 0.5 * storm, static_cast<int>(when) * 13 + k);
+		}
 	{   // the sand close up, where the camera looks (round 16)
 		Vec3 look = eyeP;
 		const Vec3 dir = normalize(targetP - eyeP);
@@ -403,17 +436,24 @@ static std::string underTheSeaLight(const Spec &spec, std::string out, const std
 	const water::Sea &sea = spec.seas[0];
 	const undersea::Waterline wl = undersea::waterlineOf(sea, nt, eyeP);
 	if (wl.where != undersea::Waterline::Above) {
-		if (!spec.tracedCaustics && spec.hasSky) out = sealight::withCaustics(out, spec.key.empty() ? std::string("film") : spec.key, nt, eyeP, sea.level, sea.level - seabed);
-		const std::string glints = sealight::glintsText(out, nt, eyeP, sea.level);
-		if (!glints.empty()) out = night::withWords(out + glints, sealight::glintLook());
 		double rain = 0.0;   // (a `weather rain` line, or a rainy storm, as heavy as it is now)
 		for (const particles::Weather &w : spec.weather)
 			if (w.kind == "rain" && t >= w.t0 && t <= w.t1) rain = std::max(rain, std::min(1.0, w.amount));
 		if (spec.storm.on && spec.storm.kind == "rain") rain = std::max(rain, std::min(1.0, spec.storm.levelAt(t)));
+		// round 17: a storm overhead seen from below - its clouds racing over (the light dims and brightens), foam streaking the surface, lightning flashing down
+		const double storm = std::min(1.0, std::max(spec.storm.levelAt(t), 0.5 * rain));
+		if (storm > 0.0) out = sealight::dimSun(out, sealight::stormLight(storm, nt));
+		out += sealight::foamText(storm, nt, eyeP, sea.level, spec.storm.on ? spec.storm.wind : 90.0);
+		for (const skyfx::Lightning &l : spec.lightnings)
+			for (const skyfx::Strike &s : l.strikes) out += sealight::underFlashText(skyfx::strokes(s, t - s.t), Vec3{s.x - eyeP.x, l.base, s.z - eyeP.z});
+		if (!spec.tracedCaustics && spec.hasSky) out = sealight::withCaustics(out, spec.key.empty() ? std::string("film") : spec.key, nt, eyeP, sea.level, sea.level - seabed, spec.toon.on);
+		const std::string glints = sealight::glintsText(out, nt, eyeP, sea.level);
+		if (!glints.empty()) out = night::withWords(out + glints, sealight::glintLook());
 		out += sealight::rainText(rain, nt, eyeP, sea.level);
 	}
 	if (wl.where == undersea::Waterline::At) out = night::withWords(out, undersea::waterlineLook(eyeP, targetP, fov, wl.elevation, t));
 	if (wl.where != undersea::Waterline::Above) out = night::withWords(out, undersea::housingLook(spec.underwater));   // (round 16: a flat port, a filter)
+	if (spec.toon.on && wl.where != undersea::Waterline::Above) out = night::withWords(out, undersea::toonDepthLook(sea.level - eyeP.y));   // (round 17: a cartoon's colour script by depth)
 	return out;
 }
 double DataFilm::seabedAt(double x, double z) const {
@@ -501,7 +541,17 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 			header = undersea::throughFlatPort(header);
 	}
 	std::string out = film_camera::exposed(header, exposureAt(t) * underTheSeaExposure(spec, header));
-	if (spec.hasUnderwater) out = underTheSea(spec, out, header, t, nt, schoolsSwum());   // under the sea: the water round the camera, the light coming down through it, what lives in it
+	if (spec.hasUnderwater) {
+		SeaCast cast;
+		if (spec.vignettes.any())
+			for (const Character &c : spec.characters) {
+				const auto pbrt = [](Vec3 p) { return Vec3{-p.x, p.y, p.z}; };
+				cast.chests.push_back(pbrt(chestOf(c, t)));
+				const CharacterKind &kind = characterKinds().at(c.kind);
+				if (kind.handAt) cast.hands[c.name] = pbrt(kind.handAt(momentOf(c, t), kind.hand));
+			}
+		out = underTheSea(spec, out, header, t, nt, schoolsSwum(), landings(), cast);
+	}   // under the sea: the water round the camera, the light coming down through it, what lives in it
 	if (!spec.fires.empty() || !spec.lavas.empty() || !spec.volcanoes.empty() || !spec.wildfires.empty()) {   // fire, lava and smoke (film_fire.h)
 		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
 		const auto groundAt = [&](double x, double z) { return ground && ground->inside(x, z) ? ground->heightAt(x, z) : (ground ? spec.terrain.y : 0.0); };
@@ -626,6 +676,12 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 		dressing::SkyOptics optics = spec.optics;
 		optics.exposure = exposureAt(t);
 		out += "# the sun and sky at " + std::to_string(dressing::hourAt(spec.sky, t, spec.storyEnd)) + " h (film_dressing.h)\n" + dressing::skyText(spec.key, spec.sky, t, spec.storyEnd, rainbow, storm, optics);
+	}
+	if (spec.moon.on) {   // (round 17: `moonlight` - after the sun, so the sea's caustics and glints take the sun's light while it is up)
+		Vec3 eye, target;
+		double fov = 40.0;
+		film_subjects::cameraOf(header, eye, target, fov);
+		out += sealight::moonText(spec.moon, {-eye.x, eye.y, eye.z});
 	}
 	out += dressingAt(t);
 	if (!spec.weather.empty() || !spec.emitters.empty()) {   // weather round the camera, and particles (film_particles.h)
@@ -767,6 +823,7 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 		double fov = 40.0;
 		film_subjects::cameraOf(header, eye, target, fov);
 		out = underTheSeaLight(spec, out, header, t, nt, seabedAt(-eye.x, eye.z));
+		if (spec.toon.on) out = undersea::bubblesGrouped(out);   // (round 17: a toon film draws no ink round its bubbles)
 	}
 	return spec.space.on ? cosmos::withSpaceLook(space::recentred(out), spec.space.flare, spec.space.bloom) : out;   // (a floating origin for a film in space: film_space.h)
 }
@@ -793,7 +850,7 @@ std::string DataFilm::castAt(double t) const {
 	};
 	// (round 16) a swimmer laid level in the water round its chest as it goes - the whole of it, hair and all - and where a point of it then is
 	const auto swimTurn = [](const Character &c, const CharacterKind &kind, const CharacterMoment &m) {
-		if (m.swim <= 0.0) return identity();
+		if (m.swim <= 0.0 || kind.aquatic) return identity();   // (a fish or an octopus swims as it is: film_sea_kinds.h)
 		const Vec3 chest = transformPoint(m.frame, kind.chest * c.scale), right = normalize(transformPoint(m.frame, {1.0, 0.0, 0.0}) - transformPoint(m.frame, {0.0, 0.0, 0.0}));
 		return mul(translate(chest), rotate(right, 80.0 * m.going), translate(chest * -1.0));
 	};
@@ -860,7 +917,8 @@ std::string DataFilm::castAt(double t) const {
 		const double tc = motion::heldTime(spec.stepping, c.name, t, spec.fps);   // (on twos: the moment of the frame it holds; film_motion.h)
 		std::string text = drawnAt(tc);
 		const bool talks = std::any_of(spec.lines.begin(), spec.lines.end(), [&](const speech::Line &l) { return l.who == c.name && l.t <= tc + 0.1 && l.t >= tc - 30.0; });   // (only a line begun lately: its bubbles are still rising)
-		if (swimming(c) && talks) text += speechBubbles(c, kind, tc);
+		if (underwater(c) && talks) text += speechBubbles(c, kind, tc);   // (a crab on the seabed talks in bubbles too)
+		if (spec.hasUnderwater && !spec.seas.empty()) text += waterPlay(c, kind, tc);
 		// a smear's multiples: copies of it back along its way on a dash (film_motion.h)
 		if (const motion::Smear *sm = motion::smearFor(spec.smears, c.name); sm && sm->multiples > 0)
 			for (const double u : motion::smearTimes([&](double w) {
@@ -869,11 +927,81 @@ std::string DataFilm::castAt(double t) const {
 					 return at;
 				 }, tc, kind.height * c.scale, sm->amount, spec.fps, sm->multiples))
 				text += drawnAt(u);
+		if (spec.toon.on && spec.hasUnderwater) text = undersea::bubblesGrouped(text);   // (round 17: no ink round its bubbles - grouped before its own group, which they then keep)
 		out += "# " + c.name + " (" + c.kind + ")\n" + shot_lighting::inLinkGroup(text, "cast/" + c.name);   // (light linking: a shot's `lighting ... only cast` - "cast" names every cast/ group; the ID passes)
 	}
 	return out;
 }
 
+// Round 17: a character and the water (film_undersea.h's bubbles and silt, film_giants.h's spray), from its own moments over the last three seconds: where its chest crossed
+// the surface - going in, a splash and a trail of bubbles after it; coming out, a splash and drips running off it back into the water - a wake of bubbles when it swims fast,
+// and a puff of silt at each step it takes on the seabed.
+std::string DataFilm::waterPlay(const Character &c, const CharacterKind &kind, double t) const {
+	const double level = spec.seas[0].level, dt = 1.0 / 12.0, back = 3.0;
+	struct Sample {
+		double u, steps, going;
+		Vec3 chest;   // (pbrt's)
+	};
+	std::vector<Sample> path;
+	for (double u = t - back; u <= t + 1e-9; u += dt) {
+		const CharacterMoment m = momentOf(c, std::max(0.0, u));
+		const Vec3 p = transformPoint(m.frame, kind.chest * c.scale);
+		path.push_back({u, m.steps, m.going, {-p.x, p.y, p.z}});
+	}
+	const auto chestAt = [&path, dt, back, t](double u) {   // (between the samples)
+		const double k = std::clamp((u - (t - back)) / dt, 0.0, static_cast<double>(path.size() - 1));
+		const std::size_t i = std::min(path.size() - 2, static_cast<std::size_t>(k));
+		return lerp(path[i].chest, path[i + 1].chest, k - static_cast<double>(i));
+	};
+	const int seed = seedOf(c.name);
+	std::string out, drops;
+	std::vector<undersea::Bubble> bubbles;
+	for (std::size_t i = 1; i < path.size(); ++i) {
+		const double a = path[i - 1].chest.y - level, b = path[i].chest.y - level;
+		if (a * b >= 0.0 || path[i - 1].u < 0.0) continue;
+		const double uc = path[i - 1].u + dt * a / (a - b);   // (when it crossed)
+		const Vec3 at = chestAt(uc);
+		const bool goingIn = b < 0.0;
+		out += giants::sprayText({at.x, level, at.z}, t - uc, 90, 2.2 * c.scale, 0.008, seed * 17 + static_cast<int>(uc * 12.0));
+		for (int k = 0; k < 75; ++k) {   // going in, a trail of bubbles from it; coming out, drips falling from it back to the water
+			const int key = seed * 1013 + static_cast<int>(uc * 100.0) * 7 + k;
+			const double born = uc + (goingIn ? 3.0 : 2.5) * k / 75.0 + 0.03 * hash01(key, 1);
+			if (born > t) break;
+			const Vec3 from = chestAt(born) + Vec3{0.25 * (hash01(key, 2) - 0.5), 0.3 * (hash01(key, 3) - 0.5), 0.25 * (hash01(key, 4) - 0.5)} * c.scale;
+			if (goingIn) {
+				undersea::Bubble bb;
+				if (from.y < level && undersea::bubbleAt(from, (0.002 + 0.006 * hash01(key, 5)) * c.scale, t - born, t, key, level, spec.current, bb)) bubbles.push_back(bb);
+			} else {
+				const double age = t - born, y = from.y - 0.5 * 9.8 * age * age;
+				if (y <= level || from.y <= level) continue;
+				char buf[200];
+				std::snprintf(buf, sizeof buf, "AttributeBegin\n  Translate %.4f %.4f %.4f\n  Shape \"sphere\" \"float radius\" [ %.4f ]\nAttributeEnd\n", from.x, y, from.z, 0.004 + 0.006 * hash01(key, 6));
+				drops += buf;
+			}
+		}
+	}
+	if (!drops.empty()) out += "# drips (film_world.cpp waterPlay)\nAttributeBegin\n  Material \"dielectric\" \"float eta\" [ 1.33 ]\n" + drops + "AttributeEnd\n";
+	const Sample &last = path.back();
+	if (underwater(c) && last.chest.y < level) {
+		const double speed = length(last.chest - path[path.size() - 4].chest) / (3.0 * dt);   // (over the last quarter second)
+		if (swimming(c) && last.going > 0.4 && speed > 0.8)   // a wake of bubbles behind a fast swimmer (0.8 m/s and more), from where it was
+			for (int k = 0; k < 24; ++k) {
+				const int key = seed * 337 + static_cast<int>(std::floor(t * 8.0)) * 31 - k * 31;
+				const double born = std::floor(t * 8.0) / 8.0 - k / 8.0;
+				undersea::Bubble bb;
+				const Vec3 from = chestAt(born) + Vec3{0.1 * (hash01(key, 1) - 0.5), -0.05, 0.1 * (hash01(key, 2) - 0.5)} * c.scale;
+				if (born > t - back && undersea::bubbleAt(from, (0.0015 + 0.003 * hash01(key, 3)) * c.scale, t - born, t, key, level, spec.current, bb)) bubbles.push_back(bb);
+			}
+		for (std::size_t i = 1; i < path.size(); ++i)   // a puff of silt where each step comes down on the seabed
+			if (std::floor(path[i].steps) > std::floor(path[i - 1].steps) && path[i].going > 0.1) {
+				const Vec3 p = path[i].chest;
+				const double bed = seabedAt(p.x, p.z) + 0.04;
+				if (p.y - bed < 0.9 * kind.height * c.scale + 0.3)
+					out += undersea::siltText({p.x, bed, p.z}, t - path[i].u, 0.12 * c.scale, seed * 7 + static_cast<int>(path[i].steps));
+			}
+	}
+	return out + undersea::bubblesText(bubbles);
+}
 // Round 16: what the water sounds like (film_dressing.h) - the reef's hush and crackle while the ears are under the water, the waves' wash while they are above
 // it, changing as the camera crosses the waterline (cartoons.cpp leaves an underwater film's `reef` and `sea` beds to here) - and the boats, the dolphins and the
 // whales, and the gannets' plunges, from where they are. `natureAt`: nature's time at a film time; `bedAt`: the seabed's height (pbrt's x z).
@@ -1383,7 +1511,7 @@ std::string DataFilm::motionOf(const Character &c, const CharacterKind &kind, do
 		}, t, jiggle);
 	std::string text = kind.text(m);
 	// squash and stretch: the whole of it deformed along its motion and by its bouncy spring
-	const double squash = motion::amountFor(spec.squash, c.name);
+	const double squash = motion::amountFor(spec.squash, c.name) * (underwater(c) ? 0.5 : 1.0);   // (round 17: toned down in the water, which cushions every move)
 	if (squash > 0.0)
 		text = motion::wrapped(text, motion::squashStretch([&](double u) {
 			Vec3 at;

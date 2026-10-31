@@ -1,0 +1,38 @@
+# A starter cartoon under the sea (python scripts/anim/film.py new ice NAME): under the sea ice, a breathing hole of light, seals, and a fish who has never seen ice.
+# Change anything - the grammar is in docs/VIDEO_GENERATION.md ("Under the sea", rounds 14 to 17). Heights on the sea's lines are above the seabed, 15 m down here;
+# a character's y and the camera's keys are the world's (the surface is at 0).
+film    {{key}}
+name    {{name}}
+about   A little fish swims under the polar ice for the first time, follows the light to a hole in it, and meets the seals who come up there to breathe.
+scene   film_assets/wild/set.pbrt
+length  22
+tags    cartoon, underwater
+
+toon       bands 3  lines 2
+water      sea  level 0  waves 0.1
+sky        12:00 12:00 south 0 physical
+underwater clarity 1.5  colour blue
+exposure   auto
+
+icecap     thickness 1.5  holes 1  hole 0 -12  seed 4
+swimmers   sealions 2  at 0 10 -12  radius 5
+
+character  finn fish  at 0 -9 -2  facing 180
+character  olly octopus  at 2 -14.6 -4  facing 200
+walk       finn  6 0.6  0 -9.5
+say        finn  1 "It's so cold up here!"
+gesture    finn  "shrug" 1 1.4 3 3.4
+say        olly  4 "That's the ice, Finn. A roof on the sea."
+gesture    olly  "point" 4 4.4 6.5 7
+say        finn  9 "There's light over there!"
+feel       finn  happy 12 12.5 20 20.5
+say        finn  14 "Hello, seals!"
+gesture    finn  "wave" 14 14.4 16 16.4
+
+shot 0 Under the ice
+  key   1.6 -9.6 1.2   0 -7.5 -5   58
+  key   1.2 -9.8 0.6   0 -7.5 -6   56
+shot 8 The light
+  key   -1.2 -10.5 -2.5   0 -2 -12   62
+shot 13 The seals
+  key   2.2 -8.5 -5.5   0 -5 -12   52

@@ -415,6 +415,7 @@ struct LaunchArgs {
 	int draft_step = 1;
 	// --temporal-denoise [R]: a cartoon video's frames are denoised with the R frames either side in their shot (launcher/film_temporal.h; R 1 to 3, 2 when not given); 0 = not.
 	int temporal_radius = 0;
+	bool no_temporal = false;   // (--no-temporal-denoise: not even a film's own default, FilmMeta::temporal)
 	// --ppm-only: write the picture as a PPM and no PNG beside it. A cartoon video's frame runs are started with it (the video turns each PPM into its numbered PNG itself and deletes the
 	// frame run's own PNG, so making one was a second encode of every frame); people have no use for it.
 	bool ppm_only = false;
@@ -988,6 +989,10 @@ inline FlagResult handle_image_and_video_flag(const std::string& arg, int argc, 
 	} else if (arg == "--resume") {
 		out.cartoon_resume = true;
 		consumed_args.insert(i);
+	} else if (arg == "--no-temporal-denoise") {
+		out.no_temporal = true;
+		out.temporal_radius = 0;
+		consumed_args.insert(i);
 	} else if (arg == "--temporal-denoise") {
 		out.temporal_radius = 2;
 		consumed_args.insert(i);
@@ -1407,6 +1412,7 @@ inline void print_launch_help(const char* program) {
 				  << "               settings and --resume then renders only the frames the draft left out\n"
 				  << "  --temporal-denoise [R]: a cartoon video's frames denoised with the R (1 to 3, default 2) either side\n"
 				  << "               in their shot where nothing moves: less flicker, or as smooth with fewer samples\n"
+				  << "               (a film under the water does this with R 1 by default; --no-temporal-denoise: not)\n"
 				  << "               Accepts either short id or descriptive key:\n"
 				  << "               V1/cornell-orbit, V2/teapot-spin, V3/one-weekend-flyby,\n"
 				  << "               V4/next-week-finale, V5/glass-dragon-caustics,\n"

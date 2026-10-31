@@ -106,7 +106,7 @@ inline std::string inLinkGroup(const std::string &text, const std::string &group
 		const std::size_t typeEnd = text.find('"', at + 7);
 		if (typeEnd == std::string::npos) break;
 		out.append(text, from, typeEnd + 1 - from);
-		out += " \"string linkgroup\" \"" + group + "\"";
+		if (text.compare(typeEnd + 1, 19, " \"string linkgroup\"") != 0) out += " \"string linkgroup\" \"" + group + "\"";   // (one in a group already keeps it: a film's bubbles)
 		from = typeEnd + 1;
 	}
 	out.append(text, from, std::string::npos);

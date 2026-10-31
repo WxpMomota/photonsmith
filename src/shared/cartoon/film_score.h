@@ -5,6 +5,10 @@
 // a short shot quicker), and from them a key (major or minor), a tempo and a progression of chords: a pad holding each chord, the bass on its root, a melody of its notes on
 // the beat (a bell when it is happy, a pluck when calm, strings when sad, a low pulse when it is afraid), a swell into a surprise; and a hit on every cut. The levels are low:
 // the music sits under the lines, and is ducked under them besides. A draft: change it as any cues file.
+//
+// Under the sea (round 17: a film with `underwater`) a calm or happy shot is scored for the water: slower, its chords with their sevenths (a floating, unresolved sound), a
+// marimba-like mallet for the melody, everything sent deep into the reverb, and now and then a run of high notes rising like bubbles. (The whole score is heard muffled
+// while the camera is under the water: DataFilm::musicCutoffs.)
 
 #include <algorithm>
 #include <cmath>
@@ -44,10 +48,15 @@ struct Style {
 	std::vector<std::vector<int>> chords;   // degrees of the scale (0 the tonic) each chord's root, third and fifth stand on
 	std::string melody, pad = "pad";
 	double melodyGain = 0.035;
+	double send = 0.7;      // (how much of the chords goes to the reverb)
+	bool bubbles = false;   // (under the sea: a rising run of high notes now and then)
 };
-inline Style styleOf(const std::string &mood, bool fast) {
+inline Style styleOf(const std::string &mood, bool fast, bool sea = false) {
 	Style s;
-	if (mood == "happy" || mood == "smug") {
+	if (sea && (mood == "calm" || mood == "happy" || mood == "smug" || mood == "sleepy" || mood == "thinking")) {
+		s.bpm = mood == "happy" || mood == "smug" ? 92 : 72, s.chords = {{0, 2, 4, 6}, {3, 5, 7, 9}, {5, 7, 9, 11}, {1, 3, 5, 7}}, s.melody = "mallet", s.send = 0.9;   // Imaj7 IVmaj7 vi7 ii7
+		s.bubbles = true;
+	} else if (mood == "happy" || mood == "smug") {
 		s.bpm = 112, s.chords = {{0, 2, 4}, {4, 6, 8}, {5, 7, 9}, {3, 5, 7}}, s.melody = "bell";   // I V vi IV
 	} else if (mood == "sad") {
 		s.minor = true, s.bpm = 66, s.chords = {{0, 2, 4}, {5, 7, 9}, {2, 4, 6}, {6, 8, 10}}, s.melody = "strings", s.pad = "strings", s.melodyGain = 0.025;   // i VI III VII
@@ -81,7 +90,7 @@ inline std::string draft(const film_file::DataFilm &d) {
 		const double t0 = starts[k], t1 = k + 1 < starts.size() ? starts[k + 1] : d.spec.length;
 		const std::string mood = moodOf(d, t0, t1);
 		const bool fast = lively(d, t0, t1) || t1 - t0 < 3.0;
-		const Style s = styleOf(mood, fast);
+		const Style s = styleOf(mood, fast, d.spec.hasUnderwater);
 		const double beat = 60.0 / s.bpm, bar = 4.0 * beat;
 		std::snprintf(buf, sizeof buf, "\n[%zu]   # %s: %s, %s, %.0f a minute\n", k + 1, k < d.spec.shots.size() ? d.spec.shots[k].name.c_str() : "the film", mood.c_str(),
 					  s.minor ? "minor" : "major", s.bpm);
@@ -92,13 +101,20 @@ inline std::string draft(const film_file::DataFilm &d) {
 			const double len = std::min(2.0 * bar, t1 - t0 - at) + 0.6;
 			// (the chords round middle C and the bass an octave under, at levels heard over a film's ambience: an octave lower they were under 200 Hz, where small
 			// speakers and ears are weakest, and birdsong at 2 to 5 kHz hid them)
-			std::snprintf(buf, sizeof buf, "%-6.2f %-7s %d %d %d  length %.2f  gain 0.05  send 0.7\n", at, s.pad.c_str(), noteOf(c[0], s.minor, 0), noteOf(c[1], s.minor, 0),
-						  noteOf(c[2], s.minor, 0), len);
+			std::snprintf(buf, sizeof buf, "%-6.2f %-7s %d %d %d", at, s.pad.c_str(), noteOf(c[0], s.minor, 0), noteOf(c[1], s.minor, 0), noteOf(c[2], s.minor, 0));
 			out += buf;
+			if (c.size() > 3) out += " " + std::to_string(noteOf(c[3], s.minor, 0));   // (the seventh)
+			std::snprintf(buf, sizeof buf, "  length %.2f  gain 0.05  send %.1f\n", len, s.send);
+			out += buf;
+			if (s.bubbles && chord % 2 == 1) {   // (bubbles: four notes of the chord two octaves up, rising quickly, soft, deep in the reverb)
+				std::snprintf(buf, sizeof buf, "%-6.2f pluck   %d %d %d %d  spread 0.07  length 0.6  gain 0.018  send 1.0\n", at + bar + 0.5 * beat, noteOf(c[0], s.minor, 2),
+							  noteOf(c[1], s.minor, 2), noteOf(c[2], s.minor, 2), noteOf(c[0] + 7, s.minor, 2));
+				out += buf;
+			}
 			std::snprintf(buf, sizeof buf, "%-6.2f bass    %d  length %.2f  gain 0.08\n", at, noteOf(c[0], s.minor, -1), std::min(2.0 * bar, len));
 			out += buf;
 			for (int b = 0; b < 8 && at + b * beat < t1 - t0 - 0.1; b += (s.melody == "knock" ? 1 : 2)) {   // (the melody on every other beat; a pulse on every beat)
-				const int degree = c[static_cast<std::size_t>((b / 2 + chord) % 3)] + (b % 4 == 2 ? 7 : 0);
+				const int degree = c[static_cast<std::size_t>((b / 2 + chord) % static_cast<int>(c.size()))] + (b % 4 == 2 ? 7 : 0);
 				const double g = 2.0 * s.melodyGain;   // (the melody over the chords and the ambience)
 				if (s.melody == "knock") std::snprintf(buf, sizeof buf, "%-6.2f knock  gain %.3f\n", at + b * beat, b % 4 == 0 ? g : 0.6 * g);
 				else std::snprintf(buf, sizeof buf, "%-6.2f %-7s %d  length %.2f  gain %.3f  send 0.5\n", at + b * beat, s.melody.c_str(), noteOf(degree, s.minor, 0), 2.0 * beat, g);

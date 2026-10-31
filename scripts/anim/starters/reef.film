@@ -1,0 +1,48 @@
+# A starter cartoon under the sea (python scripts/anim/film.py new reef NAME): a sunny reef, a fish and a crab, a pufferfish that puffs up and a treasure chest.
+# Change anything - the grammar is in docs/VIDEO_GENERATION.md ("Under the sea", rounds 14 to 17). Heights on the sea's lines are above the seabed, 15 m down here;
+# a character's y and the camera's keys are the world's (the surface is at 0).
+film    {{key}}
+name    {{name}}
+about   On a sunny reef a little fish and a crab find a treasure chest - and a pufferfish who does not like visitors.
+scene   film_assets/wild/set.pbrt
+length  24
+tags    cartoon, underwater
+
+toon       bands 3  lines 2
+water      sea  level 0  waves 0.4
+sky        11:00 11:00 south 0 physical
+underwater clarity 2  colour teal  ripples
+exposure   auto
+current    0.08 toward 60
+
+reef       30 in -9 -16 9 -10
+clownfish  -2.6 0 -6.5  count 3
+pufferfish 2.2 0.9 -6  at 12.5
+shells     60 in -5 -10 5 -3
+chest      0.4 -9  toward 0  open 17
+
+character  finn fish  at -1.2 -13.9 -4  facing 180
+character  cora crab  at 1.2 -15 -4.2  facing 200
+walk       cora  1.0 0.3  1.1 -6  0.9 -7.8
+walk       finn  7.5 0.5  -0.4 -6.5  -0.3 -7.9
+say        finn  1.5 "Cora, look! Something shiny!"
+gesture    finn  "point" 1.4 1.8 3.6 4
+say        cora  5 "It's only a shell, Finn."
+gesture    cora  "shrug" 5 5.4 6.8 7.2
+say        finn  10.5 "Let's ask him."
+gesture    finn  "wave" 10.5 10.9 12 12.4
+feel       finn  surprised 12.6 13 14.5 15
+say        cora  16 "Never mind him... look!"
+gesture    cora  "snap" 16 16.3 17.5 18
+feel       finn  happy 17.5 18 23 23.5
+gesture    finn  "cheer" 18.5 18.9 21 21.5
+say        finn  19 "Treasure!"
+
+shot 0 The reef
+  key   0.2 -13.2 0   -0.2 -14.3 -5   50
+  key   0.4 -13.4 -1.2   0 -14.4 -5.5   48
+shot 9.5 The pufferfish
+  key   0.6 -13.7 -3.6   1.6 -14.2 -6.2   42
+shot 15 The chest
+  key   -1.6 -13.6 -5.4   0.3 -14.6 -8.8   48
+  key   -1.4 -13.7 -5.8   0.3 -14.6 -8.8   46

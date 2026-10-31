@@ -1058,6 +1058,12 @@ inline int assembleVideoFile(const std::filesystem::path &frames_dir, int conver
 
 // --video: renders the frames along a camera path, converts them to PNG as they finish, and assembles an MP4.
 inline int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
+    if (const cartoon::Film *film = cartoon::forCameraPath(s.camera_path.c_str()); film && film->meta.temporal > 0 && args.temporal_radius == 0 && !args.no_temporal) {
+        LaunchArgs own = args;   // (the film's own default: FilmMeta::temporal - a film under the water)
+        own.temporal_radius = film->meta.temporal;
+        std::cout << "Frames denoised with their neighbours (the film's default; --no-temporal-denoise for none)" << std::endl;
+        return run_video_render(own, s);
+    }
     const int image_width = s.image_width;
     const int image_height = s.image_height;
     // what this run prints, kept beside the video (<name>_video.log), and its warnings and errors summed up when it ends, however it ends (run_log.h)

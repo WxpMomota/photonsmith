@@ -179,6 +179,12 @@
 //     vents    3 in -6 -46 6 -40                                 # black smokers (film_vents.h); `murk X Y Z [radius R] [green|grey]`, `silt X Z at T`
 //     tornado  150 at 0 3 -8  around Ana                         # barracuda (film_behaviour.h); `cleaningstation`, `playmate X Y Z with NAME`, `damselfish N at`
 //     wreckroom 30 -20  length 12                                # inside a wreck; `underwater port flat filter red`: a camera's housing
+//     character finn fish  at 0 -12 -4                           # round 17: the sea's characters (film_sea_kinds.h): fish, crab, octopus
+//     clownfish 0 0 -6  count 3                                  # comic sea life (film_vignettes.h): `pufferfish X Y Z [at T]`, `flounder X Z [at T]`,
+//                                                               # `moray X Y Z [at T]`, `cleanershrimp NAME`, `dugong X Z [radius R]`
+//     seacave  0 -20  radius 8                                   # places: a sea cave, `ruins X Z [length L]` (a sunken city); `icecap [holes N]`: ice overhead
+//     chest    0 -8  open 12                                     # treasure (film_treasure.h): `clam X Z [shut T]`, `bottle X Y Z`, `shells N in X0 Z0 X1 Z1`
+//     sink     coin 0 3 -6  at 4                                 # something let go in the water: coin, anchor, rock, ball (it floats); `moonlight [elevation E]`
 //     space    stars 1  milkyway 1  sun 60 15                   # the universe (film_space.h, round 10): a set in space - the stars all round, the Milky Way, the sun a
 //                                                               # glowing ball at a bearing and an elevation; no sky, no air
 //     planet   home ocean  at 0 0 -20000  radius 6000           # a planet (film_planets.h): rocky, desert, ice, ocean, gas or lava; `tilt`, `spin SECONDS`

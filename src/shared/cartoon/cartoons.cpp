@@ -153,13 +153,14 @@ Film withFilmFiles(Film f) {
 	f.headerAt = wrap(f.headerAt);
 	const std::string cues = music_cues::fileOf(key);
 	if (!cues.empty()) {
-		f.soundtrack = [base = f.soundtrack, starts = f.shotStarts, names, own = f.instruments, cues, speech = f.speechAt](audio::Mix &m) {
+		f.soundtrack = [base = f.soundtrack, starts = f.shotStarts, names, own = f.instruments, cues, speech = f.speechAt, muffle = f.musicCutoffs](audio::Mix &m) {
 			if (base) base(m);
 			const music_cues::Sheet sheet = music_cues::read(cues);
 			std::vector<std::string> problems = sheet.problems;
 			// the cues on a mix of their own, ducked under the characters' lines (down by up to two thirds, in 0.06 s and back over 0.5 s) and laid on the film's sound
 			audio::Mix music(m.seconds());
 			music_cues::play(music, sheet, own ? own() : std::map<std::string, CueInstrument>(), starts ? starts() : std::vector<double>(), names, problems);
+			if (muffle) music.lowPass(muffle());   // (round 17: muffled while the camera is under the water)
 			m.add(music, speech ? music_cues::duckingOf(speech, m.seconds() + 4.0) : std::vector<float>());
 			for (const std::string &problem : problems) std::cerr << "[cues] " << cues << ": " << problem << std::endl;
 		};
@@ -218,6 +219,7 @@ Film filmOf(Registry &r, const film_file::DataFilm &d, bool drafted, int id, con
 	Film f{r.keep(d.spec.key), r.keep(d.spec.name), r.keep(d.spec.about.empty() ? "A film made from " + std::filesystem::path(d.spec.scene).filename().string() + "." : d.spec.about),
 		   d.spec.length, d.spec.fps, [p](double t) { return p->sceneAt(t); }, [p](double t) { return p->headerAt(t); }, [p]() { return p->shotStarts(); }, d.spec.still,
 		   {id, r.keep(tags), r.keep(d.shotNames()), d.scene.samples, 0.0}};
+	if (d.spec.hasUnderwater) f.meta.temporal = 1;   // (round 17: the open water calmed over frames: FilmMeta::temporal)
 	if (d.hasEvents()) {   // a film with characters or props with physics: what its shots are about, its footsteps, touches and landings, its characters' feet
 		f.subjectsAt = [p](double t) { return p->subjectsAt(t); };
 		f.events = [p]() { return p->events(); };
@@ -225,6 +227,7 @@ Film filmOf(Registry &r, const film_file::DataFilm &d, bool drafted, int id, con
 	}
 	// how loud its characters speak (its music is ducked under it)
 	if (!d.spec.lines.empty() || !d.spec.characters.empty()) f.speechAt = [p](double t) { return p->speechAt(t); };
+	if (d.spec.hasUnderwater) f.musicCutoffs = [p]() { return p->musicCutoffs(); };   // (round 17: its music muffled while the camera is under the water)
 	// every film file has a soundtrack: its set's sound and its rain, its footsteps, touches and lines, and its music - its cues file's (withFilmFiles) or, when it has none,
 	// the score drafted from what happens in it (film_score.h; `music none` leaves it out), ducked under the lines as a cues file's music is. (One with no music and nothing
 	// else to hear has a soft wind: a video of a film is never silent.)
@@ -246,6 +249,7 @@ Film filmOf(Registry &r, const film_file::DataFilm &d, bool drafted, int id, con
 		std::vector<std::string> problems = sheet.problems;
 		audio::Mix music(m.seconds());
 		music_cues::play(music, sheet, {}, p->shotStarts(), names, problems);
+		if (p->spec.hasUnderwater) music.lowPass(p->musicCutoffs());
 		m.add(music, speech ? music_cues::duckingOf(speech, m.seconds() + 4.0) : std::vector<float>());
 		for (const std::string &problem : problems) std::cerr << "[score] " << p->spec.key << ": " << problem << std::endl;
 	};
@@ -340,6 +344,7 @@ Registry &registry() {
 		Registry *reg = new Registry();   // (lives as long as the program: films hand out pointers into it)
 		film_kinds::install();   // (before any film file is read: its characters are of these kinds)
 		film_kinds::aliens::install();   // (and the aliens and the robot: film_aliens.h)
+		film_kinds::sea::install();      // (and the sea's characters: film_sea_kinds.h)
 		for (const Film &f : kFilms) {
 			reg->made.push_back(withFilmFiles(f));
 			reg->all.push_back(&reg->made.back());

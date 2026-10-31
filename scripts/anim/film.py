@@ -25,6 +25,9 @@ The films themselves are C++ (src/shared/cartoon/: cartoon_lib.h is the toolkit,
                                                                 blurrier than its own full render. --write puts a `samples` line for each such shot into the film's cameras file
                                                                 (pbrt_scenes/film_assets/<key>/cameras.txt), which the video reads
 
+  python scripts/anim/film.py new reef my-reef                  a new film from a starter (scripts/anim/starters/: reef, wreck, ice - cartoons under the sea), written to
+                                                                pbrt_scenes/my-reef.film with its key and name filled in, ready to change and render; `new` alone lists the starters
+
 Options (before or after the command): --exe PATH (default: RayTracer_Package/ray_tracer next to this repository), --cpu (default is the GPU, denoised), --height N (picture height,
 default 270 for a sheet and 720 otherwise), --spp N, --out PATH. Plain Python 3; the contact sheet needs Pillow (pip install pillow).
 """
@@ -704,10 +707,40 @@ def cmd_video(args):
     sys.exit(subprocess.run(cmd, cwd=run_dir()).returncode)
 
 
+STARTERS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "starters")
+
+
+def cmd_new(args):
+    """A new film file from a starter: `new STARTER KEY` (KEY lower-case letters, digits and '-'), its name the key in words. Never writes over a film that is there."""
+    kinds = sorted(f[:-5] for f in os.listdir(STARTERS) if f.endswith(".film"))
+    if not args.target:
+        for k in kinds:
+            with open(os.path.join(STARTERS, k + ".film"), encoding="utf-8") as f:
+                about = next((line[5:].strip() for line in f if line.startswith("about")), "")
+            print("%-8s %s" % (k, about))
+        return
+    if args.target not in kinds:
+        sys.exit("no starter %r (there are: %s)" % (args.target, ", ".join(kinds)))
+    key = args.key
+    if not key or not all(c.islower() or c.isdigit() or c == "-" for c in key):
+        sys.exit("new %s KEY: the new film's key, lower-case letters, digits and '-' (it names the file: pbrt_scenes/KEY.film)" % args.target)
+    out = args.out or os.path.join(REPO, "pbrt_scenes", key + ".film")
+    if os.path.exists(out):
+        sys.exit("%s is there already: choose another key, or --out PATH" % out)
+    with open(os.path.join(STARTERS, args.target + ".film"), encoding="utf-8") as f:
+        text = f.read()
+    name = " ".join(w.capitalize() for w in key.split("-") if w)
+    text = text.replace("{{key}}", key).replace("{{name}}", name)
+    with open(out, "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+    print("wrote %s: render a still with  python scripts/anim/film.py still %s" % (out, key))
+
+
 def main():
     p = argparse.ArgumentParser(description="Look at a cartoon film (the films are C++: src/shared/cartoon/).")
-    p.add_argument("command", choices=["list", "still", "sheet", "video", "doctor", "budget", "preview", "baseline"])
-    p.add_argument("target", nargs="?", help="still: <key>[@seconds]; sheet and video: <key>")
+    p.add_argument("command", choices=["list", "still", "sheet", "video", "doctor", "budget", "preview", "baseline", "new"])
+    p.add_argument("target", nargs="?", help="still: <key>[@seconds]; sheet and video: <key>; new: a starter")
+    p.add_argument("key", nargs="?", help="new: the new film's key")
     p.add_argument("--exe")
     p.add_argument("--cpu", action="store_true")
     p.add_argument("--height", type=int)
@@ -727,10 +760,10 @@ def main():
         args.out = os.path.abspath(args.out)   # (the program runs from its package folder)
     if args.exe:
         args.exe = os.path.abspath(args.exe)
-    if args.command not in ("list", "baseline") and not args.target:
+    if args.command not in ("list", "baseline", "new") and not args.target:
         p.error("%s needs a film key" % args.command)
     {"list": cmd_list, "still": cmd_still, "sheet": cmd_sheet, "video": cmd_video, "doctor": cmd_doctor, "budget": cmd_budget, "preview": cmd_preview,
-     "baseline": cmd_baseline}[args.command](args)
+     "baseline": cmd_baseline, "new": cmd_new}[args.command](args)
 
 
 if __name__ == "__main__":

@@ -2406,6 +2406,66 @@ place animals, plants or bubbles also take `[seed K]` (the line's usage, said wh
 trail are bubbles left where they were shed, rising, as the boat goes on. A school is worked out once for a film and kept in its cache folder (each frame renders in a
 process of its own, and working a big school out again in every one cost seconds a frame).
 
+### Under the sea, round 17 (2026-10-30)
+
+Ten things for cartoons under the water. As in rounds 14 to 16, the heights on these lines are above the seabed (a terrain's ground, or the plain floor 15 m under the
+surface when there is none); x and z are pbrt's. A character's y and the camera's keys are the world's.
+
+**The cartoon look under the water.** (nothing to write: a film with `toon` and `underwater`) The colour script follows the depth: near the surface warm and clear, deeper
+bluer and a little more saturated (film_undersea.h toonDepthLook). The caustic net is drawn in three soft bands instead of a ramp (film_sealight.h toonNet), the ink lines
+thin with distance and take a little of the water's colour (`line-depth`, `ink-tint`, set unless the `toon` line says otherwise), and the marine snow is left out (each
+speck got an ink outline and the water filled with black dots). For the same reason the bubbles get no ink: they are put in link group `fx/bubbles` and the toon line
+names it `noink fx/bubbles` (toon_look.h: `noink NAME`, any object - a link group - drawn with no lines on or round it).
+
+**The sea's characters: `character NAME fish|crab|octopus`.** (film_sea_kinds.h) A round cartoon fish (big eyes that look and blink, lips that move as it talks, fins that
+wave), a crab that scuttles sideways on six legs and snaps its claws as it talks, and an octopus whose eight arms trail as it swims. They take the gestures of every kind
+(`wave`, `point`, `cheer`, `shrug`, `nod`, and the crab's `snap`), `say` and `feel`. A fish and an octopus swim at their own height and stay upright as they go (a person
+under the water is laid level for a breaststroke); a crab walks on the seabed under the water and does not swim.
+
+**Characters meeting the water.** (nothing to write) A character crossing the surface makes a splash; after going in it trails bubbles for three seconds, after coming out
+it drips for two and a half. Swimming fast leaves a wake of bubbles, and a step on the sand under the water kicks up a little silt.
+
+**Comic sea life.** (film_vignettes.h) `clownfish X Y Z [count N]`: an anemone with one to four clownfish darting round it, diving into its tentacles to hide whenever
+anyone - the camera, a diver, a character - comes within a metre and a half. `pufferfish X Y Z [at T]...`: a pufferfish pottering round a small circle that blows itself up
+into a spiky ball when someone comes within a metre, or at T, holds it four seconds and goes down again. `flounder X Z [at T]`: a flounder lying flat in the sand, the
+sand's colour, its two eyes swivelling; at T it bursts off the bottom in a puff of silt, flaps two metres away and settles. `moray X Y Z [toward A] [at T]...`: a moray eel
+in a hole in a rock, breathing, its mouth opening and closing; at each T it lunges out half its length, jaws wide. `cleanershrimp NAME [from T0] [to T1]`: a red and white
+cleaner shrimp walking about on character NAME's hand. `dugong X Z [radius R]`: a dugong cruising round a seagrass meadow, every nine seconds nosing down to crop the grass
+in a puff of silt. Each takes `[seed K]`.
+
+**New places: `seacave X Z [toward A] [radius R]`, `ruins X Z [toward A] [length L]`, `icecap [thickness T] [holes N] [hole X Z]...`.** (film_seabed.h, film_undersea.h) A sea cave: a dome
+of rock (R 3 to 30 m, 6) with its mouth towards A and holes in its roof letting shafts of light down. Ruins: a sunken city's paving, columns (some broken, one fallen), an
+archway and a statue on its plinth, weed and sponges growing on them (L 6 to 60 m, 12). Ice: a sheet of sea ice over the whole water (T 0.2 to 6 m thick, lumpy underneath),
+translucent, the sun glowing through it blue and dim - brighter through clear ice, darker under the thick snowy floes; in each 30 m square of the world a breathing hole with a chance of N in 4 (2), and one at each `hole X Z` (2.5 m across), where the sun comes down in a beam.
+
+**Treasure and props.** (film_treasure.h) `chest X Z [toward A] [open T]`: an iron-banded chest sunk a little in the sand; at T its lid creaks open with a bounce, a rush of
+bubbles escapes and the gold coins heaped inside glow warm. `clam X Z [shut T]... [nopearl]`: a giant clam, its wavy lips gaping and breathing, a pearl inside; at each T
+it snaps shut and opens again three seconds later. `bottle X Y Z`: a message in a bottle - at the surface it floats neck up, bobbing, and drifts with the current; below it
+lies rocking on the sand. `shells N in X0 Z0 X1 Z1`: scallops, cones, starfish and sand dollars over the sand (1 to 400).
+
+**Things fall as in water: `sink coin|anchor|rock|ball X Y Z at T`.** Something let go at T (Y above the water: dropped in from the air, a splash and a trail of bubbles as
+it goes in). In water a thing reaches its terminal speed in a moment (treasure::fallOf): a coin flutters down like a leaf at 0.3 m/s, swinging side to side; an anchor
+plunges at 2.6 m/s and lands tipped over in a big puff of silt; a rock sinks at 1.8 m/s; a ball rises and bobs at the surface. The current carries them as they go. Under
+the water (any film with `underwater`) the props that bounce or topple and the `rigid` world fall at half the film's gravity (a stone's weight in water), the water slows
+whatever moves and turns (rigid_world.h `drag`), a bounce is soft and a roll soon stops, a hard landing on the sand throws up silt, and squash and stretch is halved.
+
+**A storm and the moon from below.** (film_sealight.h) With a `storm` (or rain) overhead, seen from under the water: the light dims and brightens as the storm's clouds race
+over, white foam streaks the surface along the wind (dark against the bright water above, each streak fixed in the drifting water), every lightning stroke flashes cold
+down through the water, and the water rocks in a slow surge - the kelp, the bubbles, the silt along the bottom stirred every seven seconds (a storm sets the `current`
+when the film has none). `moonlight [elevation E] [toward A] [bright B]`: a full moon E degrees up (2 to 90, 35) towards A, its cold silver light a distant light and its
+disc in the sky; under the water, at night, the caustic net and the glints on the surface are the moon's (it is found as the sun is). It works above the water too.
+
+**Cleaner frames.** A film under the water has its video's frames denoised with their neighbours by default (`--temporal-denoise 1`; `--no-temporal-denoise` for none;
+launcher/film_temporal.h): its open water, smooth and still, boiled from frame to frame as each frame's denoiser left blotches of its own. The wavefront renderer, which
+draws the sea round the camera, already gives the denoiser the water's colour where a camera ray scatters in it before reaching a surface (its guides fade with the water).
+
+**The story kit.** `python scripts/anim/film.py new reef|wreck|ice NAME` writes a starter film (scripts/anim/starters: a sunny reef with a fish, a crab, a pufferfish and a
+chest; an old wreck with an octopus, a moray, a clam and a coin falling from a boat; under the ice with seals), its key and name filled in, ready to change; `new` alone
+lists them. The score drafted for a film under the water (film_score.h, when it has no cues file) is the sea's: slower, its chords with their sevenths, a mallet melody,
+everything deep in the reverb, and runs of high notes rising like bubbles. Its music - drafted or a cues file's - is heard muffled while the camera is under the water
+(a low-pass at 900 Hz, eased across the waterline: DataFilm::musicCutoffs, audio::Mix::lowPass), as voices already were. A line said under the water is captioned in a
+glassy speech bubble with little bubbles rising to it (launcher/film_captions.h bubbled).
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)
