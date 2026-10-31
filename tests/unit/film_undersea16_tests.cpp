@@ -17,6 +17,7 @@
 #include "../../src/shared/cartoon/film_behaviour.h"
 #include "../../src/shared/cartoon/film_boat.h"
 #include "../../src/shared/cartoon/film_dressing.h"
+#include "../../src/shared/cartoon/film_school.h"
 #include "../../src/shared/cartoon/film_sealight.h"
 #include "../../src/shared/cartoon/film_vents.h"
 #include "../../src/shared/lens_look.h"
@@ -192,7 +193,8 @@ TEST(FilmUndersea16, SetPiecesOfBehaviour) {
 	double roll = 0.0;
 	const V3 friendAt{3, -5, 0};
 	EXPECT_LT(cartoon::length(behaviour::playmateAt(pm, 6.0, [&](double) { return friendAt; }, f, roll) - friendAt), 4.0) << "round its friend";
-	for (const char *line : {"cleaningstation -3 0 -12", "tornado 150 at 0 3 -8 around Ana radius 2.5 height 4", "playmate 2 3 -6 with Ana", "damselfish 6 at -1 0.4 -3 radius 1.5"})
+	for (const char *line : {"cleaningstation -3 0 -12", "diver Ana from 0 2 0 to 4 2 -4\ntornado 150 at 0 3 -8 around Ana radius 2.5 height 4", "diver Ana from 0 2 0 to 4 2 -4\nplaymate 2 3 -6 with Ana",
+							 "damselfish 6 at -1 0.4 -3 radius 1.5"})
 		EXPECT_EQ(problemWith(line), "") << line;
 	EXPECT_NE(problemWith("tornado 5 at 0 3 -8"), "") << "10 at least";
 }
@@ -291,4 +293,78 @@ TEST(FilmUndersea16, AWholeDive) {
 	for (const char *what : {"# a boat", "# the sardine run", "# hydrothermal vents", "# murky water", "# silt", "# a cleaning station", "# a barracuda tornado",
 							 "# a playful sea lion", "# damselfish"})
 		EXPECT_NE(a.find(what), std::string::npos) << what;
+}
+
+// ---- the review of rounds 14 to 16 ----------------------------------------------------------------------------------------------------------------------------------------
+
+// A mover's trail of bubbles: each bubble is born at its own time and left where it was shed, so from one frame to the next the bubbles stay put (rising a little) while
+// the mover goes on - not a trail laid out afresh behind it each frame.
+TEST(FilmUndersea16, ATrailsBubblesStayWhereTheyWereShed) {
+	const auto path = [](double t) { return V3{2.0 * t, -6.0, 0.0}; };   // (2 m/s along x)
+	std::vector<undersea::Bubble> a, b;
+	undersea::trailBubbles(path, 5.0, 30.0, 1.0, 7, 0.0, underwater::Current(), a);
+	undersea::trailBubbles(path, 5.05, 30.0, 1.0, 7, 0.0, underwater::Current(), b);
+	ASSERT_GT(a.size(), 50u);
+	int stayed = 0;
+	for (const undersea::Bubble &p : a)
+		for (const undersea::Bubble &q : b)
+			if (std::abs(p.p.x - q.p.x) < 0.02 && std::abs(p.p.z - q.p.z) < 0.02 && q.p.y >= p.p.y) {
+				++stayed;
+				break;
+			}
+	EXPECT_GT(stayed, static_cast<int>(0.8 * a.size())) << "the mover went 10 cm on: its old bubbles did not go with it";
+}
+
+// An underwater film is heard as a reef under the water and as the sea's waves above it; the lines of rounds 14 to 16 need `underwater`; a tornado or a sea lion names a
+// diver that is there.
+TEST(FilmUndersea16, AnUnderwaterFilmsLinesAndItsSound) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("heard", std::string(kSea) + "shot 0 S\n  key 0 -5 4  0 -5 -4  50\n", film), "");
+	for (const char *kind : {"reef", "sea"})
+		EXPECT_TRUE(std::any_of(film.spec.ambience.begin(), film.spec.ambience.end(), [&](const cartoon::dressing::Ambience &x) { return x.kind == kind; })) << kind;
+	ff::DataFilm dry;
+	EXPECT_NE(loadFilm("dry16", "scene s.pbrt\nlength 12\nwater sea level 0\nboat 0 -14 speed 2\n", dry).find("underwater"), std::string::npos) << "a boat with no `underwater`";
+	EXPECT_NE(problemWith("tornado 50 at 0 3 -8 around Bob"), "") << "no diver called Bob";
+	EXPECT_NE(problemWith("playmate 2 3 -6 with Bob"), "");
+	EXPECT_EQ(problemWith("diver Bob from 0 2 0 to 4 2 -4\ntornado 50 at 0 3 -8 around Bob\nplaymate 2 3 -6 with Bob"), "");
+}
+
+// The anchor's puff of silt starts as it lands: anchorTime turns anchorFall round.
+TEST(FilmUndersea16, TheAnchorsSiltStartsAsItLands) {
+	for (const double s : {0.1, 0.25, 1.0, 4.0, 9.0}) EXPECT_NEAR(boat::anchorTime(boat::anchorFall(s)), s, 1e-9) << s;
+	boat::Boat b;
+	b.speed = 0.0, b.anchor = 1.0;
+	const double lands = 1.0 + boat::anchorTime(10.0 + 0.05 * b.length - 0.16);   // (the bow 5% of its length over the surface, the bed 10 m down)
+	EXPECT_EQ(boat::boatText(b, lands - 0.05, 0.0, flat, underwater::Current()).find("# silt"), std::string::npos) << "still falling";
+	EXPECT_NE(boat::boatText(b, lands + 0.05, 0.0, flat, underwater::Current()).find("# silt"), std::string::npos) << "landed";
+}
+
+// A flat port narrows the view only with water in front of it: a shot above the surface keeps its own field of view.
+TEST(FilmUndersea16, AFlatPortOnlyUnderTheWater) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("port", std::string(kSea) + "underwater port flat\nshot 0 Under\n  key 0 -5 4  0 -5 -4  60\nshot 5 Above\n  key 0 4 4  0 4 -4  60\n", film), "");
+	static const std::regex fov(R"("float fov" \[ (\S+) \])");
+	const auto fovAt = [&](double t) {
+		const std::string s = film.sceneAt(t);
+		std::smatch m;
+		return std::regex_search(s, m, fov) ? std::atof(m[1].str().c_str()) : -1.0;
+	};
+	EXPECT_LT(fovAt(2.0), 59.0);
+	EXPECT_NEAR(fovAt(8.0), 60.0, 0.5);
+}
+
+// A school's worked-out swim goes to bytes and back whole (each frame's process reads it from the film's cache instead of working it out again).
+TEST(FilmUndersea16, ASchoolsSwumIsKeptWhole) {
+	cartoon::school::School sc;
+	sc.count = 40, sc.strikes = {2.0};
+	cartoon::school::prepare(sc, 4.0, [](double) { return std::vector<V3>{}; });
+	cartoon::school::School back;
+	back.count = 40;
+	ASSERT_TRUE(cartoon::school::swumFrom(back, cartoon::school::swumBytes(sc)));
+	EXPECT_EQ(back.pos.size(), sc.pos.size());
+	EXPECT_EQ(back.dashes.size(), sc.dashes.size());
+	EXPECT_NEAR(cartoon::length(cartoon::school::fishAt(back, 7, 3.3) - cartoon::school::fishAt(sc, 7, 3.3)), 0.0, 1e-4);
+	cartoon::school::School other;
+	other.count = 41;
+	EXPECT_FALSE(cartoon::school::swumFrom(other, cartoon::school::swumBytes(sc))) << "another school's";
 }

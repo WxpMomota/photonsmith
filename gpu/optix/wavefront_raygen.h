@@ -376,12 +376,31 @@ extern "C" __global__ void __raygen__wf_shadow() {
 	);
 
 	// The listed volumes (their boundary spheres were skipped by the trace): what gets through the part of the shadow ray inside each - all of it
-	// that lies in one, wherever the ray starts and ends (a fog point lit by a lamp in the same fog).
-	for (unsigned int i = 0; i < wf_params.numMediumShapes && sp.transmittance > 0.0f; ++i) {
-		const GpuMediumShape& shape = wf_params.mediumShapes[i];
-		float t0, t1;
-		if (wf_medium_shape_flight(shape, s.origin, s.direction, 0.0f, s.tMax, t0, t1))
-			wf_shadow_through_medium(wf_params.materials[shape.materialIdx], s.origin, s.direction, t0, t1, &sp);
+	// that lies in one, wherever the ray starts and ends (a fog point lit by a lamp in the same fog). Walked along the ray as the camera's flights
+	// are (__raygen__wf_intersect): where the ray is in two at once only the one it leaves first counts, and a volume inside another takes over
+	// where the ray enters it - murk or ink in the sea round the camera replaces the sea there, not adds to it.
+	float along = 0.0f;
+	for (int guard = 0; guard < 64 && along < s.tMax && sp.transmittance > 0.0f; ++guard) {
+		int in = -1;
+		float inEnd = 0.0f, nextStart = 1e30f;
+		const float tie = 1e-5f * fmaxf(1.0f, fabsf(along));
+		for (unsigned int i = 0; i < wf_params.numMediumShapes; ++i) {
+			float t0, t1;
+			if (!wf_medium_shape_flight(wf_params.mediumShapes[i], s.origin, s.direction, along, s.tMax, t0, t1)) continue;
+			if (t0 <= along + tie) {
+				if (in < 0 || t1 < inEnd) in = (int)i, inEnd = t1;
+			} else {
+				nextStart = fminf(nextStart, t0);
+			}
+		}
+		if (in < 0) {   // (between volumes: on to the next one the ray enters)
+			if (nextStart >= 1e29f) break;
+			along = nextStart;
+			continue;
+		}
+		const float end = fminf(inEnd, nextStart);
+		wf_shadow_through_medium(wf_params.materials[wf_params.mediumShapes[in].materialIdx], s.origin, s.direction, along, end, &sp);
+		along = end;
 	}
 
 	// Write result into the transmittance array (reused from framebuffer

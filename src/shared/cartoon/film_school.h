@@ -14,7 +14,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <functional>
 #include <map>
 #include <string>
@@ -170,6 +172,50 @@ inline void prepare(School &s, double seconds, const std::function<std::vector<V
 		v = nv;
 		for (int i = 0; i < n; ++i) p[static_cast<std::size_t>(i)] = p[static_cast<std::size_t>(i)] + v[static_cast<std::size_t>(i)] * s.dt;
 	}
+}
+// A worked-out swim as bytes (positions and velocities as floats, the dashes as doubles) and back: a film's frames each render in a process of their own, and working a
+// big school out again in every one cost seconds a frame - the first keeps it on disk for the rest (DataFilm::schoolsSwum). False when the bytes are not a whole swim of `s`.
+inline std::string swumBytes(const School &s) {
+	std::string out;
+	const auto put = [&out](const void *p, std::size_t n) { out.append(static_cast<const char *>(p), n); };
+	const std::uint32_t steps = static_cast<std::uint32_t>(s.pos.size()), n = static_cast<std::uint32_t>(s.count), dashes = static_cast<std::uint32_t>(s.dashes.size());
+	put(&steps, 4), put(&n, 4), put(&dashes, 4);
+	out.reserve(out.size() + static_cast<std::size_t>(steps) * n * 24 + dashes * 56);
+	for (const auto *all : {&s.pos, &s.vel})
+		for (const std::vector<Vec3> &row : *all)
+			for (const Vec3 &q : row) {
+				const float f[3] = {static_cast<float>(q.x), static_cast<float>(q.y), static_cast<float>(q.z)};
+				put(f, 12);
+			}
+	for (const School::Dash &d : s.dashes) {
+		const double v[7] = {d.from.x, d.from.y, d.from.z, d.dir.x, d.dir.y, d.dir.z, d.start};
+		put(v, 56);
+	}
+	return out;
+}
+inline bool swumFrom(School &s, const std::string &bytes) {
+	std::uint32_t head[3];
+	if (bytes.size() < 12) return false;
+	std::memcpy(head, bytes.data(), 12);
+	const std::size_t steps = head[0], n = head[1], dashes = head[2];
+	if (n != static_cast<std::size_t>(s.count) || steps < 2 || bytes.size() != 12 + steps * n * 24 + dashes * 56) return false;
+	const char *p = bytes.data() + 12;
+	for (auto *all : {&s.pos, &s.vel}) {
+		all->assign(steps, std::vector<Vec3>(n));
+		for (std::vector<Vec3> &row : *all)
+			for (Vec3 &q : row) {
+				float f[3];
+				std::memcpy(f, p, 12), p += 12;
+				q = {f[0], f[1], f[2]};
+			}
+	}
+	s.dashes.resize(dashes);
+	for (School::Dash &d : s.dashes) {
+		double v[7];
+		std::memcpy(v, p, 56), p += 56;
+		d.from = {v[0], v[1], v[2]}, d.dir = {v[3], v[4], v[5]}, d.start = v[6];
+	}
+	return true;
 }
 // Where fish i is at t (pbrt's) and its velocity, between the worked-out steps.
 inline Vec3 fishAt(const School &s, int i, double t, Vec3 *vel = nullptr) {

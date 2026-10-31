@@ -2386,8 +2386,15 @@ wreckroom  30 -20  length 12
 ```
 
 The GPU's wavefront renderer now draws a fog, smoke or ink volume inside another one - the murk, the vents' plumes, round 14's octopus ink, all inside the sea round the
-camera: before, it sampled the inner one only beyond the outer one's far side, so the inner showed only as its shadow. And a camera at the waterline stays a little under
-the surface at its lens with the waves (at nine tenths of the wave it was above the water in a trough, and the picture's lower half showed the surface's top).
+camera: before, it sampled the inner one only beyond the outer one's far side, so the inner showed only as its shadow. Its light's shadow rays take the inner one in place
+of the sea too (they had counted both, and a murk cast a dark disc on the sand even when thin). And a camera at the waterline stays a little under the surface at its lens
+with the waves (at nine tenths of the wave it was above the water in a trough, and the picture's lower half showed the surface's top).
+
+The lines of rounds 14 to 16 (divers, schools, boats, vents, murk, the seabed's life and places, bubbles, `waterline` shots...) need an `underwater` line: without one the
+film is not read, where before they were left out of the picture without a word. `tornado ... around NAME` and `playmate ... with NAME` name a diver of the film, matched
+exactly. An underwater film is heard as a reef under the water and as the sea's waves above it, unless its `ambience` lines say otherwise. A boat's wake and a swimmer's
+trail are bubbles left where they were shed, rising, as the boat goes on. A school is worked out once for a film and kept in its cache folder (each frame renders in a
+process of its own, and working a big school out again in every one cost seconds a frame).
 
 ## Examples
 

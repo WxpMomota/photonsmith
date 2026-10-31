@@ -335,7 +335,8 @@ TEST(FilmUndersea14, PlacesToFilm) {
 
 // ---- the whole sea in a film -------------------------------------------------------------------------------------------------------------------------------------------------
 
-// A film with every round-14 line: each is in its frame, the frame changes as nature's time goes on, and the sea is heard as a reef, not as waves.
+// A film with every round-14 line: each is in its frame, the frame changes as nature's time goes on, and the sea is heard as a reef under the water (and as waves above it:
+// round 16's soundscape plays one or the other by the camera's side of the surface).
 TEST(FilmUndersea14, AWholeReefFilm) {
 	ff::DataFilm film;
 	const std::string text = std::string("scene s.pbrt\nlength 10\nwater sea level 0 waves 0.4\nunderwater clarity 2 ripples\ncurrent 0.2 toward 90\n") +
@@ -348,5 +349,5 @@ TEST(FilmUndersea14, AWholeReefFilm) {
 		EXPECT_NE((a + b).find(what), std::string::npos) << what;
 	EXPECT_NE(a, b);
 	EXPECT_TRUE(std::any_of(film.spec.ambience.begin(), film.spec.ambience.end(), [](const cartoon::dressing::Ambience &x) { return x.kind == "reef"; }));
-	EXPECT_FALSE(std::any_of(film.spec.ambience.begin(), film.spec.ambience.end(), [](const cartoon::dressing::Ambience &x) { return x.kind == "sea"; }));
+	EXPECT_TRUE(std::any_of(film.spec.ambience.begin(), film.spec.ambience.end(), [](const cartoon::dressing::Ambience &x) { return x.kind == "sea"; }));
 }

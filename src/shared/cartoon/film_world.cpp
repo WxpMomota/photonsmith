@@ -3,6 +3,11 @@
 
 #include "film_file.h"
 
+#include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+
 #define STB_TRUETYPE_IMPLEMENTATION
 #define STBTT_STATIC   // (its functions static to this file: the launcher has its own copy)
 #include "../../external/stb_truetype.h"
@@ -430,9 +435,35 @@ const std::vector<school::School> &DataFilm::schoolsSwum() const {
 		for (const diver::Diver &d : divers) out.push_back(diver::diverAt(d, t));
 		return out;
 	};
-	for (school::School &sc : swum_.schools) {
+	// (each frame renders in a process of its own: the first to work a school out keeps it in the film's cache, named by all it was worked out from - the school, how long,
+	// and where the camera and the divers were at every step - and the rest read it: seconds a frame for a big school)
+	const double seconds = natureAt(spec.length) + 1.0;
+	for (std::size_t i = 0; i < swum_.schools.size(); ++i) {
+		school::School &sc = swum_.schools[i];
 		sc.at.y += seabedAt(sc.at.x, sc.at.z);
-		school::prepare(sc, natureAt(spec.length) + 1.0, avoid);
+		const int steps = static_cast<int>(std::ceil(seconds / sc.dt)) + 2;
+		std::vector<std::vector<Vec3>> threats(static_cast<std::size_t>(steps));
+		for (int k = 0; k < steps; ++k) threats[static_cast<std::size_t>(k)] = avoid(k * sc.dt);
+		char buf[160];
+		std::snprintf(buf, sizeof buf, "%s %s %d %d %.4f %.4f %.4f %.4f %.6f %.4f|", sc.kind.c_str(), sc.hunter.c_str(), sc.count, sc.seed, sc.at.x, sc.at.y, sc.at.z, sc.radius, sc.dt, seconds);
+		std::string key = buf;
+		for (const double st : sc.strikes) std::snprintf(buf, sizeof buf, "%.4f ", st), key += buf;
+		for (const std::vector<Vec3> &row : threats)
+			for (const Vec3 &q : row) std::snprintf(buf, sizeof buf, "%.3f %.3f %.3f;", q.x, q.y, q.z), key += buf;
+		std::uint64_t h = 1469598103934665603ull;   // (FNV-1a)
+		for (const unsigned char c : key) h = (h ^ c) * 1099511628211ull;
+		std::snprintf(buf, sizeof buf, "school_%zu_%016llx.bin", i, static_cast<unsigned long long>(h));
+		const std::filesystem::path file = film_cache::dir(spec.key.empty() ? std::string("film") : spec.key) / buf;
+		{
+			std::ifstream in(file, std::ios::binary);
+			const std::string bytes = in ? std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()) : std::string();
+			if (!bytes.empty() && school::swumFrom(sc, bytes)) continue;
+		}
+		school::prepare(sc, seconds, [&threats, &sc](double t) {
+			const std::size_t k = static_cast<std::size_t>(std::llround(t / sc.dt));
+			return k < threats.size() ? threats[k] : std::vector<Vec3>();
+		});
+		film_cache::writeOnce(file, school::swumBytes(sc));
 	}
 	return swum_.schools;
 }
@@ -448,7 +479,12 @@ static double underTheSeaExposure(const Spec &spec, const std::string &header) {
 std::string DataFilm::worldAt(const std::string &given, double t) const {
 	const double nt = natureAt(t);   // (nature's time: the clouds, the water, the aurora, the wind, the animals; `timelapse`, `slowmo`)
 	std::string header = spec.hasUnderwater ? undersea::floated(given, spec.seas[0], nt, !spec.shots.empty() && spec.shots[shotAt(t)].waterline) : given;   // (a camera at the surface floats on it: film_undersea.h)
-	if (spec.hasUnderwater && spec.underwater.port == "flat") header = undersea::throughFlatPort(header);   // (round 16: through a flat port things look a third nearer)
+	if (spec.hasUnderwater && spec.underwater.port == "flat") {   // (round 16: through a flat port things look a third nearer - with water in front of it, not in the air)
+		Vec3 eye, target;
+		double fov = 40.0;
+		if (film_subjects::cameraOf(header, eye, target, fov) && undersea::waterlineOf(spec.seas[0], nt, {-eye.x, eye.y, eye.z}).where != undersea::Waterline::Above)
+			header = undersea::throughFlatPort(header);
+	}
 	std::string out = film_camera::exposed(header, exposureAt(t) * underTheSeaExposure(spec, header));
 	if (spec.hasUnderwater) out = underTheSea(spec, out, header, t, nt, schoolsSwum());   // under the sea: the water round the camera, the light coming down through it, what lives in it
 	if (!spec.fires.empty() || !spec.lavas.empty() || !spec.volcanoes.empty() || !spec.wildfires.empty()) {   // fire, lava and smoke (film_fire.h)
@@ -808,7 +844,8 @@ std::string DataFilm::castAt(double t) const {
 		};
 		const double tc = motion::heldTime(spec.stepping, c.name, t, spec.fps);   // (on twos: the moment of the frame it holds; film_motion.h)
 		std::string text = drawnAt(tc);
-		if (spec.hasUnderwater && !spec.seas.empty() && c.start[1] < spec.seas[0].level - 0.3) text += speechBubbles(c, kind, tc);
+		const bool talks = std::any_of(spec.lines.begin(), spec.lines.end(), [&](const speech::Line &l) { return l.who == c.name && l.t <= tc + 0.1 && l.t >= tc - 30.0; });   // (only a line begun lately: its bubbles are still rising)
+		if (swimming(c) && talks) text += speechBubbles(c, kind, tc);
 		// a smear's multiples: copies of it back along its way on a dash (film_motion.h)
 		if (const motion::Smear *sm = motion::smearFor(spec.smears, c.name); sm && sm->multiples > 0)
 			for (const double u : motion::smearTimes([&](double w) {
@@ -937,7 +974,7 @@ void DataFilm::soundscape(audio::Mix &m) const {
 	// under the sea (film_undersea.h): a diver breathing - the regulator's hiss, then the burble of the breath going out - and the bubbles of a stream
 	for (std::size_t i = 0; i < spec.undersea.breaths.size(); ++i) {
 		const undersea::Breath &b = spec.undersea.breaths[i];
-		const Vec3 at = b.at + Vec3{0.0, groundAt(b.at.x, b.at.z), 0.0};
+		const Vec3 at = b.at + Vec3{0.0, seabedAt(b.at.x, b.at.z), 0.0};   // (above the seabed, as the picture puts it: the plain floor when there is no terrain)
 		for (double t0 = 0.0; t0 < T; t0 += std::max(1.5, b.every)) {
 			const unsigned seed = 2101u + static_cast<unsigned>(i * 977 + t0 * 10.0);
 			ss::place(m, ears, t0 + 0.05 * b.every, at, audio::noiseBurst(0.35 * b.every, 0.1, 0.25 * b.every, 2200.0, 6500.0, seed), 0.35, 30.0);
@@ -956,7 +993,7 @@ void DataFilm::soundscape(audio::Mix &m) const {
 	}
 	for (std::size_t i = 0; i < spec.undersea.streams.size(); ++i) {
 		const undersea::Stream &st = spec.undersea.streams[i];
-		const Vec3 at = st.at + Vec3{0.0, groundAt(st.at.x, st.at.z), 0.0};
+		const Vec3 at = st.at + Vec3{0.0, seabedAt(st.at.x, st.at.z), 0.0};
 		for (double t0 = std::max(0.0, st.t0); t0 < std::min(T, st.t1); t0 += 0.15 + 0.6 * audio::unit(2301u + static_cast<unsigned>(t0 * 100.0) + static_cast<unsigned>(i)))
 			ss::place(m, ears, t0, at, ss::bubble(2401u + static_cast<unsigned>(t0 * 100.0)), 0.25 * std::min(2.0, std::sqrt(st.rate / 6.0)), 20.0);
 	}

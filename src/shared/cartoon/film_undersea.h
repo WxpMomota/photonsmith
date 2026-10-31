@@ -404,11 +404,15 @@ inline std::string ringText(const Ring &r, double t, double level, const underwa
 }
 // Bubbles left behind along a path (a penguin's, a seal's): air shed from its coat every 1/rate seconds while it moves, rising from where it was.
 inline void trailBubbles(const std::function<Vec3(double)> &path, double t, double rate, double size, int seed, double level, const underwater::Current &c, std::vector<Bubble> &out) {
-	for (int k = 0; k < static_cast<int>(rate * 4.0); ++k) {   // (the last 4 s)
-		const double age = (k + hash01(k, seed)) / rate;
-		const Vec3 p0 = path(t - age);
+	if (rate <= 0.0) return;
+	// (each bubble born at its own time over the last 4 s and left where it was shed, rising from there: numbered by its birth, as a stream's are, so it is the same
+	// bubble from frame to frame - not a trail laid out afresh behind the mover each frame)
+	for (long k = static_cast<long>(std::floor((t - 4.0) * rate)); k <= static_cast<long>(std::floor(t * rate)); ++k) {
+		const int key = static_cast<int>(k % 1000003);
+		const double born = (k + hash01(key, seed)) / rate;
+		if (born > t) continue;
 		Bubble b;
-		if (bubbleAt(p0, size * (0.0015 + 0.003 * hash01(k, seed + 1)), age, t, seed * 31 + k, level, c, b)) out.push_back(b);
+		if (bubbleAt(path(born), size * (0.0015 + 0.003 * hash01(key, seed + 1)), t - born, t, seed * 31 + key, level, c, b)) out.push_back(b);
 	}
 }
 // All of a sea's bubbles and layers at t (pbrt's eye for the layers).

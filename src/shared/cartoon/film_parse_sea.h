@@ -531,5 +531,22 @@ inline std::string underseaLine(Spec &s, const std::string &verb, const std::str
 	return std::string();
 }
 
+// What is wrong with a whole film's lines under the sea, or "": `underwater` needs a `water` line and no mist or fog; the lines of rounds 14 to 16 are drawn only for a camera under the water (without `underwater` they
+// would be dropped without a word), and a barracuda tornado `around` a diver or a sea lion playing `with` one names a diver of the film.
+inline std::string underseaProblems(const Spec &s) {
+	if (s.hasUnderwater && s.seas.empty()) return "`underwater` puts the camera under the film's water: it needs a `water ... level Y` line";
+	if (s.hasUnderwater && (s.hasMist || s.fog.on)) return std::string("`underwater` and `") + (s.hasMist ? "mist" : "fog") + "` both fill the air round the camera: use one";
+	if (!s.hasUnderwater && (s.undersea.any() || s.deep.any() || s.seabed.any() || !s.divers.empty() || !s.schools.empty() || !s.bigFish.empty() || s.reefLife.any() || !s.boats.empty() ||
+							 !s.sardineRuns.empty() || !s.vents.empty() || !s.murks.empty() || !s.silts.empty() || s.behaviours.any() ||
+							 std::any_of(s.shots.begin(), s.shots.end(), [](const Shot &sh) { return sh.waterline; })))
+		return "divers, schools, boats, vents, murk, the seabed's life and places, bubbles and `waterline` shots are under the sea: the film needs an `underwater` line (and a `water` one)";
+	const auto aDiver = [&](const std::string &name) { return std::any_of(s.divers.begin(), s.divers.end(), [&](const diver::Diver &d) { return d.name == name; }); };
+	for (const behaviour::Tornado &tn : s.behaviours.tornadoes)
+		if (!tn.around.empty() && !aDiver(tn.around)) return "`tornado ... around " + tn.around + "`: there is no diver called " + tn.around + " (a `diver NAME ...` line; names are matched exactly)";
+	for (const behaviour::Playmate &pm : s.behaviours.playmates)
+		if (!pm.with.empty() && !aDiver(pm.with)) return "`playmate ... with " + pm.with + "`: there is no diver called " + pm.with + " (a `diver NAME ...` line; names are matched exactly)";
+	return std::string();
+}
+
 }  // namespace film_file
 }  // namespace cartoon

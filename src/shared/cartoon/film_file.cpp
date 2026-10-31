@@ -1039,7 +1039,7 @@ CharacterMoment DataFilm::momentOf(const Character &c, double t, Vec3 *at) const
 		if (moving) break;
 	}
 	double swim = 0.0;   // (round 16) under the water a walk is a swim: at its own height, bobbing, its feet on nothing (film_kinds.h strokes it, castAt lays it level)
-	if (spec.hasUnderwater && !spec.seas.empty() && c.start[1] < spec.seas[0].level - 0.3) {
+	if (swimming(c)) {
 		swim = 1.0, airborne = true;
 		where.y = c.start[1] + 0.06 * c.scale * std::sin(2.0 * kPi * t / 3.2 + seedOf(c.name));
 	}
@@ -1386,7 +1386,7 @@ void DataFilm::speak(audio::Mix &mix) const {
 		std::vector<float> sound = recordingOf(i) ? recordingOf(i)->sound : speech::speak(spoken[i], t0, voiceOf(c), static_cast<unsigned>(i + 1));
 		// (round 16) under the water a voice is muffled - its highs gone, a little louder below, bubbling (the speaker's bubbles are drawn: castAt) - when the one speaking
 		// or the ears are under it
-		const bool under = spec.hasUnderwater && !spec.seas.empty() && (c.start[1] < spec.seas[0].level - 0.3 || eye.y < spec.seas[0].level);
+		const bool under = swimming(c) || (spec.hasUnderwater && !spec.seas.empty() && eye.y < spec.seas[0].level);
 		if (under) {
 			const double k = 1.0 - std::exp(-2.0 * kPi * 650.0 / audio::kRate);   // (two passes of a one-pole low-pass at 650 Hz)
 			for (int pass = 0; pass < 2; ++pass) {

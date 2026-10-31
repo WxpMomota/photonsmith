@@ -83,6 +83,8 @@ inline void hullMesh(double L, Mesh &bottom, Mesh &topsides) {
 	deepsea::detail::add(topsides, roundedBox(0.5 * beam, 0.12 * L, 0.3 * L, 0.02 * L, 2), translate(0.0, free + 0.06 * L, -0.05 * L));   // (the cabin)
 }
 inline double anchorFall(double since) { return 2.4 * std::max(0.0, since - 0.3) + 1.2 * std::min(since, 0.3) * std::min(since, 0.3) / 0.6; }
+// How long after it is let go the anchor has fallen `drop` metres (anchorFall turned round): when it lands, for its puff of silt.
+inline double anchorTime(double drop) { return drop <= 0.18 ? std::sqrt(std::max(0.0, drop) / 2.0) : 0.3 + (drop - 0.18) / 2.4; }
 // A boat at t as scene text: its hull rocking on the swell, its wake's bubbles, its anchor and chain.
 inline std::string boatText(const Boat &b, double t, double level, const std::function<double(double, double)> &groundAt, const underwater::Current &c) {
 	if (t < b.t0 - 1.0 || t > b.t1 + 600.0) return std::string();
@@ -121,7 +123,7 @@ inline std::string boatText(const Boat &b, double t, double level, const std::fu
 			deepsea::detail::add(chain, torus(0.035, 0.009, 8, 4), mul(translate(sealife::detail::story(p)), rotate({0, 1, 0}, (k % 2) * 90.0)));
 		}
 		out += attr(metalMaterial({0.25, 0.24, 0.23}, 0.5), emitMesh(chain, identity()));
-		if (landed) out += undersea::siltText({anchorAt.x, floor, anchorAt.z}, t - (b.anchor + std::sqrt(std::max(0.0, depth)) / 1.5), 1.0, b.seed * 3);
+		if (landed) out += undersea::siltText({anchorAt.x, floor, anchorAt.z}, since - anchorTime(depth - 0.16), 1.0, b.seed * 3);   // (from the moment it hits the sand)
 	}
 	return out;
 }
