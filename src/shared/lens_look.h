@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "kuwahara.h"
+#include "tone_map.h"   // (a `tonemap` word: the names it takes)
 #include "print_look.h"
 #include "sun_beams.h"
 #include "ppm_text.h"
@@ -148,7 +149,8 @@ inline std::string parse(const std::string &text, Look &out) {
 		if (word == "tonemap") {
 			std::string name;
 			in >> name;
-			if (name != "aces" && name != "agx" && name != "agx-punchy" && name != "neutral" && name != "reinhard" && name != "none") return "\"tonemap\" takes aces, agx, agx-punchy, neutral, reinhard or none";
+			ToneMapMode mode;
+			if (!tone_map_mode_from_name(name, mode)) return std::string("\"tonemap\" takes ") + kToneMapNames;
 			out.tonemap = name;
 			continue;
 		}

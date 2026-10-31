@@ -404,7 +404,7 @@ extern "C" int optix_render_main(
 		if (options.tonemap != nullptr) {
 			if (!tone_map_mode_from_name(options.tonemap, tone_map_mode) && options.tonemap[0] != '\0') {
 				std::cerr << "Warning: unrecognized --tonemap \"" << options.tonemap
-						  << "\", using aces. Valid: aces, agx, agx-punchy, neutral, reinhard, none.\n";
+						  << "\", using aces. Valid: " << kToneMapNames << ".\n";
 				tone_map_mode = ToneMapMode::ACES;
 			}
 		}

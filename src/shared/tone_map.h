@@ -173,6 +173,47 @@ inline void pbr_neutral(double& r, double& g, double& b) {
 }
 
 // ---------------------------------------------------------------------------
+// Filmic -- Blender's view transform from 2.80 to 3.6 ("Filmic", base contrast,
+// no look), which scenes made in those versions were lit for: a gentle toe that
+// keeps night scenes readable, a long shoulder (middle grey 0.18 shows at about
+// 0.51, white is reached 6 stops above it), and bright saturated light washing
+// out towards white. Not Blender's lookup tables: our own small model, fitted
+// to Blender 5.2's Filmic measured on greys and on 12 hues x 4 saturations
+// from 12 stops below middle grey to 12 above (largest error 0.005 on greys,
+// 0.04 on the brightest saturated colours, rms 0.01).
+//   * In Filmic's log encoding (12.47 stops below middle grey to 12.53 above,
+//     0..1), each channel is pulled towards the largest by
+//     0.865 * smoothstep(0.639, 0.997, largest)^0.2247: colours past about 3.5
+//     stops over grey lose saturation, the way the transform's gamut LUT does.
+//   * Each channel then goes through a generalised logistic in stops s
+//     (log2(x / 0.18)): lo + (hi - lo) / (1 + e^(-k (s - s0)))^(1/nu), which
+//     is display-encoded (sRGB) already.
+// Input linear Rec.709; output linear [0, 1] for the sRGB encoding (the curve's
+// display value decoded, so that the writer's encoding gives it back).
+// ---------------------------------------------------------------------------
+inline void filmic_blender(double& r, double& g, double& b) {
+	const double lo = 12.473931188, range = 25.0;   // the log encoding: log2 x from -12.47 to +12.53
+	double v[3] = {r, g, b};
+	double vmax = 0.0;
+	for (double& x : v) {
+		x = (std::log2(x > 1e-12 ? x : 1e-12) + lo) / range;
+		x = x < 0.0 ? 0.0 : (x > 1.0 ? 1.0 : x);
+		vmax = x > vmax ? x : vmax;
+	}
+	double t = (vmax - 0.63918) / (0.99729 - 0.63918);
+	t = t < 0.0 ? 0.0 : (t > 1.0 ? 1.0 : t);
+	const double d = 0.86483 * std::pow(t * t * (3.0 - 2.0 * t), 0.22471);
+	double out[3];
+	for (int i = 0; i < 3; ++i) {
+		const double s = (v[i] + (vmax - v[i]) * d) * range - lo - std::log2(0.18);
+		double y = -0.011947 + (1.038885 + 0.011947) / std::pow(1.0 + std::exp(-0.563328 * (s - 0.657732)), 1.0 / 1.243626);
+		y = y < 0.0 ? 0.0 : (y > 1.0 ? 1.0 : y);
+		out[i] = y <= 0.04045 ? y / 12.92 : std::pow((y + 0.055) / 1.055, 2.4);   // display -> linear, undone by linear_to_srgb
+	}
+	r = out[0], g = out[1], b = out[2];
+}
+
+// ---------------------------------------------------------------------------
 // ToneMapMode -- selects the active operator
 // ---------------------------------------------------------------------------
 enum class ToneMapMode {
@@ -181,7 +222,8 @@ enum class ToneMapMode {
 	None,       // No tone mapping -- clamp only (legacy behavior)
 	AgX,        // Blender's AgX (agx() above): hue-keeping highlights
 	AgXPunchy,  // the same with the punchy look: more contrast and colour
-	Neutral     // Khronos PBR Neutral (pbr_neutral() above): the colours as painted
+	Neutral,    // Khronos PBR Neutral (pbr_neutral() above): the colours as painted
+	Filmic      // Blender's Filmic (filmic_blender() above): scenes made in Blender 2.8 - 3.6 look as their makers saw them
 };
 
 // ---------------------------------------------------------------------------
@@ -193,6 +235,9 @@ enum class ToneMapMode {
 // behavior and warning text, matching sampler_kind_from_name()'s own
 // contract (camera.h).
 // ---------------------------------------------------------------------------
+// The names tone_map_mode_from_name() takes, for the messages that list them.
+constexpr const char* kToneMapNames = "aces, agx, agx-punchy, filmic, neutral, reinhard, none";
+
 inline bool tone_map_mode_from_name(const std::string& name, ToneMapMode& out) {
 	if (name == "aces")     { out = ToneMapMode::ACES;     return true; }
 	if (name == "reinhard") { out = ToneMapMode::Reinhard; return true; }
@@ -200,6 +245,7 @@ inline bool tone_map_mode_from_name(const std::string& name, ToneMapMode& out) {
 	if (name == "agx")      { out = ToneMapMode::AgX;      return true; }
 	if (name == "agx-punchy") { out = ToneMapMode::AgXPunchy; return true; }
 	if (name == "neutral")  { out = ToneMapMode::Neutral;  return true; }
+	if (name == "filmic")   { out = ToneMapMode::Filmic;   return true; }
 	return false;
 }
 
@@ -217,6 +263,7 @@ inline const char* tone_map_mode_display_name(ToneMapMode mode) {
 		case ToneMapMode::AgX:      return "AgX (Blender)";
 		case ToneMapMode::AgXPunchy: return "AgX Punchy";
 		case ToneMapMode::Neutral:  return "Khronos PBR Neutral";
+		case ToneMapMode::Filmic:   return "Filmic (Blender 2.8-3.6)";
 		default:                    return "ACES Narkowicz 2015";
 	}
 }
@@ -239,6 +286,11 @@ inline double apply_tone_map(double x, ToneMapMode mode) {
 			pbr_neutral(r, g, b);
 			return g;
 		}
+		case ToneMapMode::Filmic: {
+			double r = x, g = x, b = x;
+			filmic_blender(r, g, b);
+			return g;
+		}
 		default:                    return x < 0.0 ? 0.0 : x;
 	}
 }
@@ -251,6 +303,7 @@ inline double apply_tone_map(double x, ToneMapMode mode) {
 inline void apply_tone_map_rgb(double& r, double& g, double& b, ToneMapMode mode) {
 	if (mode == ToneMapMode::AgX || mode == ToneMapMode::AgXPunchy) return agx(r, g, b, mode == ToneMapMode::AgXPunchy);
 	if (mode == ToneMapMode::Neutral) return pbr_neutral(r, g, b);
+	if (mode == ToneMapMode::Filmic) return filmic_blender(r, g, b);
 	r = apply_tone_map(r, mode);
 	g = apply_tone_map(g, mode);
 	b = apply_tone_map(b, mode);

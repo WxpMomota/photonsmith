@@ -39,17 +39,18 @@ Write-Host "║  This will build and package everything for you!            ║"
 Write-Host "╚════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
 Write-Host ""
 
-$buildArgs = @(
-	"-Configuration", $Configuration,
-	"-Deploy"
-)
+# (a hashtable: Windows PowerShell 5.1 passes an array's "-Configuration" as a value, not as the parameter's name)
+$buildArgs = @{
+	Configuration = $Configuration
+	Deploy        = $true
+}
 
 if ($SkipTests) {
-	$buildArgs += "-SkipTests"
+	$buildArgs.SkipTests = $true
 }
 
 if ($Clean) {
-	$buildArgs += "-Clean"
+	$buildArgs.Clean = $true
 }
 
 try {

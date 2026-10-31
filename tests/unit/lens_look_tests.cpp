@@ -115,7 +115,9 @@ TEST(LensLook, ALookLineCanChooseTheColourCurve) {
 	EXPECT_EQ(look.tonemap, "agx");
 	EXPECT_TRUE(lens_look::parse("tonemap neutral saturation 1.1", look).empty()) << "later words win";
 	EXPECT_EQ(look.tonemap, "neutral");
-	EXPECT_FALSE(lens_look::parse("tonemap filmic", look).empty()) << "a curve it does not know";
+	EXPECT_TRUE(lens_look::parse("tonemap filmic", look).empty()) << "every curve tone_map.h knows";
+	EXPECT_EQ(look.tonemap, "filmic");
+	EXPECT_FALSE(lens_look::parse("tonemap velvia", look).empty()) << "a curve it does not know";
 	lens_look::Look only;
 	only.tonemap = "agx";
 	EXPECT_FALSE(only.active()) << "the curve alone changes nothing in apply(): it is the writers'";

@@ -507,7 +507,7 @@ extern "C" int cpu_render_main(int width, int height, int spp, int max_depth, co
 				cam.tone_map = mode;
 			} else if (options.tonemap[0] != '\0') {
 				std::cerr << "Warning: unrecognized --tonemap \"" << options.tonemap
-						  << "\", using aces. Valid: aces, agx, agx-punchy, neutral, reinhard, none.\n";
+						  << "\", using aces. Valid: " << kToneMapNames << ".\n";
 			}
 		}
 		// a film's own curve (its look line's `tonemap`: lens_look.h; the launcher leaves it out when --tonemap was given)

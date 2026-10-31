@@ -193,6 +193,23 @@ TEST(ToneMapModeFromName, KnowsAgxAndNeutral) {
 	EXPECT_EQ(mode, ToneMapMode::Neutral);
 	EXPECT_TRUE(tone_map_mode_from_name("agx-punchy", mode));
 	EXPECT_EQ(mode, ToneMapMode::AgXPunchy);
+	EXPECT_TRUE(tone_map_mode_from_name("filmic", mode));
+	EXPECT_EQ(mode, ToneMapMode::Filmic);
+}
+
+// Filmic against Blender 5.2's own Filmic (base contrast), measured on a linear test image saved through its view transform (8-bit, so within 2/255 of what
+// Blender shows): greys from 4 stops under middle grey to 4 over, and a pure red whose other channels come up as it passes 4 stops over grey.
+TEST(ApplyToneMapRgb, FilmicMatchesBlendersFilmic) {
+	const auto display = [](double r, double g, double b, int channel) {
+		apply_tone_map_rgb(r, g, b, ToneMapMode::Filmic);
+		return linear_to_srgb(channel == 0 ? r : channel == 1 ? g : b);
+	};
+	const double greys[][2] = {{0.01125, 0.1098}, {0.045, 0.2549}, {0.18, 0.502}, {0.72, 0.7569}, {2.88, 0.9255}};
+	for (const auto &gv : greys) EXPECT_NEAR(display(gv[0], gv[0], gv[0], 1), gv[1], 0.008) << "grey " << gv[0];
+	EXPECT_NEAR(display(3.3866, 0, 0, 0), 0.9412, 0.008);
+	EXPECT_NEAR(display(3.3866, 0, 0, 1), 0.0, 0.01) << "a red 2 stops over grey keeps its saturation";
+	EXPECT_NEAR(display(13.5466, 0, 0, 1), 0.0314, 0.03);
+	EXPECT_NEAR(display(54.1863, 0, 0, 1), 0.5529, 0.04) << "6 stops over grey it washes towards white";
 }
 
 // The punchy look: the same curve with more contrast (a mid grey darker, a bright one still near white) and more colour.
@@ -219,7 +236,7 @@ TEST(ApplyToneMapRgb, AcesAndReinhardAreStillTheirPerChannelCurves) {
 
 // Every curve: black stays black, grey stays grey, the result is in [0, 1], and more light never gives a darker colour.
 TEST(ApplyToneMapRgb, AgxAndNeutralKeepGreyGreyAndAreInRangeAndRising) {
-	for (ToneMapMode mode : {ToneMapMode::AgX, ToneMapMode::AgXPunchy, ToneMapMode::Neutral}) {
+	for (ToneMapMode mode : {ToneMapMode::AgX, ToneMapMode::AgXPunchy, ToneMapMode::Neutral, ToneMapMode::Filmic}) {
 		double r = 0.0, g = 0.0, b = 0.0;
 		apply_tone_map_rgb(r, g, b, mode);
 		EXPECT_LT(g, 0.002) << tone_map_mode_display_name(mode);

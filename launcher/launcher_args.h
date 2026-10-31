@@ -785,12 +785,11 @@ inline FlagResult handle_quality_flag(const std::string& arg, int argc, char** a
 		std::string name = argv[i + 1];
 		std::transform(name.begin(), name.end(), name.begin(),
 						[](unsigned char c) { return std::tolower(c); });
-		static const std::set<std::string> kValidTonemaps = {"aces", "agx", "agx-punchy", "neutral", "reinhard", "none"};
-		if (kValidTonemaps.count(name)) {
+		ToneMapMode mode;
+		if (tone_map_mode_from_name(name, mode)) {
 			out.tonemap = name;
 		} else {
-			std::cerr << "Invalid --tonemap \"" << argv[i + 1] << "\", using default (aces). "
-						 "Valid: aces, agx, agx-punchy, neutral, reinhard, none\n";
+			std::cerr << "Invalid --tonemap \"" << argv[i + 1] << "\", using default (aces). Valid: " << kToneMapNames << "\n";
 		}
 		consumed_args.insert(i);
 		consumed_args.insert(i + 1);
@@ -1294,6 +1293,7 @@ inline void print_launch_help(const char* program) {
 				  << "               OETF (default aces, this project's pre-existing behavior).\n"
 				  << "               One of aces, agx (Blender's: bright colours keep their hue),\n"
 				  << "               agx-punchy (the same with more contrast and colour),\n"
+				  << "               filmic (Blender 2.8-3.6's Filmic: scenes made there look as made),\n"
 				  << "               neutral (Khronos PBR Neutral: colours as painted), reinhard,\n"
 				  << "               none. Applies to both CPU and GPU\n"
 				  << "               (recursive and wavefront). No effect under\n"

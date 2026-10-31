@@ -199,7 +199,7 @@ TEST(ShotCameras, AChangeMovesAndTurnsTheCameraOnItsOwnAxesAndSetsTheFovAndExpos
 // `tonemap` in a cameras file: the film's colour curve, a shot's own on top; written onto the frame's look line, which the picture writers read.
 TEST(ShotCameras, AFilmOrAShotChoosesItsColourCurveOnTheLookLine) {
 	namespace sc = cartoon::shot_cameras;
-	const sc::File f = sc::parse("[*]\ntonemap agx\n[2]\ntonemap neutral\n[3]\ntonemap filmic\n");
+	const sc::File f = sc::parse("[*]\ntonemap agx\n[2]\ntonemap neutral\n[3]\ntonemap velvia\n");
 	EXPECT_EQ(f.problems.size(), 1u) << "a curve it does not know is said";
 	const std::string scene = testHeader();
 	const std::string first = sc::apply(scene, sc::changeFor(f, 0, ""));

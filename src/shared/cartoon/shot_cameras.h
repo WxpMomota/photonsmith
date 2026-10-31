@@ -181,8 +181,9 @@ inline File parse(const std::string &text) {
 				f.problems.push_back(where + "'tonemap' before any [shot] section");
 				continue;
 			}
-			if (name != "aces" && name != "agx" && name != "agx-punchy" && name != "neutral" && name != "reinhard" && name != "none") {
-				f.problems.push_back(where + "'tonemap' takes aces, agx, agx-punchy, neutral, reinhard or none");
+			ToneMapMode mode;
+			if (!tone_map_mode_from_name(name, mode)) {
+				f.problems.push_back(where + "'tonemap' takes " + kToneMapNames);
 				continue;
 			}
 			at->tonemap = name;

@@ -911,6 +911,7 @@ void MainWindow::buildPostProcessingGroup(QWidget *optionsTab, QVBoxLayout *layo
 	m_tonemapCombo->addItem(tr("ACES (default)"), QString());
 	m_tonemapCombo->addItem(tr("AgX (Blender: bright colours keep their hue)"), QStringLiteral("agx"));
 	m_tonemapCombo->addItem(tr("AgX Punchy (more contrast and colour)"), QStringLiteral("agx-punchy"));
+	m_tonemapCombo->addItem(tr("Filmic (Blender 2.8-3.6: scenes made there look as made)"), QStringLiteral("filmic"));
 	m_tonemapCombo->addItem(tr("PBR Neutral (colours as painted)"), QStringLiteral("neutral"));
 	m_tonemapCombo->addItem(tr("Reinhard"), QStringLiteral("reinhard"));
 	m_tonemapCombo->addItem(tr("None"), QStringLiteral("none"));
