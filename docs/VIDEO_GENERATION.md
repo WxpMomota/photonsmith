@@ -2466,6 +2466,52 @@ everything deep in the reverb, and runs of high notes rising like bubbles. Its m
 (a low-pass at 900 Hz, eased across the waterline: DataFilm::musicCutoffs, audio::Mix::lowPass), as voices already were. A line said under the water is captioned in a
 glassy speech bubble with little bubbles rising to it (launcher/film_captions.h bubbled).
 
+### Models in a film file (2026-10-30)
+
+A film file can now build its own props, buildings, vehicles and creatures: a `model NAME` block, read up to a line `end`, then `place NAME at X Y Z [scale S] [turn A]`
+or `scatter NAME N in X0 Z0 X1 Z1 [y Y] [scale A B] [seed K]` as for a tree. A model is made of pieces (`piece NAME [colour R G B] [rough R] [plastic|matte|metal|glass|glow G]`;
+lines before the first piece go into one called `main`), each meshed once and kept in the film's cache folder by a hash of what makes it. Its coordinates are its own metres,
+y up, placed by its origin. `ray_tracer --model-check FILM` reports every piece's triangles and what is wrong with it; `python scripts/anim/film.py model FILM NAME` adds a
+turntable sheet of the model from four sides.
+
+**Shapes: `sphere`, `box`, `ellipsoid`, `capsule`, `cylinder`, `torus`, `cone`.** (film_model.h, model_sdf.h) `sphere X Y Z radius R`, `box X Y Z size W H D [round R]`,
+`ellipsoid X Y Z size W H D`, `capsule X Y Z to X Y Z radius R`, `cylinder X Y Z radius R height H [round R]`, `torus X Y Z radius R tube r`, `cone X Y Z radius R1 R2 height H`,
+each `[turn AX AY AZ]`. A shape is added to the piece (`add`, the default), joined in smoothly (`blend K SHAPE ...`, K metres of fillet: an arm into a body), cut out
+(`cut SHAPE ...`, or `cut soft K SHAPE ...`) or intersected (`intersect SHAPE ...`). `round R` rounds every edge of the piece, `shell T` hollows it to a wall T thick,
+`detail CELL` sets the meshing cube's size (a fiftieth of the piece by default).
+
+**Hard surface: `hard [smooth DEGREES]`.** A piece is meshed by dual contouring (Ju et al., 2002): each vertex sits where the planes the surface crosses its cell meet, so a
+box's corners and a machined edge stay crisp instead of being bevelled by a cell's width. `hard` splits its normals where faces meet at more than 35 degrees (or the given
+angle), as Blender's auto smooth does, so a hard edge shades hard and a curve stays smooth.
+
+**Subdivision surfaces: `cage`.** (model_subdiv.h) A coarse cage of polygons smoothed by Catmull-Clark subdivision: `cage box W H D [crease S]`, `cage file NAME.obj` (a
+cage modelled elsewhere, under film_assets), or `cage` followed by `v X Y Z` and `f A B C D` lines (vertices numbered from 0); `crease A B S` makes an edge semi-sharp (sharp
+for S levels, then smoothing: Pixar's creases), `corner V` pins a vertex, `pull V DX DY DZ` moves one, `extrude FACE D [scale S]` pushes a face out on new sides (an arm
+from a body), `levels N` subdivides N times (2).
+
+**Modifiers.** (model_modifiers.h) After a piece's shapes, applied in the order written: `bend A [toward x|z]`, `twist A`, `taper S`, `mirror x|y|z`, `array N DX DY DZ`,
+`radial N`, `lattice I J K DX DY DZ` (a corner of the piece's box moved, the piece bending smoothly with it), `solidify T` (an open sheet given a wall), `smooth N`, `move`,
+`scale` and `rotate`.
+
+**Curves: `sweep`, `loft`.** (model_curves.h) `sweep circle R|rect W H|star N R1 R2|shape X Y ... path X Y Z X Y Z ... [twist A] [taper S] [loop]`: a profile carried
+along a smooth path (centripetal Catmull-Rom) without spinning (rotation-minimizing frames), its ends capped - pipes, ropes, rails, tentacles. `loft [sides N] [square]
+[open]` then `ring Y RX RZ [at X Z]` lines: a skin through rings - a hull, a bottle, a vase.
+
+**Painted textures: `paint`.** (model_texture.h) `paint base R G B [wear R G B A] [dirt R G B A] [mottle A] [stripes R G B W [x|y|z]] [spots R G B A] [res N]` bakes a
+picture for the piece, its UVs unwrapped automatically (box projection into a 3 x 2 atlas): the base colour, blotchy with `mottle`, worn to the wear colour where the
+surface bulges (edges, corners: its curvature) and dirty in its creases.
+
+**Displacement: `displace noise|rock|bumps|scales|wood|ribs AMOUNT [size S] [seed K]`.** (model_detail.h) Every point moved along its normal by a pattern S across, after
+the mesh is split finely enough for it to show: in the geometry, so the same on every renderer.
+
+**Kit parts and generators.** (model_kit.h) `kit crate W H D`, `kit barrel R H`, `kit panel W H`, `kit window W H`, `kit door W H`, `kit wheel R W [SPOKES]`,
+`kit pipe R X Y Z X Y Z ...`, each `[at X Y Z] [turn AX AY AZ]`, join a piece. `make building [floors N] [width W] [depth D] [storey H] [windows N] [roof gable|flat]`,
+`make chair|table|shelf|lamp [size S]`, `make car|rocket|boat [size S]`, all `[colour R G B]`, write a whole model's pieces with their materials.
+
+**Levels of detail and instancing.** A model placed more than once in a frame is written once as a pbrt object and instanced, one copy in memory however many there are;
+each placement is drawn at the level its size on the screen asks for - as written within 25 of its sizes from the camera, its fields meshed twice as coarse and its cage
+a level less subdivided out to 100, four times as coarse beyond.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

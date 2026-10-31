@@ -185,6 +185,12 @@
 //     seacave  0 -20  radius 8                                   # places: a sea cave, `ruins X Z [length L]` (a sunken city); `icecap [holes N]`: ice overhead
 //     chest    0 -8  open 12                                     # treasure (film_treasure.h): `clam X Z [shut T]`, `bottle X Y Z`, `shells N in X0 Z0 X1 Z1`
 //     sink     coin 0 3 -6  at 4                                 # something let go in the water: coin, anchor, rock, ball (it floats); `moonlight [elevation E]`
+//     model    robot                                            # a model of the film's own (film_model.h), read up to `end`: pieces of shapes (add, blend K, cut,
+//       piece  body colour 0.8 0.3 0.2                          #   intersect; `hard` for crisp edges), subdivision cages (`cage box W H D crease S`), modifiers
+//       box    0 0.8 0 size 0.6 0.7 0.4 round 0.03              #   (bend, twist, taper, mirror, array, radial, lattice, solidify, smooth), `sweep`, `loft`,
+//       mirror x                                                #   `paint`, `displace`, `kit`, and whole models by `make building|chair|table|car|rocket|boat`
+//     end
+//     place    robot  at 0 0 -3  turn 20                        # placed (or `scatter robot N in X0 Z0 X1 Z1`): instanced, drawn coarser far from the camera
 //     space    stars 1  milkyway 1  sun 60 15                   # the universe (film_space.h, round 10): a set in space - the stars all round, the Milky Way, the sun a
 //                                                               # glowing ball at a bearing and an elevation; no sky, no air
 //     planet   home ocean  at 0 0 -20000  radius 6000           # a planet (film_planets.h): rocky, desert, ice, ocean, gas or lava; `tilt`, `spin SECONDS`

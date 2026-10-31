@@ -58,6 +58,8 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 	if (!p.ok) return p.error;
 	spec = p.spec;
 	spec.version = std::to_string(std::hash<std::string>{}(text));
+	for (const model::Model &m : spec.models)   // (a model block left open runs to the end of the file)
+		if (!m.closed) return filePath + ": the model " + m.name + " has no `end` (a model block runs from `model NAME` to a line `end`)";
 	for (auto &b : spec.bounces) b.second.gravity = fallGravity();   // (the film's gravity on what falls and topples: `gravity`, less under the water)
 	for (auto &tp : spec.topples) tp.second.gravity = fallGravity();
 	if (spec.hasUnderwater && spec.storm.on && !spec.current.on)   // (round 17: a storm overhead rocks the water below in a slow surge - the kelp, the silt, the bubbles)

@@ -428,6 +428,15 @@ static std::string underTheSea(const Spec &spec, std::string out, const std::str
 }
 // The light under the sea once the frame has its sun (round 15, film_sealight.h): the caustic net over everything in the water, the sun's glints up through the surface
 // with their stars, rain landing on the surface seen from below; and the look's words for a camera at the waterline (film_undersea.h).
+// The film's own models where they are placed, seen from the frame's camera (film_model.h: a model placed many times is written once and instanced, each drawn at the
+// level of detail its distance asks for).
+static std::string placedModels(const Spec &spec, const std::string &header) {
+	if (spec.modelPlaces.empty()) return std::string();
+	Vec3 eye, target;
+	double fov = 40.0;
+	film_subjects::cameraOf(header, eye, target, fov);
+	return model::placedText(spec.key.empty() ? std::string("film") : spec.key, spec.models, spec.modelPlaces, {-eye.x, eye.y, eye.z});
+}
 static std::string underTheSeaLight(const Spec &spec, std::string out, const std::string &header, double t, double nt, double seabed) {
 	Vec3 eye, target;
 	double fov = 40.0;
@@ -684,6 +693,7 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 		out += sealight::moonText(spec.moon, {-eye.x, eye.y, eye.z});
 	}
 	out += dressingAt(t);
+	out += placedModels(spec, header);   // the film's own models where they are placed (film_model.h)
 	if (!spec.weather.empty() || !spec.emitters.empty()) {   // weather round the camera, and particles (film_particles.h)
 		Vec3 eye, target;
 		double fov = 40.0;

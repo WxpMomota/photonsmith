@@ -75,6 +75,7 @@
 #include "film_vents.h"
 #include "film_undersea.h"
 #include "film_vignettes.h"
+#include "film_model.h"
 #include "film_macro.h"
 #include "film_night.h"
 #include "film_water.h"
@@ -485,6 +486,9 @@ struct Spec {
 	undersea::IceCap iceCap;
 	treasure::World treasure;
 	sealight::Moon moon;
+	// models written in the film (`model NAME ... end`, placed with `place NAME at ...` and `scatter NAME N in ...`: film_model.h, the modeling round)
+	std::vector<model::Model> models;
+	std::vector<model::Placed> modelPlaces;
 	// fire, lava and smoke (`fire`, `lava`, `volcano`, `wildfire`)
 	std::vector<fire::Fire> fires;
 	std::vector<fire::Lava> lavas;

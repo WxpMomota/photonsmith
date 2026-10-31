@@ -5,6 +5,7 @@
 
 #include "film_parse_space.h"   // (and film_spec.h)
 #include "film_parse_sea.h"
+#include "film_parse_model.h"
 
 namespace cartoon {
 namespace film_file {
@@ -643,6 +644,8 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 	using detail::number;
 	const auto fail = [](const std::string &what) { return what; };
 	handled = true;
+	if (!s.models.empty() && !s.models.back().closed) return model::modelLine(s.models.back(), detail::tokens(line));   // (inside a `model` block: film_model.h)
+	if (verb == "model" || ((verb == "place" || verb == "scatter") && modelNamed(s, line))) return modelLines(s, verb, line);
 	if (verb == "terrain") {
 		const std::vector<std::string> t = detail::tokens(line);
 		if (t.size() < 2 || std::find(terrain::kinds().begin(), terrain::kinds().end(), t[1]) == terrain::kinds().end())

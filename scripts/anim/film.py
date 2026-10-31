@@ -25,6 +25,8 @@ The films themselves are C++ (src/shared/cartoon/: cartoon_lib.h is the toolkit,
                                                                 blurrier than its own full render. --write puts a `samples` line for each such shot into the film's cameras file
                                                                 (pbrt_scenes/film_assets/<key>/cameras.txt), which the video reads
 
+  python scripts/anim/film.py model my-film robot              a model of a film file by itself: what is wrong with its meshes (ray_tracer --model-check) and a
+                                                                turntable sheet - the model from four sides on a grey floor - written to <model>_turntable.png (or --out)
   python scripts/anim/film.py new reef my-reef                  a new film from a starter (scripts/anim/starters/: reef, wreck, ice - cartoons under the sea), written to
                                                                 pbrt_scenes/my-reef.film with its key and name filled in, ready to change and render; `new` alone lists the starters
 
@@ -707,6 +709,44 @@ def cmd_video(args):
     sys.exit(subprocess.run(cmd, cwd=run_dir()).returncode)
 
 
+def cmd_model(args):
+    """A film file's model on its own: the doctor's report on every model of the film, then a turntable sheet of the one named."""
+    exe = find_exe(args.exe)
+    done = subprocess.run([exe, "--model-check", args.target], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=run_dir())
+    print(done.stdout.rstrip())
+    if not args.key:
+        sys.exit(done.returncode)
+    try:
+        from PIL import Image, ImageDraw
+    except ImportError:
+        sys.exit("the turntable sheet needs Pillow: pip install pillow")
+    size = args.height or 360
+    spp = args.spp or 64
+    tiles = []
+    with tempfile.TemporaryDirectory() as tmp:
+        for angle in (30, 120, 210, 300):
+            scene = os.path.join(tmp, "turn_%d.pbrt" % angle)
+            png = os.path.join(tmp, "turn_%d.png" % angle)
+            made = subprocess.run([exe, "--model-scene", args.target, args.key, str(angle), scene, str(size), str(size), str(spp)],
+                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=run_dir())
+            if made.returncode != 0:
+                sys.exit("no model %r in %s:\n%s" % (args.key, args.target, made.stdout[-800:]))
+            r = subprocess.run([exe] + renderer_flags(args) + ["--output", png, "--height", str(size), str(size), str(spp), "8", scene],
+                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=run_dir())
+            if r.returncode != 0 or not os.path.exists(png):
+                sys.exit("render failed (%d):\n%s" % (r.returncode, r.stdout[-1500:]))
+            tiles.append((angle, Image.open(png).convert("RGB")))
+    sheet = Image.new("RGB", (size * 2, size * 2))
+    draw = ImageDraw.Draw(sheet)
+    for k, (angle, im) in enumerate(tiles):
+        x, y = (k % 2) * size, (k // 2) * size
+        sheet.paste(im, (x, y))
+        draw.text((x + 8, y + 6), "%s  %d deg" % (args.key, angle), fill=(255, 255, 255))
+    out = args.out or os.path.abspath("%s_turntable.png" % args.key)
+    sheet.save(out)
+    print("wrote %s" % out)
+
+
 STARTERS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "starters")
 
 
@@ -738,9 +778,9 @@ def cmd_new(args):
 
 def main():
     p = argparse.ArgumentParser(description="Look at a cartoon film (the films are C++: src/shared/cartoon/).")
-    p.add_argument("command", choices=["list", "still", "sheet", "video", "doctor", "budget", "preview", "baseline", "new"])
+    p.add_argument("command", choices=["list", "still", "sheet", "video", "doctor", "budget", "preview", "baseline", "new", "model"])
     p.add_argument("target", nargs="?", help="still: <key>[@seconds]; sheet and video: <key>; new: a starter")
-    p.add_argument("key", nargs="?", help="new: the new film's key")
+    p.add_argument("key", nargs="?", help="new: the new film's key; model: the model to turn round")
     p.add_argument("--exe")
     p.add_argument("--cpu", action="store_true")
     p.add_argument("--height", type=int)
@@ -763,7 +803,7 @@ def main():
     if args.command not in ("list", "baseline", "new") and not args.target:
         p.error("%s needs a film key" % args.command)
     {"list": cmd_list, "still": cmd_still, "sheet": cmd_sheet, "video": cmd_video, "doctor": cmd_doctor, "budget": cmd_budget, "preview": cmd_preview,
-     "baseline": cmd_baseline, "new": cmd_new}[args.command](args)
+     "baseline": cmd_baseline, "new": cmd_new, "model": cmd_model}[args.command](args)
 
 
 if __name__ == "__main__":

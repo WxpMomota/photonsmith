@@ -298,6 +298,7 @@ add_executable(unit_tests
     unit/film_undersea15_tests.cpp
     unit/film_undersea16_tests.cpp
     unit/film_undersea17_tests.cpp
+    unit/film_model_tests.cpp
     unit/film_whole_tests.cpp
     unit/toon_look_tests.cpp
     unit/height_fog_tests.cpp

@@ -859,6 +859,50 @@ static bool prepare_cartoon_worker(LaunchArgs &args, cartoon_worker::Job &job) {
 
 // `ray_tracer --film-check [FILE.film ...]`: checks film files (cartoon/film_file.h): each is loaded with its scene and either described or reported with the file and line of what is wrong. With
 // no file it lists the films found in the scene folders and the files that were left out. Exit status 1 when anything is wrong.
+// `ray_tracer --model-check <film key>`: each model of a film file, piece by piece - its triangles and what is wrong with it (film_model.h, model_doctor.h); exit 1 when
+// something is. `ray_tracer --model-scene <film key> <model> <degrees> OUT.pbrt [W H SPP]`: the model alone on a turntable seen from that angle, to render (film.py model).
+static int model_command(int argc, char** argv) {
+	const std::string mode = argv[1];
+	const cartoon::film_file::DataFilm *film = argc >= 3 ? cartoon::filmFileOf(argv[2]) : nullptr;
+	if (!film) {
+		std::cerr << "usage: " << argv[0] << " --model-check <film key> | --model-scene <film key> <model> <degrees> OUT.pbrt [W H SPP] (a film made from a film file)" << std::endl;
+		return EXIT_FAILURE;
+	}
+	const std::string key = film->spec.key.empty() ? std::string("film") : film->spec.key;
+	if (mode == "--model-scene") {
+		const cartoon::model::Model *m = nullptr;
+		for (const cartoon::model::Model &x : film->spec.models)
+			if (argc >= 4 && x.name == argv[3]) m = &x;
+		if (!m || argc < 6) {
+			std::cerr << "usage: " << argv[0] << " --model-scene <film key> <model> <degrees> OUT.pbrt [W H SPP]" << std::endl;
+			return EXIT_FAILURE;
+		}
+		const int w = argc >= 7 ? std::atoi(argv[6]) : 480, h = argc >= 8 ? std::atoi(argv[7]) : 480, spp = argc >= 9 ? std::atoi(argv[8]) : 64;
+		std::ofstream out(argv[5], std::ios::binary);
+		out << cartoon::model::turntableScene(key, *m, std::atof(argv[4]), std::max(16, w), std::max(16, h), std::max(1, spp));
+		if (!out) return EXIT_FAILURE;
+		std::cout << argv[5] << std::endl;
+		return EXIT_SUCCESS;
+	}
+	bool trouble = false;
+	if (film->spec.models.empty()) std::cout << film->spec.key << " has no models" << std::endl;
+	for (const cartoon::model::Model &m : film->spec.models) {
+		std::cout << "model " << m.name << " (" << cartoon::model::sizeOf(key, m) << " m across)" << std::endl;
+		for (const cartoon::model::Part &p : m.parts) {
+			const cartoon::Mesh mesh = cartoon::model::partMesh(p);
+			const cartoon::model::Report r = cartoon::model::examine(cartoon::model::welded(mesh, 1e-6));
+			std::cout << "  " << p.name << ": " << r.tris << " triangles" << (r.closed() ? ", closed" : "");
+			const std::vector<std::string> problems = r.problems();
+			std::cout << (problems.empty() ? ", fine" : "") << std::endl;
+			for (const std::string &q : problems) std::cout << "    - " << q << std::endl;
+			// (an open sheet is a problem only when it was meant to be solid: a piece of shapes or a closed cage)
+			const bool sheetOk = r.nonManifold == 0 && r.flipped == 0 && r.degenerate == 0 && p.sdf.steps.empty() && !p.hasCage;
+			trouble = trouble || (!problems.empty() && !(sheetOk && r.holes > 0 && problems.size() == 1));
+		}
+	}
+	return trouble ? 1 : EXIT_SUCCESS;
+}
+
 static int film_check_command(int argc, char** argv) {
 	int bad = 0;
 	for (int i = 2; i < argc; ++i) {
@@ -965,6 +1009,7 @@ int main(int argc, char** argv) {
 		return EXIT_SUCCESS;
 	}
 	if (argc >= 2 && std::string(argv[1]) == "--film-check") return film_check_command(argc, argv);
+	if (argc >= 2 && (std::string(argv[1]) == "--model-check" || std::string(argv[1]) == "--model-scene")) return model_command(argc, argv);
 	// `ray_tracer --film-shots <key>`: what a tool driving the films needs of one (scripts/anim/film.py doctor), as tab-separated lines: a `film` line (key, name, seconds, fps,
 	// width, height, samples, measured seconds a frame) and a `shot` line for each shot (start, name, its share of the samples: the film's cameras file's `samples`).
 	if (argc >= 2 && std::string(argv[1]) == "--film-shots") {
