@@ -28,6 +28,9 @@ struct Emission {
 	// `"bool sampled" false` (our extension): a glow the camera sees that is no light to aim at - left out of next-event estimation (a film's matte painting,
 	// film_matte.h, of thousands of glowing triangles that light nothing: its light linking keeps bounces from taking its light too). Triangles and quads.
 	bool sampled = true;
+	// `"bool camera" false` (our extension): a panel that lights the scene and is not seen - its triangles become spots when the scene is flattened (pbrt_light_size.h), `spreadSamples` of them.
+	bool camera = true;
+	int spreadSamples = 16;
 	// Round 6 Phase 4: pbrt-v4's real AreaLightSource "diffuse" also accepts
 	// a "filename" parameter for spatially-varying emission (an image
 	// mapped onto the shape instead of a flat L) - when set, this wins over
@@ -158,6 +161,9 @@ struct PunctualLight {
 	// Light linking (light_link.h): the groups it lights (`"string illuminates"`) and the groups whose shapes cast its shadows (`"string shadowsfrom"`); bit g: group g
 	std::uint64_t illuminates = ~0ull, shadowsFrom = ~0ull;
 	int lightGroup = -1;   // its light group (light_groups.h); -1: none
+	// Point and spot: `"float radius"` and `"integer samples"` (our extension): a light of that size, spread into so many when the scene is flattened (pbrt_light_size.h).
+	double radius = 0.0;
+	int spreadSamples = 16;
 
 	// pbrt's "scale" parameter, read the same way for all five kinds.
 	double scale = 1.0;

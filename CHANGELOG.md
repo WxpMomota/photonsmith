@@ -6,6 +6,8 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **Lights with a size, hidden panels (2026-10-31).** `"float radius"` on point and spot lights for soft shadows, `"bool camera" false` on area lights for panels that light but are not seen, made at load time from ordinary lights so every renderer has them; the Blender import uses both.
+
 * **Blender import (2026-10-31).** File > Import Blender Scene and `tools/blender_import/import_blend.py`: a `.blend` becomes a scene of My Scenes, run through the user's own Blender with scripts in the file disabled. Modifiers applied, node colours baked, cutouts, particle copies, path hair, lamps and camera carried over, y up for film files, the file's view transform as its tone map, an Eevee scene's glowing meshes as glow only.
 
 * **Films: `swarm` (2026-10-31).** Thousands of glowing particles as one line: streaming in, circling, diving and hovering, fountains, trails behind a moving block; each a fixed function of its number and the time, in a few meshes left out of the light sampling.

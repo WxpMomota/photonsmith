@@ -7,8 +7,8 @@ blender --background --factory-startup --disable-autoexec scene.blend --python b
 
 Meshes are written with their modifiers applied, one binary PLY per (object, material). A material whose colour comes from nodes (colour ramps over coordinates, painted pictures,
 mixes) is baked to a picture with Cycles on a fresh smart-UV layout; a plain one keeps its values; a mix with a transparent shader becomes a cutout. Particle and geometry-node
-copies become ObjectInstances, hair drawn as paths pbrt curves. Lights, world colour and camera (lens, depth of field) follow Blender's units: point and spot I = P / (4 pi),
-emission L = colour * strength, an area light (which pbrt would show to the camera) a wide spot of the panel's intensity P / pi.
+copies become ObjectInstances, hair drawn as paths pbrt curves. Lights, world colour and camera (lens, depth of field) follow Blender's units: point and spot I = P / (4 pi) with
+their size, emission L = colour * strength, an area light L = P / (pi A), a panel hidden from the camera as Blender's are.
 
 Blender's y and z are swapped, to pbrt's y up and left hand: film files and the cartoon camera use the scene as it is. The file's view transform becomes the scene's tone map
 (`# @rt-look tonemap filmic`). A scene made for Eevee lit it with lamps, not with its glowing meshes: those stay a glow the camera sees, lighting nothing, and do not shadow the lamps
@@ -485,20 +485,24 @@ for inst in dg.object_instances:
             # a sphere light lights what is outside it as a point at its centre does; the meshes inside it (the campfire's flames) must not shadow it:
             # in an Eevee scene the emitters are in a group the point lights' shadows pass through
             through = ' "string shadowsfrom" [ "rest" ]' if EEVEE and emitters else ''
-            light_lines.append(f'AttributeBegin\n  LightSource "point" "point3 from" [ {f3(pos)} ] "rgb I" [ {f3(I)} ]{through}\nAttributeEnd')
+            size = f' "float radius" {L.shadow_soft_size:.4g}' if L.shadow_soft_size > 0.05 else ''
+            light_lines.append(f'AttributeBegin\n  LightSource "point" "point3 from" [ {f3(pos)} ] "rgb I" [ {f3(I)} ]{through}{size}\nAttributeEnd')
         else:
             half = math.degrees(L.spot_size) / 2
             light_lines.append(f'AttributeBegin\n  LightSource "spot" "point3 from" [ {f3(pos)} ] "point3 to" [ {f3(pos + direc)} ] "rgb I" [ {f3(I)} ] '
-                               f'"float coneangle" {half:.4g} "float conedelta" {max(0.01, half * L.spot_blend):.4g}\nAttributeEnd')
+                               f'"float coneangle" {half:.4g} "float conedelta" {max(0.01, half * L.spot_blend):.4g}' + (f' "float radius" {L.shadow_soft_size:.4g}' if L.shadow_soft_size > 0.05 else '') + '\nAttributeEnd')
     elif L.type == 'AREA':
         sx = L.size; sy = L.size_y if L.shape in ('RECTANGLE', 'ELLIPSE') else L.size
         area = sx * sy * (math.pi / 4 if L.shape in ('DISK', 'ELLIPSE') else 1)
         s3 = M.to_3x3(); area *= abs(s3.col[0].length * s3.col[1].length)
-        # Blender hides lights from the camera, a pbrt area light is a visible panel: a wide soft spot with the panel's on-axis intensity (L A = P / pi)
-        # stands in for it (no cosine lobe beyond the cone, but the panel faces the stage)
-        I = tuple(c * L.energy / math.pi for c in col)
-        light_lines.append(f'AttributeBegin\n  LightSource "spot" "point3 from" [ {f3(pos)} ] "point3 to" [ {f3(pos + direc)} ] "rgb I" [ {f3(I)} ] '
-                           f'"float coneangle" 85 "float conedelta" 75\nAttributeEnd')
+        # a panel that lights the scene and is not seen, as Blender's are (`"bool camera" false`: the loader's pbrt_light_size.h), radiance P / (pi A)
+        Lr = tuple(c * L.energy / (math.pi * area) for c in col)
+        hx, hy = sx / 2, sy / 2
+        corners = [swp(M @ Vector(c)) for c in ((-hx, -hy, 0), (hx, -hy, 0), (hx, hy, 0), (-hx, hy, 0))]
+        if (corners[1] - corners[0]).cross(corners[2] - corners[0]).dot(direc) < 0: corners.reverse()   # (facing the way the lamp does)
+        pts = '  '.join(f3(c) for c in corners)
+        light_lines.append(f'AttributeBegin\n  AreaLightSource "diffuse" "rgb L" [ {f3(Lr)} ] "bool camera" false\n'
+                           f'  Shape "trianglemesh" "integer indices" [ 0 1 2 0 2 3 ] "point3 P" [ {pts} ]\nAttributeEnd')
     elif L.type == 'SUN':
         light_lines.append(f'LightSource "distant" "point3 from" [0 0 0] "point3 to" [ {f3(direc)} ] "rgb L" [ {f3(tuple(c * L.energy for c in col))} ]')
     p('light', ob.name, L.type, L.energy, col)

@@ -395,3 +395,59 @@ TEST(FlattenPunctualLightTest, ProjectionLightDefaultFovMatchesPbrt) {
 	// worth a warning since it is itself malformed.
 	EXPECT_TRUE(warnedAbout(s, "projection"));
 }
+
+// ===========================================================================
+// Lights with a size, panels the camera does not see (pbrt_light_size.h)
+// ===========================================================================
+TEST(FlattenLightSizeTest, ARadiusSpreadsALightAndKeepsItsTotal) {
+	const FlatScene s = flattenSource("LightSource \"point\" \"point3 from\" [ 1 2 3 ] \"rgb I\" [ 8 8 8 ] \"float radius\" [ 0.5 ] \"integer samples\" [ 8 ]\n");
+	ASSERT_EQ(s.punctualLights.size(), 8u);
+	double total = 0.0, sum[3] = {0, 0, 0}, far = 0.0;
+	for (const PunctualLight &pl : s.punctualLights) {
+		total += pl.intensity[0] * pl.scale;
+		for (int c = 0; c < 3; ++c) sum[c] += pl.pos[c] / 8.0;
+		far = std::max(far, std::hypot(pl.pos[0] - 1.0, pl.pos[1] - 2.0, pl.pos[2] - 3.0));
+		EXPECT_EQ(pl.kind, PunctualLightKind::Point);
+	}
+	EXPECT_NEAR(total, 8.0, 1e-9);
+	EXPECT_NEAR(sum[0], 1.0, 0.08) << "centred where the light was";
+	EXPECT_NEAR(sum[1], 2.0, 0.08);
+	EXPECT_LE(far, 0.5);
+	EXPECT_GT(far, 0.2);
+	const FlatScene plain = flattenSource("LightSource \"point\" \"rgb I\" [ 8 8 8 ]\n");
+	EXPECT_EQ(plain.punctualLights.size(), 1u) << "no radius: the light as it was";
+}
+
+TEST(FlattenLightSizeTest, ASpotSpreadsAcrossItsAxisAndKeepsItsCone) {
+	const FlatScene s = flattenSource("LightSource \"spot\" \"point3 from\" [ 0 5 0 ] \"point3 to\" [ 0 0 0 ] \"rgb I\" [ 4 4 4 ] \"float coneangle\" [ 30 ] \"float radius\" [ 1 ]\n");
+	ASSERT_EQ(s.punctualLights.size(), 16u);
+	for (const PunctualLight &pl : s.punctualLights) {
+		EXPECT_NEAR(pl.pos[1], 5.0, 1e-9) << "on the disk across its axis";
+		EXPECT_DOUBLE_EQ(pl.coneAngleDeg, 30.0);
+		EXPECT_NEAR(pl.dir[1], -1.0, 1e-9);
+		EXPECT_LE(std::hypot(pl.pos[0], pl.pos[2]), 1.0);
+	}
+}
+
+TEST(FlattenLightSizeTest, AHiddenPanelBecomesSpotsWithItsPower) {
+	// a 2 x 3 panel at y = 4 of radiance 5, facing down
+	const std::string panel = "AreaLightSource \"diffuse\" \"rgb L\" [ 5 5 5 ] \"bool camera\" false \"integer samples\" [ 9 ]\n"
+							  "Shape \"trianglemesh\" \"integer indices\" [ 0 1 2 0 2 3 ] \"point3 P\" [ -1 4 -1.5  1 4 -1.5  1 4 1.5  -1 4 1.5 ]\n";
+	const FlatScene s = flattenSource(panel);
+	EXPECT_TRUE(s.triangles.empty()) << "the camera does not see it";
+	ASSERT_EQ(s.punctualLights.size(), 9u);
+	double total = 0.0, down = 0.0;
+	for (const PunctualLight &pl : s.punctualLights) {
+		EXPECT_EQ(pl.kind, PunctualLightKind::Spot);
+		EXPECT_NEAR(pl.pos[1], 4.0, 1e-9);
+		EXPECT_LE(std::abs(pl.pos[0]), 1.0);
+		EXPECT_LE(std::abs(pl.pos[2]), 1.5);
+		total += pl.intensity[0] * pl.scale;
+		down += pl.dir[1];
+	}
+	EXPECT_NEAR(total, 5.0 * 6.0, 1e-9) << "L x area, a Lambertian panel's on-axis intensity";
+	EXPECT_NEAR(std::abs(down), 9.0, 1e-9) << "all facing as the panel does";
+	const FlatScene seen = flattenSource("AreaLightSource \"diffuse\" \"rgb L\" [ 5 5 5 ]\nShape \"trianglemesh\" \"integer indices\" [ 0 1 2 ] \"point3 P\" [ 0 0 0  1 0 0  0 1 0 ]\n");
+	EXPECT_EQ(seen.triangles.size(), 1u);
+	EXPECT_TRUE(seen.punctualLights.empty());
+}

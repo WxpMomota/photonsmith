@@ -52,6 +52,7 @@ inline constexpr int kMaxSubdivLevels = 4;
 #include "pbrt_flat_shapes_types.h"
 #include "pbrt_flat_materials_types.h"
 #include "pbrt_flat_scene_types.h"
+#include "pbrt_light_size.h"
 
 namespace pbrt_flatten {
 
@@ -895,6 +896,8 @@ inline FlatScene flatten(const pbrt_scene::Scene &scene,
 	resolveAfterShapes(scene, out);
 	flattenSettings(scene, out);
 	applyFilmImagingRatio(scene, out);
+	hiddenPanelsToSpots(out);   // (lights with a size, panels the camera does not see: pbrt_light_size.h)
+	spreadSizedLights(out);
 	return out;
 }
 

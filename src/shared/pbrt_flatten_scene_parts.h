@@ -408,12 +408,16 @@ struct PunctualLightLinks {
 	std::size_t from;
 	std::uint64_t illuminates, shadowsFrom;
 	int lightGroup;
+	double radius;      // (a light with a size: pbrt_light_size.h)
+	int samples;
 	PunctualLightLinks(const pbrt_scene::Scene &scene, FlatScene &o, const pbrt_scene::ParamList &params)
 		: out(o), from(o.punctualLights.size()), illuminates(linkMask(scene, o, params, "illuminates")), shadowsFrom(linkMask(scene, o, params, "shadowsfrom")),
-		  lightGroup(lightGroupOf(o, params)) {}
+		  lightGroup(lightGroupOf(o, params)), radius(params.getFloat("radius", 0.0)), samples(params.getInt("samples", 16)) {}
 	~PunctualLightLinks() {
-		for (std::size_t i = from; i < out.punctualLights.size(); ++i)
+		for (std::size_t i = from; i < out.punctualLights.size(); ++i) {
 			out.punctualLights[i].illuminates = illuminates, out.punctualLights[i].shadowsFrom = shadowsFrom, out.punctualLights[i].lightGroup = lightGroup;
+			out.punctualLights[i].radius = radius, out.punctualLights[i].spreadSamples = samples;
+		}
 	}
 };
 
@@ -728,6 +732,8 @@ inline void flattenAreaLights(const pbrt_scene::Scene &scene, FlatScene &out) {
 		e.filename = ld.params.getString("filename", "");
 		e.twoSided = ld.params.getBool("twosided", false);
 		e.sampled = ld.params.getBool("sampled", true);   // (a glow that is no light to aim at: Emission::sampled)
+		e.camera = ld.params.getBool("camera", true);     // (a panel the camera does not see: pbrt_light_size.h)
+		e.spreadSamples = ld.params.getInt("samples", 16);
 		if (const pbrt_scene::Param *p = ld.params.find("power")) {
 			if (!p->numbers.empty()) {
 				e.hasPower = true;
