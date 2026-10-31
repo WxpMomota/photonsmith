@@ -22,6 +22,8 @@
 #include "model_detail.h"
 #include "model_modifiers.h"
 #include "model_sdf.h"
+#include "model_skin.h"
+#include "model_surface.h"
 #include "model_subdiv.h"
 #include "model_texture.h"
 
@@ -63,7 +65,16 @@ struct Part {
 	int openKey = -1;   // (while a key's modifiers are read)
 	std::vector<std::string> sources;   // (the files it was made from - `mesh FILE` - with their sizes and times: part of the cache's key)
 	std::string texture;                // (`texture FILE`: an imported mesh's own picture on its own uvs)
-	bool empty() const { return sdf.steps.empty() && !hasCage && sweeps.empty() && lofts.empty() && pieces.empty(); }
+	// (modeling round 3)
+	bool skin = false;                  // a character's continuous skin, bent by bones (model_skin.h)
+	std::vector<Bone> bones;
+	Fur fur;                            // strands grown from it (model_surface.h)
+	std::vector<Cloth> cloths;          // sheets dropped onto the model (model_surface.h; the rest of the model is what they fall onto)
+	std::vector<Stroke> strokes;        // sculpting brushes (each at its place among the modifiers: a modifier "stroke" with v[0] its index)
+	std::vector<Region> regions;        // parts of its surface in materials of their own
+	bool unwrap = false;                // chart uvs in place of box projection (model_surface.h)
+	std::string roughMap, normalMap;    // (`pbr`: an imported mesh's roughness and normal pictures on its own uvs, beside `texture`)
+	bool empty() const { return sdf.steps.empty() && !hasCage && sweeps.empty() && lofts.empty() && pieces.empty() && cloths.empty(); }
 };
 
 // A text that changes whenever anything that shapes or paints the part does (the cache's key).
@@ -99,7 +110,12 @@ inline std::string keyOf(const Part &p) {
 		for (double v : m.v) o << ',' << v;
 	}
 	for (const Displace &d : p.displaces) o << "|d" << d.kind << d.amount << ',' << d.size << ',' << d.seed << ',' << d.bake;
-	o << "|t" << p.tool << ',' << p.budget << ',' << p.texture;
+	o << "|t" << p.tool << ',' << p.budget << ',' << p.texture << ',' << p.skin << ',' << p.unwrap << ',' << p.roughMap << ',' << p.normalMap;
+	for (const Cloth &c : p.cloths) o << "|cl" << c.w << ',' << c.d << ',' << c.at.x << ',' << c.at.y << ',' << c.at.z << ',' << c.res;
+	for (const Stroke &k : p.strokes) {
+		o << "|st" << k.kind << ',' << k.radius << ',' << k.strength << ',' << k.toward.x << ',' << k.toward.y << ',' << k.toward.z;
+		for (const Vec3 &q : k.path) o << ';' << q.x << ',' << q.y << ',' << q.z;
+	}
 	for (const Part::Boolean &b : p.booleans) o << "|b" << int(b.op) << ',' << b.k << ',' << b.with;
 	for (const std::string &s : p.sources) o << "|f" << s;
 	for (const Decal &d : p.paint.decals) o << "|e" << d.file << ',' << d.at.x << ',' << d.at.y << ',' << d.at.z << ',' << d.toward.x << ',' << d.toward.y << ',' << d.toward.z << ',' << d.w << ',' << d.h;
@@ -148,6 +164,19 @@ inline Mesh partMesh(const Part &p, int lod = 1) {
 	for (const Loft &l : p.lofts) append(m, loftMesh(l));
 	for (const Mesh &k : p.pieces) append(m, k);
 	for (const Modifier &mod : p.mods) {
+		if (mod.kind == "stroke") {
+			const std::size_t i = static_cast<std::size_t>(mod.v.empty() ? 0 : mod.v[0]);
+			if (i < p.strokes.size()) m = sculpted(m, p.strokes[i]);
+			continue;
+		}
+		if (mod.kind == "remesh") {
+			m = remeshed(m, (mod.v.empty() ? 0.0 : mod.v[0]) * lod);
+			continue;
+		}
+		if (mod.kind == "close") {
+			m = closedHoles(m);
+			continue;
+		}
 		if (mod.kind == "displace") {
 			const std::size_t i = static_cast<std::size_t>(mod.v.empty() ? 0 : mod.v[0]);
 			if (i < p.displaces.size()) {
@@ -173,6 +202,7 @@ inline std::string materialOf(const Part &p, const std::string &texName = std::s
 	if (p.finish == "matte") return diffuseMaterial(p.colour);
 	if (p.finish == "metal") return metalMaterial(p.colour, p.rough);
 	if (p.finish == "glass") return glassMaterial(1.5, std::min(p.rough, 0.3));
+	if (p.finish == "skin") return subsurfaceMaterial(p.colour, Vec3{0.012, 0.005, 0.003}, p.rough);   // (light going into it: a cartoon skin, wax, a gummy sweet)
 	if (p.finish == "glow") {
 		const Vec3 L = p.colour * std::max(0.1, p.glow);
 		std::snprintf(buf, sizeof buf, "AreaLightSource \"diffuse\" \"rgb L\" [ %.4f %.4f %.4f ]\n  Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]", L.x, L.y, L.z);

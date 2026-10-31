@@ -490,6 +490,14 @@ struct Spec {
 	std::vector<model::Model> models;
 	std::vector<model::Placed> modelPlaces;
 	std::vector<model::Shatter> shatters;   // (`shatter ID at T`: model_fracture.h)
+	model::Animated animated;                // (round 3: flex, morph, build, vanish, wobble and the mechanisms: model_anim.h)
+	struct ModelBody {                       // (round 3: `rigidbody ID ...` - a placed model in the rigid-body world)
+		std::string id;
+		double mass = 1.0, bounce = 0.25, friction = 0.6, at = -1.0;
+		Vec3 push, spin;
+		bool fixed = false;
+	};
+	std::vector<ModelBody> modelBodies;
 	// fire, lava and smoke (`fire`, `lava`, `volcano`, `wildfire`)
 	std::vector<fire::Fire> fires;
 	std::vector<fire::Lava> lavas;

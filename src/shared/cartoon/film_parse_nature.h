@@ -645,6 +645,7 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 	const auto fail = [](const std::string &what) { return what; };
 	handled = true;
 	if (!s.models.empty() && !s.models.back().closed) return model::modelLine(s.models.back(), detail::tokens(line));   // (inside a `model` block: film_model.h)
+	if (modelAnimVerb(verb)) return modelAnimLine(s, verb, line);   // (modeling round 3: shapes over time, mechanisms, the rigid-body world)
 	if (verb == "model" || verb == "shatter" || ((verb == "place" || verb == "scatter") && modelNamed(s, line))) return modelLines(s, verb, line);
 	if (verb == "terrain") {
 		const std::vector<std::string> t = detail::tokens(line);

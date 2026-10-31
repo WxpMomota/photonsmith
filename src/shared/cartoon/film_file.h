@@ -431,6 +431,14 @@ class DataFilm {
 	// The shot's own lighting at t (`lighting`: shot_lighting.h): round the character it is on, or what the camera looks at, from where the camera is.
 	std::string shotLightsAt(const std::string &header, double t) const;
 
+	// (modeling round 3) where a placed model is at t (story space), what puts it somewhere else (a route, a character carrying it, the rigid-body world: false for nothing),
+	// and a piece's mechanisms with its own move/turn lines (the model's space)
+	Mat4 placementFrame(const model::Placed &pl, double t) const;
+	bool placementOverride(const model::Placed &pl, double t, Mat4 &frame) const;
+	Mat4 mechMatrix(const std::string &name, double t) const;
+	std::string loadModelsEarly(const std::string &filePath, const std::filesystem::path &base);   // (loadFile's model steps: film_world.cpp)
+	void loadModelsLate();
+
   private:
 	// The lines' ends once worked out (lineEnd): a copy of the film starts without them.
 	struct LineEnds {
@@ -464,7 +472,8 @@ class DataFilm {
 	// (the modeling rounds) the film's own models where they are placed at t, seen from the camera of `header` (film_model.h), moved by the film's `move`, `turn` and
 	// `grow` lines and shown or hidden by its `show` lines as scene blocks are (by a placement's `as ID`, and ID.PIECE), broken by its `shatter` lines
 	std::string modelsAt(const std::string &header, double t) const;
-	Mat4 animMatrix(const std::string &name, double t) const;   // (those lines' transform of a name: pbrt's, as transformsAt writes it)
+	Mat4 animMatrix(const std::string &name, double t) const;
+ // (those lines' transform of a name: pbrt's, as transformsAt writes it)
 	static std::string num(double v);
 	// The transforms of a block at t; with a shutter, a moving block's at the shutter's opening (StartTime) and closing (EndTime) - pbrt's object motion blur, which
 	// the CPU and the GPU both render (gpu: a two-key triangle GAS, moving spheres).

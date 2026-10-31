@@ -46,6 +46,7 @@
 #include "cartoon_lib.h"
 #include "film_cache.h"
 #include "model_doctor.h"
+#include "model_anim.h"
 #include "model_boolean.h"
 #include "model_decimate.h"
 #include "model_fracture.h"
@@ -53,6 +54,7 @@
 #include "model_import.h"
 #include "model_kit.h"
 #include "model_part.h"
+#include "model_text.h"
 #include "nature_lib.h"
 
 namespace cartoon {
@@ -69,6 +71,14 @@ struct Model {
 	std::map<std::string, double> params;
 	std::string library;
 	std::vector<std::string> variants;   // (`variants N`: the models it stands for, one picked for each placement)
+	// (modeling round 3) `cover PIECE with MODEL N [up|slope D|all] [scale A B] [seed K]`: copies of another model strewn over a piece's surface (rivets, moss, leaves,
+	// barnacles), made into pieces of this model when the film is loaded (DataFilm::load: coveredParts)
+	struct Cover {
+		std::string piece, with, rule = "all";
+		int count = 100, seed = 1;
+		double slope = 0.0, s0 = 1.0, s1 = 1.0;
+	};
+	std::vector<Cover> covers;
 };
 struct Placed {
 	std::string model;
@@ -640,6 +650,178 @@ inline std::string round2Line(Part &p, const std::vector<std::string> &t, bool &
 	return std::string();
 }
 
+// One line of a piece (modeling round 3): skinned, bone, fur, cloth, stroke, remesh, close, region, unwrap, text, pbr. `mine` false (and "") when not one of these.
+inline std::string round3Line(Part &p, const std::vector<std::string> &t, bool &mine) {
+	using detail::num;
+	std::vector<double> v;
+	std::size_t i = 1;
+	const auto numbers = [&](std::size_t n) {
+		v.assign(n, 0.0);
+		for (std::size_t k = 0; k < n; ++k)
+			if (i + k >= t.size() || !num(t[i + k], v[k])) return false;
+		i += n;
+		return true;
+	};
+	const auto colourAt = [&](Vec3 &c) {
+		if (!numbers(3)) return false;
+		c = {v[0], v[1], v[2]};
+		return true;
+	};
+	const std::string verb = t[0];
+	mine = true;
+	if (verb == "skinned") {
+		if (t.size() != 1) return "`skinned` (alone: the piece bends with a character's bones, model_skin.h)";
+		p.skin = true;
+		return std::string();
+	}
+	if (verb == "bone") {
+		const char *usage = "`bone NAME from X Y Z to X Y Z` (NAME: spine, head, leg.1 .., arm.l, arm.r, tail)";
+		Bone b;
+		if (t.size() != 10 || t[2] != "from" || t[6] != "to") return usage;
+		b.name = t[1];
+		i = 3;
+		if (!numbers(3)) return usage;
+		b.a = {v[0], v[1], v[2]};
+		i = 7;
+		if (!numbers(3)) return usage;
+		b.b = {v[0], v[1], v[2]};
+		p.bones.push_back(b), p.skin = true;
+		return std::string();
+	}
+	if (verb == "fur") {
+		const char *usage = "`fur LENGTH [density N] [width W] [colour R G B] [curl C] [droop D] [seed K]`";
+		if (!numbers(1) || v[0] <= 0 || v[0] > 2) return usage;
+		p.fur.on = true, p.fur.length = v[0], p.fur.colour = p.colour;
+		while (i < t.size()) {
+			const std::string w = t[i++];
+			if (w == "density" && numbers(1) && v[0] > 0) p.fur.density = v[0];
+			else if (w == "width" && numbers(1) && v[0] > 0) p.fur.width = v[0];
+			else if (w == "colour" && colourAt(p.fur.colour)) continue;
+			else if (w == "curl" && numbers(1)) p.fur.curl = v[0];
+			else if (w == "droop" && numbers(1)) p.fur.droop = v[0];
+			else if (w == "seed" && numbers(1)) p.fur.seed = static_cast<int>(v[0]);
+			else return usage;
+		}
+		return std::string();
+	}
+	if (verb == "cloth") {
+		const char *usage = "`cloth W D [at X Y Z] [res N] [wave A]`: a sheet dropped onto the model";
+		Cloth c;
+		if (!numbers(2) || v[0] <= 0 || v[1] <= 0) return usage;
+		c.w = v[0], c.d = v[1];
+		while (i < t.size()) {
+			const std::string w = t[i++];
+			if (w == "at" && numbers(3)) c.at = {v[0], v[1], v[2]};
+			else if (w == "res" && numbers(1) && v[0] >= 6 && v[0] <= 120) c.res = static_cast<int>(v[0]);
+			else if (w == "wave" && numbers(1) && v[0] >= 0) c.wave = v[0];
+			else return usage;
+		}
+		p.cloths.push_back(c);
+		return std::string();
+	}
+	if (verb == "stroke") {
+		const char *usage = "`stroke inflate|crease|grab|smooth|pinch|flatten RADIUS STRENGTH path X Y Z ... [toward X Y Z]`";
+		static const std::vector<std::string> kinds = {"inflate", "crease", "grab", "smooth", "pinch", "flatten"};
+		Stroke k;
+		if (t.size() < 4 || std::find(kinds.begin(), kinds.end(), t[1]) == kinds.end()) return usage;
+		k.kind = t[1], i = 2;
+		if (!numbers(2) || v[0] <= 0) return usage;
+		k.radius = v[0], k.strength = v[1];
+		if (i >= t.size() || t[i++] != "path") return usage;
+		double x = 0.0;
+		while (i + 2 < t.size() && num(t[i], x) && numbers(3)) k.path.push_back({v[0], v[1], v[2]});
+		if (i < t.size()) {
+			if (t[i++] != "toward" || !numbers(3)) return usage;
+			k.toward = {v[0], v[1], v[2]};
+		}
+		if (k.path.empty() || i != t.size()) return usage;
+		if (p.openKey >= 0) return "a `stroke` cannot go in a shape key";
+		p.strokes.push_back(k);
+		p.mods.push_back({"stroke", {static_cast<double>(p.strokes.size() - 1)}});
+		return std::string();
+	}
+	if (verb == "remesh" || verb == "close") {
+		Modifier mod;
+		mod.kind = verb;
+		if (verb == "remesh" && t.size() == 2) {
+			if (!numbers(1) || v[0] < 0.0005) return "`remesh [CELL]` (the cube's size, 0.5 mm or more)";
+			mod.v = v;
+		} else if (t.size() != 1) {
+			return verb == "remesh" ? "`remesh [CELL]`" : "`close` (alone)";
+		}
+		p.mods.push_back(mod);
+		return std::string();
+	}
+	if (verb == "region") {
+		const char *usage = "`region NAME above Y|below Y|facing up|down|front|back|left|right|near X Y Z R [colour R G B] [rough R] [plastic|matte|metal|glass|skin|glow G]`";
+		Region r;
+		if (t.size() < 3) return usage;
+		r.name = t[1], r.rule = t[2], r.colour = p.colour, r.finish = p.finish, r.rough = p.rough;
+		i = 3;
+		if (r.rule == "above" || r.rule == "below") {
+			if (!numbers(1)) return usage;
+			r.value = v[0];
+		} else if (r.rule == "facing") {
+			static const std::vector<std::string> ways = {"up", "down", "front", "back", "left", "right"};
+			if (i >= t.size() || std::find(ways.begin(), ways.end(), t[i]) == ways.end()) return usage;
+			r.facing = t[i++];
+		} else if (r.rule == "near") {
+			if (!numbers(4) || v[3] <= 0) return usage;
+			r.at = {v[0], v[1], v[2]}, r.radius = v[3];
+		} else return usage;
+		while (i < t.size()) {
+			const std::string w = t[i++];
+			if (w == "colour" && colourAt(r.colour)) continue;
+			else if (w == "rough" && numbers(1)) r.rough = v[0];
+			else if (w == "glow" && numbers(1)) r.finish = "glow", r.glow = v[0];
+			else if (w == "plastic" || w == "matte" || w == "metal" || w == "glass" || w == "skin") r.finish = w;
+			else return usage;
+		}
+		p.regions.push_back(r);
+		return std::string();
+	}
+	if (verb == "unwrap") {
+		if (t.size() != 1) return "`unwrap` (alone: chart uvs for its paint and its export)";
+		p.unwrap = true;
+		return std::string();
+	}
+	if (verb == "text") {
+		const char *usage = "`text \"WORDS\" [size H] [depth D] [font FILE] [at X Y Z] [turn AX AY AZ]`";
+		if (t.size() < 2) return usage;
+		double h = 0.3, d = 0.06;
+		std::string font;
+		Vec3 at{0, 0, 0}, turn{0, 0, 0};
+		for (i = 2; i < t.size();) {
+			const std::string w = t[i++];
+			if (w == "size" && numbers(1) && v[0] > 0) h = v[0];
+			else if (w == "depth" && numbers(1) && v[0] > 0) d = v[0];
+			else if (w == "font" && i < t.size()) font = t[i++];
+			else if (w == "at" && numbers(3)) at = {v[0], v[1], v[2]};
+			else if (w == "turn" && numbers(3)) turn = {v[0], v[1], v[2]};
+			else return usage;
+		}
+		std::string error;
+		const Mesh m = textSolid(t[1], h, d, font, error);
+		if (!error.empty()) return "`text`: " + error;
+		p.pieces.push_back(transformed(m, mul(translate(at), rotate({0, 0, 1}, turn.z), rotate({0, 1, 0}, turn.y), rotate({1, 0, 0}, turn.x))));
+		p.sources.push_back("text:" + t[1] + "#" + font + "#" + std::to_string(h) + "#" + std::to_string(d));
+		return std::string();
+	}
+	if (verb == "pbr") {
+		const char *usage = "`pbr base FILE [rough FILE] [normal FILE]`: an imported mesh's pictures on its own uvs";
+		for (i = 1; i + 1 < t.size(); i += 2) {
+			if (t[i] == "base") p.texture = t[i + 1];
+			else if (t[i] == "rough") p.roughMap = t[i + 1];
+			else if (t[i] == "normal") p.normalMap = t[i + 1];
+			else return usage;
+		}
+		if (i != t.size() || p.texture.empty()) return usage;
+		return std::string();
+	}
+	mine = false;
+	return std::string();
+}
+
 inline std::string modelLine(Model &m, const std::vector<std::string> &raw) {
 	using detail::num;
 	if (raw.empty()) return std::string();
@@ -712,10 +894,10 @@ inline std::string modelLine(Model &m, const std::vector<std::string> &raw) {
 			} else if (w == "glow") {
 				if (!numbers(1) || v[0] < 0) return "`glow G` (how bright)";
 				p.finish = "glow", p.glow = v[0];
-			} else if (w == "plastic" || w == "matte" || w == "metal" || w == "glass") {
+			} else if (w == "plastic" || w == "matte" || w == "metal" || w == "glass" || w == "skin") {
 				p.finish = w;
 			} else {
-				return "\"" + w + "\": a piece takes colour R G B, rough R, plastic, matte, metal, glass or glow G";
+				return "\"" + w + "\": a piece takes colour R G B, rough R, plastic, matte, metal, glass, skin or glow G";
 			}
 		}
 		m.parts.push_back(p);
@@ -726,7 +908,26 @@ inline std::string modelLine(Model &m, const std::vector<std::string> &raw) {
 		m.parts.push_back(p);
 	}
 	Part &p = m.parts.back();
-	for (const auto handler : {round2Line, shapeLine, cageLine, curveLine, paintKitLine, modifierLine}) {
+	if (verb == "cover") {   // (the model's: copies of another model over one of its pieces)
+		const char *usage = "`cover PIECE with MODEL N [up|slope D|all] [scale A B] [seed K]` (MODEL a model of the film; N 1 to 5000)";
+		Model::Cover c;
+		if (t.size() < 5 || t[2] != "with") return usage;
+		c.piece = t[1], c.with = t[3];
+		i = 4;
+		if (!numbers(1) || v[0] < 1 || v[0] > 5000) return usage;
+		c.count = static_cast<int>(v[0]);
+		while (i < t.size()) {
+			const std::string w = t[i++];
+			if (w == "up" || w == "all") c.rule = w;
+			else if (w == "slope" && numbers(1)) c.rule = "slope", c.slope = v[0];
+			else if (w == "scale" && numbers(2) && v[0] > 0 && v[1] > 0) c.s0 = v[0], c.s1 = v[1];
+			else if (w == "seed" && numbers(1)) c.seed = static_cast<int>(v[0]);
+			else return usage;
+		}
+		m.covers.push_back(c);
+		return std::string();
+	}
+	for (const auto handler : {round3Line, round2Line, shapeLine, cageLine, curveLine, paintKitLine, modifierLine}) {
 		bool mine = false;
 		const std::string e = handler(p, t, mine);
 		if (mine) return e;
@@ -765,6 +966,20 @@ inline std::string pieceName(const Model &m, const Part &p, int lod) {
 // a quarter or a sixteenth of its triangles (model_decimate.h).
 inline Mesh pieceMesh(const Model &m, const Part &p, int lod, int depth = 0) {
 	Mesh mesh = partMesh(p, lod);
+	if (!p.cloths.empty() && depth == 0) {   // (round 3) its sheets dropped onto the rest of the model
+		std::vector<Mesh> others;
+		std::vector<MeshField> fields;
+		for (const Part &q : m.parts)
+			if (&q != &p && !q.tool && q.cloths.empty()) others.push_back(pieceMesh(m, q, 2, depth + 1));
+		for (const Mesh &o : others) {
+			Vec3 lo, hi;
+			boxOf(o, lo, hi);
+			if (!o.tris.empty()) fields.push_back(meshField(o, std::max({hi.x - lo.x, hi.y - lo.y, hi.z - lo.z, 0.05}) / 60.0));
+		}
+		std::vector<const MeshField *> colliders;
+		for (const MeshField &f : fields) colliders.push_back(&f);
+		for (const Cloth &c : p.cloths) append(mesh, draped(c, colliders));
+	}
 	if (!p.booleans.empty() && depth < 4 && !mesh.tris.empty()) {
 		Vec3 lo, hi;
 		boxOf(mesh, lo, hi);
@@ -782,33 +997,75 @@ inline Mesh pieceMesh(const Model &m, const Part &p, int lod, int depth = 0) {
 	}
 	return mesh;
 }
+// The piece's mesh with uvs for its paint (charts with `unwrap`, else box projection) and, when asked, each copied vertex's curvature.
+inline Mesh uvMeshOf(const Part &p, const Mesh &mesh, std::vector<double> *curvature) {
+	std::vector<int> from;
+	if (p.unwrap) {
+		Mesh w = welded(mesh, 1e-7);
+		sdf::computeNormals(w);
+		const Mesh uv = chartUnwrapped(mesh, &from);
+		if (curvature) {
+			const std::vector<double> k = curvatureOf(w);
+			curvature->resize(from.size());
+			for (std::size_t q = 0; q < from.size(); ++q) (*curvature)[q] = k[static_cast<std::size_t>(from[q])];
+		}
+		return uv;
+	}
+	const Mesh uv = boxUnwrapped(mesh, &from);
+	if (curvature) {
+		const std::vector<double> k = curvatureOf(mesh);
+		curvature->resize(from.size());
+		for (std::size_t q = 0; q < from.size(); ++q) (*curvature)[q] = k[static_cast<std::size_t>(from[q])];
+	}
+	return uv;
+}
+// The piece's regions (model_surface.h), each its own mesh in the cache and its own material: "" when it has none.
+inline std::string regionsText(const std::string &film, const Model &m, const Part &p, int lod, const std::string &name) {
+	if (p.regions.empty()) return std::string();
+	std::string out;
+	for (std::size_t k = 0; k <= p.regions.size(); ++k) {
+		const std::string file = film_cache::ply(film, name + "_r" + std::to_string(k), [&]() { return splitByRegions(pieceMesh(m, p, lod), p.regions)[k]; });
+		if (file.empty()) continue;
+		Part look = p;
+		look.paint.on = false;
+		if (k > 0) {
+			const Region &r = p.regions[k - 1];
+			look.finish = r.finish, look.colour = r.colour, look.rough = r.rough, look.glow = r.glow;
+		}
+		out += attr(materialOf(look), film_cache::plyShape(file));
+	}
+	return out;
+}
 // One piece as scene text at level `lod`, in the model's own space: its mesh from the cache, its painted picture and baked normal map (model_texture.h) or its own
 // picture (`texture`), its material.
 inline std::string pieceText(const std::string &film, const Model &m, const Part &p, int lod) {
 	const std::string name = pieceName(m, p, lod);
-	const std::string file = film_cache::ply(film, name, [&]() { return p.paint.on ? boxUnwrapped(pieceMesh(m, p, lod)) : pieceMesh(m, p, lod); });
-	if (file.empty()) return std::string();
-	if (!p.texture.empty() && !p.paint.on) {   // an imported mesh's picture on its own uvs
-		const std::string found = film_cache::asset(p.texture);
-		char buf[600];
-		std::snprintf(buf, sizeof buf, "Texture \"%s_tex\" \"spectrum\" \"imagemap\" \"string filename\" [ \"%s\" ]\n  Material \"coateddiffuse\" \"texture reflectance\" \"%s_tex\" \"float roughness\" [ %.4f ]",
-					  name.c_str(), (found.empty() ? p.texture : found).c_str(), name.c_str(), p.rough);
-		return attr(buf, film_cache::plyShape(file));
+	std::string extra;   // (round 3: its fur)
+	if (p.fur.on) {
+		Fur f = p.fur;
+		f.density /= lod * lod;   // (fewer strands far off)
+		extra = furText(pieceMesh(m, p, lod), f);
+	}
+	if (const std::string regions = regionsText(film, m, p, lod, name); !regions.empty()) return regions + extra;
+	const std::string file = film_cache::ply(film, name, [&]() { return p.paint.on ? uvMeshOf(p, pieceMesh(m, p, lod), nullptr) : pieceMesh(m, p, lod); });
+	if (file.empty()) return extra;
+	if (!p.texture.empty() && !p.paint.on) {   // an imported mesh's pictures on its own uvs: its colour, and (`pbr`) its roughness and its normal map
+		const auto found = [](const std::string &f) {
+			const std::string a = film_cache::asset(f);
+			return a.empty() ? f : a;
+		};
+		std::string mat = "Texture \"" + name + "_tex\" \"spectrum\" \"imagemap\" \"string filename\" [ \"" + found(p.texture) + "\" ]\n  ";
+		if (!p.roughMap.empty()) mat += "Texture \"" + name + "_rough\" \"float\" \"imagemap\" \"string filename\" [ \"" + found(p.roughMap) + "\" ] \"string encoding\" \"linear\"\n  ";
+		char buf[200];
+		std::snprintf(buf, sizeof buf, " \"float roughness\" [ %.4f ]", p.rough);
+		mat += "Material \"coateddiffuse\" \"texture reflectance\" \"" + name + "_tex\"" + (p.roughMap.empty() ? std::string(buf) : " \"texture roughness\" \"" + name + "_rough\"");
+		if (!p.normalMap.empty()) mat += " \"string normalmap\" [ \"" + found(p.normalMap) + "\" ]";
+		return attr(mat, film_cache::plyShape(file)) + extra;
 	}
 	std::string picture, normals;
 	if (p.paint.on) {
 		const int N = std::clamp(p.paint.res, 64, 4096);
-		const auto unwrapped = [&](std::vector<double> *curvature) {
-			const Mesh mesh = pieceMesh(m, p, lod);
-			std::vector<int> from;
-			Mesh uv = boxUnwrapped(mesh, &from);
-			if (curvature) {
-				const std::vector<double> k = curvatureOf(mesh);
-				curvature->resize(from.size());
-				for (std::size_t q = 0; q < from.size(); ++q) (*curvature)[q] = k[static_cast<std::size_t>(from[q])];
-			}
-			return uv;
-		};
+		const auto unwrapped = [&](std::vector<double> *curvature) { return uvMeshOf(p, pieceMesh(m, p, lod), curvature); };
 		picture = film_sky::picture(film, name + "_paint", N, N, [&](std::vector<float> &rgb) {
 			std::vector<double> kk;
 			const Mesh uv = unwrapped(&kk);
@@ -823,7 +1080,7 @@ inline std::string pieceText(const std::string &film, const Model &m, const Part
 	}
 	std::string material = materialOf(p, name + "_tex", picture);
 	if (!normals.empty()) material += " \"string normalmap\" [ \"" + normals + "\" ]";
-	return attr(material, film_cache::plyShape(file));
+	return attr(material, film_cache::plyShape(file)) + extra;
 }
 // The model's drawn pieces at level `lod`, as scene text (in the model's own space: placed by whatever transform is round it).
 inline std::string modelText(const std::string &film, const Model &m, int lod) {
@@ -867,11 +1124,55 @@ struct Motion {
 	std::function<bool(const std::string &)> shown;
 	std::function<const Shatter *(const std::string &)> shatter;   // a placement's break, if it has one
 	double t = 0.0;
+	// (modeling round 3) shapes changing over time (model_anim.h), the models of the film (a morph's other), and what puts a placement somewhere else - a route, a
+	// character carrying it, the rigid-body world (`frame` given the placement and its own frame: false when nothing does)
+	const Animated *anim = nullptr;
+	std::function<const Model *(const std::string &)> modelNamed;
+	std::function<bool(const Placed &, double, Mat4 &)> frame;
+	std::function<Mat4(const std::string &, double)> transformAt;   // (a placement's whole frame, story space, at another time: what lags behind it)
 };
+// Whether anything changes the placed model's shape or place now or later (it is written by itself then).
+inline bool movesAtAll(const Model &m, const Placed &pl, const Motion &mo) {
+	if (pl.id.empty() || !mo.moves) return false;
+	bool moving = mo.moves(pl.id) || (mo.shatter && mo.shatter(pl.id)) || (mo.anim && mo.anim->names(pl.id));
+	Mat4 unused;
+	moving = moving || (mo.frame && mo.frame(pl, mo.t, unused));
+	for (const Part &p : m.parts) {
+		moving = moving || mo.moves(pl.id + "." + p.name) || (mo.anim && mo.anim->names(pl.id + "." + p.name));
+		for (const Cloth &c : p.cloths) moving = moving || c.wave > 0.0;
+	}
+	return moving;
+}
 // A placed model that moves, hides a piece or breaks: written by itself, piece by piece (no instancing), at level `lod`.
 inline std::string movingText(const std::string &film, const Model &m, const Placed &pl, const Mat4 &frame, int lod, const Motion &mo) {
-	const Mat4 base = mo.moves(pl.id) ? mul(mo.transform(pl.id), frame) : frame;
+	Mat4 placed = frame;
+	if (mo.frame) mo.frame(pl, mo.t, placed);   // (a route, a character carrying it, the rigid-body world)
+	const Mat4 base = mo.moves(pl.id) ? mul(mo.transform(pl.id), placed) : placed;
 	std::string out;
+	if (mo.anim)   // (round 3) melting into another model
+		for (const Morph &mph : mo.anim->morphs) {
+			if (mph.id != pl.id || mo.t <= mph.t0) continue;
+			const Model *to = mo.modelNamed ? mo.modelNamed(mph.to) : nullptr;
+			if (!to) break;
+			const double u = std::clamp((mo.t - mph.t0) / std::max(1e-6, mph.t1 - mph.t0), 0.0, 1.0);
+			if (u >= 1.0) return "AttributeBegin\n" + film_cache::placement(base) + modelText(film, *to, lod) + "AttributeEnd\n";
+			const int step = static_cast<int>(std::lround(u * 24.0));   // (24 steps from one to the other, each kept in the cache)
+			const auto whole = [&](const Model &x) {
+				Mesh all;
+				for (const Part &q : x.parts)
+					if (!q.tool) append(all, pieceMesh(x, q, 2));
+				return all;
+			};
+			const std::string file = film_cache::ply(film, "morph_" + m.name + "_" + to->name + "_" + hashOf(fullKeyOf(m, m.parts[0]) + fullKeyOf(*to, to->parts[0])).substr(0, 8) + "_" + std::to_string(step), [&]() {
+				const Mesh a = whole(m), b = whole(*to);
+				Vec3 lo, hi;
+				boxOf(a, lo, hi);
+				return morphed(a, b, step / 24.0, std::max({hi.x - lo.x, hi.y - lo.y, hi.z - lo.z, 0.05}) / 60.0);
+			});
+			Part look = m.parts[0];
+			look.paint.on = false, look.colour = lerp(m.parts[0].colour, to->parts[0].colour, u);
+			return file.empty() ? std::string() : attr(materialOf(look), film_cache::placement(base) + film_cache::plyShape(file));
+		}
 	if (const Shatter *s = mo.shatter ? mo.shatter(pl.id) : nullptr; s && mo.t >= s->t) {   // broken: its chunks where they have flown to
 		const std::vector<Chunk> chunks = chunksOf(film, m.name, m.parts, *s, [&](const Part &p) { return pieceMesh(m, p, 1); });
 		Vec3 lo{1e30, 1e30, 1e30}, hi{-1e30, -1e30, -1e30};
@@ -881,11 +1182,55 @@ inline std::string movingText(const std::string &film, const Model &m, const Pla
 			out += attr(materialOf(*chunks[k].part), film_cache::placement(mul(base, chunkAt(chunks[k], static_cast<int>(k), mid, *s, mo.t - s->t))) + film_cache::plyShape(chunks[k].file));
 		return out;
 	}
+	int index = 0, drawn = 0;
+	for (const Part &p : m.parts) drawn += p.tool ? 0 : 1;
 	for (const Part &p : m.parts) {
 		if (p.tool) continue;
 		const std::string name = pl.id + "." + p.name;
+		const int k = index++;
 		if (mo.moves(name) && !mo.shown(name)) continue;
-		const Mat4 piece = mo.moves(name) ? mul(base, mo.transform(name)) : base;
+		Mat4 piece = mo.moves(name) ? mul(base, mo.transform(name)) : base;
+		// (round 3) its shape over time: built up, flexed, wobbling, rippling, breaking up - written out as it is now
+		bool reshaped = false;
+		Mesh mesh;
+		const auto meshNow = [&]() -> Mesh & {
+			if (!reshaped) mesh = pieceMesh(m, p, lod), reshaped = true;
+			return mesh;
+		};
+		if (mo.anim) {
+			for (const Build &b : mo.anim->builds)
+				if (b.id == pl.id) {
+					Vec3 lo, hi;
+					boxOf(pieceMesh(m, p, 4), lo, hi);
+					piece = mul(piece, buildMatrix(b.style, std::clamp((mo.t - b.t0) / std::max(1e-6, b.t1 - b.t0), 0.0, 1.0), k, drawn, lo, hi));
+				}
+			for (const Flex &f : mo.anim->flexes)
+				if (f.name == name) meshNow() = flexed(meshNow(), f.kind, keyedAt(f.keys, mo.t));
+			for (const Wobble &w : mo.anim->wobbles)
+				if (w.name == name && mo.transformAt) {   // the lag of a damped spring behind the placement's motion over the last second and a half
+					Vec3 lag{0, 0, 0}, vel{0, 0, 0};
+					const double dt = 1.0 / 60.0;
+					Vec3 prevPos = transformPoint(mo.transformAt(pl.id, mo.t - 1.5), Vec3{0, 0, 0}), prevVel{0, 0, 0};
+					for (double u = mo.t - 1.5 + dt; u <= mo.t + 1e-9; u += dt) {
+						const Vec3 pos = transformPoint(mo.transformAt(pl.id, u), Vec3{0, 0, 0}), v = (pos - prevPos) * (1.0 / dt), acc = (v - prevVel) * (1.0 / dt);
+						vel = vel + (acc * -0.04 * w.amount - lag * 40.0 - vel * 4.0) * dt;
+						lag = lag + vel * dt;
+						prevPos = pos, prevVel = v;
+					}
+					const Vec3 local = transformPoint(invertAffine(base), transformPoint(base, Vec3{0, 0, 0}) + lag) - Vec3{0, 0, 0};
+					meshNow() = wobbled(meshNow(), local);
+				}
+			for (const Vanish &v : mo.anim->vanishes)
+				if (v.id == pl.id && mo.t > v.t0) meshNow() = vanished(meshNow(), std::clamp((mo.t - v.t0) / std::max(1e-6, v.t1 - v.t0), 0.0, 1.0), k + 1);
+		}
+		for (const Cloth &c : p.cloths)
+			if (c.wave > 0.0) meshNow() = rippled(meshNow(), c.wave, mo.t);
+		if (reshaped) {
+			Part look = p;
+			look.paint.on = false;
+			if (!mesh.tris.empty()) out += attr(materialOf(look), emitMesh(mesh, piece));
+			continue;
+		}
 		out += "AttributeBegin\n" + film_cache::placement(piece) + pieceText(film, m, p, lod) + "AttributeEnd\n";
 	}
 	return out;
@@ -911,12 +1256,7 @@ inline std::string placedText(const std::string &film, const std::vector<Model> 
 		const double size = sizeOf(film, m) * pl.scale;
 		const int lod = lodFor(size, length(pl.at - eye));
 		const Mat4 frame = mul(translate({-pl.at.x, pl.at.y, pl.at.z}), rotate({0, 1, 0}, pl.turn), scale(pl.scale));
-		bool moving = false;
-		if (!pl.id.empty() && motion.moves) {
-			moving = motion.moves(pl.id) || (motion.shatter && motion.shatter(pl.id));
-			for (const Part &p : m.parts) moving = moving || motion.moves(pl.id + "." + p.name);
-		}
-		if (moving) {
+		if (movesAtAll(m, pl, motion)) {
 			if (!motion.moves(pl.id) || motion.shown(pl.id)) out += movingText(film, m, pl, frame, lod, motion);
 			continue;
 		}
@@ -933,6 +1273,53 @@ inline std::string placedText(const std::string &film, const std::vector<Model> 
 		for (const Mat4 &f : frames) out += nature::placeObject(object, f);
 	}
 	return defs + out;
+}
+
+// ---- covering a piece with another model (round 3) ----
+// The pieces that cover `c.piece` of `m` with copies of `child`: points strewn over the piece by area (seeded), kept by the rule - `up` where it faces up, `slope D`
+// where it is within D degrees of level, `all` everywhere - each copy stood on the surface along its normal, turned at random about it and sized between s0 and s1.
+// One piece for each of the child's pieces, its copies merged into one mesh (at most about two million triangles in all).
+inline std::vector<Part> coveredParts(const Model &m, const Model::Cover &c, const Model &child) {
+	std::vector<Part> out;
+	const auto target = std::find_if(m.parts.begin(), m.parts.end(), [&](const Part &p) { return p.name == c.piece; });
+	if (target == m.parts.end()) return out;
+	const Mesh surface = pieceMesh(m, *target, 1);
+	double area = 0.0;
+	std::vector<double> run;
+	for (const auto &t : surface.tris) area += 0.5 * length(cross(surface.verts[t[1]] - surface.verts[t[0]], surface.verts[t[2]] - surface.verts[t[0]])), run.push_back(area);
+	if (area <= 0.0) return out;
+	std::vector<Mat4> places;
+	const double minUp = c.rule == "up" ? 0.6 : c.rule == "slope" ? std::cos(c.slope * kPi / 180.0) : -2.0;
+	for (int k = 0; k < 40 * c.count && static_cast<int>(places.size()) < c.count; ++k) {
+		const int key = c.seed * 7919 + k;
+		const std::size_t ti = std::min(surface.tris.size() - 1, static_cast<std::size_t>(std::lower_bound(run.begin(), run.end(), hash01(key, 1) * area) - run.begin()));
+		const auto &t = surface.tris[ti];
+		const Vec3 n = normalize(cross(surface.verts[t[1]] - surface.verts[t[0]], surface.verts[t[2]] - surface.verts[t[0]]));
+		if (n.y < minUp) continue;
+		double a = hash01(key, 2), b = hash01(key, 3);
+		if (a + b > 1.0) a = 1.0 - a, b = 1.0 - b;
+		const Vec3 p = surface.verts[t[0]] + (surface.verts[t[1]] - surface.verts[t[0]]) * a + (surface.verts[t[2]] - surface.verts[t[0]]) * b;
+		places.push_back(mul(translate(p), alignY({0, 0, 0}, n), rotate({0, 1, 0}, 360.0 * hash01(key, 4)), scale(lerp(c.s0, c.s1, hash01(key, 5)))));
+	}
+	std::size_t budget = 2000000;
+	for (const Part &q : child.parts) {
+		if (q.tool) continue;
+		const Mesh one = pieceMesh(child, q, places.size() > 200 ? 2 : 1);
+		Part copy = q;
+		copy.name = c.piece + ".cover." + child.name + "." + q.name;
+		copy.sdf.steps.clear(), copy.hasCage = false, copy.sweeps.clear(), copy.lofts.clear(), copy.mods.clear(), copy.displaces.clear(), copy.booleans.clear(), copy.cloths.clear();
+		copy.paint.on = false, copy.fur.on = false, copy.regions.clear();
+		Mesh all;
+		for (const Mat4 &pl : places) {
+			if (all.tris.size() + one.tris.size() > budget) break;
+			append(all, transformed(one, pl));
+		}
+		budget -= std::min(budget, all.tris.size());
+		copy.pieces = {all};
+		copy.sources.push_back("cover:" + hashOf(keyOf(*target)) + ":" + std::to_string(c.count) + ":" + std::to_string(c.seed) + ":" + c.rule + ":" + std::to_string(c.slope) + ":" + std::to_string(c.s0) + ":" + std::to_string(c.s1) + ":" + hashOf(keyOf(q)));
+		out.push_back(copy);
+	}
+	return out;
 }
 
 // ---- a turntable, for looking at a model by itself ----

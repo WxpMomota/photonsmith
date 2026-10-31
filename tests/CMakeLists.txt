@@ -300,6 +300,7 @@ add_executable(unit_tests
     unit/film_undersea17_tests.cpp
     unit/film_model_tests.cpp
     unit/film_model2_tests.cpp
+    unit/film_model3_tests.cpp
     unit/film_whole_tests.cpp
     unit/toon_look_tests.cpp
     unit/height_fog_tests.cpp

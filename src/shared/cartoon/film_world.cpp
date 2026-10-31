@@ -2,6 +2,7 @@
 // placed where it comes from - DataFilm's members. Compiled once, in cpu_renderer.
 
 #include "film_file.h"
+#include "film_model_kind.h"   // (a model as a character: loadModelsLate)
 
 #include <cstdint>
 #include <filesystem>
@@ -1642,6 +1643,92 @@ Mat4 DataFilm::animMatrix(const std::string &name, double t) const {
 	return m;
 }
 
+// (modeling round 3) Where a placement is at t, story space: its own frame, put somewhere else by a route, a character carrying it or the rigid-body world, then moved
+// by the film's `move`/`turn`/`grow` lines.
+Mat4 DataFilm::placementFrame(const model::Placed &pl, double t) const {
+	static const Mat4 mirror = scale(-1.0, 1.0, 1.0);
+	Mat4 frame = mul(translate({-pl.at.x, pl.at.y, pl.at.z}), rotate({0, 1, 0}, pl.turn), scale(pl.scale));
+	placementOverride(pl, t, frame);
+	if (std::any_of(spec.anims.begin(), spec.anims.end(), [&](const Anim &a) { return a.name == pl.id; })) frame = mul(mul(mirror, animMatrix(pl.id, t), mirror), frame);
+	return frame;
+}
+bool DataFilm::placementOverride(const model::Placed &pl, double t, Mat4 &frame) const {
+	if (pl.id.empty()) return false;
+	static const Mat4 mirror = scale(-1.0, 1.0, 1.0);
+	for (const model::Mech &m : spec.animated.mechs) {
+		if (m.name != pl.id) continue;
+		if (m.kind == "route") {   // along its path, facing its way (pbrt's path: turned to story space)
+			double heading = 0.0;
+			const Vec3 p = model::routeAt(m.path, (std::clamp(t, m.t0, m.t1) - m.t0) / std::max(1e-6, m.t1 - m.t0), heading);
+			frame = mul(translate({-p.x, p.y, p.z}), rotate({0, 1, 0}, -heading), scale(pl.scale));
+			return true;
+		}
+		if (m.kind == "attach") {   // carried by a character: at its head, its hand or its chest, turned with it
+			const Character *c = character(m.target);
+			if (!c) return false;
+			const CharacterKind &kind = characterKinds().at(c->kind);
+			const CharacterMoment mo = momentOf(*c, t);
+			const Vec3 at = m.where == "hand" && kind.handAt ? kind.handAt(mo, kind.hand) : transformPoint(mo.frame, (m.where == "chest" ? kind.chest : kind.head) * c->scale);
+			Mat4 turnOnly = mo.frame;
+			turnOnly[3] = turnOnly[7] = turnOnly[11] = 0.0;
+			frame = mul(translate(at), turnOnly, translate(m.offset), scale(pl.scale));
+			return true;
+		}
+	}
+	for (std::size_t k = 0; k < spec.rigids.size(); ++k) {   // (`rigidbody`: where the rigid-body world has it)
+		if (spec.rigids[k].block != "model:" + pl.id) continue;
+		const std::vector<rigid::Pose> poses = rigid::posesAt(*rigidRun(), t);
+		if (k >= poses.size()) return false;
+		const rigid::BodyDef &d = spec.rigids[k];
+		const rigid::Pose &p = poses[k];
+		const rigid::Quat rel = rigid::qmul(p.q, rigid::qconj(rigid::qaxis({0.0, 1.0, 0.0}, d.turn * kPi / 180.0)));
+		const double angle = 2.0 * std::acos(std::clamp(rel.w, -1.0, 1.0)), s = std::sqrt(std::max(0.0, 1.0 - rel.w * rel.w));
+		Mat4 world = translate(p.at);   // (pbrt's, as rigid::transformOf writes it)
+		if (angle > 1e-7 && s > 1e-9) world = mul(world, rotate({rel.x / s, rel.y / s, rel.z / s}, angle * 180.0 / kPi));
+		world = mul(world, translate(d.at * -1.0));
+		frame = mul(mul(mirror, world, mirror), frame);
+		return true;
+	}
+	return false;
+}
+// A piece's mechanisms at t (model_anim.h: spin, gear, piston, roll, aim), in the model's own space, after its `move`/`turn` lines; identity for none.
+Mat4 DataFilm::mechMatrix(const std::string &name, double t) const {
+	Mat4 m = animMatrix(name, t);
+	const auto spinOf = [&](const model::Mech &x, double rpm) { return mul(translate(x.about), rotate(x.axis, rpm * 6.0 * (std::clamp(t, x.t0 > -1e29 ? x.t0 : 0.0, x.t1) - (x.t0 > -1e29 ? x.t0 : 0.0))), translate(x.about * -1.0)); };
+	for (const model::Mech &x : spec.animated.mechs) {
+		if (x.name != name) continue;
+		if (x.kind == "spin") m = mul(m, spinOf(x, x.rpm));
+		else if (x.kind == "gear") {
+			double rpm = 0.0;
+			for (const model::Mech &d : spec.animated.mechs)
+				if (d.name == x.driver && (d.kind == "spin" || d.kind == "gear")) rpm = d.kind == "spin" ? d.rpm : d.rpm;
+			m = mul(m, spinOf(x, -rpm * x.ratio));
+		} else if (x.kind == "piston") m = mul(m, translate(x.axis * (0.5 * x.stroke * std::sin(2.0 * kPi * x.rpm / 60.0 * std::max(0.0, t - (x.t0 > -1e29 ? x.t0 : 0.0))))));
+		else if (x.kind == "roll" || x.kind == "aim") {
+			const std::string id = name.substr(0, name.find('.'));
+			const auto pl = std::find_if(spec.modelPlaces.begin(), spec.modelPlaces.end(), [&](const model::Placed &p) { return p.id == id; });
+			if (pl == spec.modelPlaces.end()) continue;
+			if (x.kind == "roll") {   // as far round as the placement has travelled
+				double run = 0.0;
+				Vec3 last = transformPoint(placementFrame(*pl, 0.0), Vec3{0, 0, 0});
+				for (double u = 1.0 / 24.0; u <= t + 1e-9 && u < 600.0; u += 1.0 / 24.0) {
+					const Vec3 now = transformPoint(placementFrame(*pl, u), Vec3{0, 0, 0});
+					run += length(now - last), last = now;
+				}
+				m = mul(m, translate(x.about), rotate(x.axis, run / x.radius * 180.0 / kPi), translate(x.about * -1.0));
+			} else {   // turned to face its target from its pivot: the target taken into the model's own space
+				Vec3 target{-x.at.x, x.at.y, x.at.z};
+				if (!x.target.empty())
+					if (const Character *c = character(x.target)) target = chestOf(*c, t);
+				const Vec3 local = transformPoint(invertAffine(placementFrame(*pl, t)), target) - x.about;
+				const double yaw = std::atan2(local.x, local.z) * 180.0 / kPi, pitch = -std::atan2(local.y, std::hypot(local.x, local.z)) * 180.0 / kPi;
+				m = mul(m, translate(x.about), rotate({0, 1, 0}, yaw), rotate({1, 0, 0}, pitch), translate(x.about * -1.0));
+			}
+		}
+	}
+	return m;
+}
+
 std::string DataFilm::modelsAt(const std::string &header, double t) const {
 	if (spec.modelPlaces.empty()) return std::string();
 	Vec3 eye, target;
@@ -1650,24 +1737,112 @@ std::string DataFilm::modelsAt(const std::string &header, double t) const {
 	const std::string film = spec.key.empty() ? std::string("film") : spec.key;
 	model::Motion motion;
 	motion.t = t;
-	motion.moves = [this](const std::string &name) { return std::any_of(spec.anims.begin(), spec.anims.end(), [&](const Anim &a) { return a.name == name; }); };
+	motion.anim = &spec.animated;
+	motion.moves = [this](const std::string &name) {
+		return std::any_of(spec.anims.begin(), spec.anims.end(), [&](const Anim &a) { return a.name == name; }) ||
+			   (name.find('.') != std::string::npos && std::any_of(spec.animated.mechs.begin(), spec.animated.mechs.end(), [&](const model::Mech &m) { return m.name == name; }));
+	};
 	motion.shown = [this, t](const std::string &name) { return visible(name, t); };
 	motion.transform = [this, t](const std::string &name) {
-		const Mat4 a = animMatrix(name, t);
-		if (name.find('.') != std::string::npos) return a;   // (a piece: in the model's own space)
+		if (name.find('.') != std::string::npos) return mechMatrix(name, t);   // (a piece: in the model's own space, its mechanisms too)
 		static const Mat4 mirror = scale(-1.0, 1.0, 1.0);
-		return mul(mirror, a, mirror);                        // (a placement: the world's pbrt space, to story space)
+		return mul(mirror, animMatrix(name, t), mirror);   // (a placement: the world's pbrt space, to story space)
 	};
 	motion.shatter = [this](const std::string &id) -> const model::Shatter * {
 		for (const model::Shatter &s : spec.shatters)
 			if (s.id == id) return &s;
 		return nullptr;
 	};
+	motion.modelNamed = [this](const std::string &name) -> const model::Model * {
+		for (const model::Model &m : spec.models)
+			if (m.name == name) return &m;
+		return nullptr;
+	};
+	motion.frame = [this](const model::Placed &pl, double at, Mat4 &frame) { return placementOverride(pl, at, frame); };
+	motion.transformAt = [this](const std::string &id, double at) {
+		for (const model::Placed &pl : spec.modelPlaces)
+			if (pl.id == id) return placementFrame(pl, at);
+		return identity();
+	};
 	std::string out = model::placedText(film, spec.models, spec.modelPlaces, {-eye.x, eye.y, eye.z}, motion);
 	for (const model::Shatter &s : spec.shatters)   // (a break's dust, round where it stood)
 		for (const model::Placed &pl : spec.modelPlaces)
 			if (pl.id == s.id && t >= s.t) out += undersea::siltText(pl.at, t - s.t, 1.2 * pl.scale, s.seed * 977);
 	return out;
+}
+
+
+// (the modeling rounds) Loading a film file's models: those of the library read and made with their values, pieces covered with copies of other models
+// (DataFilm::loadFile, before its names are checked); "" or what is wrong.
+std::string DataFilm::loadModelsEarly(const std::string &filePath, const std::filesystem::path &base) {
+	for (model::Model &m : spec.models) {   // models from the library (library/NAME.model beside the film file, else under film_assets): read now, made with their values
+		if (m.library.empty()) continue;
+		std::filesystem::path file = base / "library" / (m.library + ".model");
+		std::error_code ec;
+		if (!std::filesystem::exists(file, ec))
+			if (const std::string lib = film_cache::asset("library/" + m.library + ".model"); !lib.empty()) file = lib;
+		std::ifstream in(file, std::ios::binary);
+		if (!in) return filePath + ": the model " + m.name + " is made from " + m.library + ", which is not a model of the film nor a file library/" + m.library + ".model";
+		model::Model from;
+		bool started = false;
+		for (std::string line; std::getline(in, line);) {
+			line = detail::trim(detail::withoutComment(line));
+			if (line.empty()) continue;
+			const std::vector<std::string> t = detail::tokens(line);
+			if (!started) {
+				if (t.size() < 2 || t[0] != "model") return file.string() + ": a library model starts `model NAME [params A 1 ...]`";
+				from.name = t[1];
+				for (std::size_t i = 3; t.size() > 2 && t[2] == "params" && i + 1 < t.size(); i += 2) from.params[t[i]] = std::atof(t[i + 1].c_str());
+				started = true;
+				continue;
+			}
+			if (const std::string e = model::modelLine(from, t); !e.empty()) return file.string() + ": " + e;
+			if (from.closed) break;
+		}
+		if (const std::string e = model::remade(from, m, m.params); !e.empty()) return file.string() + ": " + e;
+		m.library.clear();
+	}
+	for (model::Model &m : spec.models)   // (round 3) pieces covered with copies of other models: made into pieces now
+		for (const model::Model::Cover &c : m.covers) {
+			const auto child = std::find_if(spec.models.begin(), spec.models.end(), [&](const model::Model &x) { return x.name == c.with; });
+			if (child == spec.models.end() || &*child == &m) return filePath + ": the model " + m.name + " covers " + c.piece + " with " + c.with + ", which is not another model of the film";
+			if (std::none_of(m.parts.begin(), m.parts.end(), [&](const model::Part &p) { return p.name == c.piece; })) return filePath + ": the model " + m.name + " has no piece " + c.piece + " to cover";
+			const std::vector<model::Part> made = model::coveredParts(m, c, *child);
+			m.parts.insert(m.parts.end(), made.begin(), made.end());
+		}
+	return std::string();
+}
+// Then the placed models in the rigid-body world and the models that are characters' kinds (after the names are checked).
+void DataFilm::loadModelsLate() {
+	for (const Spec::ModelBody &b : spec.modelBodies)   // (round 3) placed models in the rigid-body world: a box round each, where it stands
+		for (const model::Placed &pl : spec.modelPlaces) {
+			if (pl.id != b.id) continue;
+			const auto m = std::find_if(spec.models.begin(), spec.models.end(), [&](const model::Model &x) { return x.name == pl.model; });
+			if (m == spec.models.end()) continue;
+			Vec3 lo{1e30, 1e30, 1e30}, hi{-1e30, -1e30, -1e30};
+			for (const model::Part &p : m->parts) {
+				if (p.tool) continue;
+				Vec3 a, c;
+				model::boxOf(model::pieceMesh(*m, p, 4), a, c);
+				lo = {std::min(lo.x, a.x), std::min(lo.y, a.y), std::min(lo.z, a.z)}, hi = {std::max(hi.x, c.x), std::max(hi.y, c.y), std::max(hi.z, c.z)};
+			}
+			if (lo.x > hi.x) continue;
+			rigid::BodyDef d;
+			d.block = "model:" + b.id;
+			d.half = (hi - lo) * (0.5 * pl.scale);
+			const Vec3 mid = (lo + hi) * (0.5 * pl.scale);
+			d.at = {pl.at.x - mid.x, pl.at.y + mid.y, pl.at.z + mid.z};   // (pbrt's: the model's x is mirrored)
+			d.turn = -pl.turn, d.mass = b.mass, d.bounce = b.bounce, d.friction = b.friction, d.fixed = b.fixed;
+			d.start = std::max(0.0, b.at), d.velocity = b.push, d.spin = b.spin;   // (awake from the start, so that it falls; pushed then, if it is)
+			spec.rigids.push_back(d);
+		}
+	for (Character &c : spec.characters)   // models as characters (film_model_kind.h): the kind is this film's own, as a rigged model's is
+		for (const model::Model &m : spec.models)
+			if (c.kind == m.name) {
+				const std::string own = spec.key + "/" + m.name;
+				if (!characterKinds().count(own)) characterKinds()[own] = model::kindOf(spec.key.empty() ? std::string("film") : spec.key, m);
+				c.kind = own;
+			}
 }
 
 }  // namespace film_file

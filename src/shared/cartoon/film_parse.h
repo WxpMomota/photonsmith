@@ -195,6 +195,9 @@
 //     character bo robot  at 1 0 -2                             # a model as a character: rigged by its pieces' names (head, eyes, mouth, leg.N, arm.l/r, tail)
 //     model    tall from post  h 3                              # parameters (`model post params h 1`, `$h`), `variants N h lo hi`, library/NAME.model; in a block:
 //                                                               #   tool, boolean, budget, key, mesh FILE, texture, decal, displace ... bake, make tree|creature|street|room
+//     flex     r1.neck stretch 0 1  2 1.5                       # round 3: shapes over time (flex, morph ID to MODEL, build, vanish, wobble), mechanisms (spin, gear,
+//     spin     cart.wheel about 0 0.3 0 axis 1 0 0 rpm 60       #   piston, roll, route, aim, attach ID to NAME head), `rigidbody ID`; in a block: skinned, bone, fur,
+//                                                               #   cloth, cover, stroke, remesh, close, region, unwrap, text "WORDS", pbr, finish skin
 //     space    stars 1  milkyway 1  sun 60 15                   # the universe (film_space.h, round 10): a set in space - the stars all round, the Milky Way, the sun a
 //                                                               # glowing ball at a bearing and an elevation; no sky, no air
 //     planet   home ocean  at 0 0 -20000  radius 6000           # a planet (film_planets.h): rocky, desert, ice, ocean, gas or lava; `tilt`, `spin SECONDS`

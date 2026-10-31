@@ -850,7 +850,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, set, cast, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, spacecam, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, mute, music, toon, voices, acting, lighting, terrain, water, river, waterfall, clouds, fogbank, forest, flock, herd, whale, dolphins, bioluminescence, fireflies, fungi, glacier, iceberg, seaice, wind, tornado, optics, caustics, closeup, tracks, space, planet, moon, nebula, galaxy, star, blackhole, comet, asteroids, remnant, ship, astronaut, descent, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, waterline, kelp, coral, current, bubbles, halocline, deepsea, octopus, cuttlefish, swimmers, seabed, wreck, arch, cenote, reefwall, diver, divecam, school, bigfish, reef, critters, nightdive, kelpforest, boat, sardinerun, vents, murk, silt, cleaningstation, playmate, damselfish, wreckroom, model, shatter, seacave, ruins, clownfish, pufferfish, flounder, moray, cleanershrimp, dugong, icecap, chest, clam, bottle, shells, sink, moonlight, hunt, flight, baitball, reeffish, jellyfish, seaturtles, insects, dew, night, cameratrap, shimmer, burn, laser, explode, shield, gravity, footprints, blob, drift, interior, hologram, screen, label, orbitline, scalebar, compare, skin-light, eyes, hair, footing, act, fire, lava, volcano, wildfire, weather, particles, burst, mark, cloth, animate, squash, jiggle, smear, anticipate, rigid, terminator, face-normals, mocap, matte)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, set, cast, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, spacecam, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, mute, music, toon, voices, acting, lighting, terrain, water, river, waterfall, clouds, fogbank, forest, flock, herd, whale, dolphins, bioluminescence, fireflies, fungi, glacier, iceberg, seaice, wind, tornado, optics, caustics, closeup, tracks, space, planet, moon, nebula, galaxy, star, blackhole, comet, asteroids, remnant, ship, astronaut, descent, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, waterline, kelp, coral, current, bubbles, halocline, deepsea, octopus, cuttlefish, swimmers, seabed, wreck, arch, cenote, reefwall, diver, divecam, school, bigfish, reef, critters, nightdive, kelpforest, boat, sardinerun, vents, murk, silt, cleaningstation, playmate, damselfish, wreckroom, model, shatter, flex, morph, build, vanish, wobble, spin, gear, piston, roll, route, aim, attach, rigidbody, seacave, ruins, clownfish, pufferfish, flounder, moray, cleanershrimp, dugong, icecap, chest, clam, bottle, shells, sink, moonlight, hunt, flight, baitball, reeffish, jellyfish, seaturtles, insects, dew, night, cameratrap, shimmer, burn, laser, explode, shield, gravity, footprints, blob, drift, interior, hologram, screen, label, orbitline, scalebar, compare, skin-light, eyes, hair, footing, act, fire, lava, volcano, wildfire, weather, particles, burst, mark, cloth, animate, squash, jiggle, smear, anticipate, rigid, terminator, face-normals, mocap, matte)");
 		}
 	}
 	n = shotLine;
@@ -1250,4 +1250,102 @@ FilmParts partsOf(const std::string &text, const std::string &where) {
 }
 
 }  // namespace film_file
+}  // namespace cartoon
+
+// ---- 3D lettering for models (model_text.h): the font reader built in here, its functions private to this file ----
+#define STB_TRUETYPE_IMPLEMENTATION
+#define STBTT_STATIC
+#include "../../external/stb_truetype.h"
+#include "../scene_text.h"
+#include "model_text.h"
+
+namespace cartoon {
+namespace model {
+
+Mesh textSolid(const std::string &words, double height, double depth, const std::string &font, std::string &error) {
+	namespace fs = std::filesystem;
+	const std::string file = font.empty() ? std::string("arial.ttf") : font;
+	std::vector<fs::path> where{file};
+	if (const std::string own = film_cache::asset("fonts/" + file); !own.empty()) where.insert(where.begin(), own);
+#if defined(_WIN32)
+	where.push_back(fs::path(pbrt_asset_check::environmentValue("WINDIR").empty() ? "C:/Windows" : pbrt_asset_check::environmentValue("WINDIR")) / "Fonts" / file);
+#elif defined(__APPLE__)
+	for (const char *d : {"/System/Library/Fonts/Supplemental", "/System/Library/Fonts", "/Library/Fonts"}) where.push_back(fs::path(d) / file);
+#else
+	for (const char *d : {"/usr/share/fonts/truetype/msttcorefonts", "/usr/share/fonts/truetype/dejavu", "/usr/share/fonts/truetype"}) where.push_back(fs::path(d) / file);
+#endif
+	std::vector<unsigned char> bytes;
+	for (const fs::path &p : where) {
+		std::ifstream in(p, std::ios::binary);
+		if (in) {
+			bytes.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+			break;
+		}
+	}
+	stbtt_fontinfo info;
+	if (bytes.empty() || !stbtt_InitFont(&info, bytes.data(), stbtt_GetFontOffsetForIndex(bytes.data(), 0))) {
+		error = "no font \"" + file + "\" (under film_assets/fonts, the system's fonts, or a path)";
+		return Mesh();
+	}
+	// the outlines: each glyph's contours, its curves cut into short straight pieces, laid along a line by the font's advances and kerning
+	scene_doc::TextOutline outline;
+	double x = 0.0;
+	int previous = 0;
+	for (std::size_t i = 0; i < words.size();) {
+		int cp = static_cast<unsigned char>(words[i]);
+		const int extra = cp >= 0xF0 ? 3 : cp >= 0xE0 ? 2 : cp >= 0xC0 ? 1 : 0;
+		cp &= extra == 3 ? 0x07 : extra == 2 ? 0x0F : extra == 1 ? 0x1F : 0x7F;
+		for (int k = 1; k <= extra && i + k < words.size(); ++k) cp = (cp << 6) | (static_cast<unsigned char>(words[i + k]) & 0x3F);
+		i += 1 + extra;
+		if (previous) x += stbtt_GetCodepointKernAdvance(&info, previous, cp);
+		stbtt_vertex *v = nullptr;
+		const int n = stbtt_GetCodepointShape(&info, cp, &v);
+		scene_doc::TextContour c;
+		double px = 0.0, py = 0.0;
+		for (int k = 0; k < n; ++k) {
+			const double vx = v[k].x + x, vy = v[k].y;
+			if (v[k].type == STBTT_vmove) {
+				if (c.size() > 2) outline.contours.push_back(c);
+				c.clear();
+				c.push_back({vx, vy});
+			} else if (v[k].type == STBTT_vline) {
+				c.push_back({vx, vy});
+			} else {   // (a quadratic or a cubic curve, in eight pieces)
+				const double cx = v[k].cx + x, cy = v[k].cy, cx1 = v[k].cx1 + x, cy1 = v[k].cy1;
+				for (int s = 1; s <= 8; ++s) {
+					const double u = s / 8.0, w = 1.0 - u;
+					if (v[k].type == STBTT_vcurve) c.push_back({w * w * px + 2 * w * u * cx + u * u * vx, w * w * py + 2 * w * u * cy + u * u * vy});
+					else c.push_back({w * w * w * px + 3 * w * w * u * cx + 3 * w * u * u * cx1 + u * u * u * vx, w * w * w * py + 3 * w * w * u * cy + 3 * w * u * u * cy1 + u * u * u * vy});
+				}
+			}
+			px = vx, py = vy;
+		}
+		if (c.size() > 2) outline.contours.push_back(c);
+		if (v) stbtt_FreeShape(&info, v);
+		int advance = 0, bearing = 0;
+		stbtt_GetCodepointHMetrics(&info, cp, &advance, &bearing);
+		x += advance;
+		previous = cp;
+	}
+	int capHeight = 0;
+	{   // (a capital's height: H's box)
+		int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+		if (stbtt_GetCodepointBox(&info, 'H', &x0, &y0, &x1, &y1)) capHeight = y1 - y0;
+	}
+	outline.capHeight = capHeight;
+	const scene_doc::ShapeMesh s = scene_doc::extrudeOutlines(outline, height, 1.0, depth);
+	Mesh m;
+	for (std::size_t k = 0; k + 2 < s.P.size(); k += 3) m.verts.push_back({s.P[k], s.P[k + 1], s.P[k + 2]});
+	for (std::size_t k = 0; k + 2 < s.N.size(); k += 3) m.normals.push_back({s.N[k], s.N[k + 1], s.N[k + 2]});
+	for (std::size_t k = 0; k + 2 < s.indices.size(); k += 3) m.tris.push_back({s.indices[k], s.indices[k + 1], s.indices[k + 2]});
+	if (m.tris.empty()) {
+		error = "no letters to make of \"" + words + "\"";
+		return Mesh();
+	}
+	Vec3 lo, hi;
+	boxOf(m, lo, hi);
+	return transformed(m, translate({-0.5 * (lo.x + hi.x), -lo.y, -0.5 * (lo.z + hi.z)}));
+}
+
+}  // namespace model
 }  // namespace cartoon

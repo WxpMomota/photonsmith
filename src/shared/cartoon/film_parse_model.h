@@ -21,6 +21,160 @@ inline bool modelNamed(const Spec &s, const std::string &line) {
 	return t.size() > 1 && std::any_of(s.models.begin(), s.models.end(), [&](const model::Model &m) { return m.name == t[1]; });
 }
 
+// (modeling round 3) the lines that change a placed model's shape or move its pieces (model_anim.h) and put it in the rigid-body world: "" or what is wrong.
+inline bool modelAnimVerb(const std::string &verb) {
+	static const std::vector<std::string> k = {"flex", "morph", "build", "vanish", "wobble", "spin", "gear", "piston", "roll", "route", "aim", "attach", "rigidbody"};
+	return std::find(k.begin(), k.end(), verb) != k.end();
+}
+inline std::string modelAnimLine(Spec &s, const std::string &verb, const std::string &line) {
+	using detail::number;
+	const std::vector<std::string> t = detail::tokens(line);
+	std::vector<double> v;
+	std::size_t i = 2;
+	const auto numbers = [&](std::size_t n) {
+		v.assign(n, 0.0);
+		for (std::size_t k = 0; k < n; ++k)
+			if (i + k >= t.size() || !number(t[i + k], v[k])) return false;
+		i += n;
+		return true;
+	};
+	if (t.size() < 2) return "`" + verb + " ID ...`";
+	// the name: a placement `as ID`, or ID.PIECE a piece of its model
+	const std::string name = t[1], id = name.substr(0, name.find('.'));
+	const auto placed = std::find_if(s.modelPlaces.begin(), s.modelPlaces.end(), [&](const model::Placed &pl) { return pl.id == id; });
+	if (placed == s.modelPlaces.end()) return "`" + verb + " " + name + "`: no model is placed `as " + id + "` (before this line)";
+	const bool piece = name.find('.') != std::string::npos;
+	const bool wantsPiece = verb == "flex" || verb == "wobble" || verb == "spin" || verb == "gear" || verb == "piston" || verb == "roll" || verb == "aim";
+	if (wantsPiece != piece) return "`" + verb + "` names " + (wantsPiece ? "a piece: ID.PIECE" : "a placement: ID");
+	model::Animated &a = s.animated;
+	const auto timeKeys = [&](std::vector<std::pair<double, double>> &keys) {
+		while (i + 1 < t.size()) {
+			if (!numbers(2)) return false;
+			keys.push_back({v[0], v[1]});
+		}
+		return i == t.size() && !keys.empty();
+	};
+	const auto fromTo = [&](double &t0, double &t1) {
+		while (i < t.size()) {
+			const std::string w = t[i++];
+			if (w == "from" && numbers(1)) t0 = v[0];
+			else if (w == "to" && numbers(1)) t1 = v[0];
+			else return false;
+		}
+		return t1 > t0;
+	};
+	if (verb == "flex") {
+		model::Flex f;
+		f.name = name;
+		static const std::vector<std::string> kinds = {"bend", "twist", "taper", "stretch", "squash"};
+		if (t.size() < 5 || std::find(kinds.begin(), kinds.end(), t[2]) == kinds.end()) return "`flex ID.PIECE bend|twist|taper|stretch|squash T V  T V ...`";
+		f.kind = t[2], i = 3;
+		if (!timeKeys(f.keys)) return "`flex ID.PIECE KIND T V  T V ...` (pairs of time and amount)";
+		a.flexes.push_back(f);
+		return std::string();
+	}
+	if (verb == "morph") {
+		model::Morph mo;
+		mo.id = name;
+		if (t.size() < 4 || t[2] != "to") return "`morph ID to MODEL from T0 to T1`";
+		mo.to = t[3], i = 4;
+		if (std::none_of(s.models.begin(), s.models.end(), [&](const model::Model &m) { return m.name == mo.to; })) return "`morph ... to " + mo.to + "`: no model of that name";
+		if (!fromTo(mo.t0, mo.t1)) return "`morph ID to MODEL from T0 to T1`";
+		a.morphs.push_back(mo);
+		return std::string();
+	}
+	if (verb == "build" || verb == "vanish") {
+		model::Build b;
+		model::Vanish van;
+		b.id = van.id = name;
+		double t0 = 0.0, t1 = 0.0;
+		for (i = 2; i < t.size();) {
+			const std::string w = t[i];
+			if (verb == "build" && (w == "rise" || w == "pop" || w == "pieces")) b.style = w, ++i;
+			else if ((w == "from" || w == "to") && i + 1 < t.size() && number(t[i + 1], (w == "from" ? t0 : t1))) i += 2;
+			else return "`" + verb + " ID from T0 to T1`" + (verb == "build" ? std::string(" [rise|pop|pieces]") : std::string());
+		}
+		if (t1 <= t0) return "`" + verb + " ID from T0 to T1` (T1 after T0)";
+		if (verb == "build") b.t0 = t0, b.t1 = t1, a.builds.push_back(b);
+		else van.t0 = t0, van.t1 = t1, a.vanishes.push_back(van);
+		return std::string();
+	}
+	if (verb == "wobble") {
+		model::Wobble w;
+		w.name = name;
+		if (t.size() == 3) {
+			if (!numbers(1) || v[0] <= 0) return "`wobble ID.PIECE [AMOUNT]`";
+			w.amount = v[0];
+		} else if (t.size() != 2) return "`wobble ID.PIECE [AMOUNT]`";
+		a.wobbles.push_back(w);
+		return std::string();
+	}
+	if (verb == "rigidbody") {
+		Spec::ModelBody b;
+		b.id = name;
+		for (i = 2; i < t.size();) {
+			const std::string w = t[i++];
+			if (w == "mass" && numbers(1) && v[0] > 0) b.mass = v[0];
+			else if (w == "bounce" && numbers(1) && v[0] >= 0 && v[0] <= 1) b.bounce = v[0];
+			else if (w == "friction" && numbers(1) && v[0] >= 0) b.friction = v[0];
+			else if (w == "fixed") b.fixed = true;
+			else if (w == "push" && numbers(3)) {
+				b.push = {v[0], v[1], v[2]};
+				if (i < t.size() && t[i] == "at") {
+					++i;
+					if (!numbers(1)) return "`push VX VY VZ at T`";
+					b.at = v[0];
+				} else b.at = 0.0;
+			} else if (w == "spin" && numbers(3)) b.spin = {v[0], v[1], v[2]};
+			else return "`rigidbody ID [mass M] [bounce B] [friction F] [push VX VY VZ at T] [spin X Y Z] [fixed]`";
+		}
+		s.modelBodies.push_back(b);
+		return std::string();
+	}
+	// mechanisms
+	model::Mech m;
+	m.kind = verb, m.name = name;
+	const std::string usage = verb == "spin"	? "`spin ID.PIECE about X Y Z axis X Y Z rpm R [from T0] [to T1]`"
+							  : verb == "gear"	? "`gear ID.PIECE driven-by ID.PIECE ratio K about X Y Z axis X Y Z`"
+							  : verb == "piston" ? "`piston ID.PIECE axis X Y Z stroke S rpm R`"
+							  : verb == "roll"	? "`roll ID.PIECE about X Y Z axis X Y Z radius R`"
+							  : verb == "route" ? "`route ID through X Y Z X Y Z ... from T0 to T1`"
+							  : verb == "aim"	? "`aim ID.PIECE at X Y Z | at NAME [about X Y Z]`"
+												: "`attach ID to NAME [head|hand|chest] [offset X Y Z]`";
+	for (i = 2; i < t.size();) {
+		const std::string w = t[i++];
+		if (w == "about" && numbers(3)) m.about = {v[0], v[1], v[2]};
+		else if (w == "axis" && numbers(3)) m.axis = normalize(Vec3{v[0], v[1], v[2]} + Vec3{1e-12, 0, 0});
+		else if (w == "rpm" && numbers(1)) m.rpm = v[0];
+		else if (w == "ratio" && numbers(1)) m.ratio = v[0];
+		else if (w == "stroke" && numbers(1)) m.stroke = v[0];
+		else if (w == "radius" && numbers(1) && v[0] > 0) m.radius = v[0];
+		else if (w == "from" && numbers(1)) m.t0 = v[0];
+		else if (w == "to" && verb != "attach" && numbers(1)) m.t1 = v[0];
+		else if (w == "driven-by" && i < t.size()) m.driver = t[i++];
+		else if (w == "offset" && numbers(3)) m.offset = {v[0], v[1], v[2]};
+		else if (w == "through") {
+			double x = 0.0;
+			while (i + 2 < t.size() && number(t[i], x) && numbers(3)) m.path.push_back({v[0], v[1], v[2]});
+		} else if (w == "at" && verb == "aim") {
+			double x = 0.0;
+			if (i < t.size() && number(t[i], x)) {
+				if (!numbers(3)) return usage;
+				m.at = {v[0], v[1], v[2]};
+			} else if (i < t.size()) m.target = t[i++];
+			else return usage;
+		} else if (w == "to" && verb == "attach" && i < t.size()) {
+			m.target = t[i++];
+			if (i < t.size() && (t[i] == "head" || t[i] == "hand" || t[i] == "chest")) m.where = t[i++];
+		} else return usage;
+	}
+	if (verb == "route" && (m.path.size() < 2 || m.t1 >= 1e29 || m.t0 <= -1e29)) return usage;
+	if (verb == "gear" && m.driver.empty()) return usage;
+	if (verb == "attach" && m.target.empty()) return usage;
+	a.mechs.push_back(m);
+	return std::string();
+}
+
 inline std::string modelLines(Spec &s, const std::string &verb, const std::string &line) {
 	using detail::number;
 	const std::vector<std::string> t = detail::tokens(line);

@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "film_model.h"
+#include "model_skin.h"
 #include "film_sea_kinds.h"
 
 namespace cartoon {
@@ -33,6 +34,9 @@ struct RigPiece {
 	Mesh mesh;                        // (at level 1, for its keys)
 	std::vector<Mesh> keyed;          // (each key's mesh: the same vertices, moved)
 	std::string file;                 // (its PLY in the cache)
+	// (round 3) a skinned piece: its bones and its vertices' weights (model_skin.h)
+	std::vector<Bone> bones;
+	Weights weights;
 };
 struct Rig {
 	std::vector<RigPiece> pieces;
@@ -49,6 +53,8 @@ inline std::string roleOf(const std::string &name) {
 	if (name == "arm.l" || name == "arm.left") return "arm.l";
 	if (name == "arm.r" || name == "arm.right") return "arm.r";
 	if (starts("tail")) return "tail";
+	if (starts("brow")) return "brow";   // (round 3: the face - brows raised and tilted by feelings, lids closed by blinks)
+	if (starts("lid")) return "lid";
 	return "body";
 }
 // The model's rig: its drawn pieces measured, their pivots found (a leg's and an arm's at its top, the head's at its base, a tail's at the end nearest the body).
@@ -70,6 +76,13 @@ inline Rig rigOf(const std::string &film, const Model &m) {
 		boxOf(rp.mesh, rp.lo, rp.hi);
 		r.lo = {std::min(r.lo.x, rp.lo.x), std::min(r.lo.y, rp.lo.y), std::min(r.lo.z, rp.lo.z)}, r.hi = {std::max(r.hi.x, rp.hi.x), std::max(r.hi.y, rp.hi.y), std::max(r.hi.z, rp.hi.z)};
 		if (rp.role == "leg") rp.index = legs++;
+		if (p.skin) {   // (round 3) its skeleton (written, or found from its shape) and its weights
+			rp.bones = p.bones.empty() ? autoSkeleton(rp.mesh) : p.bones;
+			rp.weights = weightsOf(rp.mesh, rp.bones);
+			int boneLegs = 0;
+			for (const Bone &b : rp.bones) boneLegs += boneRole(b.name) == "leg";
+			legs = std::max(legs, boneLegs);
+		}
 		rp.file = film_cache::ply(film, pieceName(m, p, 1) + "_rig", [&]() { return rp.mesh; });
 		r.pieces.push_back(rp);
 	}
@@ -139,7 +152,7 @@ inline film_file::CharacterKind kindOf(const std::string &film, const Model &m) 
 		std::string out;
 		for (const RigPiece &rp : r->pieces) {
 			Mat4 local = identity();
-			const double swing = 28.0 * mo.going * std::sin(phase + (rp.index % 2 ? kPi : 0.0) + (rp.index / 2) * 0.5 * kPi);
+			const double swing = 28.0 * mo.going * std::sin(phase + gaitPhase(rp.index));
 			if (rp.role == "leg") local = about(rp.pivot, rotate({1, 0, 0}, swing));
 			else if (rp.role == "arm.l" || rp.role == "arm.r") {
 				const double sideSign = rp.role == "arm.l" ? 1.0 : -1.0, walk = -20.0 * mo.going * std::sin(phase) * sideSign;
@@ -155,7 +168,12 @@ inline film_file::CharacterKind kindOf(const std::string &film, const Model &m) 
 					local = mul(local, about(c, scale(1.0, 1.0 - shut, 1.0)));
 					if (rp.role == "pupil" && p.lookWeight > 0.0) local = mul(local, translate({0.01 * H * std::sin(yaw * kPi / 180.0), -0.01 * H * std::sin(pitch * kPi / 180.0), 0}));
 				}
-				if (rp.role == "mouth") local = mul(local, about(c, scale(1.0 + 0.3 * std::max(0.0, p.smile), 1.0 + 3.0 * p.mouthOpen, 1.0)));
+				if (rp.role == "mouth") local = mul(local, about(c, scale(1.0 + 0.3 * std::max(0.0, p.smile) + 0.4 * mo.mouth.wide - 0.3 * mo.mouth.round, 1.0 + 3.0 * p.mouthOpen, 1.0)));
+			} else if (rp.role == "brow" || rp.role == "lid") {   // (round 3) the face: brows raised and tilted, lids shut over the eyes
+				const Vec3 c = (rp.lo + rp.hi) * 0.5;
+				const double side = rp.part->name.find(".r") != std::string::npos ? -1.0 : 1.0;
+				if (rp.role == "brow") local = mul(headM, translate({0, (0.025 * p.browRaise + 0.01 * p.eyeWide) * H, 0}), about(c, rotate({0, 0, 1}, side * 18.0 * p.browTilt)));
+				else local = mul(headM, about({c.x, rp.hi.y, c.z}, rotate({1, 0, 0}, 80.0 * std::clamp(std::max(p.blink, p.lids), 0.0, 1.0) - 10.0)));
 			}
 			const Mat4 m = mul(place, bodyM, local);
 			Vec3 colour = rp.part->colour;
@@ -168,12 +186,35 @@ inline film_file::CharacterKind kindOf(const std::string &film, const Model &m) 
 			for (std::size_t q = 0; q < rp.keyed.size(); ++q) {
 				const std::string &n = rp.part->keys[q].name;
 				w[q] = n == "smile" || n == "happy" ? std::max(0.0, p.smile) : n == "sad" ? std::max(0.0, -p.smile) : n == "open" || n == "talk" ? p.mouthOpen
+					 : n == "wide"										? mo.mouth.wide
+					 : n == "round"										? mo.mouth.round
 					 : n == "surprised"										   ? p.eyeWide
 					 : n == "angry"												   ? std::max(0.0, p.browTilt)
 					 : n == "blink"												   ? p.blink
 																				   : 0.0;
 				w[q] = std::clamp(w[q], 0.0, 1.0);
 				keyed = keyed || w[q] > 0.01;
+			}
+			if (!rp.bones.empty()) {   // (round 3) a skinned piece: each bone posed as the rig poses its role, arms and head riding on the spine
+				const Bone *spine = nullptr;
+				for (const Bone &b : rp.bones)
+					if (boneRole(b.name) == "spine") spine = &b;
+				const Mat4 spineM = spine ? about(spine->a, mul(rotate({1, 0, 0}, 5.0 * mo.going + p.nod * 0.3), rotate({0, 0, 1}, p.tilt * 0.5))) : identity();
+				std::vector<Mat4> poses;
+				int legIndex = 0;
+				for (const Bone &b : rp.bones) {
+					const std::string role = boneRole(b.name);
+					if (role == "leg") poses.push_back(about(b.a, rotate({1, 0, 0}, 28.0 * mo.going * std::sin(phase + gaitPhase(legIndex++)))));
+					else if (role == "arm.l" || role == "arm.r") {
+						const double sideSign = role == "arm.l" ? 1.0 : -1.0, walk = -20.0 * mo.going * std::sin(phase) * sideSign;
+						const double raise = 150.0 * (role == "arm.l" ? p.raiseL : p.raiseR) + 45.0 * p.spread + (role == "arm.r" ? 25.0 * p.waveR : 0.0), ahead = role == "arm.r" ? -80.0 * p.forwardR : 0.0;
+						poses.push_back(mul(spineM, about(b.a, mul(rotate({0, 0, 1}, sideSign * raise), rotate({1, 0, 0}, walk + ahead)))));
+					} else if (role == "head") poses.push_back(mul(spineM, about(b.a, mul(rotate({0, 1, 0}, yaw), rotate({1, 0, 0}, pitch + p.nod), rotate({0, 0, 1}, p.tilt)))));
+					else if (role == "tail") poses.push_back(about(b.a, rotate({0, 1, 0}, 18.0 * std::sin(2.0 * kPi * mo.t * (1.0 + mo.going)))));
+					else poses.push_back(spineM);
+				}
+				out += attr(materialOf(tinted), emitMesh(skinned(rp.mesh, rp.weights, poses), mul(place, bodyM)));
+				continue;
 			}
 			if (!keyed && !rp.file.empty()) {
 				out += attr(materialOf(tinted), film_cache::placement(m) + film_cache::plyShape(rp.file));

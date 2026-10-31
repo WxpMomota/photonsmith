@@ -2557,6 +2557,48 @@ facing a road with pavements, road markings and lamp posts; a room with a door a
 **Things that break: `shatter ID at T [pieces N] [force F] [seed K]`.** (model_fracture.h) The placement breaks at T into N chunks (a Voronoi fracture of each piece, its
 broken faces flat): they burst out at about F metres a second, tumble, fall, bounce and come to rest, in a puff of dust, and the break is heard.
 
+### Models in a film file, round 3 (2026-10-31)
+
+**Characters in one skin: `skinned`, `bone NAME from X Y Z to X Y Z`.** (model_skin.h) A piece marked `skinned` bends with bones instead of moving stiffly: a body that
+bends at its hips, knees, shoulders, elbows and neck, one smooth surface. Its bones are written (spine, head, leg.1 .., arm.l, arm.r, tail) or, with none, found from its
+shape (a spine and head up its middle, legs below, arms out to the sides); each vertex is shared between its nearest bones. Four and six legs walk in diagonals (a trot, an
+insect's tripod), numbered front to back, left then right.
+
+**Faces.** A model character's pieces called `brow.l` and `brow.r` are raised and tilted by what it feels; `lid.l` and `lid.r` close over its eyes as it blinks or grows
+sleepy. Shape keys called `wide` and `round` follow the mouth shapes of its speech, beside `open`, `smile`, `sad`, `surprised`, `angry` and `blink`.
+
+**Shapes over time.** (model_anim.h) `flex ID.PIECE bend|twist|taper|stretch|squash T V T V ...` keys a modifier's amount over time (a stretching neck, a jelly's squash
+that keeps its volume); `morph ID to MODEL from T0 to T1` melts the placed model into any other (their distance fields blended, 24 steps kept in the cache); `build ID from
+T0 to T1 [rise|pop|pieces]` grows it into being; `vanish ID from T0 to T1` breaks it up into falling triangles; `wobble ID.PIECE [AMOUNT]` makes a piece lag and spring back
+as the model moves.
+
+**Mechanisms.** `spin ID.PIECE about X Y Z axis X Y Z rpm R`, `gear ID.PIECE driven-by ID.PIECE ratio K about ... axis ...` (the other way, K times as fast),
+`piston ID.PIECE axis X Y Z stroke S rpm R`, `roll ID.PIECE about ... axis ... radius R` (a wheel turned as far as its model has travelled), `route ID through X Y Z ...
+from T0 to T1` (driven along a smooth path, facing its way), `aim ID.PIECE at X Y Z|NAME [about X Y Z]` (a turret, a head, a lamp turned to face it), and
+`attach ID to NAME [head|hand|chest] [offset X Y Z]` (a hat, a sword, a balloon carried by a character).
+
+**Models in the physics world: `rigidbody ID [mass M] [bounce B] [friction F] [push VX VY VZ at T] [spin X Y Z] [fixed]`.** The placed model is a box in the film's
+rigid-body world: it falls, lands, is knocked by other bodies and by characters walking into it, and is pushed at T.
+
+**Fur and cloth: `fur LENGTH [density N] [width W] [colour R G B] [curl C] [droop D]`, `cloth W D [at X Y Z] [res N] [wave A]`.** (model_surface.h) Strands grown from a piece
+(fur, grass on a mound, moss, a fuzzy toy; fewer far from the camera); and a sheet dropped from above onto the model's other pieces and the ground and left as it settles -
+a tablecloth, a cape on a chair - rippling with `wave A` like a flag.
+
+**Covering a piece: `cover PIECE with MODEL N [up|slope D|all] [scale A B] [seed K]`.** Copies of another model strewn over one of the model's pieces by area, where it faces
+up, where it is within D degrees of level, or everywhere: studs on a toy brick, rivets, moss on a rock, barnacles on a hull. They are made into pieces of the model when the
+film is loaded.
+
+**Sculpting: `stroke inflate|crease|grab|smooth|pinch|flatten RADIUS STRENGTH path X Y Z ... [toward X Y Z]`, `remesh [CELL]`, `close`.** A brush dragged along a path
+through the piece; the piece made again as one clean closed surface; its holes filled.
+
+**Materials by region: `region NAME above Y|below Y|facing up|down|front|back|left|right|near X Y Z R [colour R G B] [rough R] [finish]`, finish `skin`, `pbr base FILE [rough
+FILE] [normal FILE]`.** Parts of a piece in materials of their own (a red roof, a white frame); the `skin` finish lets light into the surface (a cartoon skin, wax, a gummy
+sweet); an imported mesh's colour, roughness and normal pictures on its own uvs.
+
+**Lettering and proper uvs: `text "WORDS" [size H] [depth D] [font FILE] [at X Y Z] [turn ...]`, `unwrap`.** (model_text.h) Words pulled out into a solid from a TrueType
+font (Arial unless named; film_assets/fonts, the system's fonts or a path), a capital H metres tall - a shop sign, a title, a name on a door. `unwrap` gives a piece chart
+uvs (its surface cut into near-flat charts along its creases, each laid flat and packed) for its paint, its baked normal map and its export, in place of box projection.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)
