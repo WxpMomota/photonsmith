@@ -10,6 +10,7 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <array>
 #include <map>
 #include <limits>
 #include <mutex>
@@ -29,6 +30,7 @@
 #include "rigid_world.h"
 #include "film_matte.h"
 #include "film_particles.h"
+#include "film_surround.h"
 #include "film_swarm.h"
 #include "film_paths.h"
 #include "film_acting.h"
@@ -328,6 +330,8 @@ struct Spec {
 	std::vector<Anim> anims;
 	std::map<std::string, std::string> parents;   // (`parent CHILD to OTHER`, `group NAME of A B C`) what rides on what: it takes its parent's moves, hides and lights as well as its own
 	std::vector<std::string> groups;              // (a group's name: animated by the lines naming it, with no block of its own)
+	std::map<std::string, std::array<double, 3>> subjectPoints;   // (`subject NAME at X Y Z` in a shot: where on a block, group or placement the film doctor looks, at rest)
+	surround::Surround around;                    // (`surround FILE ...`: film_surround.h)
 	std::vector<Character> characters;
 	// props with physics: the block they move, and the line that says so
 	std::vector<std::pair<std::string, physics::Bounce>> bounces;

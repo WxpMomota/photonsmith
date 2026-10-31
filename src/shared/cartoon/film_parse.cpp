@@ -791,7 +791,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 			if (t.size() < 2) return fail("`" + verb + "` needs a character's name");
 			Shot &shot = s.shots.back();
 			if (verb == "subject") {
-				for (std::size_t i = 1; i < t.size(); ++i) shot.about.push_back(t[i]);
+				if (const std::string e = subjectLine(s, shot, t); !e.empty()) return fail(e);
 				continue;
 			}
 			shot.following = true;
@@ -848,7 +848,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 				a.keys.push_back(key);
 			}
 			s.anims.push_back(a);
-		} else if (actingVerb(verb)) {   // (parent, group, hop, blink, gaze: film_parse_acting.h)
+		} else if (actingVerb(verb)) {   // (parent, group, hop, blink, gaze, surround: film_parse_acting.h)
 			if (const std::string e = actingLine(s, verb, w, n); !e.empty()) return fail(e);
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");

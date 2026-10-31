@@ -2619,6 +2619,12 @@ uvs (its surface cut into near-flat charts along its creases, each laid flat and
 
 **Matching a reference: `tools/blender_import/match_lights.py SCENE.pbrt REFERENCE.png [--view filmic|srgb] [--exe PATH]`.** Eevee and a path tracer spread light differently, so an imported scene rarely balances by itself. This groups the scene's lights by kind and colour, renders once per group with the others off and once with all off, and solves for the gains that best add up to the reference: non-negative least squares, weighted so a dark sky counts as much as a bright fire, leaving out pixels that clipped. It prints the gains and writes `SCENE_matched.pbrt`. On the production scene it was tried on, it beat a careful hand balance (mean difference from the Eevee frame 11.5 against 13.2 out of 255).
 
+**Camera keys by time: `key ... at T`.** Keys are normally paced by how far the camera travels, which is wrong for a focus pull or a turn on the spot, where it travels nowhere. Give every key of a path `at T` (seconds into the shot, going up) and each one is reached then, whatever the distance: `key 0 2 9  0 1 0  35  at 0` ... `key 0 2 9  0 1 0  50  at 1.5`. It is all the keys or none, and `hold` is not used with it (two keys at different times with the same place already hold).
+
+**Any block as a subject: `subject NAME at X Y Z`.** In a shot, a block, group or placement can be what the film doctor checks, not only a character: `at` is a point on it where it rests, in pbrt coordinates, and the doctor follows it wherever `move`, `parent` and the rest take it. Later shots can just say `subject NAME`. A hidden one (`show`) is not checked.
+
+**A backdrop for a scene made for one camera: `surround FILE [radius R] [height H] [repeat N] [bright B] [ground R G B] [at X Z]`.** A scene modelled for a single view is empty everywhere else. This puts a ring of a panorama round the set (the picture beside the film or in the library, its left edge meeting its right, `repeat` times round), glowing a little and left out of the light sampling, its top carried on upwards so a low camera cannot see out over it, and a plain ground under the set out past the ring. The defaults (radius 115, height 62, repeat 3, bright 0.35) suit a set some tens of metres across.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

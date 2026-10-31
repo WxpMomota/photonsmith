@@ -12,11 +12,48 @@
 namespace cartoon {
 namespace film_file {
 
-inline bool actingVerb(const std::string &verb) { return verb == "parent" || verb == "group" || verb == "hop" || verb == "blink" || verb == "gaze"; }
+inline bool actingVerb(const std::string &verb) { return verb == "parent" || verb == "group" || verb == "hop" || verb == "blink" || verb == "gaze" || verb == "surround"; }
+
+// A shot's `subject NAME [at X Y Z] ...`: whom it is about, and for a block, group or placement where on it to look. "" or what is wrong with it.
+inline std::string subjectLine(Spec &s, Shot &shot, const std::vector<std::string> &t) {
+	for (std::size_t i = 1; i < t.size(); ++i) {
+		if (t[i] != "at") {
+			shot.about.push_back(t[i]);
+			continue;
+		}
+		std::array<double, 3> at{};
+		if (i == 1 || i + 3 >= t.size() || !detail::number(t[i + 1], at[0]) || !detail::number(t[i + 2], at[1]) || !detail::number(t[i + 3], at[2]))
+			return "`subject NAME at X Y Z`: where on it to look";
+		s.subjectPoints[t[i - 1]] = at, i += 3;
+	}
+	return std::string();
+}
 
 // One such line, split into words `w`, line `n` of the file: what it says goes into `s`. "" or what is wrong with it.
 inline std::string actingLine(Spec &s, const std::string &verb, const std::vector<std::string> &w, int n) {
 	using detail::number;
+	if (verb == "surround") {   // film_surround.h
+		const char *usage = "`surround FILE [radius R] [height H] [repeat N] [bright B] [ground R G B] [at X Z]`";
+		if (w.size() < 2) return usage;
+		surround::Surround &a = s.around;
+		a.on = true, a.file = w[1];
+		for (std::size_t i = 2; i < w.size();) {
+			const auto one = [&](double &v) {
+				const bool good = i + 1 < w.size() && number(w[i + 1], v) && v > 0.0;
+				i += 2;
+				return good;
+			};
+			bool ok = false;
+			if (w[i] == "radius") ok = one(a.radius);
+			else if (w[i] == "height") ok = one(a.height);
+			else if (w[i] == "repeat") ok = one(a.repeat);
+			else if (w[i] == "bright") ok = one(a.bright);
+			else if (w[i] == "ground" && i + 3 < w.size()) ok = number(w[i + 1], a.ground[0]) && number(w[i + 2], a.ground[1]) && number(w[i + 3], a.ground[2]), i += 4;
+			else if (w[i] == "at" && i + 2 < w.size()) ok = number(w[i + 1], a.x) && number(w[i + 2], a.z), i += 3;
+			if (!ok) return usage;
+		}
+		return std::string();
+	}
 	if (verb == "parent" || verb == "group") {   // what rides on what (DataFilm::animMatrix)
 		if (verb == "parent" && (w.size() != 4 || w[2] != "to")) return "`parent CHILD to OTHER`";
 		if (verb == "group" && (w.size() < 4 || w[2] != "of")) return "`group NAME of A B C ...`";

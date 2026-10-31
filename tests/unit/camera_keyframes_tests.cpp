@@ -415,3 +415,33 @@ TEST(CameraKeyframes, AKeyWithoutAHoldIsPassedThroughWithoutStoppingEvenWhenOthe
 	}
 	EXPECT_NEAR(at(p, 0.5, 10.0).pos[0], 15.0, 1e-9) << "the middle of the 8 seconds of moving is the middle of the run";
 }
+
+// `at T`: the camera is at a key at the time it says, however far the keys are apart; standing still it can change its focus; all or none of the keys say it.
+TEST(CameraKeyframes, KeysAtTimesAreReachedAtThoseTimes) {
+	const ParseResult r = parse("ease 0\nkey 0 0 0  0 0 1  at 1\nkey 1 0 0  1 0 1  at 2\nkey 100 0 0  100 0 1  at 8\n");
+	ASSERT_TRUE(r.ok) << r.error;
+	const double duration = 10.0;
+	EXPECT_DOUBLE_EQ(at(r.path, 0.0, duration).pos[0], 0.0) << "held before the first";
+	EXPECT_NEAR(at(r.path, 0.2, duration).pos[0], 1.0, 1e-9) << "at 2 s, though the far key is 99 m further";
+	EXPECT_NEAR(at(r.path, 0.8, duration).pos[0], 100.0, 1e-9);
+	EXPECT_DOUBLE_EQ(at(r.path, 1.0, duration).pos[0], 100.0) << "held after the last";
+	const double half = at(r.path, 0.5, duration).pos[0];
+	EXPECT_GT(half, 30.0);
+	EXPECT_LT(half, 70.0);
+}
+
+TEST(CameraKeyframes, AFocusPullWithTheCameraStandingStill) {
+	const ParseResult r = parse("key 0 0 0  0 0 1  40 0.05 3  at 0\nkey 0 0 0  0 0 1  40 0.05 9  at 2\n");
+	ASSERT_TRUE(r.ok) << r.error;
+	EXPECT_NEAR(at(r.path, 0.5, 2.0).focus, 6.0, 1e-9);
+	EXPECT_NEAR(at(r.path, 1.0, 2.0).focus, 9.0, 1e-9);
+}
+
+TEST(CameraKeyframes, AtMustBeOnEveryKeyAndGoUp) {
+	EXPECT_FALSE(parse("key 0 0 0 0 0 1 at 1\nkey 1 0 0 0 0 1\n").ok);
+	EXPECT_FALSE(parse("key 0 0 0 0 0 1 at 2\nkey 1 0 0 0 0 1 at 1\n").ok);
+	EXPECT_FALSE(parse("key 0 0 0 0 0 1 at 1 hold 2\nkey 1 0 0 0 0 1 at 5\n").ok);
+	const ParseResult r = parse("key 0 0 0 0 0 1 at 1\nkey 1 0 0 0 0 1 at 3\n");
+	ASSERT_TRUE(r.ok);
+	EXPECT_NE(toText(r.path).find("at 3"), std::string::npos) << "written back";
+}

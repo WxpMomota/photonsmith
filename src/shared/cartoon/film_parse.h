@@ -26,7 +26,8 @@
 //     shutter  0.5                          # motion blur: a moving block is blurred over this share of a frame (0.5, the default: a film camera's 180-degree shutter); 0: sharp
 //
 //     shot 0 The sails                      # a camera shot that begins at 0 seconds ... (a hard cut at the next shot's start)
-//       key  px py pz  tx ty tz  [fov [lensRadius focusDistance]]  [hold S]    # as in a camera keyframes file: where the camera is and what it looks at
+//       key  px py pz  tx ty tz  [fov [lensRadius focusDistance]]  [hold S] [at T]    # as in a camera keyframes file: where the camera is and what it looks at;
+//                                                                                     # `at T`: there T seconds into the shot (every key or none; else the moves share the time by how far they go)
 //       key  ...
 //     shot 6 Pull back
 //       key  ...
@@ -45,6 +46,8 @@
 //     blink  eyes about -1.3 6.8 -13.2 [shut 0.1]  2.0 4.8 7.3   # shut along y at those times
 //     gaze   head about -1.8 5.9 -12.4 forward 0.5 0 -0.85 at star [offset 0 0 0] [max 50] [from 6 6.6] [to 8 8.5]   # turned to keep looking at a point, or at a block, group,
 //                                                            # placement or character as it moves, eased in and out
+//     surround pines.png [radius 115] [height 62] [repeat 3] [bright 0.35] [ground 0.03 0.04 0.03] [at 2 -15]   # a panorama round the set and a ground under it, for what a
+//                                                            # scene built for one camera lacks from anywhere else (film_surround.h)
 //     light lamp   0 0   2 1   10 1   12 0                   # the power of the lights in NAME times k: pairs time k (a lamp that fades up and down)
 //     show  ghost  3 5   8 9                                 # NAME is there only between these times (any number of pairs); outside them it is left out
 //
@@ -84,6 +87,7 @@
 //     shot 9 Looking up
 //       key ...
 //       subject  kai                                            # what the shot is about (the film doctor's framing checks); a follow shot is about whom it follows
+//       subject  fox at -1.8 7 -12.5                            # a block, group or placement: `at` a point on it where it rests, then followed wherever it goes
 //     shot 10 Around her
 //       orbit    ann  radius 3  degrees 120  height 1.6        # instead of `key` lines, a move about a character: orbit (round them), crane (rise in front of them:
 //                                                               # from H1 to H2, distance D), push (in towards them: from D1 to D2), track (beside them as they go: side S)

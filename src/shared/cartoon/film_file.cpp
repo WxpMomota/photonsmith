@@ -10,6 +10,15 @@
 namespace cartoon {
 namespace film_file {
 
+// A file a film line names: beside the film file, else in the library.
+static std::filesystem::path assetFile(const std::filesystem::path &base, const std::string &name) {
+	const std::filesystem::path given(name);
+	std::error_code ec;
+	if (given.is_absolute() || std::filesystem::exists(base / given, ec)) return base / given;
+	const std::string lib = film_cache::asset("library/" + name);
+	return lib.empty() ? base / given : std::filesystem::path(lib);
+}
+
 std::string DataFilm::load(const std::string &filePath, int part) {
 	sourcePath = filePath;
 	partIndex = part;
@@ -125,14 +134,20 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 		if (!animatable(child) || !animatable(over)) return filePath + ": `parent` or `group`: no block, group or placement is called " + (animatable(child) ? over : child);
 	for (const swarm::Swarm &sw : spec.swarms)
 		if (!sw.after.empty() && !animatable(sw.after)) return filePath + ": `swarm " + sw.name + " after " + sw.after + "`: no block, group or placement has that name";
+	for (const auto &[name, point] : spec.subjectPoints)
+		if (!animatable(name)) return filePath + ": `subject " + name + " at ...`: no block, group or placement has that name";
+	if (spec.around.on) {   // (the picture: beside the film file, else in the library)
+		const std::filesystem::path file = assetFile(base, spec.around.file);
+		std::error_code ec;
+		if (!std::filesystem::exists(file, ec)) return filePath + ": `surround`: the picture " + file.string() + " is not there";
+		spec.around.file = std::filesystem::absolute(file, ec).generic_string();
+	}
 	for (const auto &[name, line] : spec.physicsLines)
 		if (std::find(scene.names.begin(), scene.names.end(), name) == scene.names.end())
 			return detail::lineWhere(spec, filePath, line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + name + "`";
 	for (const Spec::Rigged &rg : spec.rigged) {   // the kinds its rigged models make (beside the film file, else in the library)
-		std::filesystem::path file = std::filesystem::path(rg.file).is_absolute() ? std::filesystem::path(rg.file) : (rg.dir.empty() ? base : rg.dir) / rg.file;
+		const std::filesystem::path file = assetFile(rg.dir.empty() ? base : rg.dir, rg.file);
 		std::error_code ec;
-		if (!std::filesystem::exists(file, ec) && !std::filesystem::path(rg.file).is_absolute())
-			if (const std::string lib = film_cache::asset("library/" + rg.file); !lib.empty()) file = lib;
 		// (the kind is this film's own - "<film>/<kind>" in the table every film shares - and its characters are pointed at it: two films' rigged kinds of one name
 		// were one kind, the last film's, and a rigged kind named as a built-in one replaced it in every film)
 		if (characterKinds().count(rg.kind)) return detail::lineWhere(spec, filePath, rg.line) + ": \"" + rg.kind + "\" is a kind of character already: name the rigged model something else";
@@ -157,19 +172,15 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 				return filePath + ": compare \"" + name + "\": " + explain::compareUsage();
 	for (screens::Screen &sc : spec.screens) {   // a screen's own picture (`show picture FILE`): beside the film file, else in the library
 		if (sc.show != "picture") continue;
-		std::filesystem::path file = std::filesystem::path(sc.file).is_absolute() ? std::filesystem::path(sc.file) : base / sc.file;
+		const std::filesystem::path file = assetFile(base, sc.file);
 		std::error_code ec;
-		if (!std::filesystem::exists(file, ec) && !std::filesystem::path(sc.file).is_absolute())
-			if (const std::string lib = film_cache::asset("library/" + sc.file); !lib.empty()) file = lib;
 		int w = 0, h = 0, comp = 0;
 		if (!stbi_info(file.string().c_str(), &w, &h, &comp) || w <= 0 || h <= 0) return filePath + ": the screen " + sc.name + "'s picture " + file.string() + " cannot be read";
 		sc.file = std::filesystem::absolute(file, ec).generic_string();
 	}
 	for (matte::Matte &m : spec.mattes) {   // the matte paintings' pictures: beside the film file, else in the library; their shapes as wide as they are
-		std::filesystem::path file = std::filesystem::path(m.file).is_absolute() ? std::filesystem::path(m.file) : base / m.file;
+		const std::filesystem::path file = assetFile(base, m.file);
 		std::error_code ec;
-		if (!std::filesystem::exists(file, ec) && !std::filesystem::path(m.file).is_absolute())
-			if (const std::string lib = film_cache::asset("library/" + m.file); !lib.empty()) file = lib;
 		int w = 0, h = 0, comp = 0;
 		if (!stbi_info(file.string().c_str(), &w, &h, &comp) || w <= 0 || h <= 0) return detail::lineWhere(spec, filePath, m.line) + ": the matte painting " + file.string() + " cannot be read";
 		m.file = std::filesystem::absolute(file, ec).generic_string();
@@ -178,19 +189,15 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 	for (Spec::FaceAct &a : spec.faceActs) {   // the faces' acting from videos (face_track.h): beside the film, else in the library
 		if (const Character *c = character(a.who); c && characterKinds().count(c->kind) && !characterKinds().at(c->kind).face)
 			return detail::lineWhere(spec, filePath, a.line) + ": " + a.who + " is a " + c->kind + ", which has no face to act with (a rigged model needs face morphs)";
-		std::filesystem::path file = std::filesystem::path(a.file).is_absolute() ? std::filesystem::path(a.file) : (a.dir.empty() ? base : a.dir) / a.file;
+		const std::filesystem::path file = assetFile(a.dir.empty() ? base : a.dir, a.file);
 		std::error_code ec;
-		if (!std::filesystem::exists(file, ec) && !std::filesystem::path(a.file).is_absolute())
-			if (const std::string lib = film_cache::asset("library/" + a.file); !lib.empty()) file = lib;
 		std::string why;
 		a.track = face_track::load(file.string(), why);
 		if (!a.track) return detail::lineWhere(spec, filePath, a.line) + ": " + why;
 	}
 	for (const Spec::Mocap &mc : spec.mocaps) {   // the motion captures its rigged characters play: a clip of the kind's rig, played as a gesture
-		std::filesystem::path file = std::filesystem::path(mc.file).is_absolute() ? std::filesystem::path(mc.file) : (mc.dir.empty() ? base : mc.dir) / mc.file;
+		const std::filesystem::path file = assetFile(mc.dir.empty() ? base : mc.dir, mc.file);
 		std::error_code ec;
-		if (!std::filesystem::exists(file, ec) && !std::filesystem::path(mc.file).is_absolute())
-			if (const std::string lib = film_cache::asset("library/" + mc.file); !lib.empty()) file = lib;
 		Character *who = nullptr;
 		for (Character &c : spec.characters)
 			if (c.name == mc.who) who = &c;
@@ -280,14 +287,16 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 	for (Shot &shot : spec.shots)   // (what a move is about, it is about)
 		if (shot.move.kind != Shot::Move::None && std::find(shot.about.begin(), shot.about.end(), shot.move.who) == shot.about.end()) shot.about.push_back(shot.move.who);
 	for (const Shot &shot : spec.shots) {
-		std::vector<std::string> named = shot.about;
+		std::vector<std::string> named;
+		for (const std::string &who : shot.about)
+			if (!spec.subjectPoints.count(who) || who == shot.move.who) named.push_back(who);   // (only the doctor looks at a block; cameras go by characters)
 		if (shot.following) named.push_back(shot.follow.who);
 		for (const auto &[at, who] : shot.focus) named.push_back(who);
 		if (!shot.lightOn.empty()) named.push_back(shot.lightOn);
 		for (const std::string &who : named) {
 			Vec3 feet, front, chest;
 			if (!character(who) && !wildSubject(who, shot.start, feet, front, chest))
-				return filePath + ": the shot \"" + shot.name + "\" names " + who + ", who is not brought in with `character` (nor a herd or a flock: herd1, flock1 ...)";
+				return filePath + ": the shot \"" + shot.name + "\" names " + who + ", who is not brought in with `character` (nor a herd or a flock: herd1, flock1 ...; for a block, `subject " + who + " at X Y Z`)";
 		}
 	}
 	return std::string();
@@ -351,7 +360,7 @@ void DataFilm::leaveOutSkyLights() {
 }
 
 std::string DataFilm::dressingAt(double t) const {
-	std::string out = spec.hasTerrain ? terrain::text(spec.key.empty() ? std::string("film") : spec.key, spec.terrain, weatherAt(t)) : std::string();
+	std::string out = surround::text(spec.around) + (spec.hasTerrain ? terrain::text(spec.key.empty() ? std::string("film") : spec.key, spec.terrain, weatherAt(t)) : std::string());
 	if (spec.placements.empty()) return out;
 	out += "# the set's dressing (film_dressing.h)\n" + dressing::objects();
 	for (const dressing::Placement &p : spec.placements) out += dressing::placementText(p, natureAt(t), spec.gusts);
@@ -1224,6 +1233,10 @@ std::vector<Vec3> DataFilm::subjectsAt(double t) const {
 		Vec3 feet, front, chest;
 		if (const Character *c = character(who)) out.push_back(chestOf(*c, t));
 		else if (wildSubject(who, t, feet, front, chest)) out.push_back(chest);
+		else if (const auto p = spec.subjectPoints.find(who); p != spec.subjectPoints.end() && visible(who, t)) {   // (a block, wherever it has got to; story space mirrors pbrt's x)
+			const Vec3 at = transformPoint(animMatrix(who, t), Vec3{p->second[0], p->second[1], p->second[2]});
+			out.push_back(Vec3{-at.x, at.y, at.z});
+		}
 	}
 	return out;
 }

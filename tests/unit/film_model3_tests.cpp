@@ -238,6 +238,33 @@ TEST(FilmSwarm, FliesCirclesDivesAndCostsNoLightSampling) {
 	EXPECT_GT(a.x, 10.0) << "born where the block was by then";
 }
 
+// `subject` puts a plain block in what the doctor checks, following it; `surround` writes its ring into every frame, left out of the light sampling.
+TEST(FilmActing, SubjectsAndSurround) {
+	const std::filesystem::path d = std::filesystem::temp_directory_path() / "photonsmith_model3_test_subject";
+	std::filesystem::create_directories(d);
+	std::ofstream(d / "s.pbrt", std::ios::binary) << std::string(kSet) + "# @anim a\nAttributeBegin\n  Shape \"sphere\" \"float radius\" [ 1 ]\nAttributeEnd\n";
+	std::ofstream(d / "pano.png", std::ios::binary) << "x";
+	const auto write = [&](const std::string &film) { std::ofstream(d / "f.film", std::ios::binary) << film; };
+	write("scene s.pbrt\nlength 6\nease 0\nmove a  0 0 0 0  6 6 0 0\nsurround pano.png radius 50 bright 0.2\n" + kShot + "  subject a at 0 1 0\n");
+	ff::DataFilm film;
+	ASSERT_EQ(film.load((d / "f.film").string()), "");
+	const std::vector<V3> s = film.subjectsAt(3.0);
+	ASSERT_EQ(s.size(), 1u);
+	EXPECT_NEAR(s[0].x, -3.0, 1e-9) << "where it has moved to (story space: x mirrored)";
+	EXPECT_NEAR(s[0].y, 1.0, 1e-9);
+	const std::string scene = film.sceneAt(3.0);
+	EXPECT_NE(scene.find("# surround"), std::string::npos);
+	EXPECT_NE(scene.find("pano.png"), std::string::npos);
+	EXPECT_NE(scene.find("\"bool sampled\" false"), std::string::npos);
+	for (const std::string &wrong : {"scene s.pbrt\nlength 6\n" + kShot + "  subject nobody at 0 1 0\n", "scene s.pbrt\nlength 6\n" + kShot + "  subject a\n",
+									 "scene s.pbrt\nlength 6\n" + kShot + "  subject a at 0 1\n", "scene s.pbrt\nlength 6\nsurround missing.png\n" + kShot,
+									 "scene s.pbrt\nlength 6\nsurround pano.png radius\n" + kShot}) {
+		write(wrong);
+		ff::DataFilm bad;
+		EXPECT_NE(bad.load((d / "f.film").string()), "") << wrong;
+	}
+}
+
 TEST(FilmModel3, ASkinnedCharacterWalksAndFeels) {
 	ff::DataFilm film;
 	ASSERT_EQ(loadFilm("skin", kHead + kBlob + "character bo blob at 0 0 0\nwalk bo 1.0 0.5  0 2\nfeel bo surprised 4 4.3 6 6\nsay bo 4.2 \"Oh!\"\n" + kShot, film), "");

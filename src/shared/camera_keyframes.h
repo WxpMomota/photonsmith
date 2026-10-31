@@ -9,6 +9,7 @@
 //     key  px py pz   tx ty tz  fov    # ... and its vertical field of view in degrees
 //     key  px py pz   tx ty tz  fov lensRadius focusDistance    # ... and its lens: the radius of the aperture (0: sharp everywhere) and the distance in focus
 //     key  ...   hold 1.5              # at the end of any key line: the camera stays here for this many seconds (see below)
+//     key  ...   at 8                  # at the end of every key line or none: the camera is here 8 seconds in, whatever the distances; a key can repeat a place to change its lens
 //
 // The first frame is exactly the first key and the last frame exactly the last. In between the camera goes through every key on a smooth curve (a Catmull-Rom
 // spline through the places, and another through the targets), spending time on each stretch in proportion to how far it is (the distance the camera and its
@@ -43,6 +44,7 @@ struct Key {
 	double lensRadius = -1;         // aperture radius; < 0: not given (0 is a real value: no depth of field)
 	double focus = 0;               // distance in focus; 0: not given
 	double hold = 0;                // seconds the camera stays here (a pause); 0: it does not stop
+	double when = -1;               // `at T`: the camera is here T seconds in; < 0: not given (the moves share the time by how far they go)
 	bool hasLens() const { return lensRadius >= 0 && focus > 0; }
 };
 
@@ -124,10 +126,11 @@ inline ParseResult parse(const std::string& text) {
 				s >> out;
 				return !s.fail() && s.eof() && detail::finiteNumber(out);
 			};
-			if (tokens.size() >= 2 && tokens[tokens.size() - 2] == "hold") {
+			while (tokens.size() >= 2 && (tokens[tokens.size() - 2] == "hold" || tokens[tokens.size() - 2] == "at")) {
 				double h = 0;
-				if (!number(tokens.back(), h) || h < 0.0 || h > 3600.0) return fail("'hold' is a number of seconds, 0 to 3600");
-				k.hold = h;
+				const bool holding = tokens[tokens.size() - 2] == "hold";
+				if (!number(tokens.back(), h) || h < 0.0 || (holding && h > 3600.0)) return fail(holding ? "'hold' is a number of seconds, 0 to 3600" : "'at' is a time in seconds, 0 or more");
+				(holding ? k.hold : k.when) = h;
 				tokens.resize(tokens.size() - 2);
 			}
 			for (const std::string& t : tokens) {
@@ -161,6 +164,16 @@ inline ParseResult parse(const std::string& text) {
 		r.path.keys.clear();
 		return r;
 	}
+	const bool timed = std::any_of(r.path.keys.begin(), r.path.keys.end(), [](const Key& k) { return k.when >= 0.0; });
+	for (std::size_t i = 0; timed && i < r.path.keys.size(); ++i) {
+		const Key& k = r.path.keys[i];
+		r.error = k.when < 0.0 ? "either every 'key' says 'at T' or none does" : k.hold > 0.0 ? "a 'key' with 'at T' does not take 'hold': give two keys at the same place" :
+				  i > 0 && k.when <= r.path.keys[i - 1].when ? "the 'at' times of the keys must go up" : std::string();
+		if (!r.error.empty()) {
+			r.path.keys.clear();
+			return r;
+		}
+	}
 	r.ok = true;
 	return r;
 }
@@ -193,6 +206,7 @@ inline std::string toText(const Path& p) {
 		if (k.fov > 0) out << "  " << k.fov;
 		if (k.fov > 0 && k.hasLens()) out << " " << k.lensRadius << " " << k.focus;
 		if (k.hold > 0) out << "  hold " << k.hold;
+		if (k.when >= 0) out << "  at " << k.when;
 		out << "\n";
 	}
 	return out.str();
@@ -231,6 +245,16 @@ inline Key at(const Path& path, double t, double durationSeconds = 0.0) {
 	if (k.empty()) return Key{};
 	if (k.size() == 1) return k[0];
 	t = std::min(1.0, std::max(0.0, t));
+	if (k.front().when >= 0.0 && durationSeconds > 0.0) {   // at the times the keys say: spaced as they are; a camera that stands still can still change its focus and its lens
+		const double now = t * durationSeconds;
+		if (now <= k.front().when) return k.front();
+		if (now >= k.back().when) return k.back();
+		std::size_t seg = 0;
+		while (seg + 2 < k.size() && now >= k[seg + 1].when) ++seg;
+		double u = (now - k[seg].when) / (k[seg + 1].when - k[seg].when);
+		if (path.ease && k.size() == 2) u = ease_curves::at(path.curve, u);
+		return splineAt(k, seg, u);
+	}
 	const std::size_t n = k.size(), segments = n - 1;
 	std::vector<double> length(segments);
 	double total = 0.0;

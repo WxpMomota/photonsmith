@@ -6,6 +6,8 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **Camera keys by time, block subjects, a surround backdrop (2026-10-31).** `key ... at T` reaches a key at a time rather than pacing by distance, so a focus pull works with the camera standing still. A shot's `subject NAME at X Y Z` makes a block, group or placement something the film doctor checks. `surround FILE ...` puts a panorama ring and a ground round a scene built for one camera.
+
 * **Automatic light matching (2026-10-31).** `tools/blender_import/match_lights.py` balances a scene's lights to match a reference picture, solving for one gain per group of lights from renders of each group alone.
 
 * **Lights with a size, hidden panels (2026-10-31).** `"float radius"` on point and spot lights for soft shadows, `"bool camera" false` on area lights for panels that light but are not seen, made at load time from ordinary lights so every renderer has them; the Blender import uses both.
