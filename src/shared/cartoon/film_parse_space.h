@@ -52,7 +52,7 @@ inline std::string spaceSetLine(Spec &s, const std::vector<std::string> &t) {
 			else if (t[i] == "bloom" && a >= 0.0 && a <= 1.0) s.space.bloom = a;
 			else if (t[i] == "planetshine" && a >= 0.0 && a <= 10.0) s.space.planetshine = a;
 			else if (t[i] == "hum" && a >= 0.0 && a <= 4.0) s.space.hum = a;
-			else if (t[i] == "seed") s.space.seed = static_cast<int>(a);
+			else if (t[i] == "seed") s.space.seed = detail::seedOf(a);
 			else return fail("\"" + t[i] + "\": " + usage + " (stars and milkyway 0 to 4, sunsize 0.05 to 20 degrees, sunlight up to 20, flare and bloom 0 to 1, planetshine 0 to 10, hum 0 to 4)");
 			i += 2;
 		} else {
@@ -97,7 +97,7 @@ inline std::string planetLine(Spec &s, const std::vector<std::string> &t) {
 			if (t[i] == "radius" && a >= 1.0 && a <= 200000.0) p.radius = a, sized = true;
 			else if (t[i] == "tilt" && a >= -180.0 && a <= 180.0) p.tilt = a;
 			else if (t[i] == "spin" && a != 0.0) p.spin = a;
-			else if (t[i] == "seed") p.seed = static_cast<int>(a);
+			else if (t[i] == "seed") p.seed = detail::seedOf(a);
 			else if (t[i] == "air" && a >= 0.0 && a <= 10.0) p.air = a;
 			else if (t[i] == "cities" && a >= 0.0 && a <= 10.0) p.cities = a;
 			else if (t[i] == "aurora" && a >= 0.0 && a <= 10.0) p.aurora = a;
@@ -187,7 +187,7 @@ inline std::string nebulaLine(Spec &s, const std::vector<std::string> &t) {
 								   n.name, n.kind, n.at, [&](const std::string &w, double a) {
 									   if (w == "size" && a >= 100.0 && a <= 200000.0) return n.size = a, sized = true;
 									   if (w == "brightness" && a > 0.0 && a <= 20.0) return n.brightness = a, true;
-									   if (w == "seed") return n.seed = static_cast<int>(a), true;
+									   if (w == "seed") return n.seed = detail::seedOf(a), true;
 									   return false;
 								   });
 	if (!e.empty()) return e;
@@ -206,7 +206,7 @@ inline std::string galaxyLine(Spec &s, const std::vector<std::string> &t) {
 									   if (w == "tilt" && a >= -90.0 && a <= 90.0) return g.tilt = a, true;
 									   if (w == "turn") return g.turn = a, true;
 									   if (w == "brightness" && a > 0.0 && a <= 20.0) return g.brightness = a, true;
-									   if (w == "seed") return g.seed = static_cast<int>(a), true;
+									   if (w == "seed") return g.seed = detail::seedOf(a), true;
 									   return false;
 								   });
 	if (!e.empty()) return e;
@@ -226,7 +226,7 @@ inline std::string starLine(Spec &s, const std::vector<std::string> &t) {
 									   if (w == "brightness" && a > 0.0 && a <= 20.0) return st.brightness = a, true;
 									   if (w == "prominences" && a >= 0.0 && a <= 40.0) return st.prominences = static_cast<int>(a), true;
 									   if (w == "flare") return st.flares.push_back(a), true;
-									   if (w == "seed") return st.seed = static_cast<int>(a), true;
+									   if (w == "seed") return st.seed = detail::seedOf(a), true;
 									   return false;
 								   });
 	if (!e.empty()) return e;
@@ -250,7 +250,7 @@ inline std::string blackHoleLine(Spec &s, const std::vector<std::string> &t) {
 									   if (w == "spin" && a >= -5.0 && a <= 5.0) return b.spin = a, true;
 									   if (w == "jets" && (a == 0.0 || (a >= 2.0 && a <= 60.0))) return b.jets = a, true;
 									   if (w == "brightness" && a > 0.0 && a <= 20.0) return b.brightness = a, true;
-									   if (w == "seed") return b.seed = static_cast<int>(a), true;
+									   if (w == "seed") return b.seed = detail::seedOf(a), true;
 									   return false;
 								   });
 	if (!e.empty()) return e;
@@ -280,7 +280,7 @@ inline std::string cometLine(Spec &s, const std::vector<std::string> &t) {
 		if (w == "size" && a >= 10.0 && a <= 20000.0) return c.size = a, true;
 		if (w == "tail" && a >= 100.0 && a <= 400000.0) return c.tail = a, true;
 		if (w == "brightness" && a > 0.0 && a <= 20.0) return c.brightness = a, true;
-		if (w == "seed") return c.seed = static_cast<int>(a), true;
+		if (w == "seed") return c.seed = detail::seedOf(a), true;
 		return false;
 	});
 	if (!e.empty()) return e;
@@ -301,7 +301,7 @@ inline std::string beltLine(Spec &s, const std::vector<std::string> &t) {
 									   if (w == "tilt" && a >= -90.0 && a <= 90.0) return b.tilt = a, true;
 									   if (w == "turn") return b.turn = a, true;
 									   if (w == "spin" && a >= -10.0 && a <= 10.0) return b.spin = a, true;
-									   if (w == "seed") return b.seed = static_cast<int>(a), true;
+									   if (w == "seed") return b.seed = detail::seedOf(a), true;
 									   return false;
 								   });
 	if (!e.empty()) return e;
@@ -321,7 +321,7 @@ inline std::string remnantLine(Spec &s, const std::vector<std::string> &t) {
 									   if (w == "period" && a >= 0.05 && a <= 600.0) return m.period = a, true;
 									   if (w == "tilt" && a >= -90.0 && a <= 90.0) return m.tilt = a, true;
 									   if (w == "brightness" && a > 0.0 && a <= 20.0) return m.brightness = a, true;
-									   if (w == "seed") return m.seed = static_cast<int>(a), true;
+									   if (w == "seed") return m.seed = detail::seedOf(a), true;
 									   return false;
 								   });
 	if (!e.empty()) return e;
@@ -354,7 +354,7 @@ inline std::string shipLine(Spec &s, const std::vector<std::string> &t) {
 			if (w == "heading") return sh.heading = a, true;
 			if (w == "pitch" && a >= -90.0 && a <= 90.0) return sh.pitch = a, true;
 			if (w == "spin" && a >= -20.0 && a <= 20.0) return sh.spin = a, true;
-			if (w == "seed") return sh.seed = static_cast<int>(a), true;
+			if (w == "seed") return sh.seed = detail::seedOf(a), true;
 			return false;
 		},
 		[&](const std::string &w, const std::string &v) {
@@ -402,7 +402,7 @@ inline std::string astronautLine(Spec &s, const std::vector<std::string> &t) {
 			if (w == "tumble" && v >= -360.0 && v <= 360.0) return a.tumble = v, true;
 			if (w == "size" && v >= 0.3 && v <= 20.0) return a.size = v, true;
 			if (w == "floaters" && v >= 0.0 && v <= 40.0) return a.floaters = static_cast<int>(v), true;
-			if (w == "seed") return a.seed = static_cast<int>(v), true;
+			if (w == "seed") return a.seed = detail::seedOf(v), true;
 			return false;
 		},
 		[&](const std::string &w, const std::string &v) {
@@ -539,7 +539,7 @@ inline std::string explodeLine(Spec &s, const std::vector<std::string> &t) {
 		if (i + 1 >= t.size() || !number(t[i + 1], a)) return "\"" + t[i] + "\": " + usage;
 		if (t[i] == "at") e.t = a, when = true;
 		else if (t[i] == "size" && a > 0.0) e.size = a;
-		else if (t[i] == "seed") e.seed = static_cast<int>(a);
+		else if (t[i] == "seed") e.seed = detail::seedOf(a);
 		else return "\"" + t[i] + "\": " + usage;
 	}
 	if (!when) return "when (`at T`): " + usage;
@@ -673,7 +673,7 @@ inline std::string spaceLine(Spec &s, const std::string &verb, const std::string
 				if (t[i] == "size" && a >= 0.05 && a <= 50.0) h.size = a;
 				else if (t[i] == "spin" && std::fabs(a) <= 720.0) h.spin = a;
 				else if (t[i] == "flicker" && a >= 0.0 && a <= 5.0) h.flicker = a;
-				else if (t[i] == "seed") h.seed = static_cast<int>(a);
+				else if (t[i] == "seed") h.seed = detail::seedOf(a);
 				else return "\"" + t[i] + "\": " + usage;
 				i += 2;
 			} else {
@@ -711,7 +711,7 @@ inline std::string spaceLine(Spec &s, const std::string &verb, const std::string
 				else if (t[i] == "tilt" && std::fabs(a) <= 90.0) sc.tilt = a;
 				else if (t[i] == "bright" && a >= 0.0 && a <= 100.0) sc.bright = a;
 				else if (t[i] == "range" && a > 0.0) sc.range = a;
-				else if (t[i] == "seed") sc.seed = static_cast<int>(a);
+				else if (t[i] == "seed") sc.seed = detail::seedOf(a);
 				else return "\"" + t[i] + "\": " + usage;
 				i += 2;
 			} else {
@@ -742,7 +742,7 @@ inline std::string spaceLine(Spec &s, const std::string &verb, const std::string
 				if (t[i] == "facing") in.facing = a;
 				else if (t[i] == "length" && a >= 2.0 && a <= 200.0) in.length = a;
 				else if (t[i] == "cycle" && a >= 0.0 && in.kind == "airlock") in.cycle = a;
-				else if (t[i] == "seed") in.seed = static_cast<int>(a);
+				else if (t[i] == "seed") in.seed = detail::seedOf(a);
 				else return "\"" + t[i] + "\": " + usage;
 				i += 2;
 			} else {
@@ -772,7 +772,7 @@ inline std::string spaceLine(Spec &s, const std::string &verb, const std::string
 			} else if (i + 1 < t.size() && detail::number(t[i + 1], a)) {
 				if (t[i] == "size" && a >= 0.002 && a <= 2.0) b.size = a;
 				else if (t[i] == "split" && a >= 0.0) b.split = a;
-				else if (t[i] == "seed") b.seed = static_cast<int>(a);
+				else if (t[i] == "seed") b.seed = detail::seedOf(a);
 				else return "\"" + t[i] + "\": " + usage;
 				i += 2;
 			} else {
@@ -803,7 +803,7 @@ inline std::string spaceLine(Spec &s, const std::string &verb, const std::string
 			} else if (i + 1 < t.size() && detail::number(t[i + 1], a)) {
 				if (t[i] == "size" && a > 0.0 && a <= 5.0) d.size = a;
 				else if (t[i] == "speed" && a >= 0.0 && a <= 10.0) d.speed = a;
-				else if (t[i] == "seed") d.seed = static_cast<int>(a);
+				else if (t[i] == "seed") d.seed = detail::seedOf(a);
 				else return "\"" + t[i] + "\": " + usage;
 				i += 2;
 			} else {

@@ -368,3 +368,28 @@ TEST(FilmUndersea16, ASchoolsSwumIsKeptWhole) {
 	other.count = 41;
 	EXPECT_FALSE(cartoon::school::swumFrom(other, cartoon::school::swumBytes(sc))) << "another school's";
 }
+
+// A shot that follows a school loads and renders: working the school out asks where the camera is at every step, and a camera that follows the school asked for the school
+// again - it waited on itself for ever.
+TEST(FilmUndersea16, AShotCanFollowASchool) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("followschool", std::string(kSea) + "school sardines 40 at 0 4 -6 radius 2\nshot 0 S\n  follow school1\n", film), "");
+	EXPECT_NE(film.sceneAt(2.0).find("# a school of sardines"), std::string::npos);
+}
+
+// A long swim is kept every few steps (a big school over a long film took a gigabyte in every worker); at a kept step it is the swim worked out, and the cache keeps the time
+// between steps.
+TEST(FilmUndersea16, ALongSwimIsKeptEveryFewSteps) {
+	cartoon::school::School every, fourth;
+	every.count = fourth.count = 30;
+	const auto none = [](double) { return std::vector<V3>{}; };
+	cartoon::school::prepare(every, 20.0, none, 1);
+	cartoon::school::prepare(fourth, 20.0, none, 4);
+	EXPECT_LT(fourth.pos.size(), every.pos.size() / 3);
+	EXPECT_NEAR(fourth.dt, 4.0 * every.dt, 1e-12);
+	EXPECT_LT(cartoon::length(cartoon::school::fishAt(fourth, 5, 10.0) - cartoon::school::fishAt(every, 5, 10.0)), 1e-6) << "at a kept step, the same swim";
+	cartoon::school::School back;
+	back.count = 30;
+	ASSERT_TRUE(cartoon::school::swumFrom(back, cartoon::school::swumBytes(fourth)));
+	EXPECT_NEAR(back.dt, fourth.dt, 1e-12);
+}

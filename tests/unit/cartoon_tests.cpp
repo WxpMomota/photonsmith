@@ -819,6 +819,13 @@ TEST(CartoonRender, TheFramesOfAnInterruptedVideoAreResumedOnlyForTheSameFilmSiz
 	EXPECT_NE(base, cartoon_render::resumeSignature(*film, a, 240, 24, 1280, 720, 128, 8)) << "another length";
 	EXPECT_NE(base, cartoon_render::resumeSignature(*film, b, 480, 24, 1280, 720, 128, 8)) << "other flags";
 	EXPECT_NE(base, cartoon_render::resumeSignature(*cartoon::find("fireflies"), a, 480, 24, 1280, 720, 128, 8)) << "another film";
+	// how the computer is used - power, statistics - makes the same frames: switching Power after a crash kept them (it threw them away)
+	LaunchArgs powered, noisy;
+	ASSERT_TRUE(parseArgs({"--gpu", "--denoise", "--background", "--stats"}, powered));
+	EXPECT_EQ(base, cartoon_render::resumeSignature(*film, powered, 480, 24, 1280, 720, 128, 8)) << "--background and --stats change no frame";
+	ASSERT_TRUE(parseArgs({"--gpu", "--denoise"}, noisy));
+	noisy.noise_target = 0.02;
+	EXPECT_NE(base, cartoon_render::resumeSignature(*film, noisy, 480, 24, 1280, 720, 128, 8)) << "--noise-target sets the samples: other frames";
 	// a program that has been rebuilt is another program (its frames are then compared one by one, not thrown away)
 	const std::filesystem::path exe = std::filesystem::temp_directory_path() / "photonsmith_signature_test.exe";
 	std::ofstream(exe, std::ios::binary) << "one";
@@ -1360,6 +1367,96 @@ TEST(CartoonWorkers, AWorkerThatStopsMakingProgressIsKilled) {
 	EXPECT_TRUE(*killed[1]);
 	EXPECT_GT(seconds, 1.9) << "after the stall time, twice";
 	EXPECT_LT(seconds, 8.0);
+}
+
+namespace {
+// Workers that finish one frame of their list each time the pool looks at any of them (as TheFramesAreSharedOut...), with `rcOf` giving each frame's result; `startedWhen`
+// records, for each worker started, how many frames had succeeded before it.
+struct PoolRig {
+	cartoon_render::WorkerHooks hooks;
+	std::vector<FakeWorker *> made;
+	std::set<int> markers;
+	std::vector<int> startedWhen;
+	std::vector<std::shared_ptr<bool>> killed;   // (the pool destroys its workers when it returns)
+	int succeeded = 0;
+	std::function<int(int)> rcOf = [](int) { return 0; };
+	PoolRig() {
+		hooks.start = [this](int, const std::vector<int> &frames) -> std::unique_ptr<cartoon_render::WorkerHandle> {
+			auto w = std::make_unique<FakeWorker>();
+			w->frames = frames;
+			w->killedOut = std::make_shared<bool>(false);
+			killed.push_back(w->killedOut);
+			made.push_back(w.get());
+			startedWhen.push_back(succeeded);
+			return w;
+		};
+		hooks.poll = [this](int frame, int &rc) {
+			for (FakeWorker *w : made)
+				if (w->alive && w->next < w->frames.size()) {
+					markers.insert(w->frames[w->next++]);
+					if (w->next == w->frames.size()) w->alive = false;
+					break;
+				}
+			if (markers.count(frame) == 0) return false;
+			markers.erase(frame);
+			rc = rcOf(frame);
+			if (rc == 0) ++succeeded;
+			return true;
+		};
+	}
+};
+}  // namespace
+
+// On a cold start one worker renders alone until its first frame is in (its shaders compile then): the others start after it, and every frame is still rendered.
+TEST(CartoonWorkers, OnAColdStartOneWorkerRendersAloneUntilAFrameIsIn) {
+	PoolRig rig;
+	rig.hooks.oneUntilFirstFrame = true;
+	std::vector<int> handed;
+	EXPECT_EQ(cartoon_render::runWorkers({0, 1, 2, 3, 4, 5, 6, 7, 8}, 3, 0, rig.hooks, [](int, int, double) {}, [&](int f, int) { handed.push_back(f); }, 1), 9);
+	ASSERT_GE(rig.startedWhen.size(), 3u);
+	EXPECT_EQ(rig.startedWhen[0], 0);
+	for (std::size_t i = 1; i < rig.startedWhen.size(); ++i) EXPECT_GE(rig.startedWhen[i], 1) << "worker " << i << " waited for the first frame";
+	EXPECT_EQ(handed.size(), 9u);
+}
+
+// While the computer's memory is low no second worker starts, but one always runs, so every frame is still rendered.
+TEST(CartoonWorkers, WithTheComputersMemoryLowOneWorkerAtATime) {
+	PoolRig rig;
+	rig.hooks.memoryLow = [] { return true; };
+	int most = 0;
+	std::vector<int> handed;
+	EXPECT_EQ(cartoon_render::runWorkers({0, 1, 2, 3, 4, 5}, 3, 0, rig.hooks,
+										 [&](int, int, double) {
+											 int alive = 0;
+											 for (FakeWorker *w : rig.made) alive += w->alive ? 1 : 0;
+											 most = std::max(most, alive);
+										 },
+										 [&](int f, int) { handed.push_back(f); }, 1),
+			  6);
+	EXPECT_LE(most, 1);
+	EXPECT_EQ(handed.size(), 6u);
+}
+
+// The same failure frame after frame stops the run (and says so) instead of failing every frame of the film.
+TEST(CartoonWorkers, FramesFailingOneAfterAnotherStopTheRun) {
+	PoolRig rig;
+	rig.rcOf = [](int) { return 214; };
+	bool stopped = false;
+	rig.hooks.stopAfterFailures = 3;
+	rig.hooks.stopped = &stopped;
+	int reported = 0;
+	EXPECT_EQ(cartoon_render::runWorkers({0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, 2, 0, rig.hooks, [&](int, int, double) { ++reported; }, [](int, int) {}, 1), 0);
+	EXPECT_TRUE(stopped);
+	EXPECT_EQ(reported, 3);
+	ASSERT_FALSE(rig.killed.empty());
+	for (const auto &k : rig.killed) EXPECT_TRUE(*k) << "its workers are stopped";
+	PoolRig mixed;   // a frame that succeeds between failures starts the count again
+	mixed.rcOf = [](int f) { return f % 3 == 2 ? 0 : 5; };
+	bool stopped2 = false;
+	mixed.hooks.stopAfterFailures = 3;
+	mixed.hooks.stopped = &stopped2;
+	EXPECT_EQ(cartoon_render::runWorkers({0, 1, 2, 3, 4, 5, 6, 7, 8}, 1, 0, mixed.hooks, [](int, int, double) {}, [](int, int) {}, 1), 3);
+	EXPECT_FALSE(stopped2);
 }
 
 TEST(CartoonWorkers, ARealProcessCanBeAskedWhetherItRunsAndStopped) {

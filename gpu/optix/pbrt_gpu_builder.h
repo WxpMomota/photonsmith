@@ -81,6 +81,7 @@
 // .cpp files (scene_builder.cpp and tests/unit/*.cpp - never a .cu), so
 // that is not a problem here.
 #include "../../src/shared/measured_bxdf_loader.h"
+#include "punctual_light_image.h"   // (a projector's slide or a goniometric profile, .exr too: loadPunctualLightImage)
 // PiecewiseConstant1D/PiecewiseConstant2D - the SAME distribution
 // src/TheRestOfYourLife/sky_light.h builds CPU-side for its real
 // importance-sampled HDR environment light. Built here (once per scene, from
@@ -1765,8 +1766,9 @@ inline void addPunctualLights(BuildCtx &c) {
 			// cap can't hold it at full resolution.
 			bool usedRealProfile = false;
 			if (!pl.filename.empty()) {
-				int width = 0, height = 0, channels = 0;
-				float *fdata = stbi_loadf(pl.filename.c_str(), &width, &height, &channels, 3);
+				int width = 0, height = 0;
+				std::vector<float> pixels;
+				const float *fdata = loadPunctualLightImage(pl.filename, pixels, width, height) ? pixels.data() : nullptr;
 				if (fdata && width > 0 && width == height) {
 					const int n = std::min(width, kGonioImageMaxDim);
 					g.nu = n; g.nv = n;
@@ -1780,7 +1782,6 @@ inline void addPunctualLights(BuildCtx &c) {
 					}
 					usedRealProfile = true;
 				}
-				if (fdata) stbi_image_free(fdata);
 			}
 			if (!usedRealProfile) {
 				// Uniform (isotropic) fallback - matches
@@ -1804,9 +1805,11 @@ inline void addPunctualLights(BuildCtx &c) {
 			// neighbor) to kProjImageMaxDim when larger - see the identical
 			// reasoning on the Goniometric case just above.
 			bool usedRealSlide = false;
+			float slideAspect = 0.0f;   // (the whole slide's, not the small inline copy's rounded one: a 4096 x 100 slide's was 22% off)
 			if (!pl.filename.empty()) {
-				int width = 0, height = 0, channels = 0;
-				float *fdata = stbi_loadf(pl.filename.c_str(), &width, &height, &channels, 3);
+				int width = 0, height = 0;
+				std::vector<float> pixels;
+				const float *fdata = loadPunctualLightImage(pl.filename, pixels, width, height) ? pixels.data() : nullptr;
 				if (fdata && width > 0 && height > 0) {
 					// Cap the LARGER dimension to kProjImageMaxDim and scale
 					// the other one proportionally, not each dimension
@@ -1834,9 +1837,10 @@ inline void addPunctualLights(BuildCtx &c) {
 						}
 					}
 					usedRealSlide = true;
+					slideAspect = static_cast<float>(width) / static_cast<float>(height);
 					// a bigger slide is uploaded whole too (ProjectionLightGPU::texIdx): the inline copy above stays as its stand-in. Linear bytes over the slide's brightest value,
 					// rows in the inline copy's order (bottom up)
-					if ((width > kProjImageMaxDim || height > kProjImageMaxDim) && width <= 4096 && height <= 4096) {
+					if ((width > kProjImageMaxDim || height > kProjImageMaxDim) && width <= 8192 && height <= 8192) {
 						float peak = 0.0f;
 						for (std::size_t i = 0; i < static_cast<std::size_t>(width) * height * 3; ++i) peak = std::max(peak, fdata[i]);
 						if (peak > 0.0f) {
@@ -1857,7 +1861,6 @@ inline void addPunctualLights(BuildCtx &c) {
 						}
 					}
 				}
-				if (fdata) stbi_image_free(fdata);
 			}
 			if (!usedRealSlide) {
 				// Uniform white 2x2 slide - matches pbrt_cpu_builder.h's own
@@ -1870,7 +1873,7 @@ inline void addPunctualLights(BuildCtx &c) {
 			// ProjectionLight<T>::make's own aspect-derived bounds), so this
 			// has to run after nx/ny are settled above, real or fallback.
 			{
-				const float aspect = static_cast<float>(pr.nx) / static_cast<float>(pr.ny);
+				const float aspect = slideAspect > 0.0f ? slideAspect : static_cast<float>(pr.nx) / static_cast<float>(pr.ny);
 				if (aspect >= 1.0f) {
 					pr.sb_xmin = -aspect; pr.sb_xmax = aspect;
 					pr.sb_ymin = -1.0f;   pr.sb_ymax = 1.0f;

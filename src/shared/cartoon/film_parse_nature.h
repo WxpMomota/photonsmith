@@ -29,7 +29,7 @@ inline std::string fogBankLine(Spec &s, const std::string &line) {
 			else if (t[i] == "density" && a > 0.0 && a <= 1.0) f.density = a;
 			else if (t[i] == "wind") f.wind = a, f.windSet = true;
 			else if (t[i] == "speed" && a >= 0.0) f.speed = a, f.speedSet = true;
-			else if (t[i] == "seed") f.seed = static_cast<int>(a);
+			else if (t[i] == "seed") f.seed = detail::seedOf(a);
 			else return fail("\"" + t[i] + "\": a fog bank takes size (20 to 20000 m), depth (2 to 2000 m), density (up to 1 a metre), wind, speed, during T0 T1 and seed");
 			i += 2;
 		} else {
@@ -80,7 +80,7 @@ inline std::string fireLine(Spec &s, const std::string &verb, const std::string 
 			i += 2;
 		} else if (i + 1 < t.size() && number(t[i + 1], a)) {
 			if (verb == "fire" && t[i] == "size" && a > 0.05 && a <= 100.0) fi.size = a;
-			else if (verb == "fire" && t[i] == "seed") fi.seed = static_cast<int>(a);
+			else if (verb == "fire" && t[i] == "seed") fi.seed = detail::seedOf(a);
 			else if (verb == "lava" && t[i] == "width" && a > 0.0) la.width = a;
 			else if (verb == "lava" && t[i] == "speed" && a > 0.0) la.speed = a;
 			else if (verb == "lava" && t[i] == "start") la.t0 = a;
@@ -238,7 +238,7 @@ inline std::string iceLine(Spec &s, const std::string &verb, const std::string &
 			if (i + 1 >= t.size() || !number(t[i + 1], a)) return fail("\"" + t[i] + "\": `seaice [cover C] [floe F] [seed N]` (cover 0 to 1, floes 2 to 200 m across)");
 			if (t[i] == "cover" && a > 0.0 && a <= 1.0) s.seaIce.cover = a;
 			else if (t[i] == "floe" && a >= 2.0 && a <= 200.0) s.seaIce.floe = a;
-			else if (t[i] == "seed") s.seaIce.seed = static_cast<int>(a);
+			else if (t[i] == "seed") s.seaIce.seed = detail::seedOf(a);
 			else return fail("\"" + t[i] + "\": `seaice [cover C] [floe F] [seed N]` (cover 0 to 1, floes 2 to 200 m across)");
 		}
 		return std::string();
@@ -294,7 +294,7 @@ inline std::string windLine(Spec &s, const std::string &verb, const std::string 
 		} else if (i + 1 < t.size() && number(t[i + 1], a)) {
 			if (t[i] == "width" && a >= 2.0 && a <= 1000.0) k.width = a;
 			else if (t[i] == "height" && a >= 50.0 && a <= 5000.0) k.height = a;
-			else if (t[i] == "seed") k.seed = static_cast<int>(a);
+			else if (t[i] == "seed") k.seed = detail::seedOf(a);
 			else return fail("\"" + t[i] + "\": " + usage + " (width 2 to 1000 m, height 50 to 5000 m)");
 			i += 2;
 		} else {
@@ -355,7 +355,7 @@ inline std::string groundLine(Spec &s, const std::string &verb, const std::strin
 			i += 2;
 		} else if (i + 1 < t.size() && number(t[i + 1], a) && ((t[i] == "stride" && a >= 0.2 && a <= 3.0) || t[i] == "seed")) {
 			if (t[i] == "stride") k.stride = a;
-			else k.seed = static_cast<int>(a);
+			else k.seed = detail::seedOf(a);
 			i += 2;
 		} else {
 			return fail("\"" + t[i] + "\": " + usage);
@@ -396,7 +396,7 @@ inline std::string animalLine(Spec &s, const std::string &verb, const std::strin
 				if (t[i] == "radius" && a > 0.0) f.radius = a;
 				else if (t[i] == "speed" && a > 0.0) f.speed = a;
 				else if (t[i] == "height") f.at.y = a;
-				else if (t[i] == "seed") f.seed = static_cast<int>(a);
+				else if (t[i] == "seed") f.seed = detail::seedOf(a);
 				else if (t[i] == "feathers" && (f.kind == "eagles" || f.kind == "geese") && a >= 0.0 && a <= 4.0) f.feathers = a;
 				else return fail("\"" + t[i] + "\": a flock takes at X Y Z, from X Y Z, to X Y Z, in X0 Z0 X1 Z1, radius, speed, height, during T0 T1 and seed (eagles and geese: feathers 0 to 4)");
 				i += 2;
@@ -446,7 +446,7 @@ inline std::string animalLine(Spec &s, const std::string &verb, const std::strin
 			if (t[i] == "speed" && a > 0.0) h.speed = a;
 			else if (t[i] == "start") h.t0 = a;
 			else if (t[i] == "flee" && a >= 0.0) h.flee = a;
-			else if (t[i] == "seed") h.seed = static_cast<int>(a);
+			else if (t[i] == "seed") h.seed = detail::seedOf(a);
 			else if (t[i] == "fur" && a >= 0.0 && a <= 4.0) h.fur = a;
 			else return fail("\"" + t[i] + "\": a herd takes speed, start, flee (when it bolts), fur (0 to 4), coat PATTERN and seed");
 		}
@@ -465,7 +465,7 @@ inline std::string animalLine(Spec &s, const std::string &verb, const std::strin
 			if (i + 1 >= t.size() || !number(t[i + 1], a)) return fail(usage);
 			if (t[i] == "speed" && a > 0.0) fl.speed = a;
 			else if (t[i] == "feathers" && a >= 0.0 && a <= 4.0) fl.feathers = a;
-			else if (t[i] == "seed") fl.seed = static_cast<int>(a);
+			else if (t[i] == "seed") fl.seed = detail::seedOf(a);
 			else return fail(usage);
 		}
 		if (length(fl.to - fl.from) < 1.0) return fail("a flight's `from` and `to` are at least a metre apart");
@@ -555,7 +555,7 @@ inline std::string macroLine(Spec &s, const std::string &verb, const std::string
 		double a = 0.0;
 		if (i + 1 >= t.size() || !number(t[i + 1], a)) return fail(usage);
 		if (t[i] == "size" && a > 0.0 && a <= 100.0) in.size = dw.size = a;
-		else if (t[i] == "seed") in.seed = dw.seed = static_cast<int>(a);
+		else if (t[i] == "seed") in.seed = dw.seed = detail::seedOf(a);
 		else if (verb == "insects" && t[i] == "film" && a >= 0.0 && a <= 2000.0) in.film = a;
 		else return fail(usage);
 	}
@@ -599,7 +599,7 @@ inline std::string seaLifeLine(Spec &s, const std::string &verb, const std::stri
 			else if (w == "count" && v[0] >= 10 && v[0] <= 3000) b.count = static_cast<int>(v[0]);
 			else if (w == "radius" && v[0] > 0.2 && v[0] <= 30.0) b.radius = v[0];
 			else if (w == "strike" && b.strikes.size() < 32) b.strikes.push_back(v[0]);
-			else if (w == "seed") b.seed = static_cast<int>(v[0]);
+			else if (w == "seed") b.seed = detail::seedOf(v[0]);
 			else return fail(usage);
 		}
 		s.sealife.balls.push_back(b);
@@ -615,7 +615,7 @@ inline std::string seaLifeLine(Spec &s, const std::string &verb, const std::stri
 			const std::string w = t[i++];
 			if (!numbers(1)) return fail(usage);
 			if (w == "radius" && v[0] > 0.5) tu.radius = v[0];
-			else if (w == "seed") tu.seed = static_cast<int>(v[0]);
+			else if (w == "seed") tu.seed = detail::seedOf(v[0]);
 			else return fail(usage);
 		}
 		s.sealife.turtles.push_back(tu);
@@ -628,7 +628,7 @@ inline std::string seaLifeLine(Spec &s, const std::string &verb, const std::stri
 	while (i < t.size()) {
 		const std::string w = t[i++];
 		if (!numbers(1)) return fail(usage);
-		if (w == "seed") seed = static_cast<int>(v[0]);
+		if (w == "seed") seed = detail::seedOf(v[0]);
 		else if (verb == "jellyfish" && w == "glow" && v[0] >= 0.0 && v[0] <= 20.0) glow = v[0];
 		else return fail(usage);
 	}
@@ -669,7 +669,7 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 				else if (t[i] == "y") ts.y = a, ts.ySet = true;
 				else if (t[i] == "snow" && a >= 0.0) ts.snow = a;
 				else if (t[i] == "erosion" && a >= 0.0 && a <= 3.0) ts.erosion = a;
-				else if (t[i] == "seed") ts.seed = static_cast<int>(a);
+				else if (t[i] == "seed") ts.seed = detail::seedOf(a);
 				else return fail("\"" + t[i] + "\": a terrain takes size (20 to 20000 m), height (up to 5000 m), at X Z, y, focus X Z, snow, erosion (0 to 3), seed and far off");
 				i += 2;
 			} else {
@@ -717,7 +717,7 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		}
 		for (; i < t.size(); i += 2) {
 			double v = 0.0;
-			if (i + 1 >= t.size() || !number(t[i + 1], v) || v < 0.0) return fail("\"" + t[i] + "\": a river takes width, speed and y, each with a number");
+			if (i + 1 >= t.size() || !number(t[i + 1], v) || (v < 0.0 && t[i] != "y")) return fail("\"" + t[i] + "\": a river takes width, speed and y, each with a number");   // (y may be below 0)
 			if (t[i] == "width" && v > 0.0) rv.width = v;
 			else if (t[i] == "speed") rv.speed = v;
 			else if (t[i] == "y") rv.y = v;
@@ -769,7 +769,7 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 				else if (t[i] == "speed" && a >= 0.0) c.speed = a, c.speedSet = true;
 				else if (t[i] == "density" && a > 0.0 && a <= 10.0) c.density = a;
 				else if (t[i] == "area" && a >= 100.0) c.area = a;
-				else if (t[i] == "seed") c.seed = static_cast<int>(a);
+				else if (t[i] == "seed") c.seed = detail::seedOf(a);
 				else if (t[i] == "thick" && c.kind == "deck" && a >= 20.0 && a <= 3000.0) c.thick = a;
 				else return fail("\"" + t[i] + "\": clouds take cover (0 to 1), base, size (20 to 5000 m), wind, speed, density (up to 10), area, at X Z and seed, and a deck thick (20 to 3000 m)");
 				i += 2;
@@ -828,7 +828,7 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 				else if (t[i] == "above") f.above = a;
 				else if (t[i] == "steep" && a > 0.0 && a <= 1.0) f.steep = a;
 				else if (t[i] == "near" && a >= 0.0) f.fullWithin = a;
-				else if (t[i] == "seed") f.seed = static_cast<int>(a);
+				else if (t[i] == "seed") f.seed = detail::seedOf(a);
 				else return fail("\"" + t[i] + "\": a forest takes in X0 Z0 X1 Z1, below, above, steep (0 to 1), scale A B, near, season (summer, autumn, winter or spring; `to B from T0 to T1`), grow T0 T1 and seed");
 				i += 2;
 			} else {
@@ -864,7 +864,7 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 				i += 3;
 			} else if ((t[i] == "scale" || t[i] == "seed") && i + 1 < t.size() && number(t[i + 1], a) && (t[i] == "seed" || a > 0.0)) {
 				if (t[i] == "scale") m.scale = a;
-				else m.seed = static_cast<int>(a);
+				else m.seed = detail::seedOf(a);
 				i += 2;
 			} else {
 				return fail("\"" + t[i] + "\": flowers take in X0 Z0 X1 Z1, bloom T0 T1 (each opening in its own time between them), close T0 T1, scale and seed");
@@ -1157,13 +1157,13 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 				else if (k == "every" && v >= 4.0) gy.every = v;
 				else if (k == "last" && v >= 2.0) gy.last = v;
 				else if (k == "first" && v >= 0.0) gy.first = v;
-				else if (k == "seed") gy.seed = static_cast<int>(v);
+				else if (k == "seed") gy.seed = detail::seedOf(v);
 				else ok = false;
 			} else if (verb == "rockfall") {
 				if (k == "at" && v >= 0.0) rf.t0 = v;
 				else if (k == "count" && v >= 1.0 && v <= 200.0) rf.count = static_cast<int>(v);
 				else if (k == "size" && v > 0.0) rf.size = v;
-				else if (k == "seed") rf.seed = static_cast<int>(v);
+				else if (k == "seed") rf.seed = detail::seedOf(v);
 				else ok = false;
 			} else {
 				if (k == "at" && v >= 0.0) av.t0 = v;

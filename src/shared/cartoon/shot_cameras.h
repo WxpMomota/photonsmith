@@ -454,6 +454,15 @@ inline std::string withLutPath(std::string text, const std::string &key) {
 	return text;
 }
 
+// The change film `key`'s cameras file makes to its shot `shot` (numbered from 0, named `name`); none when it has no cameras file. A film made from a file makes it in its
+// own header (DataFilm::headerAt), so that what is built round the camera - the water's surface, the decals, the sound's ears - is built round the camera as changed.
+inline Change changeOf(const std::string &key, int shot, const std::string &name) {
+	const std::shared_ptr<const File> file = forFilm(key);
+	return file && !file->empty() ? changeFor(*file, shot, name) : Change();
+}
+// What at() does to a frame besides the cameras file's change: its seed of its own and its LUT's path (for a film that has made the change itself: Film::camerasDone).
+inline std::string finished(const std::string &key, double t, const std::string &text) { return withLutPath(withFrameSeed(text, t), key); }
+
 inline std::string at(const std::string &key, const std::function<std::vector<double>()> &starts, const std::vector<std::string> &shotNames, double t, const std::string &text) {
 	const std::shared_ptr<const File> file = forFilm(key);
 	if (!file || file->empty()) return withLutPath(withFrameSeed(text, t), key);

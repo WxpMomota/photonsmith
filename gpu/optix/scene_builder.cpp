@@ -651,8 +651,10 @@ static bool something_inside_a_volume(const SceneData& scene, const double camer
 		void add(float x, float y, float z) { const float p[3] = {x, y, z}; for (int i = 0; i < 3; ++i) { lo[i] = std::min(lo[i], p[i]); hi[i] = std::max(hi[i], p[i]); } }
 		void add(const float3& p) { add(p.x, p.y, p.z); } };
 	// does a box reach into a volume? (sphere: its centre's distance to the box; box: the boxes overlap; and a grid volume's own box, outside which it is empty)
-	const auto meets = [&volumes](const Box& b) {
-		for (const GpuMediumShape& v : volumes) {
+	const auto meets = [&volumes](const Box& b, std::size_t skip = static_cast<std::size_t>(-1)) {
+		for (std::size_t vi = 0; vi < volumes.size(); ++vi) {
+			if (vi == skip) continue;
+			const GpuMediumShape& v = volumes[vi];
 			if (v.clip) {
 				const float clo[3] = {v.clipMin.x, v.clipMin.y, v.clipMin.z}, chi[3] = {v.clipMax.x, v.clipMax.y, v.clipMax.z};
 				bool overlap = true;
@@ -677,6 +679,20 @@ static bool something_inside_a_volume(const SceneData& scene, const double camer
 		Box b;
 		b.add(static_cast<float>(camera[0]), static_cast<float>(camera[1]), static_cast<float>(camera[2]));
 		if (meets(b)) return true;
+	}
+	// a volume reaching into another (smoke in a fog, murk in the sea): the recursive renderer samples the outer one's chord and goes on from its far side, so the inner one
+	// showed only as its shadow; the wavefront renderer takes over where the inner one begins (wavefront_raygen.h)
+	for (std::size_t vi = 0; vi < volumes.size(); ++vi) {
+		const GpuMediumShape& v = volumes[vi];
+		Box b;
+		if (v.isBox) { b.add(v.boxMin); b.add(v.boxMax); }
+		else { b.add(v.center.x - v.radius, v.center.y - v.radius, v.center.z - v.radius); b.add(v.center.x + v.radius, v.center.y + v.radius, v.center.z + v.radius); }
+		if (v.clip)
+			for (int i = 0; i < 3; ++i) {
+				const float clo[3] = {v.clipMin.x, v.clipMin.y, v.clipMin.z}, chi[3] = {v.clipMax.x, v.clipMax.y, v.clipMax.z};
+				b.lo[i] = std::max(b.lo[i], clo[i]), b.hi[i] = std::min(b.hi[i], chi[i]);
+			}
+		if (meets(b, vi)) return true;
 	}
 	const auto sphereBox = [](const SphereData& s) {
 		Box b;

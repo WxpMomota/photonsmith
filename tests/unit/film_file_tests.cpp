@@ -122,7 +122,10 @@ TEST(FilmFile, AProblemIsReportedWithTheFileAndTheLine) {
 		{"scene s.pbrt\n", "t.film:0:", "no `length"},
 		{"film Bad_Key\nscene s.pbrt\nlength 3\n", "t.film:1:", "lower-case"},
 		{"scene s.pbrt\nlength 10\nshot 0 A\nkey 0 0 5 0 0 0\nshot 12 B\nkey 0 0 5 0 0 0\n", "t.film:", "after the film's end"},
+		// (a shot's bad `key` at the shot's own line, naming the shot - not at the next shot's line)
+		{"scene s.pbrt\nlength 10\nshot 0 A\nkey 0 1 5 0 1\nshot 4 B\nkey 0 0 5 0 0 0\n", "t.film:3:", "the shot \"A\""},
 	};
+	EXPECT_TRUE(ff::parse("scene s.pbrt\nlength 10\nshot 0 A\nkey\t0 0 5 0 0 0\n", "t.film").ok) << "one key line written with a tab is a still camera, as with a space";
 	for (const Case &c : cases) {
 		const ff::Parsed p = ff::parse(c.text, "t.film");
 		EXPECT_FALSE(p.ok) << c.text;
@@ -445,6 +448,11 @@ TEST(FilmParts, WhatIsWrongWithAFilmInPartsIsSaidWithItsLine) {
 	EXPECT_NE(problem("part A spin 2\n").find("f.film:1: a part comes in with"), std::string::npos);
 	EXPECT_NE(problem("part\n").find("a part has a name"), std::string::npos);
 	EXPECT_NE(problem("music loud\npart A\n").find("`music none`"), std::string::npos);
+	// the whole film's lines in a part, and credits before the last part, were taken without a word and left unused
+	EXPECT_NE(problem("part A\nmusic none\npart B\n").find("f.film:2: `music` is the whole film's"), std::string::npos);
+	EXPECT_NE(problem("part A\nstill 3\n").find("`still` is the whole film's"), std::string::npos);
+	EXPECT_NE(problem("part A\ncredits\npart B\n").find("f.film:2: the credits come after"), std::string::npos);
+	EXPECT_EQ(problem("part A\nlength 2\npart B\ncredits\n"), "") << "in the last part";
 	// a part's lines are the file's own lines (the others blank): a problem in one names the file's line
 	const std::filesystem::path d = tempDir("partsbad");
 	write(d / "s.pbrt", kScene);
@@ -510,6 +518,12 @@ TEST(FilmLibrary, CastsAndSetsAreBroughtInByNameFromTheLibrary) {
 	const std::string odd = problem("set den\nlength 4\ncast x as odd\n");
 	EXPECT_NE(odd.find("g.film"), std::string::npos) << odd;
 	EXPECT_NE(odd.find("wings"), std::string::npos) << odd;
+	// a problem found once the film is read, of a line from a set, names the set's file and line (it named the film file's line of that number)
+	write(d / "library" / "monster.set", "scene rooms/den.pbrt\n# a set with a creature of no known kind\ncharacter bob robott at 0 0 0\n");
+	const std::string monster = problem("set monster\nlength 4\nshot 0 A\n key 0 1 5  0 1 0\n");
+	EXPECT_NE(monster.find("monster.set:3:"), std::string::npos) << monster;
+	EXPECT_NE(monster.find("robott"), std::string::npos) << monster;
+	EXPECT_EQ(monster.find("g.film:3:"), std::string::npos) << monster;
 	// a set in a part of a film in parts
 	write(d / "parted.film", "part One\nset den\nlength 3\nshot 0 A\n key 0 1 5  0 1 0\npart Two\nset den\nlength 3\ncast bea\nshot 0 B\n key 0 1 5  0 1 0\n");
 	ff::DataFilm two;

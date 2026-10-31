@@ -14,6 +14,7 @@
 #elif defined(__linux__)
 #include <dlfcn.h>
 #endif
+#include <cstdio>
 
 namespace gpu_memory {
 
@@ -56,6 +57,27 @@ inline long long freeMb(int device) {
 	return mb;
 #else
 	(void)device;
+	return 0;
+#endif
+}
+
+// The computer's own memory free now (RAM, what a new process could take without paging) in megabytes; 0 when it cannot be said. A GPU worker's first frame can take 5 to 15 GB of it
+// while the default renderer's shaders compile (cartoon_render.h runWorkers: memoryLow).
+inline long long freeSystemMb() {
+#ifdef _WIN32
+	MEMORYSTATUSEX status{};
+	status.dwLength = sizeof(status);
+	return GlobalMemoryStatusEx(&status) ? static_cast<long long>(status.ullAvailPhys / (1024ull * 1024ull)) : 0;
+#elif defined(__linux__)
+	FILE *f = std::fopen("/proc/meminfo", "r");
+	if (!f) return 0;
+	char line[256];
+	long long kb = 0;
+	while (std::fgets(line, sizeof line, f))
+		if (std::sscanf(line, "MemAvailable: %lld kB", &kb) == 1) break;
+	std::fclose(f);
+	return kb / 1024;
+#else
 	return 0;
 #endif
 }

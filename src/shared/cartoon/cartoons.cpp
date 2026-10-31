@@ -146,6 +146,7 @@ Film withFilmFiles(Film f) {
 	const std::string key = f.key;
 	const auto wrap = [&](std::function<std::string(double)> base) -> std::function<std::string(double)> {
 		if (!base) return base;
+		if (f.camerasDone) return [base, key](double t) { return shot_cameras::finished(key, t, base(t)); };   // (the change is in its header already: DataFilm::headerAt)
 		return [base, key, starts = f.shotStarts, names](double t) { return shot_cameras::at(key, starts, names, t, base(t)); };
 	};
 	f.sceneAt = wrap(f.sceneAt);
@@ -252,12 +253,14 @@ Film filmOf(Registry &r, const film_file::DataFilm &d, bool drafted, int id, con
 	if (!d.transitions().empty()) {
 		f.transitions = [p]() { return p->transitions(); };
 		f.sceneAcross = [p, names = d.shotNameList()](double t) {   // (the other side of a cut is the other shot's: its cameras file's changes)
+			if (p->partIndex < 0) return shot_cameras::finished(p->spec.key, p->acrossShotTime(t), p->sceneAcross(t));   // (made in its header: DataFilm::sceneAcross)
 			return shot_cameras::at(p->spec.key, [p]() { return p->shotStarts(); }, names, p->acrossShotTime(t), p->sceneAcross(t));
 		};
 		f.acrossShotTime = [p](double t) { return p->acrossShotTime(t); };
 	}
 	// its captions: its captions file and its characters' lines
 	if (!d.lineCaptions().empty()) f.captions = [p]() { return p->lineCaptions(); };
+	f.camerasDone = d.partIndex < 0;   // (a single film makes its cameras file's changes in its own header: DataFilm::withShotCamera)
 	return f;
 }
 
@@ -352,6 +355,16 @@ Registry &registry() {
 			}
 		}
 		std::sort(files.begin(), files.end());
+		// RAY_TRACER_ONLY_FILM=KEY (what a video's frame runs and workers are given: launcher/video_render.h): only the film file named after it is read, when it holds that
+		// film - every frame's process read every film file (and worked out their schools), for one film's frame. Any other way, every file is read.
+		if (const char *only = std::getenv("RAY_TRACER_ONLY_FILM"); only && *only) {
+			std::vector<std::string> mine;
+			for (const std::string &file : files)
+				if (std::filesystem::path(file).stem().string() == only) mine.push_back(file);
+			for (const std::string &file : mine) addFilmFile(*reg, file);
+			if (std::any_of(reg->all.begin(), reg->all.end(), [only](const Film *f) { return std::strcmp(f->key, only) == 0; })) return reg;
+			files.erase(std::remove_if(files.begin(), files.end(), [&mine](const std::string &f) { return std::find(mine.begin(), mine.end(), f) != mine.end(); }), files.end());
+		}
 		for (const std::string &file : files) addFilmFile(*reg, file);
 		return reg;
 	}();

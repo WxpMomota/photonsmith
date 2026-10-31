@@ -3,6 +3,7 @@
 // the reading of its lines.
 
 #include "film_file.h"
+#include "shot_cameras.h"   // (a film's cameras file, made in its header: headerAt)
 #include "../../external/stb_image.h"   // (a matte painting's size: stbi_info)
 
 namespace cartoon {
@@ -73,9 +74,18 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 	if (spec.key.empty()) spec.key = detail::keyFromFileName(filePath);
 	if (!detail::validKey(spec.key)) return filePath + ": the key \"" + spec.key + "\" is not lower-case letters, digits and '-'; give the film a `film KEY` line";
 	if (spec.name.empty()) spec.name = spec.key;
-	if (spec.still < 0.0 || spec.still > spec.length) spec.still = spec.length * 0.5;
+	if (spec.still > spec.length) {   // (a `still` after the end was moved to the middle without a word)
+		std::ostringstream why;
+		why << filePath << ": `still " << spec.still << "` is after the film's end (" << spec.length << " s)";
+		return why.str();
+	}
+	if (spec.still < 0.0) spec.still = spec.length * 0.5;
 	const std::filesystem::path base = std::filesystem::path(filePath).parent_path();
 	sceneFile = std::filesystem::path(spec.scene).is_absolute() ? std::filesystem::path(spec.scene) : base / spec.scene;
+	{   // (the scene file too: what is worked out once for a film and kept - footprints, cloth, rigid bodies - is named by its version, and an edit to the scene alone kept the old)
+		std::ifstream in(sceneFile, std::ios::binary);
+		if (in) spec.version += "|" + std::to_string(std::hash<std::string>{}(std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>())));
+	}
 	std::ifstream sf(sceneFile, std::ios::binary);
 	if (!sf) return filePath + ": the scene " + sceneFile.string() + " cannot be read";
 	const std::string sceneText = detail::absolutize(std::string((std::istreambuf_iterator<char>(sf)), std::istreambuf_iterator<char>()), sceneFile.parent_path());
@@ -84,11 +94,11 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 		if (std::find(scene.names.begin(), scene.names.end(), a.name) == scene.names.end()) {
 			std::string known;
 			for (const std::string &n : scene.names) known += (known.empty() ? "" : ", ") + n;
-			return filePath + ":" + std::to_string(a.line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + a.name + "`" + (known.empty() ? " (it has none)" : " (it has: " + known + ")");
+			return detail::lineWhere(spec, filePath, a.line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + a.name + "`" + (known.empty() ? " (it has none)" : " (it has: " + known + ")");
 		}
 	for (const auto &[name, line] : spec.physicsLines)
 		if (std::find(scene.names.begin(), scene.names.end(), name) == scene.names.end())
-			return filePath + ":" + std::to_string(line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + name + "`";
+			return detail::lineWhere(spec, filePath, line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + name + "`";
 	for (const Spec::Rigged &rg : spec.rigged) {   // the kinds its rigged models make (beside the film file, else in the library)
 		std::filesystem::path file = std::filesystem::path(rg.file).is_absolute() ? std::filesystem::path(rg.file) : (rg.dir.empty() ? base : rg.dir) / rg.file;
 		std::error_code ec;
@@ -96,9 +106,9 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 			if (const std::string lib = film_cache::asset("library/" + rg.file); !lib.empty()) file = lib;
 		// (the kind is this film's own - "<film>/<kind>" in the table every film shares - and its characters are pointed at it: two films' rigged kinds of one name
 		// were one kind, the last film's, and a rigged kind named as a built-in one replaced it in every film)
-		if (characterKinds().count(rg.kind)) return filePath + ":" + std::to_string(rg.line) + ": \"" + rg.kind + "\" is a kind of character already: name the rigged model something else";
+		if (characterKinds().count(rg.kind)) return detail::lineWhere(spec, filePath, rg.line) + ": \"" + rg.kind + "\" is a kind of character already: name the rigged model something else";
 		const std::string own = spec.key + "/" + rg.kind;
-		if (const std::string e = addRiggedKind(own, file.string(), rg.options); !e.empty()) return filePath + ":" + std::to_string(rg.line) + ": " + e;
+		if (const std::string e = addRiggedKind(own, file.string(), rg.options); !e.empty()) return detail::lineWhere(spec, filePath, rg.line) + ": " + e;
 		for (Character &c : spec.characters)
 			if (c.kind == rg.kind) c.kind = own;
 	}
@@ -131,20 +141,20 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 		if (!std::filesystem::exists(file, ec) && !std::filesystem::path(m.file).is_absolute())
 			if (const std::string lib = film_cache::asset("library/" + m.file); !lib.empty()) file = lib;
 		int w = 0, h = 0, comp = 0;
-		if (!stbi_info(file.string().c_str(), &w, &h, &comp) || w <= 0 || h <= 0) return filePath + ":" + std::to_string(m.line) + ": the matte painting " + file.string() + " cannot be read";
+		if (!stbi_info(file.string().c_str(), &w, &h, &comp) || w <= 0 || h <= 0) return detail::lineWhere(spec, filePath, m.line) + ": the matte painting " + file.string() + " cannot be read";
 		m.file = std::filesystem::absolute(file, ec).generic_string();
 		m.aspect = static_cast<double>(w) / h;
 	}
 	for (Spec::FaceAct &a : spec.faceActs) {   // the faces' acting from videos (face_track.h): beside the film, else in the library
 		if (const Character *c = character(a.who); c && characterKinds().count(c->kind) && !characterKinds().at(c->kind).face)
-			return filePath + ":" + std::to_string(a.line) + ": " + a.who + " is a " + c->kind + ", which has no face to act with (a rigged model needs face morphs)";
+			return detail::lineWhere(spec, filePath, a.line) + ": " + a.who + " is a " + c->kind + ", which has no face to act with (a rigged model needs face morphs)";
 		std::filesystem::path file = std::filesystem::path(a.file).is_absolute() ? std::filesystem::path(a.file) : (a.dir.empty() ? base : a.dir) / a.file;
 		std::error_code ec;
 		if (!std::filesystem::exists(file, ec) && !std::filesystem::path(a.file).is_absolute())
 			if (const std::string lib = film_cache::asset("library/" + a.file); !lib.empty()) file = lib;
 		std::string why;
 		a.track = face_track::load(file.string(), why);
-		if (!a.track) return filePath + ":" + std::to_string(a.line) + ": " + why;
+		if (!a.track) return detail::lineWhere(spec, filePath, a.line) + ": " + why;
 	}
 	for (const Spec::Mocap &mc : spec.mocaps) {   // the motion captures its rigged characters play: a clip of the kind's rig, played as a gesture
 		std::filesystem::path file = std::filesystem::path(mc.file).is_absolute() ? std::filesystem::path(mc.file) : (mc.dir.empty() ? base : mc.dir) / mc.file;
@@ -160,7 +170,7 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 		mocap::Options o;
 		o.speed = mc.speed, o.turn = mc.turn, o.travel = mc.travel;
 		double length = 0.0;
-		if (const std::string e = addMocapClip(who->kind, clip, file.string(), o, length); !e.empty()) return filePath + ":" + std::to_string(mc.line) + ": " + e;
+		if (const std::string e = addMocapClip(who->kind, clip, file.string(), o, length); !e.empty()) return detail::lineWhere(spec, filePath, mc.line) + ": " + e;
 		rig::Gesture g;   // (played from its start - a gesture's clip runs from its in0 - faded in over its first 0.3 s and out over its last)
 		g.pose = clip;
 		const double end = mc.to > mc.at ? mc.to : mc.at + length;
@@ -172,16 +182,16 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 		if (!characterKinds().count(c.kind)) {
 			std::string known;
 			for (const auto &[name, kind] : characterKinds()) known += (known.empty() ? "" : ", ") + name;
-			return filePath + ":" + std::to_string(c.line) + ": no kind of character called \"" + c.kind + "\" (there are: " + (known.empty() ? "none" : known) + ")";
+			return detail::lineWhere(spec, filePath, c.line) + ": no kind of character called \"" + c.kind + "\" (there are: " + (known.empty() ? "none" : known) + ")";
 		}
 	for (const Character &c : spec.characters) {
 		const CharacterKind &kind = characterKinds().at(c.kind);
-		if (c.scale != 1.0 && !kind.scalable) return filePath + ":" + std::to_string(c.line) + ": a " + c.kind + " cannot be scaled";
+		if (c.scale != 1.0 && !kind.scalable) return detail::lineWhere(spec, filePath, c.line) + ": a " + c.kind + " cannot be scaled";
 		for (const auto &[part, colour] : c.colours)
 			if (std::find(kind.parts.begin(), kind.parts.end(), part) == kind.parts.end()) {
 				std::string known;
 				for (const std::string &k : kind.parts) known += (known.empty() ? "" : ", ") + k;
-				return filePath + ":" + std::to_string(c.line) + ": a " + c.kind + " has no part called \"" + part + "\" to colour" + (known.empty() ? std::string(" (its colours are its own)") : " (its parts: " + known + ")");
+				return detail::lineWhere(spec, filePath, c.line) + ": a " + c.kind + " has no part called \"" + part + "\" to colour" + (known.empty() ? std::string(" (its colours are its own)") : " (its parts: " + known + ")");
 			}
 		if (!c.feelings.empty() && !kind.face) return filePath + ": " + c.name + " has a `feel` line, but a " + c.kind + " has no face to show it (give it a gesture)";
 		if (kind.poses.empty()) continue;
@@ -193,7 +203,7 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 			}
 	}
 	for (const speech::Line &l : spec.lines)
-		if (!character(l.who)) return filePath + ":" + std::to_string(l.line) + ": " + l.who + " says a line but is not brought in with `character`";
+		if (!character(l.who)) return detail::lineWhere(spec, filePath, l.line) + ": " + l.who + " says a line but is not brought in with `character`";
 	for (speech::Line &l : spec.lines)   // (a character's voice: its pitch and pace under each of its lines' own)
 		if (const Character *c = character(l.who)) l.pitch += c->pitch, l.rate *= c->rate;
 	for (const hair::Groom &g : spec.grooms)   // (`hair NAME ...`: a kind with a head to grow it on)
@@ -209,18 +219,32 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 	if (spec.hasSky || spec.space.on) leaveOutSkyLights();
 	for (const Spec::Prop &pr : spec.props)
 		if (std::find(scene.names.begin(), scene.names.end(), pr.name) == scene.names.end())
-			return filePath + ":" + std::to_string(pr.line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + pr.name + "`";
+			return detail::lineWhere(spec, filePath, pr.line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + pr.name + "`";
 	if (const std::string e = findWays(); !e.empty()) return filePath + ":" + e;
+	if (spec.hasTerrain) {   // the points of `look ... at`, `touch`, `mark at` and `cloth ... at` above the ground there, as every height on a terrain is (they were the scene's own y)
+		const std::shared_ptr<const terrain::Field> land = terrain::fieldOf(spec.terrain);
+		const auto lift = [&land](Vec3 &p) {
+			if (land->inside(p.x, p.z)) p.y += land->heightAt(p.x, p.z);
+		};
+		for (Spec::Look &l : spec.looks)
+			if (l.target.empty()) lift(l.point);
+		for (Spec::Contact &c : spec.contacts)
+			if (c.kind == Spec::Contact::Touch) lift(c.at);
+		for (film_marks::Mark &m : spec.marks)
+			if (m.who.empty()) lift(m.at);
+		for (cloth::Cloth &c : spec.cloths)
+			if (c.who.empty()) lift(c.at);
+	}
 	heightsOfWalks();
 	if (const std::string e = walksInTurn(); !e.empty()) return filePath + ":" + e;
 	if (const std::string e = crowding(); !e.empty()) return filePath + ": " + e;
 	if (const std::string e = holdingTimeline(); !e.empty()) return filePath + ":" + e;
 	for (const Spec::Contact &k : spec.contacts)
 		for (const std::string &name : {k.who, k.other})
-			if (!name.empty() && !character(name)) return filePath + ":" + std::to_string(k.line) + ": " + name + " is not brought in with `character`";
+			if (!name.empty() && !character(name)) return detail::lineWhere(spec, filePath, k.line) + ": " + name + " is not brought in with `character`";
 	for (const Spec::Look &l : spec.looks) {
-		if (!character(l.who)) return filePath + ":" + std::to_string(l.line) + ": " + l.who + " is not brought in with `character`";
-		if (!l.target.empty() && !character(l.target) && !prop(l.target)) return filePath + ":" + std::to_string(l.line) + ": " + l.target + " is neither a character nor a prop";
+		if (!character(l.who)) return detail::lineWhere(spec, filePath, l.line) + ": " + l.who + " is not brought in with `character`";
+		if (!l.target.empty() && !character(l.target) && !prop(l.target)) return detail::lineWhere(spec, filePath, l.line) + ": " + l.target + " is neither a character nor a prop";
 	}
 	if (const std::string e = coverShots(); !e.empty()) return filePath + ": " + e;
 	for (Shot &shot : spec.shots)   // (what a move is about, it is about)
@@ -1531,7 +1555,14 @@ std::string DataFilm::headerAt(double t) const {
 	std::string lookAt, camera;
 	cameraAt(t, lookAt, camera);
 	// The scene's lines before its LookAt, then the new LookAt, the lines between, the new Camera, the lines after. A scene with neither statement gets both after all its header lines.
-	return toonLine(t) + scene.headerBefore + lookAt + scene.headerBetween + camera + scene.headerAfter + "WorldBegin\n";
+	const std::string header = toonLine(t) + scene.headerBefore + lookAt + scene.headerBetween + camera + scene.headerAfter + "WorldBegin\n";
+	return withShotCamera(header, shotAt(t));
+}
+// The change the film's cameras file makes to shot k, made in a header (shot_cameras.h) - a single film's (a part of a film in parts numbers its shots its own way: the whole
+// film's cameras file is applied to the whole film's frames, cartoons.cpp).
+std::string DataFilm::withShotCamera(const std::string &header, std::size_t k) const {
+	if (partIndex >= 0 || spec.key.empty() || k >= spec.shots.size()) return header;
+	return shot_cameras::apply(header, shot_cameras::changeOf(spec.key, static_cast<int>(k), spec.shots[k].name));
 }
 
 std::vector<Transition> DataFilm::transitions() const {
@@ -1552,8 +1583,9 @@ std::string DataFilm::sceneAcross(double t) const {
 		const double cut = spec.shots[k].start;
 		if (tr.length <= 0.0 || tr.kind == Transition::Fade || std::abs(t - cut) > 0.5 * tr.length) continue;
 		std::string lookAt, camera;
-		cameraAt(t, lookAt, camera, static_cast<int>(t < cut ? k : k - 1));
-		return terminated(worldAt(toonLine(t) + (spec.shots.empty() ? scene.header : scene.headerBefore + lookAt + scene.headerBetween + camera + scene.headerAfter + "WorldBegin\n"), t));
+		const std::size_t other = t < cut ? k : k - 1;
+		cameraAt(t, lookAt, camera, static_cast<int>(other));
+		return terminated(worldAt(withShotCamera(toonLine(t) + (spec.shots.empty() ? scene.header : scene.headerBefore + lookAt + scene.headerBetween + camera + scene.headerAfter + "WorldBegin\n"), other), t));
 	}
 	return sceneAt(t);
 }

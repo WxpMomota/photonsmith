@@ -82,7 +82,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 	int n = 0;
 	auto fail = [&](const std::string &what) {
 		r.ok = false;
-		r.error = here + ":" + std::to_string(n) + ": " + what;
+		r.error = detail::lineWhere(s, where, n) + ": " + what;
 		return r;
 	};
 	std::string shotText;   // the key lines of the shot being read
@@ -119,7 +119,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 			shotText += shotText.substr(at, shotText.find('\n', at) - at + 1);
 		}
 		const camera_keyframes::ParseResult p = camera_keyframes::parse(ease + shotText);
-		if (!p.ok) return p.error;
+		if (!p.ok) return "the shot \"" + s.shots.back().name + "\"'s `key` lines: " + p.error;
 		s.shots.back().path = p.path;
 		shotText.clear();
 		return std::string();
@@ -129,11 +129,10 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 		if (!std::getline(*sources.back().in, line)) {   // (the end of a library file: back to the file that brought it in)
 			if (sources.size() == 1) break;
 			sources.pop_back();
-			here = sources.back().where, n = sources.back().n;
+			n = detail::lineId(s, here = sources.back().where, where, sources.back().n);
 			continue;
 		}
-		n = ++sources.back().n;
-		here = sources.back().where;
+		n = detail::lineId(s, here = sources.back().where, where, ++sources.back().n);   // (a library file's lines numbered with their file: detail::lineWhere)
 		line = detail::trim(detail::withoutComment(line));
 		if (line.empty()) continue;
 		const std::vector<std::string> w = detail::words(line);
@@ -153,7 +152,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 		if (cartoonish) continue;
 		if (verb == "key") {
 			if (s.shots.empty()) return fail("a `key` line belongs to a shot: start one with `shot 0 NAME` first");
-			shotText += line + "\n";
+			shotText += "key " + rest + "\n";   // (written `key ` whatever space followed it: one key line is counted by that, closeShot)
 		} else if (verb == "set") {   // a set of the library: its lines read here
 			if (w.size() != 2 || !detail::validKey(w[1])) return fail("`set NAME`: a set of the library (library/NAME.set), its name lower-case letters, digits and '-'");
 			if (sources.size() > 4) return fail("sets that bring in sets, more than four deep");
@@ -182,10 +181,12 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 			if (kind.empty()) return fail("the cast " + file + " has no `kind KIND` line");
 			std::string character = "character \"" + t[1] + "\" " + kind + look;
 			for (; i < t.size(); ++i) character += " " + t[i];
-			sources.push_back({std::make_shared<std::istringstream>(character + "\n"), here, n - 1, sources.back().dir, sources.back().library});   // (read next, as this line)
+			sources.push_back({std::make_shared<std::istringstream>(character + "\n"), here, sources.back().n - 1, sources.back().dir, sources.back().library});   // (read next, as this line)
 			if (!model.empty()) {   // (and before it, its kind from its model: `rigged KIND FILE ...` with the file from the cast's folder)
 				const std::vector<std::string> mw = detail::tokens(model);
-				std::string rigged = "rigged " + kind + " \"" + (std::filesystem::path(file).parent_path() / mw[0]).lexically_normal().generic_string() + "\"";
+				// (the model's file as the cast names it: the line is read from the cast's folder, its `rigged` record's dir - joined to that folder here as well, a film given by a
+				// relative path looked for films/library/films/library/robot.glb)
+				std::string rigged = "rigged " + kind + " \"" + mw[0] + "\"";
 				for (std::size_t k = 1; k < mw.size(); ++k) rigged += " " + mw[k];
 				sources.push_back({std::make_shared<std::istringstream>(rigged + "\n"), file, 0, std::filesystem::path(file).parent_path(), false});
 			}
@@ -220,7 +221,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 		} else if (verb == "shutter") {
 			if (w.size() != 2 || !number(w[1], s.shutter) || s.shutter < 0.0 || s.shutter > 1.0) return fail("shutter is a share of a frame, from 0 (sharp) to 1");
 		} else if (verb == "shot") {
-			if (const std::string e = closeShot(); !e.empty()) return fail(e);
+			if (const std::string e = closeShot(); !e.empty()) return n = shotLine, fail(e);   // (a shot's problem at the shot's own line, not the next one's)
 			Shot shot;
 			if (w.size() < 2 || !number(w[1], shot.start) || shot.start < 0) return fail("a shot starts with its time in seconds: `shot 0 Name`");
 			shot.name = detail::trim(rest.substr(w[1].size()));
@@ -437,7 +438,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 					if (i + 1 >= t.size() || !number(t[i + 1], v) || (t[i] != "scale" && t[i] != "turn" && t[i] != "seed")) return fail("a place takes scale, turn and seed");
 					if (t[i] == "scale") p.scale = v;
 					else if (t[i] == "turn") p.turn = v;
-					else p.seed = static_cast<int>(v);
+					else p.seed = detail::seedOf(v);
 				}
 				s.placements.push_back(p);
 			} else {
@@ -453,7 +454,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 						i += 3;
 					} else if ((t[i] == "y" || t[i] == "seed") && i + 1 < t.size() && number(t[i + 1], v)) {
 						if (t[i] == "y") sc.y = v;
-						else sc.seed = static_cast<int>(v);
+						else sc.seed = detail::seedOf(v);
 						i += 2;
 					} else {
 						return fail("\"" + t[i] + "\": a scatter takes y, seed and scale A B");
@@ -695,7 +696,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 				if (t[i] == "look" && i + 3 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && number(t[i + 3], c)) {
 					shot.flyLook = true, shot.flyAt = Vec3{a, b, c};
 					i += 4;
-				} else if ((t[i] == "height" || t[i] == "fov") && i + 1 < t.size() && number(t[i + 1], a) && a > 0.0) {
+				} else if ((t[i] == "height" || t[i] == "fov") && i + 1 < t.size() && number(t[i + 1], a) && a > 0.0 && (t[i] == "height" || a < 179.0)) {
 					(t[i] == "height" ? shot.flyHeight : shot.flyFov) = a;
 					i += 2;
 				} else {
@@ -758,7 +759,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 				if (i + 1 >= t.size() || !number(t[i + 1], v)) return fail("\"" + t[i] + "\" takes a number");
 				const std::string &k = t[i];
 				bool ok = true;
-				if (k == "fov") mv.fov = v;
+				if (k == "fov" && v > 0.5 && v < 179.0) mv.fov = v;   // (a field of view in degrees: 0 or 500 made a broken camera)
 				else if (mv.kind == Shot::Move::Orbit && k == "radius" && v > 0.0) mv.radius = v;
 				else if ((mv.kind == Shot::Move::Orbit || mv.kind == Shot::Move::Push || mv.kind == Shot::Move::Track) && k == "height") mv.height = v;
 				else if (mv.kind == Shot::Move::Orbit && k == "degrees") mv.degrees = v;
@@ -800,7 +801,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 				if (t[i] == "behind") shot.follow.behind = v;
 				else if (t[i] == "up") shot.follow.up = v;
 				else if (t[i] == "side") shot.follow.side = v;
-				else if (t[i] == "fov") shot.follow.fov = v;
+				else if (t[i] == "fov" && v > 0.5 && v < 179.0) shot.follow.fov = v;   // (degrees, more than 0 and less than 180)
 				else return fail("\"" + t[i] + "\": a follow takes behind, up, side and fov");
 			}
 		} else if (verb == "move" || verb == "turn" || verb == "grow" || verb == "light" || verb == "show") {
@@ -849,7 +850,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, set, cast, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, spacecam, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, mute, music, toon, voices, acting, lighting, terrain, water, river, waterfall, clouds, fogbank, forest, flock, herd, whale, dolphins, bioluminescence, fireflies, fungi, glacier, iceberg, seaice, wind, tornado, optics, caustics, closeup, tracks, space, planet, moon, nebula, galaxy, star, blackhole, comet, asteroids, remnant, ship, astronaut, descent, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, waterline, kelp, coral, current, bubbles, halocline, deepsea, octopus, cuttlefish, swimmers, seabed, wreck, arch, cenote, reefwall, diver, divecam, school, bigfish, reef, critters, nightdive, kelpforest, boat, sardinerun, vents, murk, silt, cleaningstation, playmate, damselfish, wreckroom, fire, lava, volcano, wildfire, weather, particles, burst, mark, cloth, animate, squash, jiggle, smear, anticipate, rigid, terminator, face-normals, mocap, matte)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, set, cast, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, spacecam, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, mute, music, toon, voices, acting, lighting, terrain, water, river, waterfall, clouds, fogbank, forest, flock, herd, whale, dolphins, bioluminescence, fireflies, fungi, glacier, iceberg, seaice, wind, tornado, optics, caustics, closeup, tracks, space, planet, moon, nebula, galaxy, star, blackhole, comet, asteroids, remnant, ship, astronaut, descent, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, waterline, kelp, coral, current, bubbles, halocline, deepsea, octopus, cuttlefish, swimmers, seabed, wreck, arch, cenote, reefwall, diver, divecam, school, bigfish, reef, critters, nightdive, kelpforest, boat, sardinerun, vents, murk, silt, cleaningstation, playmate, damselfish, wreckroom, hunt, flight, baitball, reeffish, jellyfish, seaturtles, insects, dew, night, cameratrap, shimmer, burn, laser, explode, shield, gravity, footprints, blob, drift, interior, hologram, screen, label, orbitline, scalebar, compare, skin-light, eyes, hair, footing, act, fire, lava, volcano, wildfire, weather, particles, burst, mark, cloth, animate, squash, jiggle, smear, anticipate, rigid, terminator, face-normals, mocap, matte)");
 		}
 	}
 	n = shotLine;
@@ -1234,6 +1235,13 @@ FilmParts partsOf(const std::string &text, const std::string &where) {
 		for (const PartText &other : out.parts)
 			if (other.name == part.name) return fail(at, "there is already a part called \"" + part.name + "\"");
 		const bool first = p == 0, last = p + 1 == starts.size();
+		for (std::size_t i = at + 1; i < end; ++i) {   // (the whole film's lines in a part were read and left unused without a word)
+			if (clean[i].empty()) continue;
+			const std::string verb = detail::words(clean[i])[0];
+			if (verb == "film" || verb == "name" || verb == "about" || verb == "tags" || verb == "still" || verb == "music")
+				return fail(i, "`" + verb + "` is the whole film's: put it before the first `part`");
+			if ((verb == "credits" || verb == "credit") && !last) return fail(i, "the credits come after the film's end: put `" + verb + "` in the last part, or before the first `part`");
+		}
 		for (std::size_t i = 0; i < lines.size(); ++i)
 			part.text += (shared[i] || (opening[i] && first) || (closing[i] && last) || (i > at && i < end) ? lines[i] : std::string()) + "\n";
 		out.parts.push_back(part);

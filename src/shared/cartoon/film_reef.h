@@ -176,16 +176,31 @@ inline std::string reefText(const std::string &film, const Reef &r, int index, d
 		(void)tips;
 	}
 	std::string out = "# a coral reef (film_reef.h)\n";
+	// (its cached meshes are named by all they are made from - the reef's line exactly, and the seabed under it, which the corals stand on: a terrain or a sea level changed
+	// left them floating or buried, and the old name's sums of the corners could name two reefs alike)
+	std::string from;
+	{
+		char buf[200];
+		std::snprintf(buf, sizeof buf, "%d %d %d %.4f %.4f %.4f %.4f %d|", index, r.seed, r.count, r.x0, r.z0, r.x1, r.z1, r.bleached ? 1 : 0);
+		from = buf;
+		for (int j = 0; j <= 4; ++j)
+			for (int i = 0; i <= 4; ++i) {
+				const double x = r.x0 + (r.x1 - r.x0) * i / 4.0, z = r.z0 + (r.z1 - r.z0) * j / 4.0;
+				std::snprintf(buf, sizeof buf, "%.3f ", groundAt(x, z)), from += buf;
+			}
+	}
+	unsigned long long h = 1469598103934665603ull;   // (FNV-1a)
+	for (const unsigned char c : from) h = (h ^ c) * 1099511628211ull;
 	char name[96];
 	for (int k = 0; k < 5; ++k) {
 		if (pieces[k].tris.empty()) continue;
 		const std::string material = k == 4 ? translucentMaterial(r.bleached ? white : tones[k], (r.bleached ? white : tones[k]) * 0.4) : coated(r.bleached ? white : tones[k], 0.5);
-		std::snprintf(name, sizeof name, "reef_%d_%d_%d_%d_%d_%d_%d", index, r.seed, r.count, static_cast<int>(std::lround(r.x0 * 10 + r.z1 * 7)), static_cast<int>(std::lround(r.x1 * 10 - r.z0 * 3)), k, r.bleached ? 1 : 0);
+		std::snprintf(name, sizeof name, "reef_%d_%016llx_%d", index, h, k);
 		out += k < 3 ? film_cache::part(film, name, material, identity(), [&] { return pieces[k]; }) : attr(material, emitMesh(pieces[k], identity()));
 	}
 	const std::string polypMaterial = r.fluoresce ? detail::glowMaterial({0.25, 1.4, 0.45}) : coated(r.bleached ? white : tips[r.seed % 3], 0.4);
 	if (!polypDots.empty()) {
-		std::snprintf(name, sizeof name, "reef_%d_%d_%d_%d_%d_polyps", index, r.seed, r.count, static_cast<int>(std::lround(r.x0 * 10 + r.z1 * 7)), static_cast<int>(std::lround(r.x1 * 10 - r.z0 * 3)));
+		std::snprintf(name, sizeof name, "reef_%d_%016llx_polyps", index, h);
 		out += film_cache::part(film, name, polypMaterial, identity(), [&] { return detail::beads(polypDots, 0.008); });
 	}
 	if (!softDots.empty()) out += attr(polypMaterial, emitMesh(detail::beads(softDots, 0.008), identity()));

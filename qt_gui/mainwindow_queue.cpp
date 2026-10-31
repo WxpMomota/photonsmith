@@ -4,6 +4,7 @@
 #include "mainwindow.h"
 #include "icon_tint.h"
 #include "scene_builder_widget.h"
+#include "gpu_warmup.h"
 #include "photo_import.h"
 #include "scene_metadata_client.h"
 #include "win_taskbar.h"
@@ -424,6 +425,25 @@ void MainWindow::processQueueIfIdle() {
 		if (!m_queueRetryPending) {
 			m_queueRetryPending = true;
 			QTimer::singleShot(2000, this, [this]() {
+				m_queueRetryPending = false;
+				processQueueIfIdle();
+			});
+		}
+		return;
+	}
+	// The GPU renderer is being prepared (gpu_warmup.h: the default renderer's shaders compiling after an update, up to 25 minutes and much of the computer's memory): a render
+	// with that renderer would compile them again beside it - its workers too - and the computer ran out of memory (2026-10-30). It waits, and looks again every five seconds;
+	// the CPU and the wavefront renderer do not need the shaders, and go now.
+	const auto nextWaiting = [this]() -> const RenderJob * {
+		for (const auto &e : m_queueModel->queue().entries())
+			if (e.state == job_queue::State::Waiting) return &e.job;
+		return nullptr;
+	};
+	if (const RenderJob *next = nextWaiting(); next && next->useGPU && !next->useWavefront && m_gpuWarmup && m_gpuWarmup->running()) {
+		m_statusLabel->setText(tr("Waiting for the GPU renderer to be prepared (first start after an update) - %n render(s) queued", nullptr, m_queueModel->waitingCount()));
+		if (!m_queueRetryPending) {
+			m_queueRetryPending = true;
+			QTimer::singleShot(5000, this, [this]() {
 				m_queueRetryPending = false;
 				processQueueIfIdle();
 			});

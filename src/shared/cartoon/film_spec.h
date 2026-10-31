@@ -526,6 +526,7 @@ struct Spec {
 	toon_look::Style toon;    // the toon look (`toon`): written into every frame's header as its `# @rt-toon` line
 	double terminator = 0.0;  // the shadow terminator offset (`terminator`, shadow_terminator.h): written into every material of the frames; 0 none
 	std::string version;      // (not a line: a hash of the film file's text as read - what a simulation kept between frames is kept under, film_cloth.h)
+	std::vector<std::string> lineFiles;   // (not a line: the library files - sets, casts - its lines came from; a record's line from one is detail::kLineFileBase * (its index + 1) + its line there)
 	std::string voices;       // what the characters' lines are said in unless a character says (`voices`): "" or "babble", "system", a word of a computer voice's name
 	bool actingWords = false; // `acting words`: each line brings the gesture and the expression its words ask for (film_acting.h), where the film gives none
 	// hands on the set and on each other (`touch`, `hold`, `hug`): reached for half a second before T0, held to T1, let go over half a second
@@ -588,6 +589,25 @@ struct Parsed {
 };
 
 namespace detail {
+
+// A line of a library file (a set, a cast) is numbered kLineFileBase times its file's place in Spec::lineFiles (from 1) plus its line there, so that a problem found
+// after the film is read names the file and line it came from - a set's lines were reported as the film file's lines of those numbers.
+// A `seed` number as the int it is kept in: clamped to an int's range (outside it the conversion is undefined: `seed 1e10` was taken without a word).
+inline int seedOf(double v) { return static_cast<int>(std::clamp(v, -2147483647.0, 2147483647.0)); }
+constexpr int kLineFileBase = 1000000;
+// The number of line `n` of `file` (`filmFile`'s own lines are their own numbers).
+inline int lineId(Spec &s, const std::string &file, const std::string &filmFile, int n) {
+	if (file == filmFile) return n;
+	const auto it = std::find(s.lineFiles.begin(), s.lineFiles.end(), file);
+	const int index = it != s.lineFiles.end() ? static_cast<int>(it - s.lineFiles.begin()) : (s.lineFiles.push_back(file), static_cast<int>(s.lineFiles.size()) - 1);
+	return kLineFileBase * (index + 1) + n;
+}
+// "file:line" for a line so numbered.
+inline std::string lineWhere(const Spec &s, const std::string &filmFile, int line) {
+	const int index = line / kLineFileBase - 1;
+	if (index < 0 || index >= static_cast<int>(s.lineFiles.size())) return filmFile + ":" + std::to_string(line);
+	return s.lineFiles[static_cast<std::size_t>(index)] + ":" + std::to_string(line % kLineFileBase);
+}
 
 inline std::string trim(const std::string &s) {
 	std::size_t a = 0, b = s.size();

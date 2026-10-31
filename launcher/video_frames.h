@@ -30,7 +30,7 @@ inline bool isOurs(const std::filesystem::path &dir) {
 		const std::string name = entry.path().filename().string();
 		const std::string ext = entry.path().extension().string();
 		const bool ours = entry.is_directory() ? name.rfind("work", 0) == 0 || name == film_transitions::kAcrossFolder || name == film_temporal::kFolder
-											   : (name.rfind("enc_", 0) == 0 || name.rfind(film_captions::kCleanPrefix, 0) == 0 || name.rfind(film_transitions::kPlainPrefix, 0) == 0 || name.rfind("frame_", 0) == 0 || name.rfind("frames", 0) == 0 || ext == ".done" || name == cartoon_render::kFilledList || name == cartoon_render::kFingerprints || name == cartoon_render::kProgramStamp);
+											   : (name.rfind("enc_", 0) == 0 || name.rfind(film_captions::kCleanPrefix, 0) == 0 || name.rfind(film_transitions::kPlainPrefix, 0) == 0 || name.rfind("frame_", 0) == 0 || name.rfind("frames", 0) == 0 || name.rfind("last_work", 0) == 0 || ext == ".done" || name == cartoon_render::kFilledList || name == cartoon_render::kFingerprints || name == cartoon_render::kProgramStamp);
 		if (!ours) return false;
 	}
 	return true;
@@ -74,7 +74,13 @@ inline int keepForResume(const std::filesystem::path &dir) {
 			std::filesystem::remove(entry.path());
 		else if (entry.is_directory() && name == film_transitions::kAcrossFolder) keepForResume(entry.path());
 		else if (entry.is_directory() && name == film_temporal::kFolder) continue;   // (the denoised frames: each is made again only when its neighbours changed)
-		else if (entry.is_directory()) std::filesystem::remove_all(entry.path());
+		else if (entry.is_directory()) {
+			// (a worker's log is what the renderer said - the only record of why frames failed: kept beside the frames as last_<folder>.log, the folder itself made again)
+			std::error_code ec;
+			if (std::filesystem::exists(entry.path() / "worker.log", ec))
+				std::filesystem::copy_file(entry.path() / "worker.log", dir / ("last_" + name + ".log"), std::filesystem::copy_options::overwrite_existing, ec);
+			std::filesystem::remove_all(entry.path());
+		}
 	}
 	return cartoon_render::dropFilledFrames(dir);
 }

@@ -117,7 +117,7 @@ extern "C" __global__ void __raygen__wf_intersect() {
 	}
 	for (unsigned int i = 0; listed >= 0 && i < wf_params.numMediumShapes; ++i) {   // (the flight ends where another volume begins inside it)
 		float t0, t1;
-		if ((int)i != listed && wf_medium_shape_flight(wf_params.mediumShapes[i], ray.origin, ray.direction, ray.mediaTMin, tSurface, t0, t1) && t0 > listedT0 && t0 < listedT1)
+		if ((int)i != listed && wf_medium_shape_flight(wf_params.mediumShapes[i], ray.origin, ray.direction, ray.mediaTMin, tSurface, t0, t1) && t0 > listedT0 + 1e-5f * fmaxf(1.0f, fabsf(listedT0)) && t0 < listedT1)   // (with the pick's own tolerance: no sliver of a flight at a shared entry)
 			listedT1 = t0;
 	}
 
@@ -380,7 +380,7 @@ extern "C" __global__ void __raygen__wf_shadow() {
 	// are (__raygen__wf_intersect): where the ray is in two at once only the one it leaves first counts, and a volume inside another takes over
 	// where the ray enters it - murk or ink in the sea round the camera replaces the sea there, not adds to it.
 	float along = 0.0f;
-	for (int guard = 0; guard < 64 && along < s.tMax && sp.transmittance > 0.0f; ++guard) {
+	for (int guard = 0; guard < 256 && along < s.tMax && sp.transmittance > 0.0f; ++guard) {   // (two steps a volume: room for a cloud field of 75)
 		int in = -1;
 		float inEnd = 0.0f, nextStart = 1e30f;
 		const float tie = 1e-5f * fmaxf(1.0f, fabsf(along));
@@ -399,7 +399,9 @@ extern "C" __global__ void __raygen__wf_shadow() {
 			continue;
 		}
 		const float end = fminf(inEnd, nextStart);
-		wf_shadow_through_medium(wf_params.materials[wf_params.mediumShapes[in].materialIdx], s.origin, s.direction, along, end, &sp);
+		const MaterialData& volume = wf_params.materials[wf_params.mediumShapes[in].materialIdx];
+		if (!wf_shadow_skips(&sp, volume))   // (shadow linking, light_link.h, as the any-hit programs do: a fog that casts no shadow of this light lets it through)
+			wf_shadow_through_medium(volume, s.origin, s.direction, along, end, &sp);
 		along = end;
 	}
 

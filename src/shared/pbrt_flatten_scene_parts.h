@@ -346,6 +346,13 @@ inline void flattenMedia(const pbrt_scene::Scene &scene, FlatScene &out) {
 			medium.nx = md.params.getInt("nx", 1);
 			medium.ny = md.params.getInt("ny", 1);
 			medium.nz = md.params.getInt("nz", 1);
+			// (a size the file gives is checked before anything is made of it: nx = ny = nz = 100000 asked for 10^15 values and crashed, and a negative one wrapped round)
+			const long long cells = static_cast<long long>(medium.nx) * medium.ny * medium.nz;
+			if (medium.nx < 1 || medium.ny < 1 || medium.nz < 1 || medium.nx > 4096 || medium.ny > 4096 || medium.nz > 4096 || cells > 512LL * 1024 * 1024) {
+				out.warnings.push_back({0, std::string(), "grid medium '" + md.name + "' is " + std::to_string(medium.nx) + " x " + std::to_string(medium.ny) + " x " + std::to_string(medium.nz) +
+															  " (each side 1 to 4096, at most 512 million cells); it is left empty"});
+				medium.nx = medium.ny = medium.nz = 1;
+			}
 		}
 		const std::size_t voxels = static_cast<std::size_t>(medium.nx)
 			* static_cast<std::size_t>(medium.ny) * static_cast<std::size_t>(medium.nz);

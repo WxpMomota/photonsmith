@@ -72,8 +72,11 @@ inline bool hunterAt(const School::Dash &d, double t, Vec3 &at) {
 	return true;
 }
 
-// Works out the school's swim over `seconds`: `avoid(t)` gives the things it keeps clear of at t (pbrt's: the camera, divers).
-inline void prepare(School &s, double seconds, const std::function<std::vector<Vec3>(double)> &avoid) {
+// Works out the school's swim over `seconds`: `avoid(t)` gives the things it keeps clear of at t (pbrt's: the camera, divers). Every `stride`-th step is kept (a long swim of a big
+// school: fishAt runs between them), and s.dt becomes the time between the steps kept.
+inline void prepare(School &s, double seconds, const std::function<std::vector<Vec3>(double)> &avoid, int stride = 1) {
+	stride = std::max(1, stride);
+	const double dt = s.dt;
 	const int n = s.count;
 	const double L = lengthOf(s.kind), pace = paceOf(s.kind), space = std::max(0.25, 1.6 * L);
 	std::vector<Vec3> p(static_cast<std::size_t>(n)), v(p.size());
@@ -84,9 +87,10 @@ inline void prepare(School &s, double seconds, const std::function<std::vector<V
 		p[static_cast<std::size_t>(i)] = s.at + Vec3{r * std::sin(ph) * std::cos(th), 0.45 * r * std::cos(ph), r * std::sin(ph) * std::sin(th)};
 		v[static_cast<std::size_t>(i)] = normalize(Vec3{1.0, 0.0, 0.3 * (hash01(q, 4) - 0.5)}) * pace;
 	}
-	const int steps = static_cast<int>(std::ceil(seconds / s.dt)) + 2;
-	s.pos.assign(static_cast<std::size_t>(steps), {});
-	s.vel.assign(static_cast<std::size_t>(steps), {});
+	const int steps = static_cast<int>(std::ceil(seconds / dt)) + 2;
+	const int kept = std::max(2, (steps - 1) / stride + 2);
+	s.pos.assign(static_cast<std::size_t>(kept), {});
+	s.vel.assign(static_cast<std::size_t>(kept), {});
 	s.dashes.clear();
 	std::vector<double> pending = s.strikes;
 	std::sort(pending.begin(), pending.end());
@@ -99,9 +103,8 @@ inline void prepare(School &s, double seconds, const std::function<std::vector<V
 	};
 	std::vector<std::pair<double, int>> around;
 	for (int k = 0; k < steps; ++k) {
-		s.pos[static_cast<std::size_t>(k)] = p;
-		s.vel[static_cast<std::size_t>(k)] = v;
-		const double t = k * s.dt;
+		if (k % stride == 0 && k / stride < kept) s.pos[static_cast<std::size_t>(k / stride)] = p, s.vel[static_cast<std::size_t>(k / stride)] = v;
+		const double t = k * dt;
 		Vec3 mid{0, 0, 0};
 		for (const Vec3 &q : p) mid = mid + q;
 		mid = mid * (1.0 / std::max(1, n));
@@ -163,15 +166,17 @@ inline void prepare(School &s, double seconds, const std::function<std::vector<V
 				if (d < 2.5) flee = flee + off * (1.0 / std::max(0.1, d)) * (2.5 - d) * 3.0, fright = std::max(fright, 0.5 * (1.0 - d / 2.5));
 			}
 			const Vec3 accel = sep * (2.5 * space) + ali * (1.2 + 2.0 * fright) + coh * 0.35 * (1.0 - fright) + (centre - pi) * (1.0 / std::max(1.0, s.radius)) * pace + flee;
-			Vec3 w = v[static_cast<std::size_t>(i)] + accel * s.dt;
+			Vec3 w = v[static_cast<std::size_t>(i)] + accel * dt;
 			w.y *= 0.95;
 			const double sp = length(w), top = pace * (1.3 + 1.7 * fright);
 			w = w * (std::clamp(sp, 0.6 * pace, top) / std::max(1e-9, sp));
 			nv[static_cast<std::size_t>(i)] = w;
 		}
 		v = nv;
-		for (int i = 0; i < n; ++i) p[static_cast<std::size_t>(i)] = p[static_cast<std::size_t>(i)] + v[static_cast<std::size_t>(i)] * s.dt;
+		for (int i = 0; i < n; ++i) p[static_cast<std::size_t>(i)] = p[static_cast<std::size_t>(i)] + v[static_cast<std::size_t>(i)] * dt;
 	}
+	for (int k = (steps - 1) / stride + 1; k < kept; ++k) s.pos[static_cast<std::size_t>(k)] = p, s.vel[static_cast<std::size_t>(k)] = v;   // (past the last step kept: where they ended)
+	s.dt = dt * stride;
 }
 // A worked-out swim as bytes (positions and velocities as floats, the dashes as doubles) and back: a film's frames each render in a process of their own, and working a
 // big school out again in every one cost seconds a frame - the first keeps it on disk for the rest (DataFilm::schoolsSwum). False when the bytes are not a whole swim of `s`.
@@ -180,6 +185,7 @@ inline std::string swumBytes(const School &s) {
 	const auto put = [&out](const void *p, std::size_t n) { out.append(static_cast<const char *>(p), n); };
 	const std::uint32_t steps = static_cast<std::uint32_t>(s.pos.size()), n = static_cast<std::uint32_t>(s.count), dashes = static_cast<std::uint32_t>(s.dashes.size());
 	put(&steps, 4), put(&n, 4), put(&dashes, 4);
+	put(&s.dt, 8);   // (the time between the steps kept: prepare's stride)
 	out.reserve(out.size() + static_cast<std::size_t>(steps) * n * 24 + dashes * 56);
 	for (const auto *all : {&s.pos, &s.vel})
 		for (const std::vector<Vec3> &row : *all)
@@ -195,11 +201,14 @@ inline std::string swumBytes(const School &s) {
 }
 inline bool swumFrom(School &s, const std::string &bytes) {
 	std::uint32_t head[3];
-	if (bytes.size() < 12) return false;
+	if (bytes.size() < 20) return false;
 	std::memcpy(head, bytes.data(), 12);
+	double dt = 0.0;
+	std::memcpy(&dt, bytes.data() + 12, 8);
 	const std::size_t steps = head[0], n = head[1], dashes = head[2];
-	if (n != static_cast<std::size_t>(s.count) || steps < 2 || bytes.size() != 12 + steps * n * 24 + dashes * 56) return false;
-	const char *p = bytes.data() + 12;
+	if (n != static_cast<std::size_t>(s.count) || steps < 2 || !(dt > 0.0) || bytes.size() != 20 + steps * n * 24 + dashes * 56) return false;
+	s.dt = dt;
+	const char *p = bytes.data() + 20;
 	for (auto *all : {&s.pos, &s.vel}) {
 		all->assign(steps, std::vector<Vec3>(n));
 		for (std::vector<Vec3> &row : *all)

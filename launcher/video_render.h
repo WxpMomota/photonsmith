@@ -157,9 +157,15 @@ private:
             } else {
                 ok = convert_ppm_to_png(job.path.c_str(), tmp_path.string().c_str());
             }
-            if (ok) {
-                std::filesystem::rename(tmp_path, png_path, ec);
+            if (ok) {   // (tried for a second: the GUI's strip of frames, an antivirus or Explorer may hold the old picture for a moment)
+                for (int attempt = 0; attempt < 10; ++attempt) {
+                    std::filesystem::rename(tmp_path, png_path, ec);
+                    if (!ec) break;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                }
                 ok = !ec;
+                // the old picture stayed under the new fingerprint (recorded as the frame finished): listed as a stand-in, so that a resume renders it again
+                if (!ok && job.index >= 0) std::ofstream(frames_dir_ / cartoon_render::kFilledList, std::ios::app) << job.index << "\n";
             }
             if (ok) {
                 if (job.index < 0) ++next_index;
@@ -376,6 +382,7 @@ struct WorkerProcess : cartoon_render::WorkerHandle {
     bool running() override { return child.running(); }
     void kill() override { child.kill(); }
     unsigned long long memoryBytes() override { return child.memoryBytes(); }
+    int exitCode() override { return child.running() ? -1 : child.exitCode(); }
 };
 
 // A cartoon video's frames. With workers (the default on an OptiX GPU: cartoon_worker.h) a few long-lived processes each render a list of frames, which spares the second and a half every
@@ -383,7 +390,8 @@ struct WorkerProcess : cartoon_render::WorkerHandle {
 // handed to `png_converter` in frame order, and a resumed video's finished frames are not rendered again. Returns the number of frames that are rendered.
 // With `only`, just the frames it flags are rendered; `across` renders the other side of the film's dissolves and wipes (Film::sceneAcross) instead of its own frames.
 inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, const cartoon::Film &film, const std::filesystem::path &frames_dir, int render_frame_count,
-                               BackgroundPngConverter &png_converter, const std::vector<char> *only = nullptr, bool across = false, int *firstError = nullptr) {
+                               BackgroundPngConverter &png_converter, const std::vector<char> *only = nullptr, bool across = false, int *firstError = nullptr,
+                               const std::pair<int, int> *progressFrom = nullptr) {   // (a farm's batch: the frames done before it and how many in all, for the count)
     const bool use_gpu = s.use_gpu;
     const int image_width = s.image_width, image_height = s.image_height, samples_per_pixel = s.samples_per_pixel, max_ray_depth = s.max_ray_depth;
     // how many frames to keep in flight follows the frame's size, its samples and the graphics card's free memory (RunPolicy::framesInFlight), unless the user chose
@@ -396,6 +404,7 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
     // --smart-power: on a busy computer each of the frames rendered at once pauses that many times as long, so that together they keep to the duty (RunPolicy::smartFrames; set before
     // the watchdog's limit is worked out and the workers are started, which read it)
     if (RunPolicy::from(args).smart) set_env_var(RunPolicy::kSmartFramesVariable, std::to_string(std::max({1, workers, jobs})).c_str());
+    set_env_var("RAY_TRACER_ONLY_FILM", film.key);   // (the frames' runs and workers read only this film's file: cartoons.cpp registry)
     for (int w = 0; w < std::max(jobs, workers); ++w) std::filesystem::create_directories(frames_dir / ("work" + std::to_string(w)));
     // A GPU frame is written as a PNG by the renderer itself (OutputOptions::write_png; Metal always did), not as a text PPM to convert: the picture of GPU SPPM is the one exception
     const bool frame_is_png = use_gpu && (kMetalVideoFrames || !args.use_sppm);
@@ -433,7 +442,7 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
     std::map<int, std::string> fingerprintOf;   // what each frame of this run was made from
     std::map<int, double> sceneSecondsOf;       // how long each frame's scene took to make (the time summary: is making the scenes, not rendering them, what holds the video up?)
     double frameSecondsTotal = 0.0, sceneSecondsTotal = 0.0;
-    int timedFrames = 0;
+    int timedFrames = 0, failedFrames = 0;
     // --draft N: only every Nth frame is rendered; the others repeat the one before (renderVideoFrames fills them in, as it fills a failed frame), so the video keeps its length
     // and the film's sound stays in step: a whole film to look at and listen to in a fraction of the time. The drafted frames are real renders, so a full render at the same
     // size, samples and flags resumes from them and renders only the rest.
@@ -453,10 +462,10 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
                                                   << load.freeVramMb / 1024.0 << " GB of the graphics card free)" << std::defaultfloat;
     if (timeout > 0) std::cout << " (a frame that takes more than " << timeout << " s is stopped and tried once more)";
     std::cout << "." << std::endl;
-    int reported = resumed;
+    int reported = progressFrom ? progressFrom->first : resumed;
     // what the count runs to: the frames finished before (a resume) and the ones this run renders - not every frame of the film, which a draft (one in N) or an `only` mask
     // never renders, so the GUI's bar, its "k of N frames" and its estimate (they read these lines) would stop at a quarter of the way for a 1-in-4 draft
-    const int reportTotal = resumed + toRender;
+    const int reportTotal = progressFrom ? progressFrom->second : resumed + toRender;
     const auto wasKept = [&](int frame) {
         std::lock_guard<std::mutex> hold(keptLock);
         return kept.count(frame) > 0;
@@ -472,9 +481,11 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
             if (const auto it = sceneSecondsOf.find(frame); it != sceneSecondsOf.end()) sceneSeconds = it->second;
             if (rc == 0 && !kept.count(frame)) frameSecondsTotal += seconds, sceneSecondsTotal += sceneSeconds, ++timedFrames;
             if (rc != 0 && firstError && *firstError == 0) *firstError = rc;   // (what the run reports when no frame came out: the renderer's own reason)
+            if (rc != 0) ++failedFrames;
         }
         std::ostringstream line;
-        line << "\n[" << ++reported << "/" << reportTotal << "] Rendering " << frame_file(frame).filename().string() << " (" << film.name << " at " << std::fixed << std::setprecision(2)
+        // (the other side of the dissolves is a count of its own, marked so: the GUI reads "[k/N] Rendering frame_" as the film's frames, and its bar went back to the start)
+        line << "\n[" << (across ? "across " : "") << ++reported << "/" << reportTotal << "] Rendering " << frame_file(frame).filename().string() << " (" << film.name << " at " << std::fixed << std::setprecision(2)
              << film.duration * frame / std::max(1, render_frame_count) << " s)...";
         if (rc == 0 && wasKept(frame)) line << " unchanged, kept";
         else if (rc == 0) {
@@ -488,10 +499,14 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
     auto inOrder = [&](int frame, int rc) {   // in frame order: the video's picture sequence (a frame kept as it was already has its picture there)
         if (rc == 0 && !already[static_cast<std::size_t>(frame)] && !wasKept(frame)) png_converter.push(frame_file(frame).string(), frame_is_png, frame);
     };
-    // once every frame has been through: the program and the film these frames are now known to match (the next resume keeps them without a look)
+    // once every frame has been through: the program and the film these frames are now known to match (the next resume keeps them without a look) - only when every frame was
+    // (a draft, an `only` mask or a farm's batch leaves frames that were never compared, and a frame that failed to render again kept its old picture: stamping those as
+    // matching kept old shots for good after an edit)
     const auto finish = [&](int done) {
-        std::ofstream out(frames_dir / cartoon_render::kProgramStamp, std::ios::trunc);
-        out << (stamp.empty() ? cartoon_render::programStamp(film, s.exe_path) : stamp) << "\n";
+        if (draftStep == 1 && !only && failedFrames == 0) {
+            std::ofstream out(frames_dir / cartoon_render::kProgramStamp, std::ios::trunc);
+            out << (stamp.empty() ? cartoon_render::programStamp(film, s.exe_path) : stamp) << "\n";
+        }
         // where the time went: rendering the frames, and making their scenes - one at a time in this program while the frame runs render (workers: each in its own)
         if (timedFrames > 0) {
             std::ostringstream t;
@@ -570,8 +585,20 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
         // --smart-power: the workers that go on after one is stopped for the card's memory pause as fewer frames at once (they are started again on its frames, and read this)
         if (RunPolicy::from(args).smart)
             hooks.workersNow = [](int n) { set_env_var(RunPolicy::kSmartFramesVariable, std::to_string(std::max(1, n)).c_str()); };
+        // a cold start compiles the shaders in one worker alone; another worker starts only with 6 GB of the computer's memory free; four frames failing in a row stop the run
+        // (2026-10-30: two workers compiling side by side ran a 32 GB computer out of memory, and every frame failed for an hour)
+        hooks.oneUntilFirstFrame = use_gpu && !kMetalVideoFrames;
+        hooks.memoryLow = [] {
+            const long long free = gpu_memory::freeSystemMb();
+            return free > 0 && free < 6144;
+        };
+        hooks.stopAfterFailures = 4;
+        bool stopped = false;
+        hooks.stopped = &stopped;
         // (a worker's first frame on a GPU also compiles the shaders when their cache is cold, about 18 minutes for the default renderer: it gets 45)
-        return finish(cartoon_render::runWorkers(todo, workers, timeout, hooks, completed, inOrder, 25, cartoon_render::workerMemoryLimitBytes(args), use_gpu ? 45 * 60 : 0) + resumed);
+        const int done = cartoon_render::runWorkers(todo, workers, timeout, hooks, completed, inOrder, 25, cartoon_render::workerMemoryLimitBytes(args), use_gpu ? RunPolicy::from(args).stallSeconds(45 * 60) : 0);   // (grown with background and smart power's pauses, as the frames' own limit)
+        if (stopped) return done + resumed;   // (not finish(): the frames that did not come out were never compared, and the program's stamp must not say they were)
+        return finish(done + resumed);
     }
     return finish(cartoon_render::runInParallel(
         render_frame_count, jobs,
@@ -614,9 +641,47 @@ inline int farmCartoonFrames(const LaunchArgs &args, const RenderSetup &s, const
     for (int f = 0; f < render_frame_count; f += draftStep) wanted[static_cast<std::size_t>(f)] = !only || (*only)[static_cast<std::size_t>(f)];
     return render_farm::run(farm, frames_dir, wanted, [&](const std::vector<char> &mask) {
         BackgroundPngConverter png(frames_dir);
-        renderCartoonFrames(args, s, film, frames_dir, render_frame_count, png, &mask, across);
+        // (the count runs over the whole farm's frames, not from 1 in each batch: the GUI's bar only goes forward, and sat at the first batch's end)
+        int before = 0, all = 0;
+        for (int f = 0; f < render_frame_count; ++f)
+            if (wanted[static_cast<std::size_t>(f)]) ++all, before += farm.done(f) ? 1 : 0;
+        const std::pair<int, int> progress{before, all};
+        renderCartoonFrames(args, s, film, frames_dir, render_frame_count, png, &mask, across, nullptr, &progress);
         png.finish();
     });
+}
+
+// A film's frames once rendered: every frame that has a picture, however it came (this run, or the run being resumed), counted into `converted`. A few holes are filled
+// with the frame before each so that the video keeps its length; more than a few make the render a failure: its error code (0 when the video can be made).
+inline int finishFilmFrames(const LaunchArgs &args, const std::filesystem::path &frames_dir, int render_frame_count, int first_frame_error, bool useGpu, int &converted) {
+    // every frame that has a picture, however it came (this run, or the run being resumed); a hole is filled with the frame before it so that the video keeps its length
+    converted = cartoon_render::countFrames(frames_dir, render_frame_count);
+    if (converted > 0 && converted < render_frame_count) {
+        // (a draft leaves out all but one frame in N on purpose: only the frames it meant to render and could not are failures)
+        const int draftStep = std::max(1, args.draft_step);
+        const int intended = (render_frame_count + draftStep - 1) / draftStep;
+        int missing = 0;
+        for (int f = 0; f < render_frame_count; f += draftStep)
+            if (!std::filesystem::exists(frames_dir / cartoon_render::encName(f))) ++missing;
+        // More than a few failed frames is a failed render, not a video with holes papered over: the frames that came out stay, and running it again resumes the rest.
+        // (Filling hundreds of failed frames and reporting success hid an hour of failures on 2026-10-30.)
+        if (missing > std::max(3, intended / 50)) {
+            std::cerr << "ERROR: " << missing << " of " << intended << " frames failed to render (more than a few): the video is not made. The " << converted
+                      << " frames that came out are kept; running the same render again resumes from them. What the renderer said is in "
+                      << (frames_dir / "work*").string() << "/worker.log." << std::endl;
+            return first_frame_error != 0 ? first_frame_error : (useGpu ? ERR_GPU_RENDER_FAILED : ERR_CPU_RENDER_FAILED);
+        }
+        const int filled = cartoon_render::fillMissingFrames(frames_dir, render_frame_count);
+        const std::set<int> copies = cartoon_render::filledFrames(frames_dir);
+        int failed = 0;
+        for (int f = 0; f < render_frame_count; f += draftStep)
+            if (copies.count(f) || !std::filesystem::exists(frames_dir / cartoon_render::encName(f))) ++failed;
+        if (failed > 0)
+            std::cout << "WARNING: " << failed << " of " << intended << " frame(s) failed; each is repeated from the frame before it so that the video keeps its length"
+                      << (filled >= render_frame_count - converted ? "." : " (some could not be).") << std::endl;
+        converted = cartoon_render::countFrames(frames_dir, render_frame_count);
+    }
+    return 0;
 }
 
 // Renders every frame (the camera moving along the path), converts them to PNG on a background thread, and reports the counts. SUCCESS, or the error code to exit with;
@@ -861,24 +926,8 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
     // conversion is far faster than a render) and gets the final count.
     std::cout << "Finishing PNG conversion..." << std::endl;
     converted = png_converter.finish();
-    if (cartoon_film) {
-        // every frame that has a picture, however it came (this run, or the run being resumed); a hole is filled with the frame before it so that the video keeps its length
-        converted = cartoon_render::countFrames(frames_dir, render_frame_count);
-        if (converted > 0 && converted < render_frame_count) {
-            const int filled = cartoon_render::fillMissingFrames(frames_dir, render_frame_count);
-            // (a draft leaves out all but one frame in N on purpose: only the frames it meant to render and could not are failures)
-            const int draftStep = std::max(1, args.draft_step);
-            const int intended = (render_frame_count + draftStep - 1) / draftStep;
-            const std::set<int> copies = cartoon_render::filledFrames(frames_dir);
-            int failed = 0;
-            for (int f = 0; f < render_frame_count; f += draftStep)
-                if (copies.count(f) || !std::filesystem::exists(frames_dir / cartoon_render::encName(f))) ++failed;
-            if (failed > 0)
-                std::cout << "WARNING: " << failed << " of " << intended << " frame(s) failed; each is repeated from the frame before it so that the video keeps its length"
-                          << (filled >= render_frame_count - converted ? "." : " (some could not be).") << std::endl;
-            converted = cartoon_render::countFrames(frames_dir, render_frame_count);
-        }
-    }
+    if (cartoon_film)
+        if (const int failed = finishFilmFrames(args, frames_dir, render_frame_count, first_frame_error, s.use_gpu, converted); failed != 0) return failed;
 
     // the other side of the film's dissolves and wipes: the frames in them seen by the camera of the shot across the cut (film_transitions.h blends them when the video is made)
     if (cartoon_film && converted > 0 && film_transitions::needsAcross(*cartoon_film, render_frame_count)) {
@@ -896,11 +945,15 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
         across_png.finish();
         // (a draft renders one frame in N here too: each gap in a dissolve is filled with its frame before, as the film's own frames are - left empty, every other frame of
         // a dissolve was blended and the next was not, and it flickered)
+        // (each copy is listed as filled, as the film's own are, so that a full render after the draft renders it instead of keeping the copy: video_frames::keepForResume)
+        std::ofstream filledList(across / cartoon_render::kFilledList, std::ios::app);
         for (int f = 1; f < render_frame_count; ++f) {
             const std::filesystem::path here = across / cartoon_render::encName(f), before = across / cartoon_render::encName(f - 1);
             std::error_code ec;
-            if (only[static_cast<std::size_t>(f)] && only[static_cast<std::size_t>(f - 1)] && !std::filesystem::exists(here, ec) && std::filesystem::exists(before, ec))
+            if (only[static_cast<std::size_t>(f)] && only[static_cast<std::size_t>(f - 1)] && !std::filesystem::exists(here, ec) && std::filesystem::exists(before, ec)) {
                 std::filesystem::copy_file(before, here, std::filesystem::copy_options::overwrite_existing, ec);
+                if (!ec) filledList << f << "\n";
+            }
         }
     }
 

@@ -642,6 +642,9 @@ struct Film {
 	std::function<double(double)> speechAt;
 	// (empty: t) the time whose shot's camera sceneAcross(t) uses: what a cameras file changes of that shot is changed on the other side of the cut too.
 	std::function<double(double)> acrossShotTime;
+	// True when sceneAt and headerAt already have its cameras file's changes (a film made from a single film file: DataFilm::headerAt makes them before the world round the
+	// camera is built); the program then adds only the frame's seed and LUT path (shot_cameras::finished), not the change a second time.
+	bool camerasDone = false;
 };
 
 }  // namespace cartoon

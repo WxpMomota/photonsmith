@@ -145,8 +145,16 @@ inline int renderFrame(const cartoon::Film &film, double t, const std::filesyste
 inline std::string resumeSignature(const cartoon::Film &film, const LaunchArgs &args, int frames, int fps, int width, int height, int spp, int depth) {
 	std::string s = std::string(film.key) + "|" + std::to_string(frames) + "|" + std::to_string(fps) + "|" + std::to_string(width) + "x" + std::to_string(height) + "|" + std::to_string(spp) + "|" +
 					std::to_string(depth);
-	for (const std::string &f : forwardedFlags(args)) s += "|" + f;
+	// (not the flags that only say how the computer is used - its power, which card, statistics, validation: the frames look the same, and switching Power after a crash threw
+	// away hours of finished frames)
+	static const std::set<std::string> sameFrames = {"--background", "--smart-power", "--gpu-device", "--stats", "--optix-validate"};
+	bool skip = false;
+	for (const std::string &f : forwardedFlags(args)) {
+		if (startsFlag(f)) skip = sameFrames.count(f) > 0;
+		if (!skip) s += "|" + f;
+	}
 	if (args.temporal_radius > 0) s += "|a seed a frame";   // (--temporal-denoise: frames rendered with seeds of their own are other pictures)
+	if (args.noise_target > 0.0) s += "|noise " + std::to_string(std::lround(args.noise_target * 1000.0));   // (--noise-target sets each shot's samples: other pictures)
 	return s;
 }
 // The seed of a frame when each has its own (--temporal-denoise: noise that differs from frame to frame averages away; one seed for all would leave the same noise in every
@@ -162,6 +170,16 @@ inline std::string programStamp(const cartoon::Film &film, const std::string &ex
 		const auto size = std::filesystem::file_size(exePath, ec);
 		const auto when = std::filesystem::last_write_time(exePath, ec);
 		s += std::to_string(static_cast<unsigned long long>(size)) + "|" + std::to_string(static_cast<long long>(when.time_since_epoch().count()));
+		// (and the GPU's programs beside it, loaded when a frame renders: an update of the shaders alone changes the pictures as much as a new program)
+		std::vector<std::filesystem::path> programs;
+		for (const auto &entry : std::filesystem::directory_iterator(std::filesystem::path(exePath).parent_path(), ec))
+			if (entry.path().extension() == ".ptx") programs.push_back(entry.path());
+		std::sort(programs.begin(), programs.end());   // (in name order: the stamp must not depend on the folder's listing order)
+		for (const std::filesystem::path &p : programs) {
+			const auto psize = std::filesystem::file_size(p, ec);
+			const auto pwhen = std::filesystem::last_write_time(p, ec);
+			s += "|" + p.filename().string() + " " + std::to_string(static_cast<unsigned long long>(psize)) + " " + std::to_string(static_cast<long long>(pwhen.time_since_epoch().count()));
+		}
 	}
 	s += "|" + frame_fingerprint::of(film.sceneAt(0.0)) + "|" + frame_fingerprint::of(film.sceneAt(film.duration * 0.5));
 	// (and its cameras file, read when a frame is made: an edit to one shot's camera changes neither the program nor, often, those two instants)
@@ -302,6 +320,7 @@ struct WorkerHandle {
 	virtual bool running() = 0;
 	virtual void kill() = 0;
 	virtual unsigned long long memoryBytes() { return 0; }   // what the worker holds now; 0 when it cannot be said
+	virtual int exitCode() { return -1; }   // how it ended, once it has (-1: not known): a frame it took down twice fails with it
 };
 
 // How much memory a worker may hold before the pool replaces it (between two frames, not counted as a failed frame): --worker-max-mb N, else RAY_TRACER_WORKER_MAX_MB, else no limit
@@ -327,6 +346,16 @@ struct WorkerHooks {
 	// Told how many workers render at once from now on, when the card's memory has made it fewer (null: nobody asks); before the workers that go on are started again, so they
 	// can be given the number (smart power's pauses follow it: RunPolicy::smartFrames).
 	std::function<void(int workers)> workersNow;
+	// A cold start: on an OptiX GPU a worker's first frame compiles the default renderer's shaders when their cache is cold (up to 25 minutes and 5 to 15 GB of the computer's
+	// memory). Every worker starting at once compiled them side by side, ran the computer out of memory and failed, again and again (2026-10-30). With this one worker runs alone
+	// until a frame has come out, so the others start with the cache warm.
+	bool oneUntilFirstFrame = false;
+	// True while the computer's memory is too low to start another worker (null: never asked): it waits until there is room. At least one always runs.
+	std::function<bool()> memoryLow;
+	// So many frames failing one after another stop the run (0: never), `stopped` set: the same failure in every worker - out of memory, a broken driver, a scene every frame
+	// shares - would otherwise fail, and the video fill, every frame of a film for hours.
+	int stopAfterFailures = 0;
+	bool *stopped = nullptr;
 };
 
 // Renders `todo` (frame numbers) with `workers` long-lived workers: worker w is given every workers-th frame and renders its list in order. The pool watches the markers the workers
@@ -392,10 +421,14 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 		allowed = static_cast<int>(going.size());
 		if (hooks.workersNow) hooks.workersNow(allowed);
 	};
+	int failedInARow = 0;
+	const auto stopNow = [&] { return hooks.stopAfterFailures > 0 && failedInARow >= hooks.stopAfterFailures; };
+	bool coldNoted = false, lowNoted = false;
 	auto report = [&](int frame, int rc, double took) {
 		result[frame] = rc;
 		finished.insert(frame);
 		if (rc == 0) ++succeeded;
+		failedInARow = rc == 0 ? 0 : failedInARow + 1;
 		++reported;
 		completed(frame, rc, took);
 		while (nextToHand < todo.size() && finished.count(todo[nextToHand]) > 0) {
@@ -404,6 +437,14 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 		}
 	};
 	while (reported < todo.size()) {
+		if (stopNow()) {   // (see WorkerHooks::stopAfterFailures)
+			std::cerr << "\nERROR: " << failedInARow << " frames in a row failed; the render is stopped rather than failing the rest the same way. What the renderer said is in "
+					  << "each work folder's worker.log; the frames that came out are kept, and running it again resumes." << std::endl;
+			for (Worker &w : ws)
+				if (w.handle && w.handle->running()) w.handle->kill();
+			if (hooks.stopped) *hooks.stopped = true;
+			return succeeded;
+		}
 		// This loop wakes every `pollMilliseconds`; a much longer gap means this program was paused (the GUI's Pause suspends it and its workers), and that time is nobody's frame.
 		const Clock::time_point now = Clock::now();
 		const auto gap = now - lastTick;
@@ -428,11 +469,22 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 						  << " at a time, which take up the stopped one's frames in order." << std::endl;
 			}
 		}
-		for (std::size_t w = 0; w < ws.size(); ++w) {
+		for (std::size_t w = 0; w < ws.size() && !stopNow(); ++w) {
 			Worker &worker = ws[w];
 			if (worker.remaining.empty()) continue;
 			if (!worker.handle) {
 				if (atWork() >= allowed) continue;   // (stopped for the card's memory: it waits for a worker to finish)
+				if (atWork() >= 1) {   // (a cold start, and the computer's memory: see WorkerHooks)
+					const bool cold = hooks.oneUntilFirstFrame && succeeded == 0, low = !cold && hooks.memoryLow && hooks.memoryLow();
+					if (cold || low) {
+						if (!(cold ? coldNoted : lowNoted))
+							std::cerr << "\nNote: " << (cold ? "one worker renders alone until its first frame is in (on a cold start it compiles the shaders, which takes much of the computer's memory)"
+														 : "the computer's memory is low: another worker starts when there is room")
+									  << "." << std::endl;
+						(cold ? coldNoted : lowNoted) = true;
+						continue;
+					}
+				}
 				worker.last = Clock::now();
 				worker.handle = hooks.start(static_cast<int>(w), std::vector<int>(worker.remaining.begin(), worker.remaining.end()));
 				worker.framesSinceStart = 0;
@@ -444,7 +496,7 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 				}
 			}
 			int rc = 0;
-			while (!worker.remaining.empty() && hooks.poll(worker.remaining.front(), rc)) {
+			while (!worker.remaining.empty() && !stopNow() && hooks.poll(worker.remaining.front(), rc)) {
 				report(worker.remaining.front(), rc, seconds(worker.last));
 				worker.remaining.pop_front();
 				worker.last = Clock::now();
@@ -482,11 +534,12 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 			const bool stalled = limit > 0 && seconds(worker.last) > limit;
 			if (ended || stalled) {
 				if (stalled) worker.handle->kill();
+				const int code = ended && !stalled ? worker.handle->exitCode() : -1;   // (the worker's own reason - an out of memory, a GPU error - not just -1)
 				worker.handle.reset();
 				const int frame = worker.remaining.front();
 				if (++attempts[frame] >= 2) {
 					std::cerr << "\nWARNING: frame " << frame << " " << (stalled ? "took longer than " + std::to_string(limit) + " s" : std::string("ended its worker")) << " twice and is given up." << std::endl;
-					report(frame, -1, seconds(worker.last));
+					report(frame, code != 0 ? code : -1, seconds(worker.last));
 					worker.remaining.pop_front();
 				} else {
 					std::cerr << "\nWARNING: a worker " << (stalled ? "did not finish frame " + std::to_string(frame) + " in " + std::to_string(limit) + " s" : "ended while rendering frame " + std::to_string(frame)) << "; starting another." << std::endl;

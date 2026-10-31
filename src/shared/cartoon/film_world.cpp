@@ -309,10 +309,10 @@ static std::string underTheSea(const Spec &spec, std::string out, const std::str
 	if (!slide) out += underwater::shaftsText(film, nt, eyeP, sea.level, bedDepth);
 	const Vec3 flow = spec.current.velocity(nt), drift = spec.current.drift(nt);
 	if (wl.where != undersea::Waterline::Above) {
-		out += underwater::snowText(t, eye, drift, wl.where == undersea::Waterline::At ? wl.surface : 1e30);
+		out += underwater::snowText(nt, eye, drift, wl.where == undersea::Waterline::At ? wl.surface : 1e30);   // (in nature's time, as the current that carries it)
 		out += undersea::windowText(sea, nt, eyeP);   // (round 14: the mirror beyond Snell's window)
 	}
-	if (spec.underwater.lamp > 0.0) out += undersea::lampText(spec.underwater.lamp, eyeP, targetP, spec.underwater.lampBlue) + undersea::backscatterText(t, eye, drift);
+	if (spec.underwater.lamp > 0.0) out += undersea::lampText(spec.underwater.lamp, eyeP, targetP, spec.underwater.lampBlue) + undersea::backscatterText(nt, eye, drift);
 	// what stands on the seabed stands on its sand (the caustics' decal, 4 cm over the ground): a starfish or a nudibranch under it would be hidden
 	const auto bedAt = [&](double x, double z) { return groundAt(x, z) + 0.04; };
 	for (const underwater::Kelp &k : spec.kelps) out += underwater::kelpText(k, nt, bedAt, flow);
@@ -422,30 +422,42 @@ double DataFilm::seabedAt(double x, double z) const {
 	return ground && ground->inside(x, z) ? ground->heightAt(x, z) : (ground ? spec.terrain.y : floorY);
 }
 const std::vector<school::School> &DataFilm::schoolsSwum() const {
-	std::lock_guard<std::mutex> hold(swum_.lock);
+	// (a recursive lock: working the schools out asks where the camera is at every step, and a shot that follows, orbits or focuses on a school asks for the schools - that call
+	// is given them as they are before they swim, each round its starting middle (fishAt's answer with no swim yet), instead of waiting on itself for ever)
+	std::lock_guard<std::recursive_mutex> hold(swum_.lock);
 	if (swum_.done) return swum_.schools;
 	swum_.done = true;
 	swum_.schools = spec.schools;
+	for (school::School &sc : swum_.schools) sc.at.y += seabedAt(sc.at.x, sc.at.z);
 	const std::vector<diver::Diver> divers = diver::lifted(spec.divers, [this](double x, double z) { return seabedAt(x, z); });
-	const auto avoid = [this, &divers](double t) {   // (the camera and the divers: the school keeps clear of them)
-		std::vector<Vec3> out;
+	// nature's time back to the film's (the camera keys are the film's; a school swims in nature's time - `timelapse`, `slowmo`)
+	const auto filmTimeAt = [this](double nt) {
+		double lo = 0.0, hi = spec.length;
+		if (natureAt(hi) <= nt) return hi;
+		for (int k = 0; k < 40; ++k) (natureAt(0.5 * (lo + hi)) < nt ? lo : hi) = 0.5 * (lo + hi);
+		return hi;
+	};
+	// how long to work them out (nature's whole film, at most four hours of it: past that a school holds its last place) and how finely to keep it: every step while the swim
+	// fits in four million fish-steps (some 190 MB), every few steps past that (fishAt runs between them) - a long film's big school took a gigabyte in every worker
+	const double seconds = std::min(natureAt(spec.length) + 1.0, 4.0 * 3600.0);
+	const double dt = spec.schools.empty() ? 1.0 / 12.0 : spec.schools[0].dt;
+	const int steps = static_cast<int>(std::ceil(seconds / dt)) + 2;
+	std::vector<std::vector<Vec3>> threats(static_cast<std::size_t>(steps));   // (the camera and the divers: the schools keep clear of them; the same for every school)
+	for (int k = 0; k < steps; ++k) {
+		const double nt = k * dt;
 		Vec3 eye, target;
 		double fov = 40.0;
-		if (film_subjects::cameraOf(headerAt(std::min(t, spec.length)), eye, target, fov)) out.push_back({-eye.x, eye.y, eye.z});
-		for (const diver::Diver &d : divers) out.push_back(diver::diverAt(d, t));
-		return out;
-	};
+		if (film_subjects::cameraOf(headerAt(filmTimeAt(nt)), eye, target, fov)) threats[static_cast<std::size_t>(k)].push_back({-eye.x, eye.y, eye.z});
+		for (const diver::Diver &d : divers) threats[static_cast<std::size_t>(k)].push_back(diver::diverAt(d, nt));
+	}
 	// (each frame renders in a process of its own: the first to work a school out keeps it in the film's cache, named by all it was worked out from - the school, how long,
 	// and where the camera and the divers were at every step - and the rest read it: seconds a frame for a big school)
-	const double seconds = natureAt(spec.length) + 1.0;
-	for (std::size_t i = 0; i < swum_.schools.size(); ++i) {
-		school::School &sc = swum_.schools[i];
-		sc.at.y += seabedAt(sc.at.x, sc.at.z);
-		const int steps = static_cast<int>(std::ceil(seconds / sc.dt)) + 2;
-		std::vector<std::vector<Vec3>> threats(static_cast<std::size_t>(steps));
-		for (int k = 0; k < steps; ++k) threats[static_cast<std::size_t>(k)] = avoid(k * sc.dt);
-		char buf[160];
-		std::snprintf(buf, sizeof buf, "%s %s %d %d %.4f %.4f %.4f %.4f %.6f %.4f|", sc.kind.c_str(), sc.hunter.c_str(), sc.count, sc.seed, sc.at.x, sc.at.y, sc.at.z, sc.radius, sc.dt, seconds);
+	std::vector<school::School> done = swum_.schools;
+	for (std::size_t i = 0; i < done.size(); ++i) {
+		school::School &sc = done[i];
+		const int stride = std::max(1, static_cast<int>(std::ceil(static_cast<double>(steps) * std::max(1, sc.count) / 4.0e6)));
+		char buf[200];
+		std::snprintf(buf, sizeof buf, "%s %s %d %d %.4f %.4f %.4f %.4f %.6f %.4f %d|", sc.kind.c_str(), sc.hunter.c_str(), sc.count, sc.seed, sc.at.x, sc.at.y, sc.at.z, sc.radius, sc.dt, seconds, stride);
 		std::string key = buf;
 		for (const double st : sc.strikes) std::snprintf(buf, sizeof buf, "%.4f ", st), key += buf;
 		for (const std::vector<Vec3> &row : threats)
@@ -459,12 +471,15 @@ const std::vector<school::School> &DataFilm::schoolsSwum() const {
 			const std::string bytes = in ? std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()) : std::string();
 			if (!bytes.empty() && school::swumFrom(sc, bytes)) continue;
 		}
-		school::prepare(sc, seconds, [&threats, &sc](double t) {
-			const std::size_t k = static_cast<std::size_t>(std::llround(t / sc.dt));
+		school::prepare(sc, seconds, [&threats, dt](double t) {
+			const std::size_t k = static_cast<std::size_t>(std::llround(t / dt));
 			return k < threats.size() ? threats[k] : std::vector<Vec3>();
-		});
-		film_cache::writeOnce(file, school::swumBytes(sc));
+		}, stride);
+		const std::string bytes = school::swumBytes(sc);
+		film_cache::writeOnce(file, bytes);
+		school::swumFrom(sc, bytes);   // (as the processes that read the file will have it, to the float: every frame's scene the same whichever process makes it)
 	}
+	swum_.schools = std::move(done);
 	return swum_.schools;
 }
 // How much more `exposure auto` opens up for a camera under the water, by its depth (film_undersea.h depthExposure); 1 for any other.
@@ -657,7 +672,7 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 	if (!spec.auroras.empty() || !spec.lightnings.empty() || !spec.meteors.empty()) {   // the sky's spectacles (film_skyfx.h)
 		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
 		const Vec3 centre = ground ? Vec3{spec.terrain.x, spec.terrain.y, spec.terrain.z} : Vec3{0.0, 0.0, 0.0};
-		for (const skyfx::Aurora &a : spec.auroras) out += skyfx::auroraText(spec.key.empty() ? std::string("film") : spec.key, a, t, centre);
+		for (const skyfx::Aurora &a : spec.auroras) out += skyfx::auroraText(spec.key.empty() ? std::string("film") : spec.key, a, t, centre);   // (the film's time: its `during` is written in it)
 		const auto groundAt = [&](double x, double z) { return ground && ground->inside(x, z) ? ground->heightAt(x, z) : (ground ? spec.terrain.y : 0.0); };
 		for (const skyfx::Lightning &l : spec.lightnings) out += skyfx::lightningText(l, t, groundAt);
 		if (!spec.meteors.empty()) {
@@ -691,7 +706,7 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 		Vec3 eye, target;
 		double fov = 40.0;
 		film_subjects::cameraOf(header, eye, target, fov);
-		out += night::flashText(spec.night, eye, target);
+		out += night::flashText(spec.night, {-eye.x, eye.y, eye.z}, {-target.x, target.y, target.z});   // (pbrt's: cameraOf's are story space, x mirrored)
 	}
 	if (spec.macro.any()) {   // the small world close up (film_macro.h)
 		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
@@ -863,7 +878,7 @@ std::string DataFilm::castAt(double t) const {
 // it, changing as the camera crosses the waterline (cartoons.cpp leaves an underwater film's `reef` and `sea` beds to here) - and the boats, the dolphins and the
 // whales, and the gannets' plunges, from where they are. `natureAt`: nature's time at a film time; `bedAt`: the seabed's height (pbrt's x z).
 static void seaSounds(const Spec &spec, audio::Mix &m, const soundscape::Ears &ears, const std::function<double(double)> &natureAt,
-					  const std::function<double(double, double)> &bedAt) {
+					  const std::function<double(double, double)> &bedAt, const std::function<double(double)> &filmTimeOf) {
 	namespace ss = soundscape;
 	const double T = m.seconds();
 	const auto bedOf = [&](const char *kind) {
@@ -885,11 +900,12 @@ static void seaSounds(const Spec &spec, audio::Mix &m, const soundscape::Ears &e
 	}
 	for (std::size_t i = 0; i < spec.boats.size(); ++i) {   // a boat's engine: a low drone, louder near, under way
 		const boat::Boat &b = spec.boats[i];
-		ss::lay(m, ears, std::max(0.0, b.t0), std::min(T, b.t1), 0.5, [&b, &spec, &natureAt](double tt) { return boat::boatAt(b, natureAt(tt), spec.seas[0].level); },
+		ss::lay(m, ears, filmTimeOf(std::max(0.0, b.t0)), std::min(T, filmTimeOf(std::min(b.t1, 1e9))), 0.5,   // (its times are nature's: heard when it is seen)
+				 [&b, &spec, &natureAt](double tt) { return boat::boatAt(b, natureAt(tt), spec.seas[0].level); },
 				[&b, &natureAt](double tt) { return b.anchor >= 0.0 && natureAt(tt) > b.anchor ? 0.25 : 1.0; }, ss::roar(45.0, 220.0, 1.0, 2701u + static_cast<unsigned>(i)), 60.0);
 	}
 	const auto whistles = [&](const std::function<Vec3(double)> &where, double t0, double t1, unsigned seed) {   // a dolphin's whistles and clicks
-		for (double tt = std::max(0.0, t0) + 0.4; tt < std::min(T, t1); tt += 0.9 + 1.4 * audio::unit(seed + static_cast<unsigned>(tt * 10.0))) {
+		for (double tt = filmTimeOf(std::max(0.0, t0)) + 0.4; tt < std::min(T, t1); tt += 0.9 + 1.4 * audio::unit(seed + static_cast<unsigned>(tt * 10.0))) {   // (t0 nature's, t1 the film's)
 			const unsigned s = seed + static_cast<unsigned>(tt * 13.0);
 			const double f0 = 5000.0 + 6000.0 * audio::unit(s), f1 = 4000.0 + 8000.0 * audio::unit(s + 1u);
 			ss::place(m, ears, tt, where(natureAt(tt)), audio::chirp(f0, f1, 0.25 + 0.4 * audio::unit(s + 2u), 9.0, 0.03, 1.0), 0.06, 40.0);
@@ -913,11 +929,11 @@ static void seaSounds(const Spec &spec, audio::Mix &m, const soundscape::Ears &e
 		const boat::Run &r = runs[i];
 		whistles([r](double) { return r.at; }, r.from, T, 3001u + static_cast<unsigned>(i) * 41u);
 		for (int g = 0; g < r.gannets; ++g)   // each gannet's plunge: a crack as it hits the water, and the rush of its bubbles
-			if (boat::diveTime(r, g) < T) {
+			if (filmTimeOf(boat::diveTime(r, g)) < T) {
 				Vec3 f;
 				double since = 0.0;
 				const Vec3 at = boat::gannetAt(r, g, boat::diveTime(r, g) + 0.01, spec.seas[0].level, f, since);
-				ss::place(m, ears, boat::diveTime(r, g), at, audio::noiseBurst(0.6, 0.002, 0.5, 1200.0, 300.0, 3101u + static_cast<unsigned>(g)), 0.5, 40.0);
+				ss::place(m, ears, filmTimeOf(boat::diveTime(r, g)), at, audio::noiseBurst(0.6, 0.002, 0.5, 1200.0, 300.0, 3101u + static_cast<unsigned>(g)), 0.5, 40.0);   // (a dive's time is nature's)
 			}
 	}
 }
@@ -926,7 +942,8 @@ void DataFilm::soundscape(audio::Mix &m) const {
 	const bool eagles = std::any_of(spec.flocks.begin(), spec.flocks.end(), [](const wildlife::Flock &f) { return f.kind == "eagles"; });
 	if (spec.falls.empty() && spec.fires.empty() && spec.lavas.empty() && spec.volcanoes.empty() && spec.wildfires.empty() && !spec.swell.on && spec.herds.empty() && !eagles &&
 		spec.forests.empty() && spec.geysers.empty() && spec.rockfalls.empty() && spec.avalanches.empty() && spec.quakes.empty() && spec.whales.empty() && spec.pods.empty() && spec.glaciers.empty() && spec.tornadoes.empty() &&
-		!spec.space.on && spec.ships.empty() && spec.astronauts.empty() && spec.descents.empty() && spec.undersea.breaths.empty() && spec.undersea.streams.empty() && spec.divers.empty() && !spec.hasUnderwater)
+		!spec.space.on && spec.ships.empty() && spec.astronauts.empty() && spec.descents.empty() && spec.undersea.breaths.empty() && spec.undersea.streams.empty() && spec.divers.empty() && !spec.hasUnderwater &&
+		spec.flights.empty())   // (a film whose only animals were a flight of geese was silent)
 		return;
 	namespace ss = soundscape;
 	const ss::Ears ears = ss::earsOf(m.seconds(), [this](double t, Vec3 &eye, Vec3 &target) {
@@ -936,6 +953,13 @@ void DataFilm::soundscape(audio::Mix &m) const {
 	const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
 	const auto groundAt = [&](double x, double z) { return ground ? ground->heightAt(x, z) : 0.0; };
 	const double T = m.seconds();
+	// nature's time back to the film's (natureAt only grows): what happens in nature's time - a boat, a dive, a flight - is heard at the film time it is seen
+	const std::function<double(double)> filmTimeOf = [this, T](double ntv) {
+		double lo = 0.0, hi = T;
+		if (natureAt(hi) <= ntv) return hi + (ntv - natureAt(hi));
+		for (int k = 0; k < 40; ++k) (natureAt(0.5 * (lo + hi)) < ntv ? lo : hi) = 0.5 * (lo + hi);
+		return hi;
+	};
 	const auto always = [](double) { return 1.0; };
 	// sound in space, and craft anywhere (film_voyage.h): a descent onto a terrain under a sky, or a ship over it, has no `space` line (it cannot be with a sky) and was silent
 	if (spec.space.on || !spec.ships.empty() || !spec.astronauts.empty() || !spec.descents.empty()) {
@@ -966,11 +990,7 @@ void DataFilm::soundscape(audio::Mix &m) const {
 		}
 	}
 	if ((!spec.whales.empty() || !spec.pods.empty()) && !spec.seas.empty())   // the sea's giants (film_giants.h); nature's times back to the film's
-		giants::giantsSound(m, ears, spec.whales, spec.pods, spec.seas[0].level, spec.hasUnderwater, [this](double ft) { return natureAt(ft); }, [this, T](double ntv) {
-			double lo = 0.0, hi = T;
-			for (int k = 0; k < 40; ++k) (natureAt(0.5 * (lo + hi)) < ntv ? lo : hi) = 0.5 * (lo + hi);
-			return hi;
-		});
+		giants::giantsSound(m, ears, spec.whales, spec.pods, spec.seas[0].level, spec.hasUnderwater, [this](double ft) { return natureAt(ft); }, filmTimeOf);
 	// under the sea (film_undersea.h): a diver breathing - the regulator's hiss, then the burble of the breath going out - and the bubbles of a stream
 	for (std::size_t i = 0; i < spec.undersea.breaths.size(); ++i) {
 		const undersea::Breath &b = spec.undersea.breaths[i];
@@ -981,7 +1001,7 @@ void DataFilm::soundscape(audio::Mix &m) const {
 			for (int k = 0; k < 9; ++k) ss::place(m, ears, t0 + 0.4 * b.every + 0.13 * k, at, ss::bubble(seed + 3u * static_cast<unsigned>(k)), 0.5, 30.0);
 		}
 	}
-	if (spec.hasUnderwater && !spec.seas.empty()) seaSounds(spec, m, ears, [this](double ft) { return natureAt(ft); }, [this](double x, double z) { return seabedAt(x, z); });
+	if (spec.hasUnderwater && !spec.seas.empty()) seaSounds(spec, m, ears, [this](double ft) { return natureAt(ft); }, [this](double x, double z) { return seabedAt(x, z); }, filmTimeOf);
 	for (std::size_t i = 0; i < spec.divers.size(); ++i) {   // a diver breathing as they swim (film_diver.h): the hiss in, the burble out, from where they are
 		diver::Diver d = spec.divers[i];
 		for (Vec3 &p : d.path) p.y += seabedAt(p.x, p.z);
@@ -1117,11 +1137,11 @@ void DataFilm::soundscape(audio::Mix &m) const {
 		if (spec.muteBirds) continue;
 		const animals::Species *sp = animals::species(f.kind);
 		const double v = sp && f.speed <= 0.0 ? sp->walkSpeed : f.speed, D = length(f.to - f.from), T1 = f.at + 1.5 + D / std::max(0.1, v);
-		for (int i = 0; i < f.count; ++i)
-			for (double t = f.at + 0.3 + 0.4 * i + 2.0 * audio::unit(static_cast<unsigned>(1101 + i)); t < std::min(T, T1); t += 2.5 + 3.0 * audio::unit(static_cast<unsigned>(1111 + i) + static_cast<unsigned>(t))) {
+		for (int i = 0; i < f.count; ++i)   // (its times are nature's - flightText's - and each call is heard at the film time it is seen)
+			for (double t = f.at + 0.3 + 0.4 * i + 2.0 * audio::unit(static_cast<unsigned>(1101 + i)); t < std::min(natureAt(T), T1); t += 2.5 + 3.0 * audio::unit(static_cast<unsigned>(1111 + i) + static_cast<unsigned>(t))) {
 				const double u = std::clamp((t - f.at) / std::max(0.1, T1 - f.at), 0.0, 1.0);
 				const Vec3 at = f.from + (f.to - f.from) * u + Vec3{0.0, 4.0 * std::min(30.0, 0.12 * D) * u * (1.0 - u), 0.0};
-				ss::place(m, ears, t, at, f.kind == "geese" ? ss::honk(static_cast<unsigned>(1121 + i * 13) + static_cast<unsigned>(t)) : ss::eagleCry(), f.kind == "geese" ? 0.25 : 0.35, 60.0);
+				ss::place(m, ears, filmTimeOf(t), at, f.kind == "geese" ? ss::honk(static_cast<unsigned>(1121 + i * 13) + static_cast<unsigned>(t)) : ss::eagleCry(), f.kind == "geese" ? 0.25 : 0.35, 60.0);
 			}
 	}
 	for (const wildlife::Flock &f : spec.flocks) {

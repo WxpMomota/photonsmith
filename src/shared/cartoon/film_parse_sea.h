@@ -71,7 +71,7 @@ inline std::string underseaLine15(Spec &s, const std::string &verb, const std::s
 			if (w == "at") d.at = v[0];
 			else if (w == "speed" && v[0] > 0.0 && v[0] <= 3.0) d.speed = v[0];
 			else if (w == "ok" && d.oks.size() < 16) d.oks.push_back(v[0]);
-			else if (w == "seed") d.seed = static_cast<int>(v[0]);
+			else if (w == "seed") d.seed = detail::seedOf(v[0]);
 			else return fail(usage);
 		}
 		if (!hasFrom || !hasTo) return fail(std::string(usage) + ": where the diver starts and where they go");
@@ -101,7 +101,7 @@ inline std::string underseaLine15(Spec &s, const std::string &verb, const std::s
 			if (!numbers(1)) return fail(usage);
 			if (w == "radius" && v[0] > 0.3 && v[0] <= 200.0) sc.radius = bf.radius = v[0];
 			else if (w == "strike" && verb == "school" && sc.strikes.size() < 32) sc.strikes.push_back(v[0]);
-			else if (w == "seed") sc.seed = bf.seed = static_cast<int>(v[0]);
+			else if (w == "seed") sc.seed = bf.seed = detail::seedOf(v[0]);
 			else return fail(usage);
 		}
 		if (verb == "school") s.schools.push_back(sc);
@@ -132,7 +132,7 @@ inline std::string underseaLine15(Spec &s, const std::string &verb, const std::s
 				continue;
 			}
 			if (w != "seed" || !numbers(1)) return fail(usage);
-			rf.seed = cr.seed = kf.seed = static_cast<int>(v[0]);
+			rf.seed = cr.seed = kf.seed = detail::seedOf(v[0]);
 		}
 		if (verb == "reef") s.reefLife.reefs.push_back(rf);
 		else if (verb == "critters") s.reefLife.critters.push_back(cr);
@@ -183,7 +183,7 @@ inline std::string underseaLine16(Spec &s, const std::string &verb, const std::s
 			else if (w == "length" && v[0] >= 3.0 && v[0] <= 60.0) b.length = v[0];
 			else if (w == "speed" && v[0] >= 0.0 && v[0] <= 15.0) b.speed = v[0];
 			else if (w == "anchor") b.anchor = v[0];
-			else if (w == "seed") b.seed = static_cast<int>(v[0]);
+			else if (w == "seed") b.seed = detail::seedOf(v[0]);
 			else return fail(usage);
 		}
 		s.boats.push_back(b);
@@ -201,7 +201,7 @@ inline std::string underseaLine16(Spec &s, const std::string &verb, const std::s
 			else if (w == "gannets" && v[0] >= 0 && v[0] <= 60) r.gannets = static_cast<int>(v[0]);
 			else if (w == "dolphins" && v[0] >= 0 && v[0] <= 20) r.dolphins = static_cast<int>(v[0]);
 			else if (w == "from") r.from = v[0];
-			else if (w == "seed") r.seed = static_cast<int>(v[0]);
+			else if (w == "seed") r.seed = detail::seedOf(v[0]);
 			else return fail(usage);
 		}
 		s.sardineRuns.push_back(r);
@@ -216,7 +216,7 @@ inline std::string underseaLine16(Spec &s, const std::string &verb, const std::s
 		vs.x0 = std::min(v[0], v[2]), vs.z0 = std::min(v[1], v[3]), vs.x1 = std::max(v[0], v[2]), vs.z1 = std::max(v[1], v[3]);
 		if (i < t.size()) {
 			if (t[i++] != "seed" || !numbers(1)) return fail(usage);
-			vs.seed = static_cast<int>(v[0]);
+			vs.seed = detail::seedOf(v[0]);
 		}
 		if (i < t.size()) return fail(usage);
 		s.vents.push_back(vs);
@@ -282,7 +282,7 @@ inline std::string underseaLine16(Spec &s, const std::string &verb, const std::s
 			continue;
 		}
 		if (!numbers(1)) return fail(usage);
-		if (w == "seed") st.seed = tn.seed = pm.seed = dm.seed = static_cast<int>(v[0]);
+		if (w == "seed") st.seed = tn.seed = pm.seed = dm.seed = detail::seedOf(v[0]);
 		else if (w == "radius" && (verb == "tornado" || verb == "damselfish") && v[0] > 0.2 && v[0] <= 30.0) tn.radius = dm.radius = v[0];
 		else if (w == "height" && verb == "tornado" && v[0] > 0.5 && v[0] <= 60.0) tn.height = v[0];
 		else return fail(usage);
@@ -384,7 +384,7 @@ inline std::string underseaLine(Spec &s, const std::string &verb, const std::str
 				if (w == "at") n.at = v[0], timed = true;
 				else if (w == "radius" && v[0] > 0.5 && v[0] <= 60.0) n.radius = v[0];
 				else if (w == "depth" && v[0] > 0.5 && v[0] <= 200.0) n.depth = v[0];
-				else if (w == "seed") n.seed = static_cast<int>(v[0]);
+				else if (w == "seed") n.seed = detail::seedOf(v[0]);
 				else return fail(usage);
 			}
 			if (!timed) return fail("`bubbles net X Z at T`: when the whale starts blowing it");
@@ -410,7 +410,7 @@ inline std::string underseaLine(Spec &s, const std::string &verb, const std::str
 			else if (w == "size" && kind == "stream" && v[0] > 0.0 && v[0] <= 10.0) st.size = v[0];
 			else if (w == "every" && kind == "breath" && v[0] >= 1.5 && v[0] <= 60.0) br.every = v[0];
 			else if (w == "at" && kind == "ring") rg.t = v[0], timed = true;
-			else if (w == "seed") st.seed = br.seed = rg.seed = static_cast<int>(v[0]);
+			else if (w == "seed") st.seed = br.seed = rg.seed = detail::seedOf(v[0]);
 			else return fail(usage);
 		}
 		if (kind == "stream") s.undersea.streams.push_back(st);
@@ -434,7 +434,7 @@ inline std::string underseaLine(Spec &s, const std::string &verb, const std::str
 		g.lo = {std::min(v[0], v[3]), std::min(v[1], v[4]), std::min(v[2], v[5])}, g.hi = {std::max(v[0], v[3]), std::max(v[1], v[4]), std::max(v[2], v[5])};
 		if (i < t.size()) {
 			if (t[i++] != "seed" || !numbers(1)) return fail(usage);
-			g.seed = static_cast<int>(v[0]);
+			g.seed = detail::seedOf(v[0]);
 		}
 		if (i < t.size()) return fail(usage);
 		s.deep.groups.push_back(g);
@@ -453,7 +453,7 @@ inline std::string underseaLine(Spec &s, const std::string &verb, const std::str
 			else if (w == "jet" && o.jets.size() < 16) o.jets.push_back(v[0]);
 			else if (w == "ink" && o.inks.size() < 8) o.inks.push_back(v[0]);
 			else if (w == "hide") o.hide = v[0];
-			else if (w == "seed") o.seed = static_cast<int>(v[0]);
+			else if (w == "seed") o.seed = detail::seedOf(v[0]);
 			else return fail(usage);
 		}
 		std::sort(o.jets.begin(), o.jets.end());
@@ -478,7 +478,7 @@ inline std::string underseaLine(Spec &s, const std::string &verb, const std::str
 			if (!numbers(1)) return fail(usage);
 			if (w == "radius" && v[0] > 0.1 && v[0] <= 500.0) sw.radius = cu.radius = v[0];
 			else if (w == "rise" && verb == "swimmers" && sw.kind == "stingrays") sw.rise = v[0];
-			else if (w == "seed") sw.seed = cu.seed = static_cast<int>(v[0]);
+			else if (w == "seed") sw.seed = cu.seed = detail::seedOf(v[0]);
 			else return fail(usage);
 		}
 		if (verb == "cuttlefish") s.deep.cuttles.push_back(cu);
@@ -496,7 +496,7 @@ inline std::string underseaLine(Spec &s, const std::string &verb, const std::str
 		p.x0 = std::min(v[0], v[2]), p.z0 = std::min(v[1], v[3]), p.x1 = std::max(v[0], v[2]), p.z1 = std::max(v[1], v[3]);
 		if (i < t.size()) {
 			if (t[i++] != "seed" || !numbers(1)) return fail(usage);
-			p.seed = static_cast<int>(v[0]);
+			p.seed = detail::seedOf(v[0]);
 		}
 		if (i < t.size()) return fail(usage);
 		s.seabed.patches.push_back(p);

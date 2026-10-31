@@ -1062,7 +1062,9 @@ void WavefrontPathTracer::renderSampleLoop(RenderCall &rc) {
 		// free medium-boundary crossings (MaterialType::Interface and the medium pass-throughs): those take an iteration
 		// here but not a bounce, and each ray's own depth (checked in the intersect and material kernels) is what enforces
 		// the real budget. The queue empties as rays finish, so the extra iterations cost nothing in a scene without media.
-		for (int depth = 0; depth < max_depth + 1 + kMaxMediumBoundaryCrossings; ++depth) {
+		// (four times the crossings the recursive renderer allows a path: a listed volume's pass-through takes one too, and a long path through murk, smoke and the sea that ran
+		// out of iterations was dropped with the light it had gathered - it is only written when the path ends)
+		for (int depth = 0; depth < max_depth + 1 + 4 * kMaxMediumBoundaryCrossings; ++depth) {
 
 			const int numRays = pendingRays;
 			if (numRays == 0) break;

@@ -359,6 +359,7 @@ class DataFilm {
 
 	std::vector<double> shotStarts() const;
 	std::vector<std::string> shotNameList() const;
+	std::string withShotCamera(const std::string &header, std::size_t k) const;   // (its cameras file's change to shot k: film_file.cpp)
 	std::string shotNames() const;
 
 	// Whether t is in the credits (after the story: `credits`), whose frames are black.
@@ -421,16 +422,25 @@ class DataFilm {
 		std::vector<double> ends;
 		LineEnds() = default;
 		LineEnds(const LineEnds &) {}
-		LineEnds &operator=(const LineEnds &) { return *this; }
+		LineEnds &operator=(const LineEnds &) {   // (a film loaded again in its place: the old film's ends are not its own)
+			const std::lock_guard<std::mutex> hold(lock);
+			ends.clear();
+			return *this;
+		}
 	};
 	mutable LineEnds lineEnds_;
 	struct Swum {   // (schoolsSwum's: a copy of the film starts without them)
-		std::mutex lock;
+		std::recursive_mutex lock;   // (recursive: see schoolsSwum)
 		bool done = false;
 		std::vector<school::School> schools;
 		Swum() = default;
 		Swum(const Swum &) {}
-		Swum &operator=(const Swum &) { return *this; }
+		Swum &operator=(const Swum &) {   // (a film loaded again in its place - the GUI after an edit: its schools are worked out afresh, not the old film's kept)
+			const std::lock_guard<std::recursive_mutex> hold(lock);
+			done = false;
+			schools.clear();
+			return *this;
+		}
 	};
 	mutable Swum swum_;
 	double progress(const Anim &anim, double t, int component) const;

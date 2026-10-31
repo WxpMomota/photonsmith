@@ -870,9 +870,14 @@ static int film_check_command(int argc, char** argv) {
 			++bad;
 			continue;
 		}
+		int firstFps = 0;   // (every part at the first part's fps, as the film list asks: cartoons.cpp addFilmFile - the check said OK to a film the list then left out)
 		for (int part = parts.parts.empty() ? -1 : 0; part < static_cast<int>(parts.parts.size()); ++part) {   // (a film in parts: each part checked as the film it is)
 			cartoon::film_file::DataFilm film;
-			const std::string problem = film.load(argv[i], part);
+			std::string problem = film.load(argv[i], part);
+			if (problem.empty() && part == 0) firstFps = film.spec.fps;
+			if (problem.empty() && part > 0 && film.spec.fps != firstFps)
+				problem = std::string(argv[i]) + ":" + std::to_string(parts.parts[static_cast<std::size_t>(part)].line) + ": the part \"" + parts.parts[static_cast<std::size_t>(part)].name +
+						  "\" has another fps than the film's first part";
 			if (!problem.empty()) {
 				std::cout << "PROBLEM  " << problem << std::endl;
 				++bad;
