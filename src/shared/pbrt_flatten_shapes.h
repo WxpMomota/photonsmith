@@ -57,18 +57,27 @@ inline bool flattenSphereShape(const pbrt_scene::Scene &scene, FlatScene &out, c
 	axisScales(xform, sc);
 	const double lo = std::fmin(sc[0], std::fmin(sc[1], sc[2]));
 	const double hi = std::fmax(sc[0], std::fmax(sc[1], sc[2]));
-	if (hi - lo > 1e-6 * std::fmax(1.0, hi)) {
+	bool ellipsoid = false;
+	if (hi - lo > 1e-6 * std::fmax(1.0, hi) || isSheared(xform)) {
 		// CPU's clipped path (sphere_clipped_hittable.h) and GPU's
 		// ClippedSphere path (pbrt_gpu_builder.h - carries the real
 		// per-sphere o2w/w2o affine, not this baked center/radius)
-		// both handle non-uniform scale EXACTLY for a clipped
-		// sphere, so no warning is needed there. "Would be an
-		// ellipsoid; emitted with its largest radius instead" only
-		// applies to an UNCLIPPED sphere, where both backends still
-		// bake down to this single center/s.radius value.
-		if (!s.clipped) {
-			warn("a sphere carries a non-uniform scale and would be an "
-				 "ellipsoid; emitted with its largest radius instead");
+		// both handle non-uniform scale EXACTLY, like pbrt's own Sphere,
+		// which intersects in object space. A full sphere takes that path
+		// too, with nothing cut away: a squashed ball is an ellipsoid. Only
+		// one bounding a medium stays baked to this single center/s.radius
+		// value, since the clipped path cannot bound a medium.
+		if (!s.clipped && shape.insideMedium < 0) {
+			ellipsoid = true;
+			s.clipped = true;
+			s.radiusLocal = r;
+			s.zMin = -r;
+			s.zMax = r;
+			s.phiMaxDeg = 360.0;
+			fromMatrix4(xform, s.xform);
+		} else if (!s.clipped) {
+			warn("a sphere bounding a medium carries a non-uniform scale and would "
+				 "be an ellipsoid; emitted with its largest radius instead");
 		}
 	}
 	s.radius = r * hi;
@@ -113,7 +122,7 @@ inline bool flattenSphereShape(const pbrt_scene::Scene &scene, FlatScene &out, c
 			s.center1[2] = s.center[2];
 		}
 	} else if (animated) {
-		warn("a clipped sphere (zmin/zmax/phimax) has an ActiveTransform "
+		warn("a clipped sphere (zmin/zmax/phimax) or an ellipsoid has an ActiveTransform "
 			 "StartTime/EndTime pair, but its own unbaked object-to-world "
 			 "affine was never wired for motion blur - rendered as static, "
 			 "at its StartTime position");
@@ -121,6 +130,12 @@ inline bool flattenSphereShape(const pbrt_scene::Scene &scene, FlatScene &out, c
 
 	s.material = shape.materialIndex;
 	s.areaLight = shape.areaLightIndex;
+	// A glowing ellipsoid: the analytic sphere light samples a whole round sphere (s.radius), so it would light the scene as that bigger ball, on every
+	// backend (5.4x too bright for one 4 times as tall as wide). As an emissive triangle mesh, its light is sampled from the shape it is.
+	if (ellipsoid && s.areaLight >= 0) {
+		quadric_tessellate::tessellateClippedSphere(s, *w.triangles);
+		return true;
+	}
 	// `medium` is populated unconditionally, regardless of clipping -
 	// an unclipped sphere has no problem bounding a medium on either
 	// backend, so both need the real index for that case.

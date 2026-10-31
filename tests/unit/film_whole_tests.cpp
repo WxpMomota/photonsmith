@@ -73,7 +73,8 @@ TEST_P(FilmRenderTestParts, EveryFilmsShotsAreWhatTheBaselineRecorded) {
 #ifndef _WIN32
 	GTEST_SKIP() << "the baseline is recorded on Windows: another platform's maths library differs in the last digits a scene's text keeps";
 #endif
-	const std::vector<const cartoon::Film *> mine = films();
+	std::vector<const cartoon::Film *> mine = films();
+	mine.erase(std::remove_if(mine.begin(), mine.end(), [](const cartoon::Film *f) { return std::string(f->key).rfind("my-", 0) == 0; }), mine.end());   // (a film of your own, in no baseline)
 	if (mine.empty()) return;
 	const std::string launcher = findRayTracerLauncher();
 	if (launcher.empty()) GTEST_SKIP() << "ray_tracer was not found";

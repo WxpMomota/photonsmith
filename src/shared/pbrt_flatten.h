@@ -19,10 +19,11 @@
 // ---------------------------------
 // Baking works exactly for triangles: any affine transform maps a triangle to
 // a triangle. It does NOT work for spheres. A non-uniform scale turns a sphere
-// into an ellipsoid, which this cannot represent, so such a sphere is emitted
-// with its largest axis and a warning. Silently emitting a round sphere where
-// the scene wanted a squashed one is the kind of difference nobody spots
-// against a reference image.
+// into an ellipsoid, which a centre and a radius cannot represent, so such a
+// sphere keeps its object-to-world transform (Sphere::clipped). One bounding a
+// medium cannot, and is emitted with its largest axis and a warning. Silently
+// emitting a round sphere where the scene wanted a squashed one is the kind of
+// difference nobody spots against a reference image.
 
 #include <algorithm>
 #include <array>
@@ -531,6 +532,18 @@ inline void axisScales(const pbrt_scene::Matrix4 &m, double *out) {
 		const double a = m.m[0 + c], b = m.m[4 + c], d = m.m[8 + c];
 		out[c] = std::sqrt(a * a + b * b + d * d);
 	}
+}
+
+// Whether the basis vectors have stopped being at right angles: a stretch along a diagonal, which can leave all three the same length.
+inline bool isSheared(const pbrt_scene::Matrix4 &m) {
+	double sc[3];
+	axisScales(m, sc);
+	for (int c = 0; c < 3; ++c) {
+		const int e = (c + 1) % 3;
+		const double dot = m.m[0 + c] * m.m[0 + e] + m.m[4 + c] * m.m[4 + e] + m.m[8 + c] * m.m[8 + e];
+		if (std::fabs(dot) > 1e-6 * sc[c] * sc[e]) return true;
+	}
+	return false;
 }
 
 // Sphere/Disk/Cylinder/InstancePlacement each carry their object-to-world

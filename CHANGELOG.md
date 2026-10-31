@@ -6,6 +6,8 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **A sphere under a non-uniform scale is an ellipsoid (2026-10-31).** It used to be baked to a round sphere of its largest radius, so `stretch` and the squash of a `hop` made a ball bigger instead of squashing it, on every renderer; only the text of the scene had been tested, and a real render found it. pbrt's sphere is an ellipsoid here (it intersects in object space), and so now is ours: on the path a clipped sphere takes, or as an emissive mesh when it glows, because the analytic sphere light is the round sphere that bounds it (measured 5.4 times too bright, within 0.5% as a mesh). A stretch along a diagonal, which leaves the basis vectors the same length, is noticed too. A sphere bounding a medium stays round with a warning, as the open clipped path cannot bound one.
+
 * **Refresh button for the scene list (2026-10-31).** A film file saved while the GUI runs is listed without a restart.
 
 * **Sound automation in the cues file (2026-10-31).** A `sample` cue takes `trim`, `fade`, `loop length L`, `curve T K ...` and `follow NAME` (as loud as a film's `light` track), and can be an MP3 or anything else ffmpeg reads.

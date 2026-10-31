@@ -393,12 +393,75 @@ TEST(FlattenTest, UniformScaleDoesNotWarn) {
 	EXPECT_DOUBLE_EQ(s.spheres[0].radius, 3.0);
 }
 
-TEST(FlattenTest, NonUniformScaleOnASphereIsReportedNotSilentlyRounded) {
-	// A squashed sphere cannot be represented, and quietly emitting a round one
-	// is exactly the difference nobody notices against a reference image.
+TEST(FlattenTest, NonUniformScaleOnASphereIsAnEllipsoid) {
+	// A squashed sphere is an ellipsoid (pbrt's own Sphere intersects in object
+	// space): it keeps its transform, on the path a clipped sphere takes, with
+	// nothing cut away. A baked centre and radius can only ever be round.
 	const FlatScene s = flattenSource(
-		"Scale 1 5 1\nShape \"sphere\" \"float radius\" [ 1 ]\n");
+		"Scale 1 5 1\nShape \"sphere\" \"float radius\" [ 2 ]\n");
 	ASSERT_EQ(s.spheres.size(), 1u);
+	EXPECT_TRUE(s.spheres[0].clipped);
+	EXPECT_DOUBLE_EQ(s.spheres[0].radiusLocal, 2.0);
+	EXPECT_DOUBLE_EQ(s.spheres[0].zMin, -2.0);
+	EXPECT_DOUBLE_EQ(s.spheres[0].zMax, 2.0);
+	EXPECT_DOUBLE_EQ(s.spheres[0].phiMaxDeg, 360.0);
+	EXPECT_DOUBLE_EQ(s.spheres[0].xform[5], 5.0) << "the scale is kept";
+	EXPECT_DOUBLE_EQ(s.spheres[0].radius, 10.0) << "and what bounds it, for its light";
+	EXPECT_FALSE(warnedAbout(s, "ellipsoid"));
+}
+
+TEST(FlattenTest, AGlowingEllipsoidIsATriangleMeshSoItsLightComesFromItsShape) {
+	// The analytic sphere light samples a whole round sphere, which would light
+	// the scene as the bigger ball that bounds this one.
+	const FlatScene s = flattenSource(
+		"AreaLightSource \"diffuse\" \"rgb L\" [ 1 1 1 ]\nScale 1 5 1\nShape \"sphere\" \"float radius\" [ 1 ]\n");
+	EXPECT_TRUE(s.spheres.empty());
+	ASSERT_FALSE(s.triangles.empty());
+	double top = 0.0, wide = 0.0;
+	for (const pbrt_flatten::Triangle &t : s.triangles) {
+		EXPECT_EQ(t.areaLight, 0);
+		for (int c = 0; c < 3; ++c) {
+			wide = std::max(wide, std::fabs(t.v[c * 3 + 0]));
+			top = std::max(top, std::fabs(t.v[c * 3 + 1]));
+		}
+	}
+	EXPECT_NEAR(wide, 1.0, 1e-3);
+	EXPECT_NEAR(top, 5.0, 1e-2);
+
+	const FlatScene round = flattenSource(
+		"AreaLightSource \"diffuse\" \"rgb L\" [ 1 1 1 ]\nScale 2 2 2\nShape \"sphere\" \"float radius\" [ 1 ]\n");
+	ASSERT_EQ(round.spheres.size(), 1u) << "a round one keeps its exact analytic light";
+	EXPECT_EQ(round.spheres[0].areaLight, 0);
+}
+
+TEST(FlattenTest, AStretchAlongADiagonalIsAnEllipsoidToo) {
+	// Stretched along (1,1,1) the three basis vectors are all the same length:
+	// only their angles give it away.
+	const FlatScene s = flattenSource(
+		"Transform [ 2 1 1 0  1 2 1 0  1 1 2 0  0 0 0 1 ]\nShape \"sphere\" \"float radius\" [ 1 ]\n");
+	ASSERT_EQ(s.spheres.size(), 1u);
+	EXPECT_TRUE(s.spheres[0].clipped);
+	const FlatScene turned = flattenSource(
+		"Rotate 30 1 2 3\nScale 3 3 3\nShape \"sphere\" \"float radius\" [ 1 ]\n");
+	ASSERT_EQ(turned.spheres.size(), 1u);
+	EXPECT_FALSE(turned.spheres[0].clipped) << "turned and evenly scaled, it is still round";
+}
+
+TEST(FlattenTest, NonUniformScaleOnASphereBoundingAMediumIsReportedNotSilentlyRounded) {
+	// The clipped path cannot bound a medium, so this one keeps its baked centre
+	// and radius, and quietly emitting a round one is exactly the difference
+	// nobody notices against a reference image.
+	const FlatScene s = flattenSource(
+		"MakeNamedMedium \"fog\" \"string type\" \"homogeneous\"\n"
+		"  \"rgb sigma_a\" [ 0.1 0.2 0.3 ] \"rgb sigma_s\" [ 1 2 3 ]\n"
+		"AttributeBegin\n"
+		"  MediumInterface \"fog\" \"\"\n"
+		"  Scale 1 5 1\n"
+		"  Shape \"sphere\" \"float radius\" [ 1 ]\n"
+		"AttributeEnd\n");
+	ASSERT_EQ(s.spheres.size(), 1u);
+	EXPECT_FALSE(s.spheres[0].clipped);
+	EXPECT_EQ(s.spheres[0].medium, 0);
 	EXPECT_TRUE(warnedAbout(s, "ellipsoid"));
 	EXPECT_DOUBLE_EQ(s.spheres[0].radius, 5.0) << "largest axis is used";
 }
@@ -517,9 +580,7 @@ TEST(FlattenTest, UnclippedSphereWithMediumInterfaceStillWorksNormally) {
 TEST(FlattenTest, NonUniformScaleOnAClippedSphereNeedsNoWarningOnEitherBackend) {
 	// Both CPU (sphere_clipped_hittable.h) and GPU (pbrt_gpu_builder.h's
 	// ClippedSphere branch) now carry a clipped sphere's real object<->world
-	// transform and handle non-uniform scale exactly - unlike an unclipped
-	// sphere, which both backends still bake down to a single world-space
-	// center+radius and so still need the "would be an ellipsoid" warning.
+	// transform and handle non-uniform scale exactly.
 	const FlatScene clipped = flattenSource(
 		"Scale 1 5 1\nShape \"sphere\" \"float radius\" [ 1 ] \"float zmin\" [ 0 ]\n");
 	ASSERT_EQ(clipped.spheres.size(), 1u);
@@ -528,11 +589,6 @@ TEST(FlattenTest, NonUniformScaleOnAClippedSphereNeedsNoWarningOnEitherBackend) 
 		<< "the ellipsoid/largest-radius wording is false for both backends' exact clipped path";
 	EXPECT_FALSE(warnedAbout(clipped, "non-uniform scale"))
 		<< "no warning is needed at all once both backends handle it exactly";
-
-	const FlatScene unclipped = flattenSource(
-		"Scale 1 5 1\nShape \"sphere\" \"float radius\" [ 1 ]\n");
-	EXPECT_TRUE(warnedAbout(unclipped, "ellipsoid"))
-		<< "unclipped spheres keep the original wording unchanged";
 }
 
 TEST(FlattenTest, ClippedSphereKeepsItsBakedCenterAndRadiusToo) {

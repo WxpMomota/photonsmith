@@ -107,6 +107,22 @@ TEST(PbrtCpuBuildTest, ClippedSphereUnderRotationHitsAtTheExactTransformedPositi
 		   "hit at t=4 (clip ignored) or miss entirely (wrong hemisphere clipped)";
 }
 
+TEST(PbrtCpuBuildTest, ASphereUnderANonUniformScaleIsHitAsAnEllipsoid) {
+	// Twice as tall and half as wide: a sphere baked to its largest radius would
+	// reach x=2, and be hit at t=3 from the side.
+	const pbrt_cpu::BuildResult b = buildFrom(
+		"Scale 0.5 2 0.5\n"
+		"Shape \"sphere\" \"float radius\" [ 1 ]\n");
+	double t = 0.0;
+	ASSERT_TRUE(castRay(b, point3(5, 0, 0), vec3(-1, 0, 0), t));
+	EXPECT_NEAR(t, 4.5, 1e-6) << "half as wide";
+	ASSERT_TRUE(castRay(b, point3(0, 5, 0), vec3(0, -1, 0), t));
+	EXPECT_NEAR(t, 3.0, 1e-6) << "twice as tall, the pole there";
+	ASSERT_TRUE(castRay(b, point3(0, 0, 5), vec3(0, 0, -1), t));
+	EXPECT_NEAR(t, 4.5, 1e-6) << "the object's own z poles, where a clip would show";
+	EXPECT_FALSE(castRay(b, point3(1, 5, 0), vec3(0, -1, 0), t)) << "and nothing out at x=1, which a round one would fill";
+}
+
 TEST(PbrtCpuBuildTest, ClippedSphereDpdvDoesNotVanishAtThePole) {
 	// phimax=90 clips azimuthally only, leaving both poles reachable - a ray
 	// straight down onto the north pole exercises sphere_clipped_hittable's

@@ -1407,10 +1407,10 @@ extern "C" int optix_render_main_sppm(
 		for (const auto& s : scene.spheres) {
 			if (s.shapeKind == GpuMediumShapeKind::ClippedSphere) {
 				std::cerr << "[OptiX] Warning: scene '" << scene_id << "' has a clipped "
-				             "sphere (\"float zmin\"/\"zmax\"/\"phimax\") but GPU SPPM does "
-				             "not implement clipping (only --gpu's recursive and "
-				             "--gpu --wavefront backends do); rendering it as a full, "
-				             "unclipped sphere.\n";
+				             "sphere (\"float zmin\"/\"zmax\"/\"phimax\") or an ellipsoid "
+				             "(a non-uniform scale) but GPU SPPM does not implement "
+				             "either (only --gpu's recursive and --gpu --wavefront "
+				             "backends do); rendering it as a full, round sphere.\n";
 				break;
 			}
 		}
