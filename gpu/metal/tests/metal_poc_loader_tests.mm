@@ -59,6 +59,28 @@ int main() {
         CHECK(!l->cylinders.empty() && l->cylinders.size() == l->cylinderMaterials.size(), "disk-cylinder-light: %zu cylinders, %zu materials", l->cylinders.size(), l->cylinderMaterials.size());
         delete l;
     }
+    {   // the volume list: each whole, still fog / smoke / cloud sphere is listed (its index stored as a float in rgbGridData and SphereData::listedMedium set), nothing else is
+        const struct { const char* scene; uint32_t listed; } cases[] = {{"fog-around-objects.pbrt", 1}, {"fire-around-ball.pbrt", 1}, {"smoke-around-camera.pbrt", 1}, {"lamp-in-fog-with-objects.pbrt", 1},
+                                                                       {"cornell-box-native.pbrt", 0}, {"clipped-spheres.pbrt", 0}};
+        for (const auto& c : cases) {
+            std::string path = scenePath(c.scene);
+            if (std::string(c.scene) == "clipped-spheres.pbrt") path = std::string(RT_SOURCE_DIR) + "/gpu/metal/tests/test_scenes/clipped-spheres.pbrt";
+            PbrtSceneLoader* l = new PbrtSceneLoader();
+            l->width = 64; l->height = 64;
+            l->pbrtScenePath = path;
+            l->loadPbrtScene();
+            CHECK(l->mediumListCount == c.listed, "%s: %u volumes listed, expected %u", c.scene, l->mediumListCount, c.listed);
+            uint32_t flagged = 0;
+            for (const SphereData& s : l->spheres) flagged += s.listedMedium > 0.5f;
+            CHECK(flagged == c.listed, "%s: %u spheres flagged, expected %u", c.scene, flagged, c.listed);
+            for (uint32_t i = 0; i < l->mediumListCount; ++i) {
+                const size_t sphere = (size_t)l->rgbGridData[l->mediumListOffset + i];
+                const uint32_t t = sphere < l->sphereMaterials.size() ? l->sphereMaterials[sphere].materialType : 0u;
+                CHECK(t >= METAL_MAT_MEDIUM_HOMOGENEOUS && t <= METAL_MAT_MEDIUM_RGB_GRID, "%s: listed entry %u is not a medium sphere", c.scene, i);
+            }
+            delete l;
+        }
+    }
     {   // hair: the material's parameters go through the named setters (matparams::setHair), the tessellated fibres carry a tangent
         PbrtSceneLoader* l = load("curve-hair-tuft.pbrt");
         CHECK(countMaterial(l->materials, METAL_MAT_HAIR) > 0, "curve-hair-tuft: no hair triangle");

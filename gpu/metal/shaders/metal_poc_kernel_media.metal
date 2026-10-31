@@ -100,6 +100,75 @@ inline bool traverseBoundedMedia(thread const KernelRes& R, thread PathState& P,
     return true;
 }
 
+// The shortest part of a flight that counts as being inside a listed volume. A ray that has just left one starts on its boundary, where float rounding (the scene sits 60 units to the side, an ulp of
+// 4e-6) can leave a hair of "flight" inside it.
+constant float kListedMinFlight = 5e-5;
+
+// The listed volumes (Uniforms::mediumListCount: fog, smoke and cloud spheres, whose boundary the trace does not report to the path's own rays): the first one the flight from the ray's origin to the
+// nearest surface (result) spends length in, and the part of the flight inside it, [listedStart, listedEnd]. A ray that starts inside one is in it from its origin, and a surface inside a volume ends the
+// flight there, as in pbrt. A glass medium's flight is the glass's own, so a path inside one finds none. listedStart stays INFINITY when there is none.
+inline void findListedVolume(thread const KernelRes& R, thread PathState& P, thread BounceState& B) {
+    KERNEL_RES_ALIASES(R)
+    PATH_STATE_ALIASES(P)
+    BOUNCE_STATE_ALIASES(B)
+    listedStart = INFINITY;
+    if (uniforms.mediumListCount == 0u || inGlass) return;
+    const float tSurface = (result.type == intersection_type::none) ? INFINITY : result.distance;
+    for (uint i = 0u; i < uniforms.mediumListCount; ++i) {
+        const uint prim = uint(rgbGridData[uniforms.mediumListOffset + i]);
+        const SphereData s = spheres[prim];
+        const float3 oc = rayOrigin - float3(s.center);
+        const float b = dot(oc, rayDir);
+        const float disc = b * b - (dot(oc, oc) - s.radius * s.radius);
+        if (!(disc > 0.0f)) continue;
+        const float root = sqrt(disc);
+        const float t0 = max(-b - root, 0.0f), t1 = min(-b + root, tSurface);
+        if (t1 - t0 > kListedMinFlight && t0 < listedStart) {
+            listedStart = t0;
+            listedEnd = t1;
+            listedPrim = prim;
+        }
+    }
+}
+
+// Samples the flight through the listed volume found by findListedVolume(): a collision scatters (B.scatteredInMedium), a flight that gets through the volume's far side goes on from there
+// (B.passedThroughMediumSphere, the next bounce looks for the next volume), and one that the nearest surface ended is left as it is: the surface is shaded with this ray's own intersection.
+inline bool traverseListedVolume(thread const KernelRes& R, thread PathState& P, thread BounceState& B) {
+    KERNEL_RES_ALIASES(R)
+    PATH_STATE_ALIASES(P)
+    BOUNCE_STATE_ALIASES(B)
+    if (!(listedStart < INFINITY)) return true;
+    const TriangleMaterial vm = sphereMaterials[listedPrim];
+    const MediumEnvRefs medEnv{envMarginalCDF, envConditionalCDF, uniforms.envMapWidth, uniforms.envMapHeight,
+                               pbrtEnvMarginalCDF, pbrtEnvConditionalCDF, uniforms.pbrtEnvMapWidth, uniforms.pbrtEnvMapHeight, earthTexture, pbrtEnvTexture};
+    const bool endedBySurface = (result.type != intersection_type::none) && listedEnd >= result.distance;
+    const float3 originBefore = rayOrigin;
+    if (vm.materialType == METAL_MAT_MEDIUM_HOMOGENEOUS) {
+        shadeHomogeneousMediumSpan(vm, listedStart, listedEnd, lights, pointLights, directionalLights, uniforms, medEnv, pbrtAreaLightTexture, textureSampler,
+            isect, accelStructure, functionTable, shadowSpherePayload,
+            rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState,
+            scatteredInMedium, passedThroughMediumSphere, mediumChan, lastBounce);
+    } else if (vm.materialType == METAL_MAT_MEDIUM_HETEROGENEOUS) {
+        shadeCloudMediumSphere(vm, listedPrim, listedEnd, spheres, shutterT,
+            cloudMediums, lights, pointLights, directionalLights, uniforms, medEnv, pbrtAreaLightTexture, textureSampler,
+            isect, accelStructure, functionTable, shadowSpherePayload,
+            rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState,
+            scatteredInMedium, passedThroughMediumSphere, envLightSampled, listedEnd, lastBounce);
+    } else if (vm.materialType == METAL_MAT_MEDIUM_RGB_GRID) {
+        shadeRgbGridMediumSphere(vm, listedPrim, listedEnd, spheres, shutterT,
+            rgbGridMediums, rgbGridData, lights, pointLights, directionalLights, uniforms, medEnv, pbrtAreaLightTexture, textureSampler,
+            isect, accelStructure, functionTable, shadowSpherePayload,
+            rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState,
+            scatteredInMedium, passedThroughMediumSphere, listedEnd, lastBounce);
+    }
+    // Through the medium up to a surface: no step to a boundary, the surface is where this ray's own trace found it.
+    if (passedThroughMediumSphere && endedBySurface) {
+        rayOrigin = originBefore;
+        passedThroughMediumSphere = false;
+    }
+    return true;
+}
+
 // The global camera medium (or the medium inside a glass sphere): samples a free-flight distance against the surface hit, and on a scatter
 // does next-event estimation with every light kind and samples a new direction (B.scatteredInMedium). Returns false when the path ends.
 inline bool scatterInGlobalMedium(thread const KernelRes& R, thread PathState& P, thread BounceState& B) {
@@ -163,6 +232,7 @@ inline bool scatterInGlobalMedium(thread const KernelRes& R, thread PathState& P
         const float shadowSigmaT = inGlass ? 0.0f : fogSigmaTHere;
         shadowSpherePayload.shadowChannel = inGlass ? glassChan : fogChan;
         float surfaceDist = (result.type == intersection_type::none) ? INFINITY : result.distance;
+        surfaceDist = min(surfaceDist, listedStart);   // the camera fog's flight ends where a listed volume begins (inside one, the volume alone is sampled)
         // The camera fog may end at a sphere (FlatScene::cameraMediumBound): only the part of the flight inside it can collide, so the flight is drawn from where it enters and
         // counts as a collision only before it leaves (a glass medium fills its whole flight).
         float flightStart = 0.0f, flightEnd = surfaceDist;

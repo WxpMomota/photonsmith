@@ -110,7 +110,7 @@ inline void shadeHomogeneousMediumSpan(
     thread float3& rayDir, thread float3& rayOrigin,
     thread float3& throughput, thread float3& radiance,
     thread float& bsdfPdf, thread bool& specularBounce, thread uint& rngState,
-    thread bool& scatteredInMedium, thread bool& passedThroughMediumSphere, thread int& mediumChan) {
+    thread bool& scatteredInMedium, thread bool& passedThroughMediumSphere, thread int& mediumChan, bool lastStep = false) {
     float sigmaT = mediumMat.ior;
     // A chromatic medium (per-channel sigma_t in conductorEta, flag in conductorK.z): this path follows ONE colour channel (the same hero channel the camera fog and glass
     // interiors use, weight x3 on it), so free flight, the albedo and the shadow rays' transmittance all use that channel's own sigma_t. One scalar (the mean) for every
@@ -141,6 +141,8 @@ inline void shadeHomogeneousMediumSpan(
     float u = randFloat(rngState);
     float tScatter = sampleFreePathDistance(u, sigmaT);
     if (tScatter < (exitT - entryT)) {
+        // The emission-only step (lastStep): a collision ends the path, with no light sampled and no new direction (pbrt's depth limit comes after the medium event).
+        if (lastStep) { scatteredInMedium = true; return; }
         float3 scatterPoint = rayOrigin + rayDir * (entryT + tScatter);
         float3 wo = -rayDir;
 
@@ -380,31 +382,8 @@ inline float3 cloudConstantSkyNee(GpuCloudMedium cloud, TriangleMaterial mediumM
         // assumed correct from the formula alone). Not
         // a bias-free match to CPU's own continuous
         // estimator - a real, documented scope cut.
-        float3 bgMo = worldToMediumPoint(cloud, mediumPoint);
-        float3 bgMd = float3(
-            cloud.worldToMediumMat[0]*bgDir.x + cloud.worldToMediumMat[1]*bgDir.y + cloud.worldToMediumMat[2]*bgDir.z,
-            cloud.worldToMediumMat[3]*bgDir.x + cloud.worldToMediumMat[4]*bgDir.y + cloud.worldToMediumMat[5]*bgDir.z,
-            cloud.worldToMediumMat[6]*bgDir.x + cloud.worldToMediumMat[7]*bgDir.y + cloud.worldToMediumMat[8]*bgDir.z);
-        float bgSegMin, bgSegMax;
-        bool bgHasSeg = cloudAabbSlabIntersect(cloud, bgMo, bgMd, bgSegMin, bgSegMax);
-        float bgS0 = 0.0, bgS1 = 0.0;
-        const bool bgInSphere = mediumSphereInterval(sphereCenter, sphereRadius, mediumPoint, bgDir, bgS0, bgS1);
-        float remainingDist = (bgHasSeg && bgSegMax > 0.0 && bgInSphere) ? min(bgSegMax, bgS1) : 0.0;
-        // Ratio tracking through the rest of the cloud (CPU's src/shared/ratio_tracking.h estimator): every majorant
-        // collision multiplies by the probability of a NULL collision, 1 - density. The old exp(-majorant * distance)
-        // treated the whole box as maximally dense, which for a cloud of any real optical depth (a pbrt scene's
-        // sigma_s 0.6 over a 160-unit box) made every environment-light NEE ray black.
-        float selfTransmittance = 1.0;
-        if (remainingDist > 0.0 && sigmaMaj > 0.0) {
-            float rt = max(max(bgSegMin, 0.0f), bgS0);
-            for (int riter = 0; riter < 256 && selfTransmittance > 1e-3; ++riter) {
-                rt += -log(max(1.0 - randFloat(rngState), 1e-8)) / sigmaMaj;
-                if (rt >= remainingDist) break;
-                float3 rp = bgMo + rt * bgMd;
-                selfTransmittance *= 1.0 - gpuCloudDensity(cloud, rp.x, rp.y, rp.z);
-            }
-        }
-
+        // (The rest of the cloud is crossed by the shadow ray below, which sphereIntersectionFunction attenuates by ratio tracking, CPU's src/shared/ratio_tracking.h; an earlier version
+        // estimated that here from the majorant, then by ratio tracking, over the box exit distance.)
         ray bgShadowRay;
         bgShadowRay.origin = mediumPoint;
         bgShadowRay.direction = bgDir;
@@ -412,7 +391,7 @@ inline float3 cloudConstantSkyNee(GpuCloudMedium cloud, TriangleMaterial mediumM
         bgShadowRay.max_distance = 1.0e6f;
         intersection_result<instancing, triangle_data> bgShadowResult =
             traceShadowAnyP(isect, bgShadowRay, accelStructure, functionTable, shadowSpherePayload);
-        return bgShadowResult.type == intersection_type::none ? float3(uniforms.pbrtEnvColor) * selfTransmittance : float3(0.0);
+        return bgShadowResult.type == intersection_type::none ? float3(uniforms.pbrtEnvColor) : float3(0.0);
 }
 
 // materialType 29 (E2, section 178) - heterogeneous, procedural
@@ -434,7 +413,7 @@ inline void shadeCloudMediumSphere(
     thread float3& throughput, thread float3& radiance,
     thread float& bsdfPdf, thread bool& specularBounce, thread uint& rngState,
     thread bool& scatteredInMedium, thread bool& passedThroughMediumSphere,
-    thread bool& envLightSampled) {
+    thread bool& envLightSampled, float flightEnd = INFINITY, bool lastStep = false) {
     // E2/section 178: heterogeneous, procedural Perlin-
     // noise cloud - delta tracking (null-collision free-
     // path sampling, pbrt-v4 SampleT_maj) through the
@@ -470,6 +449,7 @@ inline void shadeCloudMediumSphere(
     float sph0 = 0.0, sph1 = entryDistance;
     if (!mediumSphereInterval(sphereCenter, sphereRadius, rayOrigin, rayDir, sph0, sph1)) { sph0 = 0.0; sph1 = entryDistance; }
     sph0 = max(sph0, 0.0f);
+    sph1 = min(sph1, flightEnd);   // a listed volume: the flight ends at the nearest surface
     if (hasSeg) {
         segMin = max(segMin, sph0);
         segMax = min(segMax, sph1);
@@ -502,6 +482,10 @@ inline void shadeCloudMediumSphere(
         }
     }
 
+    if (didScatter && lastStep) {   // the emission-only step: a collision ends the path
+        scatteredInMedium = true;
+        return;
+    }
     if (didScatter) {
         // NEE only fires when a REAL area light is
         // registered - unlike A8/E1 (materialType 28's own
@@ -580,7 +564,7 @@ inline void shadeCloudMediumSphere(
             if (plShadowResult.type == intersection_type::none) {
                 const float plPhase = henyeyGreensteinPhase(dot(wo, plWi), mediumMat.roughness);
                 const float plSpot = spotLightFalloff(-plWi, float3(pl.direction), pl.cosOuterAngle, pl.cosInnerAngle);
-                const float tr = cloudShadowTransmittance(cloud, sphereCenter, sphereRadius, mediumPoint, plWi, plDist, sigmaMaj, rngState);
+                const float tr = 1.0;   // (the shadow ray is attenuated by the sphere when it is traced: sphereIntersectionFunction)
                 radiance += throughput * float3(mediumMat.color) * plPhase * float3(pl.emission) * plSpot * tr / plDistSq;
             }
         }
@@ -595,7 +579,7 @@ inline void shadeCloudMediumSphere(
             intersection_result<instancing, triangle_data> dlShadowResult =
                 traceShadowAnyP(isect, dlShadowRay, accelStructure, functionTable, shadowSpherePayload);
             if (dlShadowResult.type == intersection_type::none) {
-                const float tr = cloudShadowTransmittance(cloud, sphereCenter, sphereRadius, mediumPoint, dlWi, kDirectionalLightMaxDistance, sigmaMaj, rngState);
+                const float tr = 1.0;   // (as above)
                 radiance += throughput * float3(mediumMat.color) * henyeyGreensteinPhase(dot(wo, dlWi), mediumMat.roughness) * float3(dl.emission) * tr;
             }
         }
@@ -658,7 +642,7 @@ inline void shadeCloudMediumSphere(
             float3 envWi;
             const float3 envL = mediumEnvLightVisible(uniforms, medEnv, textureSampler, mediumPoint, wo, mediumMat.roughness, rngState, isect, accelStructure, functionTable, shadowSpherePayload, envWi);
             if (any(envL > 0.0f))
-                radiance += throughput * float3(mediumMat.color) * envL * cloudShadowTransmittance(cloud, sphereCenter, sphereRadius, mediumPoint, envWi, 1e5f, sigmaMaj, rngState);
+                radiance += throughput * float3(mediumMat.color) * envL;
         }
 
         // The environment light was just sampled directly (the NEE ray above, drawn from the same phase function as the
@@ -734,6 +718,17 @@ inline float3 rgbGridShadowTransmittance(GpuRgbGridMedium grid, device const flo
     return tr;
 }
 
+inline float volumeShadowPass(uint materialType, TriangleMaterial vm, float3 center, float radius, float3 origin, float3 dir, float tMax, uint seed,
+                              device const GpuCloudMedium* cloudMediums, device const GpuRgbGridMedium* rgbGridMediums, device const float* rgbGridData) {
+    uint st = seed ^ 0x9e3779b9u;
+    if (materialType == 30u) {
+        const float3 tr = rgbGridShadowTransmittance(rgbGridMediums[matMediumBufferIndex(vm)], rgbGridData, center, radius, origin, dir, tMax, st);
+        return (tr.x + tr.y + tr.z) * (1.0f / 3.0f);
+    }
+    const GpuCloudMedium cloud = cloudMediums[matMediumBufferIndex(vm)];
+    return cloudShadowTransmittance(cloud, center, radius, origin, dir, tMax, cloud.sigmaA + cloud.sigmaS, st);
+}
+
 // materialType 30 (E4, section 179) - heterogeneous per-voxel R/G/B RgbGridMedium: spectral tracking against one scalar
 // majorant, the same model as the CPU's rgb_grid_medium_hittable.h and OptiX's heterogeneous_tracking_step
 // (src/shared/volume_scattering.h). At each tentative collision a REAL event happens with probability mean_c(sigma_t_c)/majorant
@@ -760,7 +755,7 @@ inline void shadeRgbGridMediumSphere(
     thread float3& rayDir, thread float3& rayOrigin,
     thread float3& throughput, thread float3& radiance,
     thread float& bsdfPdf, thread bool& specularBounce, thread uint& rngState,
-    thread bool& scatteredInMedium, thread bool& passedThroughMediumSphere) {
+    thread bool& scatteredInMedium, thread bool& passedThroughMediumSphere, float flightEnd = INFINITY, bool lastStep = false) {
     GpuRgbGridMedium grid = rgbGridMediums[matMediumBufferIndex(mediumMat)];
     float3 mo = rgbGridWorldToMediumPoint(grid, rayOrigin);
     float3 md = float3(
@@ -779,6 +774,7 @@ inline void shadeRgbGridMediumSphere(
     float sph0 = 0.0, sph1 = entryDistance;
     if (!mediumSphereInterval(sphereCenter, sphereRadius, rayOrigin, rayDir, sph0, sph1)) { sph0 = 0.0; sph1 = entryDistance; }
     sph0 = max(sph0, 0.0f);
+    sph1 = min(sph1, flightEnd);   // a listed volume: the flight ends at the nearest surface
     if (hasSeg) {
         segMin = max(segMin, sph0);
         segMax = min(segMax, sph1);
@@ -815,6 +811,10 @@ inline void shadeRgbGridMediumSphere(
         }
     }
 
+    if (didScatter && lastStep) {   // the emission-only step: a collision ends the path (pbrt adds the grid's emission only below the depth limit)
+        scatteredInMedium = true;
+        return;
+    }
     if (didScatter) {
         // Self-emission at the real collision (pbrt "rgb Le" x "Lescale"), weighted by this event's absorption share, the same
         // estimator as the CPU rgb_grid_medium_hittable::sample_event and the OptiX grid.
@@ -850,7 +850,7 @@ inline void shadeRgbGridMediumSphere(
                     float phaseValue = henyeyGreensteinPhase(dot(wo, wi), grid.phaseG);
                     float weight = (pdfSolidAngle * pdfSolidAngle)
                         / (pdfSolidAngle * pdfSolidAngle + phaseValue * phaseValue);
-                    const float3 tr = rgbGridShadowTransmittance(grid, rgbGridData, sphereCenter, sphereRadius, mediumPoint, wi, dist, rngState);
+                    const float3 tr = float3(1.0);   // (the shadow ray is attenuated by the sphere when it is traced: sphereIntersectionFunction)
                     radiance += throughput * collideW * tr * phaseValue * ls.emission / pdfSolidAngle * weight;
                 }
             }
@@ -872,7 +872,7 @@ inline void shadeRgbGridMediumSphere(
             if (plShadowResult.type == intersection_type::none) {
                 float plPhase = henyeyGreensteinPhase(dot(wo, plWi), grid.phaseG);
                 float plSpot = spotLightFalloff(-plWi, float3(pl.direction), pl.cosOuterAngle, pl.cosInnerAngle);
-                const float3 tr = rgbGridShadowTransmittance(grid, rgbGridData, sphereCenter, sphereRadius, mediumPoint, plWi, plDist, rngState);
+                const float3 tr = float3(1.0);   // (as above)
                 radiance += throughput * collideW * tr * plPhase * float3(pl.emission) * plSpot / plDistSq;
             }
         }
@@ -890,7 +890,7 @@ inline void shadeRgbGridMediumSphere(
                 traceShadowAnyP(isect, dlShadowRay, accelStructure, functionTable, shadowSpherePayload);
             if (dlShadowResult.type == intersection_type::none) {
                 const float dlPhase = henyeyGreensteinPhase(dot(wo, dlWi), grid.phaseG);
-                const float3 tr = rgbGridShadowTransmittance(grid, rgbGridData, sphereCenter, sphereRadius, mediumPoint, dlWi, kDirectionalLightMaxDistance, rngState);
+                const float3 tr = float3(1.0);   // (as above)
                 radiance += throughput * collideW * tr * dlPhase * float3(dl.emission);
             }
         }
@@ -900,7 +900,7 @@ inline void shadeRgbGridMediumSphere(
             float3 envWi;
             const float3 envL = mediumEnvLightVisible(uniforms, medEnv, textureSampler, mediumPoint, wo, grid.phaseG, rngState, isect, accelStructure, functionTable, shadowSpherePayload, envWi);
             if (any(envL > 0.0f))
-                radiance += throughput * collideW * rgbGridShadowTransmittance(grid, rgbGridData, sphereCenter, sphereRadius, mediumPoint, envWi, 1e5f, rngState) * envL;
+                radiance += throughput * collideW * envL;
         }
 
         float3 newDir = sampleHenyeyGreenstein(wo, grid.phaseG, rngState);

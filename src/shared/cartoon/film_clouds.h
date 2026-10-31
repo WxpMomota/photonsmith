@@ -10,7 +10,7 @@
 // spheres never overlap (where two overlap, the GPU samples the second only beyond the first one's far side), and wrap round the area as they drift, so the sky never empties.
 //
 // The camera may be inside one, and the land may run through one (a fog bank always has the ground in it): every renderer samples a volume along each ray up to the nearest
-// surface (the GPU's wavefront renderer since 2026-10-27; the default one hands such a frame to it). Only the Mac's renderer still sees a volume from inside in part.
+// surface (the GPU's wavefront renderer since 2026-10-27, the default one hands such a frame to it; Metal since 2026-10-30).
 
 #include <algorithm>
 #include <cmath>

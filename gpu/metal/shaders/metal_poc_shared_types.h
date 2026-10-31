@@ -322,6 +322,9 @@ struct SphereData {
     float phiMax = 6.2831853f;
     float o2w[12] = {1, 0, 0, 0,  0, 1, 0, 0,  0, 0, 1, 0};   // object -> Metal world, 3x4 row-major
     float w2o[12] = {1, 0, 0, 0,  0, 1, 0, 0,  0, 0, 1, 0};   // and back
+    // 1 for a sphere that is a volume of the list (Uniforms::mediumListOffset / mediumListCount): the trace skips it for the path's own rays, and the kernel samples the part of each
+    // flight that lies inside it, up to the nearest surface (traverseListedVolume, metal_poc_kernel_media.metal).
+    float listedMedium = 0.0f;
 };
 
 // A second, genuinely DIFFERENT custom-primitive shape - not another

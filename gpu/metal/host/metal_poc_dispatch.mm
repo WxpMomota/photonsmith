@@ -309,6 +309,9 @@ bool MetalPocApp::dsBuildPipeline(DispatchState& s) {
     [functionTable setBuffer:uvBuffer offset:0 atIndex:6];
     [functionTable setBuffer:rgbGridDataBuffer offset:0 atIndex:7];
     [functionTable setBuffer:instanceTransformBuffer offset:0 atIndex:8];   // an instanced group's triangles are found at the instance's triBase
+    // Slots 9 and 10: the grid and cloud media a shadow ray crosses (sphereIntersectionFunction attenuates it by their transmittance).
+    [functionTable setBuffer:rgbGridMediumBuffer offset:0 atIndex:9];
+    [functionTable setBuffer:cloudMediumBuffer offset:0 atIndex:10];
     // sphereIntersectionFunction/diskIntersectionFunction/
     // cylinderIntersectionFunction each read their own geometry buffer
     // (metal_poc.metal buffer(0)/buffer(1)/buffer(2) respectively - a
@@ -741,6 +744,8 @@ void MetalPocApp::applyPbrtMediumUniforms(Uniforms& uniforms) {
     for (const TriangleMaterial& cm : cylinderMaterials)
         if (cm.materialType == METAL_MAT_MEDIUM_HOMOGENEOUS && matparams::mediumIsChromatic(cm)) chromaticShapeMedium = 2u;
     uniforms.fogChromatic = chromaticShapeMedium;
+    uniforms.mediumListOffset = mediumListOffset;   // the volumes are listed whether or not the camera has a medium of its own
+    uniforms.mediumListCount = mediumListCount;
     if (havePbrtMedium) {
         uniforms.fogSigmaT = pbrtFogSigmaT;
         uniforms.fogSigmaT3 = PackedFloat3{pbrtFogSigmaT3.x, pbrtFogSigmaT3.y, pbrtFogSigmaT3.z};

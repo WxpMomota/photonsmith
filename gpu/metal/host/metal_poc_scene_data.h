@@ -191,6 +191,9 @@ struct PbrtSceneLoader {
     // The camera medium ends at a sphere (FlatScene::cameraMediumBound), in the Metal world; radius 0 = it fills all of space.
     float3 pbrtFogBoundCenter{0, 0, 0};
     float pbrtFogBoundRadius = 0.0f;
+    // The volumes whose flight the kernel samples up to the nearest surface (Uniforms::mediumListOffset / mediumListCount): their sphere indices are stored as floats in rgbGridData.
+    uint32_t mediumListOffset = 0;
+    uint32_t mediumListCount = 0;
 
     // pbrt-v4 Film "maxcomponentvalue" (FlatScene::maxComponentValue), applied by
     // the kernel as a per-sample firefly clamp. 1e9 = pbrt's default (unbounded).
@@ -477,6 +480,7 @@ struct PbrtSceneLoader {
     bool addGoniometricImageLight(const pbrt_flatten::PunctualLight& pl, const PbrtToWorldFn& toWorld, const float3& emission);
     bool addProjectionImageLight(const pbrt_flatten::PunctualLight& pl, const PbrtToWorldFn& toWorld, float intensityScale);
     void loadPbrtMedium(const pbrt_flatten::FlatScene& scene, float sceneScale);
+    void listMediumVolumes();
     void loadPbrtInfiniteLight(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld);
     void loadPbrtCamera(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
         float3 bboxCenter, float sceneScale, float3 sceneOffset);
