@@ -9,6 +9,8 @@
 //   build ID from T0 to T1 [rise|pop|pieces]         it grows into being: rising out of the ground, popping up with an overshoot, or piece after piece
 //   vanish ID from T0 to T1                          it breaks up into its triangles, falling away in a scatter
 //   wobble ID.PIECE [AMOUNT]                         the piece lags behind as the model moves and springs back: a jelly, a belly, antennae
+//   pose ID BONE [axis X Y Z] T DEG  T DEG ...       a bone of the placed model's (`bone NAME from .. to ..`, model_skin.h) turned about its start over time, in the
+//                                                    model's own space (axis 1 0 0 unless given; several lines on one bone turn it in the order written)
 //
 //   spin ID.PIECE about X Y Z axis X Y Z rpm R [from T0] [to T1]       a wheel, a fan, a propeller, a clock's hand turning
 //   gear ID.PIECE driven-by ID.PIECE ratio K about X Y Z axis X Y Z    turning as a meshed gear does: the other way, K times as fast
@@ -35,6 +37,11 @@ namespace model {
 
 struct Flex {
 	std::string name, kind;
+	std::vector<std::pair<double, double>> keys;
+};
+struct Pose {   // (`pose ID BONE [axis X Y Z] T DEG ...`: a bone of its own turned over time, model_skin.h)
+	std::string id, bone;
+	Vec3 axis{1.0, 0.0, 0.0};
 	std::vector<std::pair<double, double>> keys;
 };
 struct Morph {
@@ -67,10 +74,11 @@ struct Animated {
 	std::vector<Vanish> vanishes;
 	std::vector<Wobble> wobbles;
 	std::vector<Mech> mechs;
+	std::vector<Pose> poses;
 	bool names(const std::string &n) const {
 		const auto has = [&](const auto &v) { return std::any_of(v.begin(), v.end(), [&](const auto &x) { return x.name == n; }); };
 		const auto hasId = [&](const auto &v) { return std::any_of(v.begin(), v.end(), [&](const auto &x) { return x.id == n; }); };
-		return has(flexes) || has(wobbles) || has(mechs) || hasId(morphs) || hasId(builds) || hasId(vanishes);
+		return has(flexes) || has(wobbles) || has(mechs) || hasId(morphs) || hasId(builds) || hasId(vanishes) || hasId(poses);
 	}
 };
 

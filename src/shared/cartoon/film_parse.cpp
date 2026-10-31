@@ -804,14 +804,14 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 				else if (t[i] == "fov" && v > 0.5 && v < 179.0) shot.follow.fov = v;   // (degrees, more than 0 and less than 180)
 				else return fail("\"" + t[i] + "\": a follow takes behind, up, side and fov");
 			}
-		} else if (verb == "move" || verb == "turn" || verb == "grow" || verb == "light" || verb == "show") {
+		} else if (verb == "move" || verb == "turn" || verb == "grow" || verb == "light" || verb == "show" || verb == "stretch" || verb == "resize") {
 			if (w.size() < 3) return fail("`" + verb + " NAME ...` needs a name and values");
 			Anim a;
 			a.name = w[1];
 			a.line = n;
 			std::size_t i = 2;
-			const std::size_t group = verb == "move" ? 4 : 2;
-			a.kind = verb == "move" ? Kind::Move : verb == "turn" ? Kind::Turn : verb == "grow" ? Kind::Grow : verb == "light" ? Kind::Light : Kind::Show;
+			const std::size_t group = verb == "move" || verb == "resize" ? 4 : 2;
+			a.kind = verb == "move" ? Kind::Move : verb == "turn" ? Kind::Turn : verb == "grow" ? Kind::Grow : verb == "light" ? Kind::Light : verb == "stretch" ? Kind::Stretch : verb == "resize" ? Kind::Resize : Kind::Show;
 			while (i < w.size() && (w[i] == "about" || w[i] == "axis" || w[i] == "ease")) {
 				if (w[i] == "ease") {   // its own curve (ease_curves.h)
 					if (i + 1 >= w.size() || !ease_curves::known(w[i + 1])) return fail("`ease` on a line takes a curve: smooth, linear, in, out, back, elastic, bounce");
@@ -819,14 +819,14 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 					i += 2;
 					continue;
 				}
-				if (a.kind != Kind::Turn && !(a.kind == Kind::Grow && w[i] == "about")) return fail("`" + w[i] + "` is not used by " + verb);
+				if (a.kind != Kind::Turn && a.kind != Kind::Stretch && !((a.kind == Kind::Grow || a.kind == Kind::Resize) && w[i] == "about")) return fail("`" + w[i] + "` is not used by " + verb);
 				double *dst = w[i] == "about" ? a.about : a.axis;
 				if (i + 3 >= w.size()) return fail("`" + w[i] + "` needs three numbers");
 				for (int k = 0; k < 3; ++k)
 					if (!number(w[i + 1 + k], dst[k])) return fail("`" + w[i] + "` needs three numbers");
 				i += 4;
 			}
-			if (a.kind == Kind::Turn && std::abs(a.axis[0]) + std::abs(a.axis[1]) + std::abs(a.axis[2]) == 0.0) return fail("a turn's axis must not be 0 0 0");
+			if ((a.kind == Kind::Turn || a.kind == Kind::Stretch) && std::abs(a.axis[0]) + std::abs(a.axis[1]) + std::abs(a.axis[2]) == 0.0) return fail("a turn's axis must not be 0 0 0");
 			const std::size_t count = w.size() - i;
 			if (count == 0 || count % group != 0) return fail("`" + verb + "` takes " + (group == 4 ? "groups of time x y z" : "pairs of numbers") + " after the name");
 			for (; i < w.size(); i += group) {

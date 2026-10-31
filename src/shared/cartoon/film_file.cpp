@@ -1791,6 +1791,17 @@ std::string DataFilm::transformsAt(const std::string &name, double t) const {
 			const double k = std::max(1e-6, progress(a, t, 0));
 			out += "  Translate " + num(a.about[0]) + " " + num(a.about[1]) + " " + num(a.about[2]) + "\n  Scale " + num(k) + " " + num(k) + " " + num(k) + "\n  Translate " + num(-a.about[0]) + " " +
 				   num(-a.about[1]) + " " + num(-a.about[2]) + "\n";
+		} else if (a.kind == Kind::Stretch) {
+			const double k = std::max(1e-6, progress(a, t, 0)), across = 1.0 / std::sqrt(k);
+			double degrees = 0.0;
+			Vec3 axis;
+			stretchTurn(a.axis, degrees, axis);
+			const std::string about = num(a.about[0]) + " " + num(a.about[1]) + " " + num(a.about[2]), around = num(axis.x) + " " + num(axis.y) + " " + num(axis.z);
+			out += "  Translate " + about + "\n  Rotate " + num(degrees) + " " + around + "\n  Scale " + num(across) + " " + num(k) + " " + num(across) + "\n  Rotate " + num(-degrees) + " " + around +
+				   "\n  Translate " + num(-a.about[0]) + " " + num(-a.about[1]) + " " + num(-a.about[2]) + "\n";
+		} else if (a.kind == Kind::Resize) {
+			out += "  Translate " + num(a.about[0]) + " " + num(a.about[1]) + " " + num(a.about[2]) + "\n  Scale " + num(std::max(1e-6, progress(a, t, 0))) + " " + num(std::max(1e-6, progress(a, t, 1))) + " " +
+				   num(std::max(1e-6, progress(a, t, 2))) + "\n  Translate " + num(-a.about[0]) + " " + num(-a.about[1]) + " " + num(-a.about[2]) + "\n";
 		}
 	}
 	return out;

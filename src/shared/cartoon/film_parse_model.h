@@ -23,7 +23,7 @@ inline bool modelNamed(const Spec &s, const std::string &line) {
 
 // (modeling round 3) the lines that change a placed model's shape or move its pieces (model_anim.h) and put it in the rigid-body world: "" or what is wrong.
 inline bool modelAnimVerb(const std::string &verb) {
-	static const std::vector<std::string> k = {"flex", "morph", "build", "vanish", "wobble", "spin", "gear", "piston", "roll", "route", "aim", "attach", "rigidbody"};
+	static const std::vector<std::string> k = {"flex", "pose", "morph", "build", "vanish", "wobble", "spin", "gear", "piston", "roll", "route", "aim", "attach", "rigidbody"};
 	return std::find(k.begin(), k.end(), verb) != k.end();
 }
 inline std::string modelAnimLine(Spec &s, const std::string &verb, const std::string &line) {
@@ -71,6 +71,25 @@ inline std::string modelAnimLine(Spec &s, const std::string &verb, const std::st
 		f.kind = t[2], i = 3;
 		if (!timeKeys(f.keys)) return "`flex ID.PIECE KIND T V  T V ...` (pairs of time and amount)";
 		a.flexes.push_back(f);
+		return std::string();
+	}
+	if (verb == "pose") {
+		const char *usage = "`pose ID BONE [axis X Y Z] T DEG  T DEG ...` (pairs of time and degrees)";
+		model::Pose p;
+		if (t.size() < 5) return usage;
+		p.id = name, p.bone = t[2], i = 3;
+		const auto mdl = std::find_if(s.models.begin(), s.models.end(), [&](const model::Model &m) { return m.name == placed->model; });
+		const bool known = mdl != s.models.end() && std::any_of(mdl->parts.begin(), mdl->parts.end(), [&](const model::Part &q) {
+			return std::any_of(q.bones.begin(), q.bones.end(), [&](const model::Bone &b) { return b.name == p.bone; });
+		});
+		if (!known) return "`pose " + name + " " + p.bone + "`: model " + placed->model + " has no `bone " + p.bone + "`";
+		if (t[i] == "axis") {
+			++i;
+			if (!numbers(3) || !(v[0] != 0.0 || v[1] != 0.0 || v[2] != 0.0)) return usage;
+			p.axis = {v[0], v[1], v[2]};
+		}
+		if (!timeKeys(p.keys)) return usage;
+		a.poses.push_back(p);
 		return std::string();
 	}
 	if (verb == "morph") {

@@ -86,7 +86,7 @@
 namespace cartoon {
 namespace film_file {
 
-enum class Kind { Move, Turn, Grow, Light, Show };
+enum class Kind { Move, Turn, Grow, Light, Show, Stretch, Resize };
 
 struct Key {
 	double t = 0.0;
@@ -99,10 +99,18 @@ struct Anim {
 	int line = 0;
 	double about[3] = {0.0, 0.0, 0.0};
 	double axis[3] = {0.0, 1.0, 0.0};
-	std::vector<Key> keys;                               // Move: v = the offset; Turn: v[0] = degrees; Grow and Light: v[0] = the factor
+	std::vector<Key> keys;                               // Move: v = the offset; Turn: v[0] = degrees; Grow, Light and Stretch: v[0] = the factor; Resize: v = the three factors
 	std::vector<std::pair<double, double>> intervals;   // Show
 	std::string ease;                                    // its own curve (`ease back` on its line: ease_curves.h); "": the film's
 };
+
+// How a `stretch` axis is reached from y (the turn: `degrees` about `axis`; none when it is y already): the stretch is that turn, a scale, and the turn back.
+inline void stretchTurn(const double along[3], double &degrees, Vec3 &axis) {
+	const Vec3 d = normalize(Vec3{along[0], along[1], along[2]});
+	axis = cross(Vec3{0.0, 1.0, 0.0}, d);
+	degrees = length(axis) > 1e-9 ? std::acos(std::clamp(d.y, -1.0, 1.0)) * 180.0 / kPi : (d.y < 0.0 ? 180.0 : 0.0);
+	if (length(axis) <= 1e-9) axis = {1.0, 0.0, 0.0};
+}
 
 // A shot's camera that follows a character (`follow NAME behind D up H side S fov F`).
 struct Follow {

@@ -2601,6 +2601,12 @@ sweet); an imported mesh's colour, roughness and normal pictures on its own uvs.
 font (Arial unless named; film_assets/fonts, the system's fonts or a path), a capital H metres tall - a shop sign, a title, a name on a door. `unwrap` gives a piece chart
 uvs (its surface cut into near-flat charts along its creases, each laid flat and packed) for its paint, its baked normal map and its export, in place of box projection.
 
+### Film tools from a Blender course scene (2026-10-31)
+
+**Bones of your own: `bone NAME from X Y Z to X Y Z [parent NAME] [radius R]`, `pose ID BONE [axis X Y Z] T DEG  T DEG ...`.** (model_skin.h) On any piece of a placed model, an imported mesh too. A bone with a `radius` moves only the skin within R of it, fading smoothly to nothing, the rest staying exactly where it is: an ear droops, a cheek lifts, a tail curls with no seam. A child rides on its parent's turn. `pose` keys a bone's turn over time in the model's own space; several lines on one bone turn it in the order written. An imported mesh keeps its picture, uvs and normals as it bends.
+
+**Squash and stretch: `stretch NAME [about X Y Z] [axis X Y Z] T V  T V ...`, `resize NAME [about X Y Z] T SX SY SZ ...`.** On any `# @anim` block or placed model. `stretch` makes it V times as long along the axis (y unless given) and thinner to match, so its volume stays; `resize` scales each axis on its own.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

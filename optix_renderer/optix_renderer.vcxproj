@@ -163,14 +163,14 @@
     <MakeDir Directories="$(PackageDir)" Condition="!Exists('$(PackageDir)')" />
     <!-- Copy PTX shader to package directory -->
     <Message Text="[Post-Build] Copying optix_programs.ptx to RayTracer_Package..." Importance="high" />
-    <Copy SourceFiles="$(PtxSource)" DestinationFiles="$(PackageDir)\optix_programs.ptx" SkipUnchangedFiles="false" Condition="Exists('$(PtxSource)')" />
+    <Copy SourceFiles="$(PtxSource)" DestinationFiles="$(PackageDir)\optix_programs.ptx" SkipUnchangedFiles="true" Condition="Exists('$(PtxSource)')" />
     <!-- The geometry modules of the recursive backend (optix_programs_sphere.ptx, ...): see gpu\optix\optix_programs.cu. -->
     <ItemGroup>
       <OptixModulePtx Include="$(MSBuildProjectDirectory)\..\gpu\optix\optix_programs_*.ptx" />
     </ItemGroup>
-    <Copy SourceFiles="@(OptixModulePtx)" DestinationFolder="$(PackageDir)" SkipUnchangedFiles="false" />
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\..\gpu\optix\wavefront_programs.ptx" DestinationFiles="$(PackageDir)\wavefront_programs.ptx" SkipUnchangedFiles="false" Condition="Exists('$(MSBuildProjectDirectory)\..\gpu\optix\wavefront_programs.ptx')" />
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\..\gpu\optix\sppm_programs.ptx" DestinationFiles="$(PackageDir)\sppm_programs.ptx" SkipUnchangedFiles="false" Condition="Exists('$(MSBuildProjectDirectory)\..\gpu\optix\sppm_programs.ptx')" />
+    <Copy SourceFiles="@(OptixModulePtx)" DestinationFolder="$(PackageDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\..\gpu\optix\wavefront_programs.ptx" DestinationFiles="$(PackageDir)\wavefront_programs.ptx" SkipUnchangedFiles="true" Condition="Exists('$(MSBuildProjectDirectory)\..\gpu\optix\wavefront_programs.ptx')" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\..\gpu\optix\sppm_programs.ptx" DestinationFiles="$(PackageDir)\sppm_programs.ptx" SkipUnchangedFiles="true" Condition="Exists('$(MSBuildProjectDirectory)\..\gpu\optix\sppm_programs.ptx')" />
     <Message Text="[Post-Build] Deployed: $(PackageDir)\optix_programs.ptx" Importance="high" Condition="Exists('$(PtxSource)')" />
     <Warning Text="[Post-Build] PTX not found at $(PtxSource). Run PTX compile step first." Condition="!Exists('$(PtxSource)')" />
   </Target>

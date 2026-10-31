@@ -7,6 +7,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -71,6 +72,76 @@ TEST(FilmModel3, ASkinBendsWithItsBones) {
 }
 
 // ---- 1 and 2: a skinned character with a face ----
+// Bones of your own: only the skin within reach moves, it fades smoothly to nothing (no seam), the rest stays exactly where it is, and a child rides on its parent.
+TEST(FilmModel3, ABoneOfYourOwnBendsOnlyTheSkinNearIt) {
+	cartoon::Mesh m;
+	for (int k = 0; k <= 40; ++k) m.verts.push_back({0.0, k * 0.05, 0.0});
+	m.normals.assign(m.verts.size(), V3{1, 0, 0});
+	m.tris.push_back({0, 1, 2});
+	model::Bone ear;
+	ear.name = "ear", ear.a = {0, 1.5, 0}, ear.b = {0, 2.0, 0}, ear.radius = 0.6;
+	const model::Weights w = model::weightsOf(m, {ear});
+	const cartoon::Mat4 turn = cartoon::mul(cartoon::translate(ear.a), cartoon::rotate({0, 0, 1}, 60.0), cartoon::translate(ear.a * -1.0));
+	const cartoon::Mesh posed = model::skinned(m, w, {turn});
+	for (std::size_t v = 0; v <= 17; ++v) EXPECT_EQ(posed.verts[v].x, m.verts[v].x) << "out of reach stays at rest, vertex " << v;
+	EXPECT_LT(posed.verts[40].x, -0.3) << "the tip follows the bone";
+	double largest = 0.0;
+	for (std::size_t v = 1; v < m.verts.size(); ++v) largest = std::max(largest, cartoon::length(posed.verts[v] - posed.verts[v - 1]));
+	EXPECT_LT(largest, 0.12) << "no tear between neighbours (they were 0.05 apart)";
+
+	model::Bone root, tip;
+	root.name = "root", root.a = {0, 0, 0}, root.b = {0, 1, 0};
+	tip.name = "tip", tip.a = {0, 1, 0}, tip.b = {0, 2, 0}, tip.parent = "root";
+	const cartoon::Mat4 r = cartoon::rotate({0, 0, 1}, 90.0);
+	const std::vector<cartoon::Mat4> chained = model::chainedPoses({tip, root}, {cartoon::identity(), r});
+	const V3 q = cartoon::transformPoint(chained[0], V3{0, 2, 0});
+	EXPECT_NEAR(q.x, -2.0, 1e-9) << "the child rides on its parent's turn";
+	EXPECT_NEAR(q.y, 0.0, 1e-9);
+}
+
+// In a film: a placed model's own bone posed over time reshapes it, an imported mesh keeps its picture and uvs as it bends, a bone that is not there is said.
+TEST(FilmModel3, PoseInAFilmKeepsAnImportedMeshsPicture) {
+	const std::filesystem::path d = std::filesystem::temp_directory_path() / "photonsmith_model3_test_pose";
+	std::filesystem::create_directories(d);
+	std::ofstream(d / "strip.obj", std::ios::binary) << "v -0.1 0 0\nv 0.1 0 0\nv 0.1 1 0\nv -0.1 1 0\nv -0.1 2 0\nv 0.1 2 0\nvt 0 0\nvt 1 0\nvt 1 0.5\nvt 0 0.5\nvt 0 1\nvt 1 1\nf 1/1 2/2 3/3\nf 1/1 3/3 4/4\nf 4/4 3/3 6/6\nf 4/4 6/6 5/5\n";
+	std::ofstream(d / "strip.png", std::ios::binary) << "x";
+	const std::string text = "model strip\n  piece body\n    mesh " + (d / "strip.obj").generic_string() + "\n    texture " + (d / "strip.png").generic_string() + "\n"
+							 "    bone ear from 0 1 0 to 0 2 0 radius 1.2\nend\nplace strip at 0 0 0 as s\npose s ear axis 0 0 1  1 0  2 70\n";
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("pose", kHead + text + kShot, film), "");
+	const std::string rest = film.sceneAt(0.5), bent = film.sceneAt(2.5);
+	EXPECT_NE(rest, bent) << "the pose reshapes it";
+	EXPECT_NE(bent.find("strip.png"), std::string::npos) << "its picture stays on as it bends";
+	EXPECT_NE(bent.find("point2 uv"), std::string::npos) << "and its uvs";
+	EXPECT_NE(problemWith(text.substr(0, text.find("pose s")) + "pose s nobone 1 0  2 70\n"), "");
+}
+// Squash and stretch on a block: V along the axis, the width made up so the volume stays; `resize` scales each axis on its own.
+TEST(FilmModel3, StretchKeepsTheVolumeAndResizeIsPerAxis) {
+	const std::string set = std::string(kSet) + "# @anim ball\nAttributeBegin\n  Shape \"sphere\" \"float radius\" [ 1 ]\nAttributeEnd\n";
+	const std::filesystem::path d = std::filesystem::temp_directory_path() / "photonsmith_model3_test_stretch";
+	std::filesystem::create_directories(d);
+	std::ofstream(d / "s.pbrt", std::ios::binary) << set;
+	const auto scaleLine = [&](const std::string &track) {
+		std::ofstream(d / "f.film", std::ios::binary) << "scene s.pbrt\nlength 6\nease 0\n" + track + "\n" + kShot;
+		ff::DataFilm film;
+		EXPECT_EQ(film.load((d / "f.film").string()), "");
+		const std::string s = film.sceneAt(3.0);
+		const std::size_t at = s.find("Scale ");
+		return at == std::string::npos ? std::string() : s.substr(at, s.find('\n', at) - at);
+	};
+	std::istringstream in(scaleLine("stretch ball about 0 0 0  0 4  6 4").substr(6));
+	double x = 0, y = 0, z = 0;
+	in >> x >> y >> z;
+	EXPECT_NEAR(y, 4.0, 1e-6);
+	EXPECT_NEAR(x * y * z, 1.0, 1e-6) << "the volume stays";
+	EXPECT_NEAR(x, z, 1e-9);
+	std::istringstream in2(scaleLine("resize ball about 0 0 0  0 1 2 3  6 1 2 3").substr(6));
+	in2 >> x >> y >> z;
+	EXPECT_NEAR(x, 1.0, 1e-6);
+	EXPECT_NEAR(y, 2.0, 1e-6);
+	EXPECT_NEAR(z, 3.0, 1e-6);
+}
+
 TEST(FilmModel3, ASkinnedCharacterWalksAndFeels) {
 	ff::DataFilm film;
 	ASSERT_EQ(loadFilm("skin", kHead + kBlob + "character bo blob at 0 0 0\nwalk bo 1.0 0.5  0 2\nfeel bo surprised 4 4.3 6 6\nsay bo 4.2 \"Oh!\"\n" + kShot, film), "");

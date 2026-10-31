@@ -675,9 +675,9 @@ inline std::string round3Line(Part &p, const std::vector<std::string> &t, bool &
 		return std::string();
 	}
 	if (verb == "bone") {
-		const char *usage = "`bone NAME from X Y Z to X Y Z` (NAME: spine, head, leg.1 .., arm.l, arm.r, tail)";
+		const char *usage = "`bone NAME from X Y Z to X Y Z [parent NAME] [radius R]` (NAME: spine, head, leg.1 .., arm.l, arm.r, tail, or a name of your own for `pose`)";
 		Bone b;
-		if (t.size() != 10 || t[2] != "from" || t[6] != "to") return usage;
+		if (t.size() < 10 || t[2] != "from" || t[6] != "to") return usage;
 		b.name = t[1];
 		i = 3;
 		if (!numbers(3)) return usage;
@@ -685,6 +685,12 @@ inline std::string round3Line(Part &p, const std::vector<std::string> &t, bool &
 		i = 7;
 		if (!numbers(3)) return usage;
 		b.b = {v[0], v[1], v[2]};
+		for (i = 10; i < t.size();) {
+			const std::string w = t[i++];
+			if (w == "parent" && i < t.size()) b.parent = t[i++];
+			else if (w == "radius" && numbers(1) && v[0] > 0.0) b.radius = v[0];
+			else return usage;
+		}
 		p.bones.push_back(b), p.skin = true;
 		return std::string();
 	}
@@ -1036,6 +1042,20 @@ inline std::string regionsText(const std::string &film, const Model &m, const Pa
 	}
 	return out;
 }
+// An imported mesh's pictures on its own uvs: its colour, and (`pbr`) its roughness and its normal map.
+inline std::string picturedMaterial(const Part &p, const std::string &name) {
+	const auto found = [](const std::string &f) {
+		const std::string a = film_cache::asset(f);
+		return a.empty() ? f : a;
+	};
+	std::string mat = "Texture \"" + name + "_tex\" \"spectrum\" \"imagemap\" \"string filename\" [ \"" + found(p.texture) + "\" ]\n  ";
+	if (!p.roughMap.empty()) mat += "Texture \"" + name + "_rough\" \"float\" \"imagemap\" \"string filename\" [ \"" + found(p.roughMap) + "\" ] \"string encoding\" \"linear\"\n  ";
+	char buf[200];
+	std::snprintf(buf, sizeof buf, " \"float roughness\" [ %.4f ]", p.rough);
+	mat += "Material \"coateddiffuse\" \"texture reflectance\" \"" + name + "_tex\"" + (p.roughMap.empty() ? std::string(buf) : " \"texture roughness\" \"" + name + "_rough\"");
+	if (!p.normalMap.empty()) mat += " \"string normalmap\" [ \"" + found(p.normalMap) + "\" ]";
+	return mat;
+}
 // One piece as scene text at level `lod`, in the model's own space: its mesh from the cache, its painted picture and baked normal map (model_texture.h) or its own
 // picture (`texture`), its material.
 inline std::string pieceText(const std::string &film, const Model &m, const Part &p, int lod) {
@@ -1049,19 +1069,7 @@ inline std::string pieceText(const std::string &film, const Model &m, const Part
 	if (const std::string regions = regionsText(film, m, p, lod, name); !regions.empty()) return regions + extra;
 	const std::string file = film_cache::ply(film, name, [&]() { return p.paint.on ? uvMeshOf(p, pieceMesh(m, p, lod), nullptr) : pieceMesh(m, p, lod); });
 	if (file.empty()) return extra;
-	if (!p.texture.empty() && !p.paint.on) {   // an imported mesh's pictures on its own uvs: its colour, and (`pbr`) its roughness and its normal map
-		const auto found = [](const std::string &f) {
-			const std::string a = film_cache::asset(f);
-			return a.empty() ? f : a;
-		};
-		std::string mat = "Texture \"" + name + "_tex\" \"spectrum\" \"imagemap\" \"string filename\" [ \"" + found(p.texture) + "\" ]\n  ";
-		if (!p.roughMap.empty()) mat += "Texture \"" + name + "_rough\" \"float\" \"imagemap\" \"string filename\" [ \"" + found(p.roughMap) + "\" ] \"string encoding\" \"linear\"\n  ";
-		char buf[200];
-		std::snprintf(buf, sizeof buf, " \"float roughness\" [ %.4f ]", p.rough);
-		mat += "Material \"coateddiffuse\" \"texture reflectance\" \"" + name + "_tex\"" + (p.roughMap.empty() ? std::string(buf) : " \"texture roughness\" \"" + name + "_rough\"");
-		if (!p.normalMap.empty()) mat += " \"string normalmap\" [ \"" + found(p.normalMap) + "\" ]";
-		return attr(mat, film_cache::plyShape(file)) + extra;
-	}
+	if (!p.texture.empty() && !p.paint.on) return attr(picturedMaterial(p, name), film_cache::plyShape(file)) + extra;
 	std::string picture, normals;
 	if (p.paint.on) {
 		const int N = std::clamp(p.paint.res, 64, 4096);
@@ -1204,6 +1212,14 @@ inline std::string movingText(const std::string &film, const Model &m, const Pla
 					boxOf(pieceMesh(m, p, 4), lo, hi);
 					piece = mul(piece, buildMatrix(b.style, std::clamp((mo.t - b.t0) / std::max(1e-6, b.t1 - b.t0), 0.0, 1.0), k, drawn, lo, hi));
 				}
+			if (!p.bones.empty() && std::any_of(mo.anim->poses.begin(), mo.anim->poses.end(), [&](const Pose &q) { return q.id == pl.id; })) {   // its own bones, as the film poses them
+				std::vector<Mat4> own(p.bones.size(), identity());
+				for (const Pose &q : mo.anim->poses)
+					if (q.id == pl.id)
+						for (std::size_t b = 0; b < p.bones.size(); ++b)
+							if (p.bones[b].name == q.bone) own[b] = mul(own[b], translate(p.bones[b].a), rotate(q.axis, keyedAt(q.keys, mo.t)), translate(p.bones[b].a * -1.0));
+				meshNow() = skinned(meshNow(), weightsOf(meshNow(), p.bones), chainedPoses(p.bones, own));
+			}
 			for (const Flex &f : mo.anim->flexes)
 				if (f.name == name) meshNow() = flexed(meshNow(), f.kind, keyedAt(f.keys, mo.t));
 			for (const Wobble &w : mo.anim->wobbles)
@@ -1228,7 +1244,7 @@ inline std::string movingText(const std::string &film, const Model &m, const Pla
 		if (reshaped) {
 			Part look = p;
 			look.paint.on = false;
-			if (!mesh.tris.empty()) out += attr(materialOf(look), emitMesh(mesh, piece));
+			if (!mesh.tris.empty()) out += attr(!p.texture.empty() && !p.paint.on ? picturedMaterial(p, pieceName(m, p, lod) + "_now") : materialOf(look), emitMesh(mesh, piece));
 			continue;
 		}
 		out += "AttributeBegin\n" + film_cache::placement(piece) + pieceText(film, m, p, lod) + "AttributeEnd\n";

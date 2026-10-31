@@ -10,10 +10,16 @@
 //
 // Gaits by the number of legs: two in turn; four and six in diagonals (a trot; an insect's tripod - legs numbered front to back, left then right, as `make creature`
 // numbers them).
+//
+// Bones of your own, on any mesh and any placed model, posed from the film (`pose ID BONE [axis X Y Z] T DEG ...`, model_anim.h): `bone ear.l from X Y Z to X Y Z parent
+// head radius R` moves only the skin within R of it, fading smoothly to nothing, the rest staying where it is - an ear droops, a cheek lifts, a tail curls with no seam. A
+// piece with any such bone is weighted that way: a vertex takes from each bone it is within reach of, and what they leave of its weight stays at rest. A child bone rides on
+// its parent's turn.
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -26,6 +32,8 @@ namespace model {
 struct Bone {
 	std::string name;
 	Vec3 a, b;   // (its start, the joint it turns about, and its end)
+	std::string parent;   // (`parent NAME`: it rides on that bone's turn)
+	double radius = 0.0;  // (`radius R`: it moves only the skin within R of it; 0: the nearest bones share every vertex)
 };
 inline std::string boneRole(const std::string &name) {
 	if (name.rfind("leg", 0) == 0) return "leg";
@@ -50,7 +58,7 @@ inline double segmentDistance(Vec3 p, Vec3 a, Vec3 b) {
 	const double u = std::clamp(dot(p - a, ab) / std::max(1e-12, dot(ab, ab)), 0.0, 1.0);
 	return length(p - (a + ab * u));
 }
-// Each vertex's three bones and their weights (summing to 1).
+// Each vertex's three bones and their weights (summing to 1, or with bones of a limited reach to what is not left at rest: bone -1).
 struct Weights {
 	std::vector<std::array<int, 3>> bone;
 	std::vector<std::array<double, 3>> w;
@@ -58,6 +66,26 @@ struct Weights {
 inline Weights weightsOf(const Mesh &m, const std::vector<Bone> &bones) {
 	Weights out;
 	out.bone.resize(m.verts.size()), out.w.resize(m.verts.size());
+	if (std::any_of(bones.begin(), bones.end(), [](const Bone &b) { return b.radius > 0.0; })) {   // bones of a limited reach: the skin near them, a smooth fall to nothing
+		for (std::size_t v = 0; v < m.verts.size(); ++v) {
+			std::array<std::pair<double, int>, 3> best{{{0.0, -1}, {0.0, -1}, {0.0, -1}}};
+			for (std::size_t b = 0; b < bones.size(); ++b) {
+				if (!(bones[b].radius > 0.0)) continue;
+				const double u = 1.0 - segmentDistance(m.verts[v], bones[b].a, bones[b].b) / bones[b].radius;
+				if (u <= 0.0) continue;
+				const double s = u * u * (3.0 - 2.0 * u);
+				for (int k = 0; k < 3; ++k)
+					if (s > best[k].first) {
+						for (int q = 2; q > k; --q) best[q] = best[q - 1];
+						best[k] = {s, static_cast<int>(b)};
+						break;
+					}
+			}
+			const double sum = best[0].first + best[1].first + best[2].first, scale = sum > 1.0 ? 1.0 / sum : 1.0;
+			for (int k = 0; k < 3; ++k) out.bone[v][k] = best[k].second, out.w[v][k] = best[k].first * scale;
+		}
+		return out;
+	}
 	for (std::size_t v = 0; v < m.verts.size(); ++v) {
 		std::array<std::pair<double, int>, 3> best{{{0.0, 0}, {0.0, 0}, {0.0, 0}}};
 		for (std::size_t b = 0; b < bones.size(); ++b) {
@@ -77,14 +105,42 @@ inline Weights weightsOf(const Mesh &m, const std::vector<Bone> &bones) {
 // The mesh posed: each vertex by its bones' matrices (`poses`, one a bone, the model's own space), blended by its weights.
 inline Mesh skinned(const Mesh &rest, const Weights &w, const std::vector<Mat4> &poses) {
 	Mesh m = rest;
+	const bool keepNormals = !rest.uvs.empty() && rest.normals.size() == rest.verts.size();   // (an imported mesh's vertices are split along its uv seams: smooth normals worked out again would show them)
 	for (std::size_t v = 0; v < m.verts.size(); ++v) {
-		Vec3 p{0, 0, 0};
+		Vec3 p{0, 0, 0}, n{0, 0, 0};
+		double moved = 0.0;
 		for (int k = 0; k < 3; ++k)
-			if (w.w[v][k] > 0.0) p = p + transformPoint(poses[static_cast<std::size_t>(w.bone[v][k])], rest.verts[v]) * w.w[v][k];
-		m.verts[v] = p;
+			if (w.w[v][k] > 0.0 && w.bone[v][k] >= 0) {
+				const Mat4 &pose = poses[static_cast<std::size_t>(w.bone[v][k])];
+				p = p + transformPoint(pose, rest.verts[v]) * w.w[v][k];
+				if (keepNormals) n = n + (transformPoint(pose, rest.verts[v] + rest.normals[v]) - transformPoint(pose, rest.verts[v])) * w.w[v][k];
+				moved += w.w[v][k];
+			}
+		m.verts[v] = p + rest.verts[v] * (1.0 - moved);
+		if (keepNormals) m.normals[v] = normalize(n + rest.normals[v] * (1.0 - moved));
 	}
-	sdf::computeNormals(m);
+	if (!keepNormals) sdf::computeNormals(m);
 	return m;
+}
+// The bones' matrices from each one's own turn (`own`, about its start), a child riding on its parent's.
+inline std::vector<Mat4> chainedPoses(const std::vector<Bone> &bones, const std::vector<Mat4> &own) {
+	std::vector<Mat4> out(bones.size());
+	std::vector<int> done(bones.size(), 0);
+	const std::function<const Mat4 &(std::size_t, int)> pose = [&](std::size_t b, int depth) -> const Mat4 & {
+		if (done[b]) return out[b];
+		out[b] = own[b];
+		if (!bones[b].parent.empty() && depth < static_cast<int>(bones.size())) {
+			for (std::size_t q = 0; q < bones.size(); ++q)
+				if (bones[q].name == bones[b].parent && q != b) {
+					out[b] = mul(pose(q, depth + 1), own[b]);
+					break;
+				}
+		}
+		done[b] = 1;
+		return out[b];
+	};
+	for (std::size_t b = 0; b < bones.size(); ++b) pose(b, 0);
+	return out;
 }
 // A leg's phase in its gait (radians): legs numbered front to back, left then right - two in turn, four and six in diagonals.
 inline double gaitPhase(int index) {

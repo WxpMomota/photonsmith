@@ -1638,6 +1638,14 @@ Mat4 DataFilm::animMatrix(const std::string &name, double t) const {
 		else if (a.kind == Kind::Grow) {
 			const double k = std::max(1e-6, progress(a, t, 0));
 			m = mul(m, translate(about), scale(k), translate(about * -1.0));
+		} else if (a.kind == Kind::Stretch) {   // V along the axis, 1 / sqrt(V) across: the volume kept
+			const double k = std::max(1e-6, progress(a, t, 0)), across = 1.0 / std::sqrt(k);
+			double degrees = 0.0;
+			Vec3 axis;
+			stretchTurn(a.axis, degrees, axis);
+			m = mul(m, mul(translate(about), rotate(axis, degrees), scale(across, k, across)), mul(rotate(axis, -degrees), translate(about * -1.0)));
+		} else if (a.kind == Kind::Resize) {
+			m = mul(m, translate(about), scale(std::max(1e-6, progress(a, t, 0)), std::max(1e-6, progress(a, t, 1)), std::max(1e-6, progress(a, t, 2))), translate(about * -1.0));
 		}
 	}
 	return m;

@@ -37,6 +37,8 @@
 //     turn  windmill about 0 3 0 axis 0 0 1   0 0   12 720   # rotate NAME: `about X Y Z` the point it turns about (default 0 0 0), `axis X Y Z` (default 0 1 0), then pairs: time degrees
 //     move  cart   0 -5 0 0   12 5 0 0                      # translate NAME: groups of time x y z
 //     grow  flower about 0 0 0   0 0.1   4 1                 # scale NAME about a point: pairs time scale
+//     stretch ball about 0 0 0 axis 0 1 0  0 1  1 0.7  1.2 1.3  1.5 1   # squash and stretch: V along the axis (default y), its width made up so the volume stays: pairs time V
+//     resize box   about 0 0 0   0 1 1 1   2 1 0.5 2         # scale NAME along x, y and z on their own: groups of time sx sy sz
 //     light lamp   0 0   2 1   10 1   12 0                   # the power of the lights in NAME times k: pairs time k (a lamp that fades up and down)
 //     show  ghost  3 5   8 9                                 # NAME is there only between these times (any number of pairs); outside them it is left out
 //
@@ -196,6 +198,8 @@
 //     model    tall from post  h 3                              # parameters (`model post params h 1`, `$h`), `variants N h lo hi`, library/NAME.model; in a block:
 //                                                               #   tool, boolean, budget, key, mesh FILE, texture, decal, displace ... bake, make tree|creature|street|room
 //     flex     r1.neck stretch 0 1  2 1.5                       # round 3: shapes over time (flex, morph ID to MODEL, build, vanish, wobble), mechanisms (spin, gear,
+//     pose     fox ear.l  axis 0 0 1  10 0  11 25               # a bone of your own (`bone ear.l from X Y Z to X Y Z [parent head] [radius R]`) turned over time: the skin near it
+//                                                               # bends, no seams; on any mesh, imported ones too (model_skin.h)
 //     spin     cart.wheel about 0 0.3 0 axis 1 0 0 rpm 60       #   piston, roll, route, aim, attach ID to NAME head), `rigidbody ID`; in a block: skinned, bone, fur,
 //                                                               #   cloth, cover, stroke, remesh, close, region, unwrap, text "WORDS", pbr, finish skin
 //     space    stars 1  milkyway 1  sun 60 15                   # the universe (film_space.h, round 10): a set in space - the stars all round, the Milky Way, the sun a
