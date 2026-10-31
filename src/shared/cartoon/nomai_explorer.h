@@ -443,8 +443,6 @@ inline double torsoSdf(Vec3 q, const ExplorerBody &b, double inset) {
 	d = smin(d, ellv(q, b.chest + Vec3{0.0, -0.02, 0.0}, {0.185 - inset, 0.18, 0.125 - inset}), 0.06);
 	return d;
 }
-// The robe's front opening below the waist: how far it is from the middle at a height.
-inline double openingHalf(const ExplorerBody &b, double y) { return 0.014 + 0.11 * std::max(0.0, b.pelvis.y - y); }
 // The front panel (the concept's long tabard down the middle): its half width at a height, and the slits beside it.
 inline double panelHalf(const ExplorerBody &b, double y) { return 0.070 + 0.050 * std::max(0.0, b.pelvis.y - y); }
 constexpr double kSlit = 0.040;

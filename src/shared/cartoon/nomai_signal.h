@@ -57,7 +57,6 @@ using ShotDef = kit::Shot<Frame>;
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 inline double lens(double mm) { return 2.0 * std::atan(10.125 / mm) * 180.0 / kPi; }   // the vertical field of a 35 mm lens on a 16:9 frame
 inline double yawOf(Vec3 dir) { return std::atan2(dir.x, dir.z) * 180.0 / kPi; }
-inline double giantYaw() { return yawOf({giantDir().x, 0.0, giantDir().z}); }
 
 inline std::string worldText(const Frame &f, double t, double rockRange = 160.0) {
 	std::string out = groundText();

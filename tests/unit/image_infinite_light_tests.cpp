@@ -28,16 +28,6 @@ static std::vector<double> make_constant_image(int w, int h,
 	return img;
 }
 
-// Build a 4x4 image where pixel (px,py) has unit value, others are zero
-static std::vector<double> make_spike_image(int w, int h, int px, int py,
-											double r, double g, double b) {
-	std::vector<double> img(w * h * 3, 0.0);
-	img[(py * w + px) * 3 + 0] = r;
-	img[(py * w + px) * 3 + 1] = g;
-	img[(py * w + px) * 3 + 2] = b;
-	return img;
-}
-
 // ----------------------------------------------------------------
 // Construction
 // ----------------------------------------------------------------

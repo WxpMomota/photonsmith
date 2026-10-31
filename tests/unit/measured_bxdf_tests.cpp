@@ -25,10 +25,6 @@
 //            = 1/(4*pi*|cos_wi|)  -- a kind of reciprocal-cosine BRDF
 // ---------------------------------------------------------------------------
 
-static void FillUniform(std::vector<float>& v, int n, float val) {
-	v.assign(n, val);
-}
-
 // Build a MeasuredBRDFData with all-constant tables.
 // ndf_val: constant NDF density (normalized over unit square = ndf_val * 1*1)
 // sigma_val: constant projected area
