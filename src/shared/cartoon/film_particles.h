@@ -107,16 +107,17 @@ inline std::string weatherText(const Weather &w, double t, Vec3 eye, double shut
 					if (w.kind == "dust") p.y = w.ground + 0.05 + 3.5 * detail::u01(n, 4) * detail::u01(n, 9) + 0.3 * std::sin(2.0 * t + 6.28 * detail::u01(n, 10));
 				}
 				if (std::hypot(p.x - eye.x, p.z - eye.z) > kReach) continue;
-				if (w.windX != 0.0 || w.windZ != 0.0 || w.kind == "ash") {   // (none right at the lens: a drop or a flake there is a blur across the picture)
+				if (w.windX != 0.0 || w.windZ != 0.0 || w.kind == "ash" || w.kind == "rain") {   // (none right at the lens: a drop or a flake there is a blur across the picture)
 					const Vec3 d = p - eye;
-					if (d.x * d.x + d.y * d.y + d.z * d.z < 1.5 * 1.5) continue;
+					const double clear = w.kind == "rain" ? 5.0 : 1.5;   // (rain further off: a streak this bright is a wide smear out of focus, and it reads as thin lines from there)
+					if (d.x * d.x + d.y * d.y + d.z * d.z < clear * clear) continue;
 				}
 				if (w.kind == "rain") {   // a streak as long as its fall while the shutter is open, a little slanted by the wind
 					const Vec3 along = normalize(Vec3{0.08 + w.windX / speed, -1.0, 0.03 + w.windZ / speed});
 					const double len = std::max(0.08, speed * shutterSeconds);
 					Vec3 right, up;
 					detail::facing(p, eye, along, right, up);
-					const Vec3 r = right * 0.0028;   // (thin: its shadow in a low sun is a faint line)
+					const Vec3 r = right * 0.0013;   // (a drop's width: a few metres off it is less than a pixel, faint as rain is. Its shadow in a low sun is a faint line.)
 					mesh.quad(p - r, p + r, p + r + along * len, p - r + along * len);
 					// where it lands: a little splash for a moment
 					if (fall > kTop - speed * 0.06) {

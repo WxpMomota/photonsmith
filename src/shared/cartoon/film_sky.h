@@ -191,8 +191,8 @@ inline double cloudDensity(const Clouds &L, double x, double z) {
 inline std::string fileName(const Spec &s) {
 	std::string key;
 	char b[400];
-	// ("v6": what render() paints; change it whenever render() or what it calls changes - a sky's file outlives builds)
-	std::snprintf(b, sizeof b, "v6|%.3f|%.3f|%.3f|%.4f|%.4f %.4f %.4f|%.3f|%.3f|%.3f|%.3f %.3f %.3f|%.3f|%.3f|%.4f %.4f %.4f|%.3f|%.4f %.4f %.4f|%.3f|%d", s.sunElevation, s.sunAzimuth, s.turbidity,
+	// ("v7": what render() paints; change it whenever render() or what it calls changes - a sky's file outlives builds)
+	std::snprintf(b, sizeof b, "v7|%.3f|%.3f|%.3f|%.4f|%.4f %.4f %.4f|%.3f|%.3f|%.3f|%.3f %.3f %.3f|%.3f|%.3f|%.4f %.4f %.4f|%.3f|%.4f %.4f %.4f|%.3f|%d", s.sunElevation, s.sunAzimuth, s.turbidity,
 				  s.brightness, s.tint.x, s.tint.y, s.tint.z, s.night, s.nightBrightness, s.milkyWay, s.milkyPole.x, s.milkyPole.y, s.milkyPole.z, s.stars, s.glow, s.glowColour.x, s.glowColour.y,
 				  s.glowColour.z, s.afterglow, s.afterglowColour.x, s.afterglowColour.y, s.afterglowColour.z, s.belt, s.width);
 	key = b;
@@ -373,7 +373,9 @@ inline std::vector<float> render(const Spec &s) {
 					c = lerp(c, cc, d * L.opacity);
 				}
 			}
-			if (up < 0.0) c = c * 0.25;   // (the ground below the horizon: hidden by the land, dimly seen in a reflection)
+			// (the ground below the horizon: hidden by the land, dimly seen in a reflection. It goes dark over the first 10 degrees and not at once: from up in the air the land ends
+			// short of the true horizon, and what lies past it is haze of the sky's own colour, not a dark band.)
+			if (up < 0.0) c = c * (1.0 - 0.75 * smoothstep(0.0, 0.18, -up));
 			float *px = &rgb[(static_cast<std::size_t>(row) * W + col) * 3];
 			px[0] = static_cast<float>(c.x);
 			px[1] = static_cast<float>(c.y);

@@ -572,6 +572,18 @@ inline std::vector<double> axis(double lo, double hi, double focus, int half) {
 	}
 	return out;
 }
+// The normals of a mesh of land from its own faces. A normal taken from the field a hand's breadth away knows bumps the mesh, metres coarse, does not have: near a ridge seen at a
+// low angle it then leaned away from the viewer on a face that looks towards them, and such a point is black, a thin dark crack along the ridge.
+inline void landNormals(Mesh &m) {
+	std::vector<Vec3> sum(m.verts.size(), Vec3{0.0, 0.0, 0.0});
+	for (const auto &t : m.tris) {
+		Vec3 n = cross(m.verts[static_cast<std::size_t>(t[1])] - m.verts[static_cast<std::size_t>(t[0])], m.verts[static_cast<std::size_t>(t[2])] - m.verts[static_cast<std::size_t>(t[0])]);
+		if (n.y < 0.0) n = n * -1.0;
+		for (int c = 0; c < 3; ++c) sum[static_cast<std::size_t>(t[c])] = sum[static_cast<std::size_t>(t[c])] + n;
+	}
+	m.normals.resize(m.verts.size());
+	for (std::size_t i = 0; i < sum.size(); ++i) m.normals[i] = length(sum[i]) > 1e-12 ? normalize(sum[i]) : Vec3{0.0, 1.0, 0.0};
+}
 // The surface, in story space (x mirrored), its (u, v) over the square for the colour picture.
 inline Mesh surfaceMesh(const Field &f, int half = 200) {
 	const Spec &s = f.spec;
@@ -584,9 +596,7 @@ inline Mesh surfaceMesh(const Field &f, int half = 200) {
 	for (int j = 0; j < nz; ++j)
 		for (int i = 0; i < nx; ++i) {
 			const double px = -xs[i], pz = zs[j];
-			const Vec3 n = f.normalAt(px, pz, 0.35);
 			m.verts.push_back({xs[i], f.heightAt(px, pz), pz});
-			m.normals.push_back({-n.x, n.y, n.z});
 			m.uvs.push_back({(px - f.sx0) / s.size, (pz - f.sz0) / s.size});
 		}
 	for (int j = 0; j + 1 < nz; ++j)
@@ -595,10 +605,13 @@ inline Mesh surfaceMesh(const Field &f, int half = 200) {
 			m.tris.push_back({a, a + nx, a + 1});
 			m.tris.push_back({a + 1, a + nx, a + nx + 1});
 		}
+	landNormals(m);
 	return m;
 }
 // A part of the surface as a mesh of its own (the vertices its triangles use, renumbered): `which` 0 the ground (the triangles not steeper than `steep`, 1 - the face
-// normal's y), 1 the steeper ones that face more along x, 2 those that face more along z. A cliff takes a picture projected from the side it faces.
+// normal's y), 1 the steeper ones that face more along x, 2 those that face more along z. A cliff takes a picture projected from the side it faces. A cliff is somewhere steep
+// and not a line: a steep cell counts only where steep cells fill most of the 5 x 5 round it, or next to one that does. Erosion cuts gullies one cell wide, and as cliffs each
+// was a thin dark crack across the green hills.
 inline Mesh surfacePart(const Mesh &m, int which, double steep, const std::vector<Spec::Cone> &cones = {}) {
 	Mesh out;
 	std::vector<int> renumber(m.verts.size(), -1);
@@ -606,9 +619,34 @@ inline Mesh surfacePart(const Mesh &m, int which, double steep, const std::vecto
 	const auto onCone = [&cones](const Vec3 &p) {
 		return std::any_of(cones.begin(), cones.end(), [&p](const Spec::Cone &c) { return std::hypot(-p.x - c.x, p.z - c.z) < 0.95 * c.radius; });
 	};
-	for (const auto &t : m.tris) {
-		const Vec3 n = normalize(cross(m.verts[t[1]] - m.verts[t[0]], m.verts[t[2]] - m.verts[t[0]]));
-		const int part = 1.0 - std::abs(n.y) <= steep || onCone(m.verts[t[0]]) ? 0 : std::abs(n.x) > std::abs(n.z) ? 1 : 2;
+	const auto normalOf = [&m](const std::array<int, 3> &t) { return normalize(cross(m.verts[t[1]] - m.verts[t[0]], m.verts[t[2]] - m.verts[t[0]])); };
+	int nx = 1;   // (the grid: surfaceMesh's rows of vertices, two triangles to a cell)
+	while (nx < static_cast<int>(m.verts.size()) && m.verts[static_cast<std::size_t>(nx)].z == m.verts[0].z) ++nx;
+	const int cw = std::max(1, nx - 1), ch = static_cast<int>(m.tris.size() / 2) / cw;
+	std::vector<char> rough(static_cast<std::size_t>(cw) * ch, 0), solid(rough.size(), 0), cliff(rough.size(), 0);
+	for (std::size_t k = 0; k + 1 < m.tris.size(); k += 2) {
+		const std::array<int, 3> &t = m.tris[k];
+		rough[k / 2] = !onCone(m.verts[t[0]]) && (1.0 - std::abs(normalOf(t).y) > steep || 1.0 - std::abs(normalOf(m.tris[k + 1]).y) > steep);
+	}
+	for (int j = 0; j < ch; ++j)
+		for (int i = 0; i < cw; ++i) {
+			int steepAround = 0;
+			for (int b = std::max(0, j - 2); b <= std::min(ch - 1, j + 2); ++b)
+				for (int a = std::max(0, i - 2); a <= std::min(cw - 1, i + 2); ++a) steepAround += rough[static_cast<std::size_t>(b) * cw + a];
+			solid[static_cast<std::size_t>(j) * cw + i] = steepAround >= 13;
+		}
+	for (int j = 0; j < ch; ++j)
+		for (int i = 0; i < cw; ++i) {
+			bool byOne = false;
+			for (int b = std::max(0, j - 2); b <= std::min(ch - 1, j + 2) && !byOne; ++b)
+				for (int a = std::max(0, i - 2); a <= std::min(cw - 1, i + 2) && !byOne; ++a) byOne = solid[static_cast<std::size_t>(b) * cw + a] != 0;
+			cliff[static_cast<std::size_t>(j) * cw + i] = rough[static_cast<std::size_t>(j) * cw + i] && byOne;
+		}
+	for (std::size_t k = 0; k < m.tris.size(); ++k) {
+		const std::array<int, 3> &t = m.tris[k];
+		const Vec3 n = normalOf(t);
+		const bool steepHere = 1.0 - std::abs(n.y) > steep && !onCone(m.verts[t[0]]) && k / 2 < cliff.size() && cliff[k / 2];
+		const int part = !steepHere ? 0 : std::abs(n.x) > std::abs(n.z) ? 1 : 2;
 		if (part != which) continue;
 		std::array<int, 3> nt{};
 		for (int c = 0; c < 3; ++c) {
@@ -673,9 +711,8 @@ inline Mesh farMesh(const Field &f) {
 		const double t = j < 0 ? -1.0 : j / double(out);
 		for (int i = 0; i <= around; ++i) {
 			const double a = 2.0 * kPi * i / around;
-			const Vec3 p = farPoint(f, a, t), n = farNormal(f, a, t);
+			const Vec3 p = farPoint(f, a, t);
 			m.verts.push_back({-p.x, p.y, p.z});
-			m.normals.push_back({-n.x, n.y, n.z});
 			m.uvs.push_back({i / double(around), std::max(0.0, t)});
 		}
 	}
@@ -686,6 +723,7 @@ inline Mesh farMesh(const Field &f) {
 			m.tris.push_back({a, a + 1, a + w});
 			m.tris.push_back({a + 1, a + w + 1, a + w});
 		}
+	landNormals(m);
 	return m;
 }
 // The far ranges' colours: painted as the terrain is (without its water), and towards the blue-grey of distance.

@@ -2629,6 +2629,14 @@ uvs (its surface cut into near-flat charts along its creases, each laid flat and
 
 **A new film without a restart.** The Refresh button beside the scene search reads any film file saved since the program started, and any scene added to My Scenes, lists it and selects it. A film file left out for a mistake is read again once it has been saved, and what is wrong with it goes to the log. Refresh does not take in changes to a film that is already listed.
 
+### Plants and animals that look real (2026-10-31)
+
+**Trees stay trees.** (film_forest.h) A far tree is the near tree's own limbs with a fifth of its leaves, each one bigger, so it keeps its broken outline and its gaps out to the horizon: as much leaf area, the same crown, no change when the camera comes closer. It was a ball, or a cone. Trees are shared objects, so this costs a few thousand triangles a species and not a tree.
+
+**Leaves.** (film_forest.h `leafMaterial`) Each species and season has a picture of 8 x 8 leaves, a row for how exposed a leaf is and a column by chance. Every leaf of a tree takes a cell: no two are alike, the midrib and side veins show, darker against the light, and what a leaf reflects and lets through never comes to more than the light that reached it (autumn crowns used to give back 130% of it, which is why they glowed). Autumn does not take a crown all at once: each leaf turns in its own time, the most exposed first, and those deep inside are still green.
+
+**The land.** (film_terrain.h) A cliff is somewhere steep and not a line: a gully one cell wide is ground. The land's normals come from its own faces, not from finer ground than the mesh has, which leaned away from the viewer near a ridge and shaded it black. Below the horizon the sky goes dark over its first 10 degrees (film_sky.h), so land that ends short of the horizon, seen from the air, fades into haze rather than stopping at a dark band. Rain (film_particles.h) keeps 5 m clear of the lens, and is as thin as a drop.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)
