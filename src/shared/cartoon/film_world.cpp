@@ -1628,9 +1628,34 @@ std::string DataFilm::airMedium() const {
 }
 
 
-Mat4 DataFilm::animMatrix(const std::string &name, double t) const {
+// A `gaze` line's turn at t: about its pivot, far enough that what faces `forward` at rest looks at the target (a point, or something moving: where its rest place is now),
+// no further than `most`, by how much the line's fade says. All worked out inside `outer`, what the block rides on, so it looks from where it is.
+Mat4 DataFilm::gazeMatrix(const Anim &a, double t, const Mat4 &outer) const {
+	const Vec3 pivot{a.about[0], a.about[1], a.about[2]};
+	Vec3 at{a.point[0], a.point[1], a.point[2]};
+	if (!a.target.empty()) {
+		if (const Character *c = character(a.target)) {
+			const Vec3 story = bodyPoint(*c, t, characterKinds().at(c->kind).head);
+			at = Vec3{-story.x, story.y, story.z};
+		} else {
+			at = transformPoint(animMatrix(a.target, t, 1), at);
+		}
+	}
+	const Vec3 d = transformPoint(invertAffine(outer), at) - pivot, f = normalize(Vec3{a.axis[0], a.axis[1], a.axis[2]});
+	const Vec3 up{0.0, 1.0, 0.0};
+	const Vec3 dFlat = normalize(Vec3{d.x, 0.0, d.z}), fFlat = normalize(Vec3{f.x, 0.0, f.z});
+	if (!(length(d) > 1e-9)) return identity();
+	double yaw = std::atan2(dot(up, cross(fFlat, dFlat)), dot(fFlat, dFlat)) * 180.0 / kPi;
+	double pitch = (std::atan2(d.y, std::hypot(d.x, d.z)) - std::atan2(f.y, std::hypot(f.x, f.z))) * 180.0 / kPi;
+	yaw = std::clamp(yaw, -a.most, a.most), pitch = std::clamp(pitch, -a.most, a.most);
+	const double k = a.keys.empty() ? 1.0 : std::clamp(progress(a, t, 0), 0.0, 1.0);
+	return mul(translate(pivot), rotate(up, yaw * k), rotate(cross(fFlat, up), pitch * k), translate(pivot * -1.0));
+}
+Mat4 DataFilm::animMatrix(const std::string &name, double t, int depth, const Anim *upTo) const {
 	Mat4 m = identity();
+	if (const auto up = spec.parents.find(name); up != spec.parents.end() && depth < 32) m = animMatrix(up->second, t, depth + 1);   // (what it rides on)
 	for (const Anim &a : spec.anims) {
+		if (&a == upTo) break;
 		if (a.name != name) continue;
 		const Vec3 about{a.about[0], a.about[1], a.about[2]};
 		if (a.kind == Kind::Move) m = mul(m, translate({progress(a, t, 0), progress(a, t, 1), progress(a, t, 2)}));
@@ -1646,6 +1671,8 @@ Mat4 DataFilm::animMatrix(const std::string &name, double t) const {
 			m = mul(m, mul(translate(about), rotate(axis, degrees), scale(across, k, across)), mul(rotate(axis, -degrees), translate(about * -1.0)));
 		} else if (a.kind == Kind::Resize) {
 			m = mul(m, translate(about), scale(std::max(1e-6, progress(a, t, 0)), std::max(1e-6, progress(a, t, 1)), std::max(1e-6, progress(a, t, 2))), translate(about * -1.0));
+		} else if (a.kind == Kind::Gaze && depth < 8) {
+			m = mul(m, gazeMatrix(a, t, m));
 		}
 	}
 	return m;
@@ -1657,7 +1684,7 @@ Mat4 DataFilm::placementFrame(const model::Placed &pl, double t) const {
 	static const Mat4 mirror = scale(-1.0, 1.0, 1.0);
 	Mat4 frame = mul(translate({-pl.at.x, pl.at.y, pl.at.z}), rotate({0, 1, 0}, pl.turn), scale(pl.scale));
 	placementOverride(pl, t, frame);
-	if (std::any_of(spec.anims.begin(), spec.anims.end(), [&](const Anim &a) { return a.name == pl.id; })) frame = mul(mul(mirror, animMatrix(pl.id, t), mirror), frame);
+	if (spec.parents.count(pl.id) || std::any_of(spec.anims.begin(), spec.anims.end(), [&](const Anim &a) { return a.name == pl.id; })) frame = mul(mul(mirror, animMatrix(pl.id, t), mirror), frame);
 	return frame;
 }
 bool DataFilm::placementOverride(const model::Placed &pl, double t, Mat4 &frame) const {
@@ -1747,7 +1774,7 @@ std::string DataFilm::modelsAt(const std::string &header, double t) const {
 	motion.t = t;
 	motion.anim = &spec.animated;
 	motion.moves = [this](const std::string &name) {
-		return std::any_of(spec.anims.begin(), spec.anims.end(), [&](const Anim &a) { return a.name == name; }) ||
+		return spec.parents.count(name) > 0 || std::any_of(spec.anims.begin(), spec.anims.end(), [&](const Anim &a) { return a.name == name; }) ||
 			   (name.find('.') != std::string::npos && std::any_of(spec.animated.mechs.begin(), spec.animated.mechs.end(), [&](const model::Mech &m) { return m.name == name; }));
 	};
 	motion.shown = [this, t](const std::string &name) { return visible(name, t); };

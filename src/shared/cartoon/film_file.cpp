@@ -110,12 +110,19 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 		}
 		return false;
 	};
+	const auto animatable = [&](const std::string &name) {
+		return std::find(scene.names.begin(), scene.names.end(), name) != scene.names.end() || std::find(spec.groups.begin(), spec.groups.end(), name) != spec.groups.end() || modelPart(name);
+	};
 	for (const Anim &a : spec.anims)
-		if (std::find(scene.names.begin(), scene.names.end(), a.name) == scene.names.end() && !modelPart(a.name)) {
+		if (!animatable(a.name)) {
 			std::string known;
 			for (const std::string &n : scene.names) known += (known.empty() ? "" : ", ") + n;
 			return detail::lineWhere(spec, filePath, a.line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + a.name + "`" + (known.empty() ? " (it has none)" : " (it has: " + known + ")");
+		} else if (a.kind == Kind::Gaze && !a.target.empty() && !animatable(a.target) && !character(a.target)) {
+			return detail::lineWhere(spec, filePath, a.line) + ": `gaze` at " + a.target + ": no block, group, placement or character has that name";
 		}
+	for (const auto &[child, over] : spec.parents)
+		if (!animatable(child) || !animatable(over)) return filePath + ": `parent` or `group`: no block, group or placement is called " + (animatable(child) ? over : child);
 	for (const auto &[name, line] : spec.physicsLines)
 		if (std::find(scene.names.begin(), scene.names.end(), name) == scene.names.end())
 			return detail::lineWhere(spec, filePath, line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + name + "`";
@@ -1740,7 +1747,9 @@ bool DataFilm::visible(const std::string &name, double t) const {
 		anyShow = true;
 		for (const auto &iv : a.intervals) shown = shown || (t >= iv.first && t <= iv.second);
 	}
-	return !anyShow || shown;
+	if (anyShow && !shown) return false;
+	const auto up = spec.parents.find(name);   // (hidden with what it rides on)
+	return up == spec.parents.end() || visible(up->second, t);
 }
 
 std::string DataFilm::num(double v) {
@@ -1759,6 +1768,7 @@ std::string DataFilm::transformsFor(const std::string &name, double t) const {
 
 std::string DataFilm::transformsAt(const std::string &name, double t) const {
 	std::string out;
+	if (const auto up = spec.parents.find(name); up != spec.parents.end()) out = transformsAt(up->second, t);   // (what it rides on: outermost)
 	if (const Spec::Prop *pr = prop(name)) {   // a prop: moved from where the scene has it to where it is (pbrt's: x mirrored back)
 		const Vec3 at = propAt(name, t);
 		out += "  Translate " + num(-at.x - pr->home.x) + " " + num(at.y - pr->home.y) + " " + num(at.z - pr->home.z) + "\n";
@@ -1802,6 +1812,12 @@ std::string DataFilm::transformsAt(const std::string &name, double t) const {
 		} else if (a.kind == Kind::Resize) {
 			out += "  Translate " + num(a.about[0]) + " " + num(a.about[1]) + " " + num(a.about[2]) + "\n  Scale " + num(std::max(1e-6, progress(a, t, 0))) + " " + num(std::max(1e-6, progress(a, t, 1))) + " " +
 				   num(std::max(1e-6, progress(a, t, 2))) + "\n  Translate " + num(-a.about[0]) + " " + num(-a.about[1]) + " " + num(-a.about[2]) + "\n";
+		} else if (a.kind == Kind::Gaze) {
+			const Mat4 m = gazeMatrix(a, t, animMatrix(name, t, 0, &a));
+			out += "  ConcatTransform [";
+			for (int c = 0; c < 4; ++c)
+				for (int r = 0; r < 4; ++r) out += " " + num(m[static_cast<std::size_t>(r * 4 + c)]);
+			out += " ]\n";
 		}
 	}
 	return out;
@@ -1810,11 +1826,16 @@ std::string DataFilm::transformsAt(const std::string &name, double t) const {
 std::string DataFilm::lightsScaled(const std::string &name, const std::string &body, double t) const {
 	double k = 1.0;
 	bool any = false;
-	for (const Anim &a : spec.anims)
-		if (a.kind == Kind::Light && a.name == name) {
-			k *= std::max(0.0, progress(a, t, 0));
-			any = true;
-		}
+	for (std::string who = name;;) {   // (its own and what it rides on)
+		for (const Anim &a : spec.anims)
+			if (a.kind == Kind::Light && a.name == who) {
+				k *= std::max(0.0, progress(a, t, 0));
+				any = true;
+			}
+		const auto up = spec.parents.find(who);
+		if (up == spec.parents.end()) break;
+		who = up->second;
+	}
 	if (!any) return body;
 	static const std::regex scaleParam("(\"float\\s+scale\"\\s*\\[\\s*)([-+0-9.eE]+)");
 	std::string out;

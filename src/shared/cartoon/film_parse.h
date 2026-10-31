@@ -39,6 +39,12 @@
 //     grow  flower about 0 0 0   0 0.1   4 1                 # scale NAME about a point: pairs time scale
 //     stretch ball about 0 0 0 axis 0 1 0  0 1  1 0.7  1.2 1.3  1.5 1   # squash and stretch: V along the axis (default y), its width made up so the volume stays: pairs time V
 //     resize box   about 0 0 0   0 1 1 1   2 1 0.5 2         # scale NAME along x, y and z on their own: groups of time sx sy sz
+//     parent eyes to head                                    # eyes ride on head: its moves, turns, hides and lights come first, then their own
+//     group  fox of head eyes tail body                      # a name for several: they ride on it, and any line can name it (it has no block of its own)
+//     hop    fox 13 1.0 by 7 -1.6 1 height 3 feet -2 4.1 -12  # an arc of 1 s from 13 s, moved by that much; given its feet, a squash before, a stretch in the air, a squash on landing
+//     blink  eyes about -1.3 6.8 -13.2 [shut 0.1]  2.0 4.8 7.3   # shut along y at those times
+//     gaze   head about -1.8 5.9 -12.4 forward 0.5 0 -0.85 at star [offset 0 0 0] [max 50] [from 6 6.6] [to 8 8.5]   # turned to keep looking at a point, or at a block, group,
+//                                                            # placement or character as it moves, eased in and out
 //     light lamp   0 0   2 1   10 1   12 0                   # the power of the lights in NAME times k: pairs time k (a lamp that fades up and down)
 //     show  ghost  3 5   8 9                                 # NAME is there only between these times (any number of pairs); outside them it is left out
 //

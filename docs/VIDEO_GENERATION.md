@@ -2607,6 +2607,10 @@ uvs (its surface cut into near-flat charts along its creases, each laid flat and
 
 **Squash and stretch: `stretch NAME [about X Y Z] [axis X Y Z] T V  T V ...`, `resize NAME [about X Y Z] T SX SY SZ ...`.** On any `# @anim` block or placed model. `stretch` makes it V times as long along the axis (y unless given) and thinner to match, so its volume stays; `resize` scales each axis on its own.
 
+**What rides on what: `parent CHILD to OTHER`, `group NAME of A B C`.** A child takes its parent's moves, turns, hides and `light` factors, then its own, for `# @anim` blocks and placed models alike. A group is a name for several things with no block of its own: `move fox ...` or `show fox ...` reaches all of them.
+
+**Acting verbs for any block or group.** `hop NAME T SECONDS by X Y Z [height H] [feet X Y Z]` is an arc from where it is; with `feet`, it squashes before, stretches in the air and squashes on landing. `blink NAME about X Y Z [shut S] T T T ...` shuts it along y at those times. `gaze NAME [about X Y Z] [forward X Y Z] at X Y Z|WHO [offset X Y Z] [max DEG] [from T0 T1] [to T2 T3]` turns it to keep looking at a point, or at a block, group, placement or character as it moves, eased in and out.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

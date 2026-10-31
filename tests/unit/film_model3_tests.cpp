@@ -142,6 +142,57 @@ TEST(FilmModel3, StretchKeepsTheVolumeAndResizeIsPerAxis) {
 	EXPECT_NEAR(z, 3.0, 1e-6);
 }
 
+// Parents and groups, hop, blink and gaze on plain blocks.
+TEST(FilmActing, GroupsParentsHopsBlinksAndGazes) {
+	const std::string set = std::string(kSet) + "# @anim a\nAttributeBegin\n  Shape \"sphere\" \"float radius\" [ 1 ]\nAttributeEnd\n# @anim b\nAttributeBegin\n  Shape \"sphere\" \"float radius\" [ 2 ]\nAttributeEnd\n"
+							"# @anim c\nAttributeBegin\n  Shape \"sphere\" \"float radius\" [ 3 ]\nAttributeEnd\n";
+	const std::filesystem::path d = std::filesystem::temp_directory_path() / "photonsmith_model3_test_acting";
+	std::filesystem::create_directories(d);
+	std::ofstream(d / "s.pbrt", std::ios::binary) << set;
+	const auto load = [&](const std::string &lines, ff::DataFilm &film) {
+		std::ofstream(d / "f.film", std::ios::binary) << "scene s.pbrt\nlength 6\nease 0\n" + lines + "\n" + kShot;
+		return film.load((d / "f.film").string());
+	};
+	const auto blockOf = [](const std::string &scene, const std::string &radius) {   // the text of the block of that radius
+		const std::size_t end = scene.find("\"float radius\" [ " + radius + " ]");
+		return end == std::string::npos ? std::string() : scene.substr(scene.rfind("AttributeBegin", end), end - scene.rfind("AttributeBegin", end));
+	};
+	{	// a group's move reaches its members; a child rides on its parent, turns included; hidden with it
+		ff::DataFilm film;
+		ASSERT_EQ(load("group all of a b\nparent c to a\nmove all  0 0 0 0  6 6 0 0\nshow all 0 3\nmove c 0 0 1 0  6 0 1 0", film), "");
+		const std::string s = film.sceneAt(1.5), later = film.sceneAt(4.0);
+		EXPECT_NE(blockOf(s, "1").find("Translate 1.5 0 0"), std::string::npos) << s.substr(0, 400);
+		EXPECT_NE(blockOf(s, "2").find("Translate 1.5 0 0"), std::string::npos);
+		EXPECT_NE(blockOf(s, "3").find("Translate 1.5 0 0"), std::string::npos) << "through its parent, to the group";
+		EXPECT_NE(blockOf(s, "3").find("Translate 0 1 0"), std::string::npos) << "and its own";
+		EXPECT_EQ(blockOf(later, "3"), "") << "hidden with what it rides on";
+	}
+	{	// a hop: there and back to the ground line by the arc, and its squash; it lands and stays
+		ff::DataFilm film;
+		ASSERT_EQ(load("hop a 1 1 by 4 0 0 height 2 feet 0 0 0\nblink b about 0 1 0  2 3", film), "");
+		EXPECT_NE(blockOf(film.sceneAt(1.5), "1").find("Translate 2 2 0"), std::string::npos) << blockOf(film.sceneAt(1.5), "1");
+		EXPECT_NE(blockOf(film.sceneAt(4.0), "1").find("Translate 4 0 0"), std::string::npos);
+		EXPECT_NE(blockOf(film.sceneAt(2.08), "2").find("Scale 1 0.1 1"), std::string::npos) << "shut";
+		EXPECT_NE(blockOf(film.sceneAt(2.6), "2").find("Scale 1 1 1"), std::string::npos) << "open again";
+	}
+	{	// a gaze follows what moves: a point turned to by the block's forward, from where the block has been moved to
+		ff::DataFilm film;
+		ASSERT_EQ(load("move b  0 10 0 0  6 10 0 0\nmove c  0 0 0 0  6 0 0 10\nparent a to c\ngaze a about 0 0 0 forward 0 0 1 at b max 180", film), "");
+		const std::string block = blockOf(film.sceneAt(3.0), "1");   // (a rides on c, 5 along z by then, and looks at b at x 10)
+		const std::size_t at = block.find("ConcatTransform [");
+		ASSERT_NE(at, std::string::npos) << block;
+		std::istringstream in(block.substr(at + 17));
+		double m[16];
+		for (double &x : m) in >> x;
+		const V3 wanted = cartoon::normalize(V3{10, 0, -5}), got = cartoon::normalize(V3{m[8], m[9], m[10]});
+		EXPECT_NEAR(cartoon::dot(wanted, got), 1.0, 1e-5) << "it looks at b from where it rides";
+	}
+	ff::DataFilm bad;
+	EXPECT_NE(load("parent a to b\nparent b to a", bad), "") << "not onto itself";
+	ff::DataFilm bad2;
+	EXPECT_NE(load("gaze a at nobody", bad2), "");
+}
+
 TEST(FilmModel3, ASkinnedCharacterWalksAndFeels) {
 	ff::DataFilm film;
 	ASSERT_EQ(loadFilm("skin", kHead + kBlob + "character bo blob at 0 0 0\nwalk bo 1.0 0.5  0 2\nfeel bo surprised 4 4.3 6 6\nsay bo 4.2 \"Oh!\"\n" + kShot, film), "");

@@ -86,7 +86,7 @@
 namespace cartoon {
 namespace film_file {
 
-enum class Kind { Move, Turn, Grow, Light, Show, Stretch, Resize };
+enum class Kind { Move, Turn, Grow, Light, Show, Stretch, Resize, Gaze };
 
 struct Key {
 	double t = 0.0;
@@ -102,6 +102,10 @@ struct Anim {
 	std::vector<Key> keys;                               // Move: v = the offset; Turn: v[0] = degrees; Grow, Light and Stretch: v[0] = the factor; Resize: v = the three factors
 	std::vector<std::pair<double, double>> intervals;   // Show
 	std::string ease;                                    // its own curve (`ease back` on its line: ease_curves.h); "": the film's
+	// (Gaze: `gaze NAME about X Y Z forward X Y Z at ...`) axis is what faces forward at rest; keys, how much it looks (v[0], none: fully)
+	std::string target;                                  // what it looks at: a block, a group, a placement or a character ("": the point `point`)
+	double point[3] = {0.0, 0.0, 0.0};                   // (or, with a target, the place on it, in its rest position)
+	double most = 60.0;                                  // the furthest it turns, degrees
 };
 
 // How a `stretch` axis is reached from y (the turn: `degrees` about `axis`; none when it is y already): the stretch is that turn, a scale, and the turn back.
@@ -321,6 +325,8 @@ struct Spec {
 	bool idle = true;       // the characters' idle life, and turning to whoever speaks (`idle off`)
 	std::vector<Shot> shots;
 	std::vector<Anim> anims;
+	std::map<std::string, std::string> parents;   // (`parent CHILD to OTHER`, `group NAME of A B C`) what rides on what: it takes its parent's moves, hides and lights as well as its own
+	std::vector<std::string> groups;              // (a group's name: animated by the lines naming it, with no block of its own)
 	std::vector<Character> characters;
 	// props with physics: the block they move, and the line that says so
 	std::vector<std::pair<std::string, physics::Bounce>> bounces;
