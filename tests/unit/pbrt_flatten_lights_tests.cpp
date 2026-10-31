@@ -451,3 +451,39 @@ TEST(FlattenLightSizeTest, AHiddenPanelBecomesSpotsWithItsPower) {
 	EXPECT_EQ(seen.triangles.size(), 1u);
 	EXPECT_TRUE(seen.punctualLights.empty());
 }
+
+// The objects a Live Preview moves are ranges of the triangles: a panel taken out before them must not leave them pointing at the wrong ones.
+TEST(FlattenLightSizeTest, ObjectRangesFollowAHiddenPanelTakenOut) {
+	const FlatScene s = flattenSource(
+		"AttributeBegin\n  AreaLightSource \"diffuse\" \"rgb L\" [ 5 5 5 ] \"bool camera\" false\n"
+		"  Shape \"trianglemesh\" \"integer indices\" [ 0 1 2 0 2 3 ] \"point3 P\" [ 0 0 0  1 0 0  1 1 0  0 1 0 ]\nAttributeEnd\n"
+		"AttributeBegin\n  Shape \"trianglemesh\" \"integer indices\" [ 0 1 2 ] \"point3 P\" [ 5 0 0  6 0 0  5 1 0 ]\nAttributeEnd\n"
+		"AttributeBegin\n  Shape \"trianglemesh\" \"integer indices\" [ 0 1 2 ] \"point3 P\" [ 7 0 0  8 0 0  7 1 0 ]\nAttributeEnd\n");
+	ASSERT_EQ(s.triangles.size(), 2u);
+	ASSERT_EQ(s.shapeRanges.size(), 2u) << "the panel's own range is gone";
+	EXPECT_EQ(s.shapeRanges[0].triBegin, 0u);
+	EXPECT_EQ(s.shapeRanges[0].triEnd, 1u);
+	EXPECT_EQ(s.shapeRanges[1].triBegin, 1u);
+	EXPECT_EQ(s.shapeRanges[1].triEnd, 2u);
+	EXPECT_DOUBLE_EQ(s.triangles[s.shapeRanges[1].triBegin].v[0], 7.0) << "and each range is still its own shape";
+}
+
+TEST(FlattenLightSizeTest, AHiddenPanelOfAnotherShapeSaysItStaysInView) {
+	const FlatScene s = flattenSource("AreaLightSource \"diffuse\" \"rgb L\" [ 5 5 5 ] \"bool camera\" false\nShape \"sphere\" \"float radius\" [ 1 ]\n");
+	EXPECT_EQ(s.spheres.size(), 1u);
+	EXPECT_TRUE(warnedAbout(s, "stays in view"));
+}
+
+// A glowing ellipsoid is made of triangles for its light's sake, but its "power" is the shape's: each of thousands of triangles taking the whole of it would be thousands of times too bright.
+TEST(FlattenLightSizeTest, AGlowingEllipsoidsPowerIsTheShapes) {
+	const FlatScene s = flattenSource("AreaLightSource \"diffuse\" \"rgb L\" [ 1 1 1 ] \"float power\" [ 10 ]\nScale 1 2 1\nShape \"sphere\" \"float radius\" [ 1 ]\n");
+	ASSERT_GT(s.triangles.size(), 1000u);
+	double area = 0.0;
+	for (const pbrt_flatten::Triangle &t : s.triangles) {
+		EXPECT_EQ(t.areaLight, s.triangles[0].areaLight) << "one light, whatever size each triangle is";
+		const double e1[3] = {t.v[3] - t.v[0], t.v[4] - t.v[1], t.v[5] - t.v[2]}, e2[3] = {t.v[6] - t.v[0], t.v[7] - t.v[1], t.v[8] - t.v[2]};
+		const double n[3] = {e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]};
+		area += 0.5 * std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+	}
+	EXPECT_NEAR(s.areaLights[static_cast<std::size_t>(s.triangles[0].areaLight)].scale * 3.14159265358979323846 * area, 10.0, 1e-6);
+}

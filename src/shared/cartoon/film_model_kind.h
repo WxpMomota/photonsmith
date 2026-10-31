@@ -213,6 +213,10 @@ inline film_file::CharacterKind kindOf(const std::string &film, const Model &m) 
 					else if (role == "tail") poses.push_back(about(b.a, rotate({0, 1, 0}, 18.0 * std::sin(2.0 * kPi * mo.t * (1.0 + mo.going)))));
 					else poses.push_back(spineM);
 				}
+				for (std::size_t b = 0; b < rp.bones.size(); ++b)   // (a bone of a limited reach goes where what it rides on goes: an ear with the head)
+					if (rp.bones[b].radius > 0.0)
+						for (std::size_t q = 0; q < rp.bones.size(); ++q)
+							if (q != b && rp.bones[q].name == rp.bones[b].parent) poses[b] = poses[q];
 				out += attr(materialOf(tinted), emitMesh(skinned(rp.mesh, rp.weights, poses), mul(place, bodyM)));
 				continue;
 			}

@@ -18,6 +18,9 @@ import bpy, bmesh, os, sys, math, struct, time
 import numpy as np
 from mathutils import Matrix, Vector
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from import_blend import narrow_fov
+
 argv = sys.argv[sys.argv.index('--') + 1:]
 OUT = argv[0]
 def option(name, default=None):
@@ -522,13 +525,7 @@ eye = swp(Mc.translation)
 fwd = swp((Mc.to_3x3() @ Vector((0, 0, -1))).normalized())
 up = swp((Mc.to_3x3() @ Vector((0, 1, 0))).normalized())
 rx, ry = sc.render.resolution_x, sc.render.resolution_y
-sensor = cd.sensor_width if cd.sensor_fit in ('AUTO', 'HORIZONTAL') else cd.sensor_height
-if cd.sensor_fit == 'VERTICAL':
-    vfov = 2 * math.degrees(math.atan(cd.sensor_height / 2 / cd.lens))
-else:
-    hsize = sensor / 2 if rx >= ry else sensor / 2 * rx / ry
-    hf = math.atan(sensor / 2 / cd.lens)
-    vfov = 2 * math.degrees(math.atan(math.tan(hf) * min(rx, ry) / max(rx, ry))) if rx >= ry else 2 * math.degrees(hf)
+fov = narrow_fov(cd.lens, cd.sensor_width, cd.sensor_height, cd.sensor_fit, rx, ry)
 cam_lines = [f'LookAt {f3(eye)}  {f3(eye + fwd)}  {f3(up)}']
 dof = ''
 if cd.dof.use_dof:
@@ -537,8 +534,8 @@ if cd.dof.use_dof:
     lr = lens_m / (2 * cd.dof.aperture_fstop)
     dof = f' "float lensradius" {lr:.5g} "float focaldistance" {fd:.5g}'
     p('dof focus', fd, 'lens radius', lr)
-cam_lines.append(f'Camera "perspective" "float fov" {vfov:.5g}{dof}')
-p('camera', tuple(eye), 'fov', vfov)
+cam_lines.append(f'Camera "perspective" "float fov" {fov:.5g}{dof}')
+p('camera', tuple(eye), 'fov', fov)
 
 print('STEP writing the scene', flush=True)
 TONEMAP = {'Filmic': 'filmic', 'AgX': 'agx', 'Standard': 'none', 'Khronos PBR Neutral': 'neutral'}.get(sc.view_settings.view_transform)

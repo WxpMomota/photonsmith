@@ -58,10 +58,14 @@ inline void spreadSizedLights(FlatScene &out) {
 }
 
 inline void hiddenPanelsToSpots(FlatScene &out) {
+	const auto hidden = [&out](int light) { return light >= 0 && static_cast<std::size_t>(light) < out.areaLights.size() && !out.areaLights[static_cast<std::size_t>(light)].camera; };
+	const auto anyHidden = [&hidden](const auto &shapes) { return std::any_of(shapes.begin(), shapes.end(), [&hidden](const auto &s) { return hidden(s.areaLight); }); };
+	if (anyHidden(out.spheres) || anyHidden(out.disks) || anyHidden(out.cylinders) || anyHidden(out.cones) || anyHidden(out.paraboloids) || anyHidden(out.bilinearPatches))
+		out.warnings.push_back({0, std::string(), "\"bool camera\" false is for a panel of triangles: an area light on any other shape stays in view"});
 	std::vector<std::vector<const Triangle *>> panels(out.areaLights.size());
 	bool any = false;
 	for (const Triangle &t : out.triangles)
-		if (t.areaLight >= 0 && static_cast<std::size_t>(t.areaLight) < out.areaLights.size() && !out.areaLights[static_cast<std::size_t>(t.areaLight)].camera) {
+		if (hidden(t.areaLight)) {
 			panels[static_cast<std::size_t>(t.areaLight)].push_back(&t);
 			any = true;
 		}
@@ -108,10 +112,18 @@ inline void hiddenPanelsToSpots(FlatScene &out) {
 			}
 		}
 	}
-	if (any)
-		out.triangles.erase(std::remove_if(out.triangles.begin(), out.triangles.end(), [&](const Triangle &t) {
-			return t.areaLight >= 0 && static_cast<std::size_t>(t.areaLight) < out.areaLights.size() && !out.areaLights[static_cast<std::size_t>(t.areaLight)].camera;
-		}), out.triangles.end());
+	if (!any) return;
+	// The objects a Live Preview moves are ranges of the triangles: they follow, and a panel's own is gone.
+	std::vector<std::size_t> kept(out.triangles.size() + 1, 0);
+	for (std::size_t i = 0; i < out.triangles.size(); ++i) kept[i + 1] = kept[i] + (hidden(out.triangles[i].areaLight) ? 0 : 1);
+	for (ShapeRange &r : out.shapeRanges) {
+		r.triBegin = kept[std::min(r.triBegin, out.triangles.size())];
+		r.triEnd = kept[std::min(r.triEnd, out.triangles.size())];
+	}
+	out.shapeRanges.erase(std::remove_if(out.shapeRanges.begin(), out.shapeRanges.end(), [](const ShapeRange &r) {
+		return r.instance < 0 && r.triBegin == r.triEnd && r.sphereBegin == r.sphereEnd && r.diskBegin == r.diskEnd && r.cylinderBegin == r.cylinderEnd;
+	}), out.shapeRanges.end());
+	out.triangles.erase(std::remove_if(out.triangles.begin(), out.triangles.end(), [&hidden](const Triangle &t) { return hidden(t.areaLight); }), out.triangles.end());
 }
 
 }  // namespace pbrt_flatten

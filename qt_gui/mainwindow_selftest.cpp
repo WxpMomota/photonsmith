@@ -90,6 +90,21 @@ const QStringList filmProblems = SceneMetadataClient::filmProblems();
 check(film_info::find("selftest-refresh") != nullptr, "the Refresh button lists a new film without a restart" + (filmProblems.isEmpty() ? QString() : " (" + filmProblems.join("; ") + ")"));
 const QString newest = SceneMetadataClient::sceneIdAtIndex(SceneMetadataClient::sceneCount() - 1);
 check(SceneMetadataClient::sceneName(m_sceneCombo->currentData().toString()).contains("Refresh test"), "and selects it: " + SceneMetadataClient::sceneName(m_sceneCombo->currentData().toString()) + " (the list ends with " + newest + ", " + SceneMetadataClient::sceneName(newest) + ", " + SceneMetadataClient::sceneCategory(newest) + "; rendering: " + (m_isRendering ? "yes" : "no") + ")");
+// ... and during a render it joins the list without taking the selection away from what is rendering.
+{
+	const QString rendering = m_sceneCombo->currentData().toString(), other = QFileInfo(second).absolutePath() + "/selftest-refresh-2.film";
+	QFile film(other);
+	check(film.open(QIODevice::WriteOnly), "a second film file can be saved");
+	film.write(("film selftest-refresh-2\nname Refresh test two\nscene " + QFileInfo(second).fileName() + "\nlength 2\nshot 0 S\n  key 0 1.5 5  0 0.8 0  45\n").toUtf8());
+	film.close();
+	m_isRendering = true;
+	onRefreshSceneList();
+	m_isRendering = false;
+	check(film_info::find("selftest-refresh-2") != nullptr, "Refresh during a render lists the film");
+	check(m_sceneCombo->currentData().toString() == rendering, "and what is rendering stays selected");
+	check(m_sceneCombo->findText("Refresh test two", Qt::MatchContains) >= 0, "and the list shows it");
+	QFile::remove(other);
+}
 QFile::remove(filmFile);
 QFile::remove(second);
 QFile::remove(listed);

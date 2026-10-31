@@ -7,12 +7,15 @@
 #include "scene_builder_widget.h"
 #include "scene_metadata_client.h"
 
+#include <QComboBox>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QSignalBlocker>
 #include <QStatusBar>
+#include <QTabBar>
 
 namespace {
 const char *const kMyScenesCategory = "My Scenes";   // SceneCategories::MyScenes: what SceneMetadataClient::sceneCategory() answers for them
@@ -94,6 +97,12 @@ void MainWindow::onRefreshSceneList() {
 	const int added = SceneMetadataClient::refreshUserScenes();
 	for (const QString &p : SceneMetadataClient::filmProblems()) onLogMessage(tr("Warning: a film file was left out - %1").arg(p));
 	if (added > 0 && !m_isRendering) selectSceneById(SceneMetadataClient::sceneIdAtIndex(SceneMetadataClient::sceneCount() - 1));   // (what was found is at the end)
+	if (added > 0 && m_isRendering && m_sceneCategoryTabs) {   // (the list grows; what is rendering stays selected)
+		const QString current = m_sceneCombo->currentData().toString();
+		populateSceneViews(m_sceneCategoryTabs->tabData(m_sceneCategoryTabs->currentIndex()).toString());
+		const QSignalBlocker blocker(m_sceneCombo);
+		m_sceneCombo->setCurrentIndex(m_sceneCombo->findData(current));
+	}
 	statusBar()->showMessage(added > 0 ? tr("%n new film(s) or scene(s) listed.", "", added) : tr("Nothing new to list."), 6000);
 }
 

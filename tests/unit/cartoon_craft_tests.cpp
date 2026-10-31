@@ -772,6 +772,21 @@ TEST(MusicCues, ARecordingIsWorkedOnAsItPlays) {
 }
 
 // Another kind of sound file comes through ffmpeg (the test is skipped on a machine without it).
+// The WAVs the program keeps of recordings of another kind, each named from the recording's time: what a test makes, it takes away again.
+static std::set<std::filesystem::path> keptRecordings() {
+	std::set<std::filesystem::path> found;
+	std::error_code ec;
+	for (const auto &entry : std::filesystem::directory_iterator(std::filesystem::temp_directory_path(), ec))
+		if (entry.path().filename().string().rfind("rt_cue_", 0) == 0) found.insert(entry.path());
+	return found;
+}
+static void removeRecordingsSince(const std::set<std::filesystem::path> &before) {
+	for (const std::filesystem::path &file : keptRecordings()) {
+		std::error_code ec;
+		if (!before.count(file)) std::filesystem::remove(file, ec);
+	}
+}
+
 TEST(MusicCues, ARecordingOfAnotherKindIsRead) {
 	namespace mc = cartoon::music_cues;
 	const std::filesystem::path d = std::filesystem::temp_directory_path() / "photonsmith_cue_formats_test";
@@ -779,12 +794,50 @@ TEST(MusicCues, ARecordingOfAnotherKindIsRead) {
 	const std::string mp3 = (d / "tone.mp3").generic_string();
 	const std::string make = "ffmpeg -v quiet -y -f lavfi -i \"sine=frequency=440:duration=1\" -ar 44100 \"" + mp3 + "\"";
 	if (std::system(make.c_str()) != 0) GTEST_SKIP() << "no ffmpeg";
+	const std::set<std::filesystem::path> before = keptRecordings();
 	const mc::Recording &r = mc::recording(mp3);
 	EXPECT_EQ(r.why, "");
 	EXPECT_NEAR(static_cast<double>(r.sound.size()), cartoon::audio::kRate, cartoon::audio::kRate * 0.1);
 	const mc::Recording &missing = mc::recording((d / "no-such.ogg").generic_string());
 	EXPECT_TRUE(missing.sound.empty());
 	EXPECT_NE(missing.why, "");
+	removeRecordingsSince(before);
+}
+
+// A film's frames are made by several processes at once, each wanting the recording: they must not read what another is writing, or delete it from under it.
+TEST(MusicCues, SeveralReadTheSameRecordingAtOnce) {
+	namespace mc = cartoon::music_cues;
+	const std::filesystem::path d = std::filesystem::temp_directory_path() / "photonsmith_cue_formats_test";
+	std::filesystem::create_directories(d);
+	const std::string mp3 = (d / "together.mp3").generic_string();
+	const std::string make = "ffmpeg -v quiet -y -f lavfi -i \"sine=frequency=330:duration=1\" -ar 44100 \"" + mp3 + "\"";
+	if (std::system(make.c_str()) != 0) GTEST_SKIP() << "no ffmpeg";
+	const std::set<std::filesystem::path> before = keptRecordings();
+	std::atomic<int> good{0};
+	std::vector<std::thread> readers;
+	for (int k = 0; k < 6; ++k)
+		readers.emplace_back([&]() {
+			std::vector<float> sound;
+			std::string why;
+			if (mc::readOther(mp3, sound, &why) && !sound.empty()) ++good;
+		});
+	for (std::thread &r : readers) r.join();
+	EXPECT_EQ(good.load(), 6);
+	removeRecordingsSince(before);
+}
+
+// A cues file for a film in parts follows the track of the part playing, at the part's own time.
+TEST(MusicCues, AFilmInPartsFollowsThePartPlaying) {
+	cartoon::Film first{}, second{}, whole{};
+	first.duration = second.duration = 2.0;
+	first.trackAt = [](const std::string &name, double) { return name == "fire" ? 0.5 : -1.0; };
+	second.trackAt = [](const std::string &name, double t) { return name == "lamp" ? t : -1.0; };
+	whole = cartoon::film_parts::joined(whole, {first, second}, {});
+	ASSERT_TRUE(static_cast<bool>(whole.trackAt));
+	EXPECT_DOUBLE_EQ(whole.trackAt("fire", 1.0), 0.5);
+	EXPECT_DOUBLE_EQ(whole.trackAt("lamp", 3.5), 1.5) << "the part's own time";
+	EXPECT_DOUBLE_EQ(whole.trackAt("lamp", 1.0), 0.0) << "another part's track: silent here, not missing";
+	EXPECT_LT(whole.trackAt("moon", 1.0), 0.0) << "no part has it";
 }
 
 TEST(MusicCues, AFilmsCuesAreHeardAtTheirTimesOnItsSoundtrack) {

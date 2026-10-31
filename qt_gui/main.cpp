@@ -5,6 +5,7 @@
 #include <QTranslator>
 #include <QLibraryInfo>
 #include <QDir>
+#include <QFileInfo>
 #include <QCoreApplication>
 #include <QSettings>
 #include <QStandardPaths>
@@ -17,6 +18,14 @@
 #include "startup_profile.h"
 
 #include <memory>
+
+// Whether a folder, which may not exist yet, is in the temporary folder.
+static bool inTemporaryFolder(const QString &folder) {
+	if (folder.isEmpty()) return false;
+	QFileInfo at(folder);
+	while (!at.exists() && at.absolutePath() != at.absoluteFilePath()) at = QFileInfo(at.absolutePath());
+	return (at.canonicalFilePath() + QLatin1Char('/')).startsWith(QDir(QDir::tempPath()).canonicalPath() + QLatin1Char('/'), Qt::CaseInsensitive);
+}
 
 int main(int argc, char *argv[]) {
 	startup_profile::begin();
@@ -60,9 +69,10 @@ int main(int argc, char *argv[]) {
 	// image) or in a protected folder. Exported through the environment so the ray_tracer subprocess and the renderer
 	// libraries loaded into this process agree on it; an explicit value (tests, power users) wins.
 	// A self-test (RT_GUI_SELFTEST) never touches the real per-user folder: it saves scenes into the scene list and deletes them again, so it gets a
-	// throwaway one, removed when the program ends (scripts/gui_selftest.py sets its own).
+	// throwaway one, removed when the program ends (scripts/gui_selftest.py sets its own, in the temporary folder). A folder given anywhere else is not trusted with that: what
+	// the test deletes is gone, so it could be the user's real scenes.
 	QTemporaryDir selfTestAssets;
-	if (!qEnvironmentVariableIsSet("RAY_TRACER_USER_ASSETS") && qEnvironmentVariableIsSet("RT_GUI_SELFTEST") && selfTestAssets.isValid())
+	if (qEnvironmentVariableIsSet("RT_GUI_SELFTEST") && selfTestAssets.isValid() && !inTemporaryFolder(qEnvironmentVariable("RAY_TRACER_USER_ASSETS")))
 		qputenv("RAY_TRACER_USER_ASSETS", selfTestAssets.path().toUtf8());
 	if (!qEnvironmentVariableIsSet("RAY_TRACER_USER_ASSETS"))
 		qputenv("RAY_TRACER_USER_ASSETS", (QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/user_assets")).toUtf8());

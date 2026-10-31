@@ -5,7 +5,7 @@ import_blend.py SCENE.blend [OUT_DIR] [--blender PATH] [--name NAME] [--frame N]
 
 OUT_DIR defaults to a folder named after the scene beside the .blend. The GUI's File > Import Blender scene does the same and adds it to My Scenes.
 """
-import glob, os, shutil, subprocess, sys
+import glob, math, os, shutil, subprocess, sys
 
 
 def find_blender(given=None):
@@ -20,6 +20,14 @@ def find_blender(given=None):
     candidates += [r'C:\Program Files (x86)\Steam\steamapps\common\Blender\blender.exe', r'C:\Program Files\Steam\steamapps\common\Blender\blender.exe',
                    '/Applications/Blender.app/Contents/MacOS/Blender', os.path.expanduser('~/Applications/Blender.app/Contents/MacOS/Blender')]
     return next((c for c in candidates if os.path.isfile(c)), None)
+
+
+def narrow_fov(lens, sensor_width, sensor_height, fit, rx, ry):
+    """A Blender camera's angle in degrees as pbrt's "fov" takes it: across the narrower side of the picture. `fit` is its sensor_fit: which side the sensor measures."""
+    across_x = fit == 'HORIZONTAL' or (fit == 'AUTO' and rx >= ry)
+    half = (sensor_height if fit == 'VERTICAL' else sensor_width) / 2 / lens
+    tx, ty = (half, half * ry / rx) if across_x else (half * rx / ry, half)
+    return 2 * math.degrees(math.atan(min(tx, ty)))
 
 
 def command(blender, blend, out, script, extra):

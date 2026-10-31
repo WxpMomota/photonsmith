@@ -116,6 +116,39 @@ TEST(FilmModel3, PoseInAFilmKeepsAnImportedMeshsPicture) {
 	EXPECT_NE(bent.find("point2 uv"), std::string::npos) << "and its uvs";
 	EXPECT_NE(problemWith(text.substr(0, text.find("pose s")) + "pose s nobone 1 0  2 70\n"), "");
 }
+// A bone of a limited reach shares a piece with bones that have none: they keep the rest of the skin, so a character with an ear of its own still walks.
+TEST(FilmModel3, ABoneOfLimitedReachLeavesTheOtherBonesTheirSkin) {
+	cartoon::Mesh m;
+	for (int k = 0; k <= 40; ++k) m.verts.push_back({0.0, k * 0.05, 0.0});
+	m.tris.push_back({0, 1, 2});
+	model::Bone leg, ear;
+	leg.name = "leg.1", leg.a = {0, 0, 0}, leg.b = {0, 1, 0};
+	ear.name = "ear", ear.a = {0, 1.5, 0}, ear.b = {0, 2.0, 0}, ear.radius = 0.6;
+	const model::Weights w = model::weightsOf(m, {leg, ear});
+	for (std::size_t v = 0; v < m.verts.size(); ++v) EXPECT_NEAR(w.w[v][0] + w.w[v][1] + w.w[v][2], 1.0, 1e-9) << "nothing left at rest, vertex " << v;
+	const cartoon::Mesh swung = model::skinned(m, w, {cartoon::translate({1, 0, 0}), cartoon::identity()});
+	EXPECT_NEAR(swung.verts[0].x, 1.0, 1e-9) << "the leg's skin goes with the leg";
+	EXPECT_NEAR(swung.verts[40].x, 0.0, 1e-9) << "the ear's stays with the ear";
+	const cartoon::Mesh bent = model::skinned(m, w, {cartoon::identity(), cartoon::translate({1, 0, 0})});
+	EXPECT_NEAR(bent.verts[40].x, 1.0, 1e-9);
+	EXPECT_NEAR(bent.verts[0].x, 0.0, 1e-9);
+}
+
+// Two looking at each other, or one at itself, is a film like any other: this used to go round until the stack ran out.
+TEST(FilmModel3, BlocksGazingAtEachOtherDoNotGoRoundForever) {
+	const std::filesystem::path d = std::filesystem::temp_directory_path() / "photonsmith_model3_test_gaze_cycle";
+	std::filesystem::create_directories(d);
+	std::ofstream(d / "s.pbrt", std::ios::binary) << std::string(kSet) + "# @anim a\nAttributeBegin\n  Shape \"sphere\" \"float radius\" [ 1 ]\nAttributeEnd\n# @anim b\nAttributeBegin\n  Translate 3 0 0\n  Shape \"sphere\" \"float radius\" [ 1 ]\nAttributeEnd\n";
+	std::ofstream(d / "f.film", std::ios::binary) << "scene s.pbrt\nlength 6\nmove b  0 0 0 0  6 2 0 0\ngaze a at b offset 3 0 0 max 90\ngaze b about 3 0 0 at a max 90\n" + kShot;
+	ff::DataFilm film;
+	ASSERT_EQ(film.load((d / "f.film").string()), "");
+	EXPECT_NE(film.sceneAt(3.0).find("ConcatTransform"), std::string::npos);
+	std::ofstream(d / "f.film", std::ios::binary) << "scene s.pbrt\nlength 6\ngaze a at a max 90\n" + kShot;
+	ff::DataFilm self;
+	ASSERT_EQ(self.load((d / "f.film").string()), "");
+	EXPECT_FALSE(self.sceneAt(3.0).empty());
+}
+
 // Squash and stretch on a block: V along the axis, the width made up so the volume stays; `resize` scales each axis on its own.
 TEST(FilmModel3, StretchKeepsTheVolumeAndResizeIsPerAxis) {
 	const std::string set = std::string(kSet) + "# @anim ball\nAttributeBegin\n  Shape \"sphere\" \"float radius\" [ 1 ]\nAttributeEnd\n";

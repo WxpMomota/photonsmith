@@ -102,14 +102,28 @@ void MainWindow::importBlendFile(const QString &blend, const std::function<void(
 		}
 	});
 	connect(progress, &QProgressDialog::canceled, process, &QProcess::kill);
+	// (`finished` never comes when it did not start: a stale saved path, a file that is not Blender. The path is forgotten, so the next import asks again.)
+	connect(process, &QProcess::errorOccurred, this, [=](QProcess::ProcessError error) {
+		if (error != QProcess::FailedToStart) return;
+		const QString why = process->errorString();
+		progress->close();
+		progress->deleteLater();
+		process->deleteLater();
+		QDir(outDir).removeRecursively();
+		QSettings(settings_keys::kOrg, settings_keys::kApp).remove(kBlenderPathKey);
+		AppLog::error(QStringLiteral("scenes"), QStringLiteral("Blender could not be started: ") + blender + QStringLiteral(": ") + why);
+		if (done) done(QString());
+		else QMessageBox::warning(this, tr("Import Blender Scene"), tr("%1 could not be started: %2").arg(blender, why));
+	});
 	connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this, [=](int code, QProcess::ExitStatus status) {
+		const bool canceled = progress->wasCanceled();   // (read first: closing the dialog sets it)
 		progress->close();
 		progress->deleteLater();
 		process->deleteLater();
 		const QString sceneFile = outDir + "/" + sceneName + ".pbrt";
 		if (status != QProcess::NormalExit || code != 0 || !QFileInfo::exists(sceneFile)) {
 			QDir(outDir).removeRecursively();
-			if (!progress->wasCanceled()) {
+			if (!canceled) {
 				AppLog::error(QStringLiteral("scenes"), QStringLiteral("Blender import failed:\n") + *log);
 				if (!done) QMessageBox::warning(this, tr("Import Blender Scene"), tr("The import did not finish. The log has what Blender said."));
 			}

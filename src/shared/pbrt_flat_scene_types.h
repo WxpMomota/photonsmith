@@ -422,6 +422,8 @@ struct FlatScene {
 	std::vector<std::string> linkGroups;
 	std::vector<ShapeRange> shapeRanges;
 	std::vector<Triangle> triangles;
+	// Ranges [begin, end) of `triangles` that are one shape to an area light's "power": a glowing ellipsoid, made of triangles for its light's sake (flattenSphereShape).
+	std::vector<std::pair<std::size_t, std::size_t>> oneLightShapes;
 	// See AnimatedTriangleMesh's own comment - real object motion blur for
 	// trianglemesh/plymesh/loopsubdiv, CPU only, populated only when a
 	// shape's xformEnd genuinely differs from xform.

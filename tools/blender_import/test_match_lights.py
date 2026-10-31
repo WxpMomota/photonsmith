@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Tests of match_lights.py's parts that need no renderer: python tools/blender_import/test_match_lights.py"""
+import math
 import unittest
 import numpy as np
+import import_blend as ib
 import match_lights as ml
 
 
@@ -36,6 +38,22 @@ class Lights(unittest.TestCase):
         self.assertIn('"float scale" [ 2 ]', ml.scaled('LightSource "spot" "rgb I" [ 1 1 1 ]', 2.0))
         self.assertIn('"float scale" 7', ml.scaled('AreaLightSource "diffuse" "float scale" 3.5', 2.0))
         self.assertIn('"float scale" [ 3 ]', ml.scaled('X "float scale" [ 1.5 ] Y', 2.0))
+
+
+class Camera(unittest.TestCase):
+    def fov(self, fit, rx, ry):
+        return ib.narrow_fov(50.0, 36.0, 24.0, fit, rx, ry)
+
+    def test_the_angle_is_across_the_narrower_side(self):
+        wide = 2 * math.degrees(math.atan(18.0 / 50.0 * 1080 / 1920))
+        self.assertAlmostEqual(self.fov('AUTO', 1920, 1080), wide, places=6)
+        self.assertAlmostEqual(self.fov('AUTO', 1080, 1920), wide, places=6, msg='AUTO fits the longer side, whichever it is: a portrait is a landscape turned')
+        self.assertAlmostEqual(self.fov('AUTO', 800, 800), 2 * math.degrees(math.atan(0.36)), places=6)
+
+    def test_a_fit_fixes_one_side(self):
+        self.assertAlmostEqual(self.fov('HORIZONTAL', 1080, 1920), 2 * math.degrees(math.atan(0.36)), places=6, msg='the sensor across the width, which is the narrower')
+        self.assertAlmostEqual(self.fov('VERTICAL', 1920, 1080), 2 * math.degrees(math.atan(0.24)), places=6)
+        self.assertAlmostEqual(self.fov('VERTICAL', 1080, 1920), 2 * math.degrees(math.atan(0.24 * 1080 / 1920)), places=6, msg='the sensor down the height, the longer')
 
 
 class Curves(unittest.TestCase):

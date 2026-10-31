@@ -1661,7 +1661,7 @@ double DataFilm::lightLevel(const std::string &name, double t) const {
 	return any ? k : -1.0;
 }
 
-Mat4 DataFilm::gazeMatrix(const Anim &a, double t, const Mat4 &outer) const {
+Mat4 DataFilm::gazeMatrix(const Anim &a, double t, const Mat4 &outer, int depth) const {
 	const Vec3 pivot{a.about[0], a.about[1], a.about[2]};
 	Vec3 at{a.point[0], a.point[1], a.point[2]};
 	if (!a.target.empty()) {
@@ -1669,7 +1669,7 @@ Mat4 DataFilm::gazeMatrix(const Anim &a, double t, const Mat4 &outer) const {
 			const Vec3 story = bodyPoint(*c, t, characterKinds().at(c->kind).head);
 			at = Vec3{-story.x, story.y, story.z};
 		} else {
-			at = transformPoint(animMatrix(a.target, t, 1), at);
+			at = transformPoint(animMatrix(a.target, t, depth + 1), at);   // (each step in: two looking at each other stop at animMatrix's limit)
 		}
 	}
 	const Vec3 d = transformPoint(invertAffine(outer), at) - pivot, f = normalize(Vec3{a.axis[0], a.axis[1], a.axis[2]});
@@ -1703,7 +1703,7 @@ Mat4 DataFilm::animMatrix(const std::string &name, double t, int depth, const An
 		} else if (a.kind == Kind::Resize) {
 			m = mul(m, translate(about), scale(std::max(1e-6, progress(a, t, 0)), std::max(1e-6, progress(a, t, 1)), std::max(1e-6, progress(a, t, 2))), translate(about * -1.0));
 		} else if (a.kind == Kind::Gaze && depth < 8) {
-			m = mul(m, gazeMatrix(a, t, m));
+			m = mul(m, gazeMatrix(a, t, m, depth));
 		}
 	}
 	return m;

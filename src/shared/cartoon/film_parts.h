@@ -62,6 +62,16 @@ inline Film joined(Film whole, const std::vector<Film> &parts, const std::vector
 		}
 		return out;
 	};
+	// a cue's `follow` on the whole film: the track of the part playing then (a track of another part's is silent there, not missing)
+	whole.trackAt = [s, local](const std::string &name, double t) {
+		std::size_t k = 0;
+		const double u = local(t, k);
+		const double own = s->parts[k].trackAt ? s->parts[k].trackAt(name, u) : -1.0;
+		if (own >= 0.0) return own;
+		for (const Film &p : s->parts)
+			if (p.trackAt && p.trackAt(name, 0.0) >= 0.0) return 0.0;
+		return -1.0;
+	};
 	// the sound: each part's on a mix of its own, laid at its start; a part that comes in with a fade or a dissolve brings its sound in over that time
 	whole.soundtrack = [s](audio::Mix &m) {
 		for (std::size_t k = 0; k < s->parts.size(); ++k) {

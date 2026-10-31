@@ -13,8 +13,8 @@
 //
 // Bones of your own, on any mesh and any placed model, posed from the film (`pose ID BONE [axis X Y Z] T DEG ...`, model_anim.h): `bone ear.l from X Y Z to X Y Z parent
 // head radius R` moves only the skin within R of it, fading smoothly to nothing, the rest staying where it is - an ear droops, a cheek lifts, a tail curls with no seam. A
-// piece with any such bone is weighted that way: a vertex takes from each bone it is within reach of, and what they leave of its weight stays at rest. A child bone rides on
-// its parent's turn.
+// vertex takes from each such bone it is within reach of, and what they leave of its weight goes to the piece's other bones, which share the skin as ever (none: it stays at
+// rest), so a character keeps its walk. A child bone rides on its parent's turn.
 
 #include <algorithm>
 #include <array>
@@ -63,10 +63,29 @@ struct Weights {
 	std::vector<std::array<int, 3>> bone;
 	std::vector<std::array<double, 3>> w;
 };
+// The three bones of no limited reach nearest a point, and how much of it each takes (summing to 1, none when there are no such bones).
+inline std::array<std::pair<double, int>, 3> nearestBones(Vec3 p, const std::vector<Bone> &bones) {
+	std::array<std::pair<double, int>, 3> best{{{0.0, 0}, {0.0, 0}, {0.0, 0}}};
+	for (std::size_t b = 0; b < bones.size(); ++b) {
+		if (bones[b].radius > 0.0) continue;
+		const double d = segmentDistance(p, bones[b].a, bones[b].b), s = 1.0 / (std::pow(d, 4.0) + 1e-10);
+		for (int k = 0; k < 3; ++k)
+			if (s > best[k].first) {
+				for (int q = 2; q > k; --q) best[q] = best[q - 1];
+				best[k] = {s, static_cast<int>(b)};
+				break;
+			}
+	}
+	const double sum = best[0].first + best[1].first + best[2].first;
+	if (sum > 0.0)
+		for (auto &one : best) one.first /= sum;
+	return best;
+}
 inline Weights weightsOf(const Mesh &m, const std::vector<Bone> &bones) {
 	Weights out;
 	out.bone.resize(m.verts.size()), out.w.resize(m.verts.size());
 	if (std::any_of(bones.begin(), bones.end(), [](const Bone &b) { return b.radius > 0.0; })) {   // bones of a limited reach: the skin near them, a smooth fall to nothing
+		const bool shared = std::any_of(bones.begin(), bones.end(), [](const Bone &b) { return !(b.radius > 0.0); });   // (what they leave goes to the bones that share the skin, else stays at rest)
 		for (std::size_t v = 0; v < m.verts.size(); ++v) {
 			std::array<std::pair<double, int>, 3> best{{{0.0, -1}, {0.0, -1}, {0.0, -1}}};
 			for (std::size_t b = 0; b < bones.size(); ++b) {
@@ -82,23 +101,23 @@ inline Weights weightsOf(const Mesh &m, const std::vector<Bone> &bones) {
 					}
 			}
 			const double sum = best[0].first + best[1].first + best[2].first, scale = sum > 1.0 ? 1.0 / sum : 1.0;
-			for (int k = 0; k < 3; ++k) out.bone[v][k] = best[k].second, out.w[v][k] = best[k].first * scale;
+			for (auto &one : best) one.first *= scale;
+			if (shared) {   // (the three that take the most, of its reach's and the rest's share of what is left)
+				const double left = 1.0 - sum * scale;
+				const std::array<std::pair<double, int>, 3> rest = nearestBones(m.verts[v], bones);
+				std::array<std::pair<double, int>, 6> all{best[0], best[1], best[2], {rest[0].first * left, rest[0].second}, {rest[1].first * left, rest[1].second}, {rest[2].first * left, rest[2].second}};
+				std::partial_sort(all.begin(), all.begin() + 3, all.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
+				const double kept = all[0].first + all[1].first + all[2].first;
+				for (int k = 0; k < 3; ++k) best[k] = {all[k].first / kept, all[k].second};
+			}
+			for (int k = 0; k < 3; ++k) out.bone[v][k] = best[k].second, out.w[v][k] = best[k].first;
 		}
 		return out;
 	}
 	for (std::size_t v = 0; v < m.verts.size(); ++v) {
-		std::array<std::pair<double, int>, 3> best{{{0.0, 0}, {0.0, 0}, {0.0, 0}}};
-		for (std::size_t b = 0; b < bones.size(); ++b) {
-			const double d = segmentDistance(m.verts[v], bones[b].a, bones[b].b), s = 1.0 / (std::pow(d, 4.0) + 1e-10);
-			for (int k = 0; k < 3; ++k)
-				if (s > best[k].first) {
-					for (int q = 2; q > k; --q) best[q] = best[q - 1];
-					best[k] = {s, static_cast<int>(b)};
-					break;
-				}
-		}
-		const double sum = best[0].first + best[1].first + best[2].first;
-		for (int k = 0; k < 3; ++k) out.bone[v][k] = best[k].second, out.w[v][k] = sum > 0.0 ? best[k].first / sum : (k == 0 ? 1.0 : 0.0);
+		const std::array<std::pair<double, int>, 3> best = nearestBones(m.verts[v], bones);
+		const bool any = best[0].first > 0.0;
+		for (int k = 0; k < 3; ++k) out.bone[v][k] = best[k].second, out.w[v][k] = any ? best[k].first : (k == 0 ? 1.0 : 0.0);
 	}
 	return out;
 }

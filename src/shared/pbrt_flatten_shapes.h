@@ -133,7 +133,9 @@ inline bool flattenSphereShape(const pbrt_scene::Scene &scene, FlatScene &out, c
 	// A glowing ellipsoid: the analytic sphere light samples a whole round sphere (s.radius), so it would light the scene as that bigger ball, on every
 	// backend (5.4x too bright for one 4 times as tall as wide). As an emissive triangle mesh, its light is sampled from the shape it is.
 	if (ellipsoid && s.areaLight >= 0) {
+		const std::size_t first = w.triangles->size();
 		quadric_tessellate::tessellateClippedSphere(s, *w.triangles);
+		out.oneLightShapes.push_back({first, w.triangles->size()});   // (its "power" is the ellipsoid's, not each triangle's)
 		return true;
 	}
 	// `medium` is populated unconditionally, regardless of clipping -
@@ -1398,11 +1400,18 @@ inline void resolveAfterShapes(const pbrt_scene::Scene &scene, FlatScene &out) {
 			const double cz = e1[0]*e2[1] - e1[1]*e2[0];
 			return 0.5 * std::sqrt(cx*cx + cy*cy + cz*cz);
 		};
-		for (Triangle &t : out.triangles) {
+		std::vector<double> shapeArea(out.triangles.size(), 0.0);   // (a triangle of a shape made of them: the whole shape's area, FlatScene::oneLightShapes)
+		for (const auto &[first, last] : out.oneLightShapes) {
+			double whole = 0.0;
+			for (std::size_t i = first; i < last; ++i) whole += triangleArea(&out.triangles[i].v[0], &out.triangles[i].v[3], &out.triangles[i].v[6]);
+			std::fill(shapeArea.begin() + static_cast<std::ptrdiff_t>(first), shapeArea.begin() + static_cast<std::ptrdiff_t>(last), whole);
+		}
+		for (std::size_t i = 0; i < out.triangles.size(); ++i) {
+			Triangle &t = out.triangles[i];
 			if (t.areaLight < 0) continue;
 			const double a = triangleArea(&t.v[0], &t.v[3], &t.v[6]);
 			area[t.areaLight] += a;
-			primitives.push_back({&t.areaLight, a});
+			primitives.push_back({&t.areaLight, shapeArea[i] > 0.0 ? shapeArea[i] : a});
 		}
 		for (Sphere &s : out.spheres) {
 			if (s.areaLight < 0) continue;

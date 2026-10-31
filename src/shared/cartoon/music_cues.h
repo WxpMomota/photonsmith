@@ -38,6 +38,7 @@
 #include <iostream>
 #include <map>
 #include <memory>
+#include <random>
 #include <mutex>
 #include <sstream>
 #include <string>
@@ -288,10 +289,20 @@ inline bool readOther(const std::string &path, std::vector<float> &out, std::str
 	if (path.find_first_of("\"$`") != std::string::npos) return *why = "has a name that cannot be passed to ffmpeg", false;
 	std::error_code ec;
 	if (!std::filesystem::exists(path, ec)) return *why = "is not there", false;
-	const std::filesystem::path wav = std::filesystem::temp_directory_path(ec) / ("rt_cue_" + std::to_string(std::hash<std::string>{}(path)) + ".wav");
-	const std::string command = "ffmpeg -v error -y -i \"" + path + "\" -ar " + std::to_string(audio::kRate) + " \"" + wav.string() + "\"";
-	const bool made = std::system(command.c_str()) == 0 && audio::readWav(wav.string(), out, why);
-	std::filesystem::remove(wav, ec);
+	// Kept in the temporary folder by the file's name, size and time: a film's frames are made by several processes at once, each wanting it. One that finds none makes its own
+	// under a name of its own and reads that, so none reads what another is writing; it is then linked into place, which never replaces one that someone may be reading.
+	const std::string identity = path + "|" + std::to_string(std::filesystem::file_size(path, ec)) + "|" + std::to_string(static_cast<long long>(std::filesystem::last_write_time(path, ec).time_since_epoch().count()));
+	const std::filesystem::path wav = std::filesystem::temp_directory_path(ec) / ("rt_cue_" + std::to_string(std::hash<std::string>{}(identity)) + ".wav");
+	bool made = false;
+	if (std::filesystem::exists(wav, ec)) {
+		made = audio::readWav(wav.string(), out, why);
+	} else {
+		const std::filesystem::path mine = wav.parent_path() / (wav.stem().string() + "_" + std::to_string(std::random_device{}()) + ".wav");
+		const std::string command = "ffmpeg -v error -y -i \"" + path + "\" -ar " + std::to_string(audio::kRate) + " \"" + mine.string() + "\"";
+		made = std::system(command.c_str()) == 0 && audio::readWav(mine.string(), out, why);
+		if (made) std::filesystem::create_hard_link(mine, wav, ec);   // (it fails when another got there first, or on a disk with no links: this one is read all the same)
+		std::filesystem::remove(mine, ec);
+	}
 	if (!made && why) *why = "could not be read as a WAV, nor by ffmpeg (is it on the PATH?)";
 	return made;
 }
