@@ -489,6 +489,7 @@ struct Spec {
 	// models written in the film (`model NAME ... end`, placed with `place NAME at ...` and `scatter NAME N in ...`: film_model.h, the modeling round)
 	std::vector<model::Model> models;
 	std::vector<model::Placed> modelPlaces;
+	std::vector<model::Shatter> shatters;   // (`shatter ID at T`: model_fracture.h)
 	// fire, lava and smoke (`fire`, `lava`, `volcano`, `wildfire`)
 	std::vector<fire::Fire> fires;
 	std::vector<fire::Lava> lavas;

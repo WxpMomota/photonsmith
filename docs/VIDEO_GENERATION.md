@@ -2512,6 +2512,51 @@ the mesh is split finely enough for it to show: in the geometry, so the same on 
 each placement is drawn at the level its size on the screen asks for - as written within 25 of its sizes from the camera, its fields meshed twice as coarse and its cage
 a level less subdivided out to 100, four times as coarse beyond.
 
+### Models in a film file, round 2 (2026-10-31)
+
+**Moving models: `place MODEL at X Y Z ... as ID`.** A placement named with `as ID` is moved, turned, grown and shown or hidden by the film's own `move`, `turn`,
+`grow` and `show` lines, as a marked block of the scene is - `move ID ...` in the world's coordinates (pbrt's), and `ID.PIECE` for one piece of it in the model's own
+coordinates: `turn car1.door about 0.9 1 0 axis 0 1 0  2 0  3 80` swings a door open, `show robot1.eyes 0 4` hides the eyes after 4 s. A placement that moves is written
+piece by piece each frame; the others are still instanced.
+
+**Models as characters: `character NAME MODEL at X Y Z`.** (film_model_kind.h) A model of the film is a kind of character - the film's own, as a rigged model's is - and
+walks, gestures, looks, feels and speaks. Its rig comes from its pieces' names: `head` (with `eyes`, `pupils` and `mouth`) turns to what it looks at and nods, the eyes
+blink and the pupils follow the look, the mouth opens as it talks; `leg.1` .. `leg.N` swing from their tops as it walks (with no legs it hops along, squashing as it
+lands); `arm.l` and `arm.r` swing and act its gestures (wave, point, cheer, shrug, nod, snap); `tail` wags; the rest is its body, which bobs and breathes. `make creature`
+names its pieces so. A piece's shape keys - `key NAME` followed by the modifiers that make it (lattice, bend, twist, taper, move, scale, rotate, smooth) - are blended in
+by what it feels and says: `smile` (or `happy`), `sad`, `open` (or `talk`), `surprised`, `angry` and `blink`. `character ... body red` colours its piece called body.
+
+**Booleans on any piece: `tool`, `boolean cut|add|intersect|blend K PIECE [soft K]`.** (model_boolean.h) A piece marked `tool` is not drawn; another piece cuts it out of
+itself, adds it, keeps only their overlap, or blends it on with a K-metre fillet - whatever either is made of (a subdivided cage, a sweep, a kit part, an imported mesh).
+Both become signed distance fields on a grid (inside or out by a ray's crossings, the exact distance near the surface) and the result is meshed with sharp edges.
+
+**Simplifying: `budget N`.** (model_decimate.h) A piece brought to at most N triangles by quadric error simplification (Garland and Heckbert), its outline and shape kept;
+a model far from the camera is drawn with a quarter or a sixteenth of its triangles.
+
+**Meshes in and out: `mesh FILE [fit H] [scale S] [at X Y Z] [turn AX AY AZ]`, `ray_tracer --model-export FILM MODEL OUT.obj`.** (model_import.h) A PLY, OBJ, glTF or GLB
+file (under film_assets, or a path) joins a piece, to be cut, modified, displaced, painted or simplified like anything else; `fit H` sizes it H metres tall and stands it on
+the ground. A glTF's own picture comes with it. `--model-export` writes a model's pieces as an OBJ with its .mtl, to carry on in Blender.
+
+**Parameters, variants and the library.** `model NAME params A 1 B 2` gives a model parameters, `$A` in its lines (or `$A*2`, `$A/2`, `$A+0.1`, `$A-0.1`);
+`model NAME2 from NAME A 3` makes another with other values; `model NAME2 from NAME variants N A lo hi` makes N of them with A drawn between lo and hi, and a placement
+or scatter of NAME2 takes one of them each. `model NAME2 from LAMP` with no model LAMP in the film reads `library/LAMP.model` (beside the film file, or under film_assets):
+a model block in a file of its own, shared by every film.
+
+**Pictures on models: `texture FILE [scale S]`, `decal FILE at X Y Z toward X Y Z size W H`, `displace ... bake`.** (model_texture.h) A picture as a piece's colour - on an
+imported mesh's own uvs, or projected from the sides of a box S metres across; a decal (a logo, a label, a face, a poster) stuck on where it is projected, its alpha kept;
+and a displacement pattern baked into a normal map instead of moved into the geometry - the detail at a fraction of the triangles.
+
+**Living things: `make tree [kind oak|pine|palm|birch] [height H]`, `make bush`, `make rocks [count N]`, `make coral`, `make mushroom`, `make creature [legs N] [arms N] [tail 1]`.**
+(model_grow.h) Branching trees (each branch a tapered sweep, leaf clumps at their tips; tiers of needles; fronds), lumpy rock clusters, branching coral, a spotted
+toadstool, and creatures from a body plan, ready to be characters.
+
+**Places: `make street [houses N] [length L]`, `make room [width W] [depth D] [height H] [furnished 0]`.** Two rows of houses of different heights, widths, colours and roofs
+facing a road with pavements, road markings and lamp posts; a room with a door and a window cut through its walls, a striped wooden floor and furniture set out by rule
+(a table and its chairs, a shelf, a lamp).
+
+**Things that break: `shatter ID at T [pieces N] [force F] [seed K]`.** (model_fracture.h) The placement breaks at T into N chunks (a Voronoi fracture of each piece, its
+broken faces flat): they burst out at about F metres a second, tumble, fall, bounce and come to rest, in a puff of dust, and the break is heard.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

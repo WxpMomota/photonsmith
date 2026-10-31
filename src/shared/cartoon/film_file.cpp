@@ -4,6 +4,7 @@
 
 #include "film_file.h"
 #include "shot_cameras.h"   // (a film's cameras file, made in its header: headerAt)
+#include "film_model_kind.h"   // (a model as a character: the modeling round)
 #include "../../external/stb_image.h"   // (a matte painting's size: stbi_info)
 
 namespace cartoon {
@@ -96,8 +97,47 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 	if (!sf) return filePath + ": the scene " + sceneFile.string() + " cannot be read";
 	const std::string sceneText = detail::absolutize(std::string((std::istreambuf_iterator<char>(sf)), std::istreambuf_iterator<char>()), sceneFile.parent_path());
 	if (const std::string e = cutScene(sceneText, scene); !e.empty()) return sceneFile.string() + ": " + e;
+	for (model::Model &m : spec.models) {   // models from the library (library/NAME.model beside the film file, else under film_assets): read now, made with their values
+		if (m.library.empty()) continue;
+		std::filesystem::path file = base / "library" / (m.library + ".model");
+		std::error_code ec;
+		if (!std::filesystem::exists(file, ec))
+			if (const std::string lib = film_cache::asset("library/" + m.library + ".model"); !lib.empty()) file = lib;
+		std::ifstream in(file, std::ios::binary);
+		if (!in) return filePath + ": the model " + m.name + " is made from " + m.library + ", which is not a model of the film nor a file library/" + m.library + ".model";
+		model::Model from;
+		bool started = false;
+		for (std::string line; std::getline(in, line);) {
+			line = detail::trim(detail::withoutComment(line));
+			if (line.empty()) continue;
+			const std::vector<std::string> t = detail::tokens(line);
+			if (!started) {
+				if (t.size() < 2 || t[0] != "model") return file.string() + ": a library model starts `model NAME [params A 1 ...]`";
+				from.name = t[1];
+				for (std::size_t i = 3; t.size() > 2 && t[2] == "params" && i + 1 < t.size(); i += 2) from.params[t[i]] = std::atof(t[i + 1].c_str());
+				started = true;
+				continue;
+			}
+			if (const std::string e = model::modelLine(from, t); !e.empty()) return file.string() + ": " + e;
+			if (from.closed) break;
+		}
+		if (const std::string e = model::remade(from, m, m.params); !e.empty()) return file.string() + ": " + e;
+		m.library.clear();
+	}
+	const auto modelPart = [&](const std::string &name) {   // (a placed model `as ID`, or ID.PIECE: film_model.h)
+		for (const model::Placed &pl : spec.modelPlaces) {
+			if (pl.id.empty()) continue;
+			if (name == pl.id) return true;
+			if (name.rfind(pl.id + ".", 0) == 0)
+				for (const model::Model &m : spec.models)
+					if (m.name == pl.model)
+						for (const model::Part &part : m.parts)
+							if (name == pl.id + "." + part.name) return true;
+		}
+		return false;
+	};
 	for (const Anim &a : spec.anims)
-		if (std::find(scene.names.begin(), scene.names.end(), a.name) == scene.names.end()) {
+		if (std::find(scene.names.begin(), scene.names.end(), a.name) == scene.names.end() && !modelPart(a.name)) {
 			std::string known;
 			for (const std::string &n : scene.names) known += (known.empty() ? "" : ", ") + n;
 			return detail::lineWhere(spec, filePath, a.line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + a.name + "`" + (known.empty() ? " (it has none)" : " (it has: " + known + ")");
@@ -118,6 +158,13 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 		for (Character &c : spec.characters)
 			if (c.kind == rg.kind) c.kind = own;
 	}
+	for (Character &c : spec.characters)   // models as characters (film_model_kind.h): the kind is this film's own, as a rigged model's is
+		for (const model::Model &m : spec.models)
+			if (c.kind == m.name) {
+				const std::string own = spec.key + "/" + m.name;
+				if (!characterKinds().count(own)) characterKinds()[own] = model::kindOf(spec.key.empty() ? std::string("film") : spec.key, m);
+				c.kind = own;
+			}
 	for (const explain::Label &l : spec.explain.labels)   // what an explainer's drawings name: things of the film (film_explain.h)
 		if (!l.on.empty() && std::none_of(spec.ships.begin(), spec.ships.end(), [&](const cosmos::Ship &s) { return s.name == l.on; }) &&
 			std::none_of(spec.planets.begin(), spec.planets.end(), [&](const planets::Planet &p) { return p.name == l.on; }) &&
@@ -1622,6 +1669,9 @@ std::vector<physics::Impact> DataFilm::landings() const {
 		const std::vector<physics::Impact> &i = rigidRun()->impacts;
 		impacts.insert(impacts.end(), i.begin(), i.end());
 	}
+	for (const model::Shatter &sh : spec.shatters)   // (a model breaking: film_model.h)
+		for (const model::Placed &pl : spec.modelPlaces)
+			if (pl.id == sh.id) impacts.push_back({sh.t, pl.at + Vec3{0.0, 0.5, 0.0}, std::max(2.0, sh.force * 1.5)});
 	return impacts;
 }
 

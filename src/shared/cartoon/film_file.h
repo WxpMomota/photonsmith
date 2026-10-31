@@ -461,6 +461,10 @@ class DataFilm {
 	mutable Swum swum_;
 	double progress(const Anim &anim, double t, int component) const;
 	bool visible(const std::string &name, double t) const;
+	// (the modeling rounds) the film's own models where they are placed at t, seen from the camera of `header` (film_model.h), moved by the film's `move`, `turn` and
+	// `grow` lines and shown or hidden by its `show` lines as scene blocks are (by a placement's `as ID`, and ID.PIECE), broken by its `shatter` lines
+	std::string modelsAt(const std::string &header, double t) const;
+	Mat4 animMatrix(const std::string &name, double t) const;   // (those lines' transform of a name: pbrt's, as transformsAt writes it)
 	static std::string num(double v);
 	// The transforms of a block at t; with a shutter, a moving block's at the shutter's opening (StartTime) and closing (EndTime) - pbrt's object motion blur, which
 	// the CPU and the GPU both render (gpu: a two-key triangle GAS, moving spheres).

@@ -45,6 +45,24 @@ struct Part {
 	std::vector<Modifier> mods;
 	std::vector<Displace> displaces;   // (each at its place among the modifiers: a modifier of kind "displace" with v[0] its index here)
 	Paint paint;
+	// (modeling round 2) a tool piece is not drawn: other pieces cut it out of themselves, or join it to themselves (`boolean`, model_boolean.h)
+	bool tool = false;
+	struct Boolean {
+		Op op = Op::Cut;
+		double k = 0.0;
+		std::string with;   // (the tool piece)
+	};
+	std::vector<Boolean> booleans;
+	int budget = 0;   // (`budget N`: at most N triangles, the mesh simplified to them: model_decimate.h; 0 none)
+	// shape keys (`key NAME` then modifiers): the piece's mesh changed by those modifiers, blended in by a model character's feelings and speech (film_model_kind.h)
+	struct ShapeKey {
+		std::string name;
+		std::vector<Modifier> mods;
+	};
+	std::vector<ShapeKey> keys;
+	int openKey = -1;   // (while a key's modifiers are read)
+	std::vector<std::string> sources;   // (the files it was made from - `mesh FILE` - with their sizes and times: part of the cache's key)
+	std::string texture;                // (`texture FILE`: an imported mesh's own picture on its own uvs)
 	bool empty() const { return sdf.steps.empty() && !hasCage && sweeps.empty() && lofts.empty() && pieces.empty(); }
 };
 
@@ -80,7 +98,12 @@ inline std::string keyOf(const Part &p) {
 		o << "|m" << m.kind << m.axis;
 		for (double v : m.v) o << ',' << v;
 	}
-	for (const Displace &d : p.displaces) o << "|d" << d.kind << d.amount << ',' << d.size << ',' << d.seed;
+	for (const Displace &d : p.displaces) o << "|d" << d.kind << d.amount << ',' << d.size << ',' << d.seed << ',' << d.bake;
+	o << "|t" << p.tool << ',' << p.budget << ',' << p.texture;
+	for (const Part::Boolean &b : p.booleans) o << "|b" << int(b.op) << ',' << b.k << ',' << b.with;
+	for (const std::string &s : p.sources) o << "|f" << s;
+	for (const Decal &d : p.paint.decals) o << "|e" << d.file << ',' << d.at.x << ',' << d.at.y << ',' << d.at.z << ',' << d.toward.x << ',' << d.toward.y << ',' << d.toward.z << ',' << d.w << ',' << d.h;
+	o << "|i" << p.paint.image << ',' << p.paint.imageScale;
 	if (p.paint.on) {
 		const Paint &q = p.paint;
 		o << "|p" << q.base.x << q.base.y << q.base.z << q.wear.x << q.wear.y << q.wear.z << q.dirt.x << q.dirt.y << q.dirt.z << q.stripe.x << q.stripe.y << q.stripe.z << q.spot.x << q.spot.y

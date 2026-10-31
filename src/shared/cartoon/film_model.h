@@ -34,6 +34,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <functional>
 #include <map>
 #include <mutex>
 #include <set>
@@ -43,6 +46,11 @@
 #include "cartoon_lib.h"
 #include "film_cache.h"
 #include "model_doctor.h"
+#include "model_boolean.h"
+#include "model_decimate.h"
+#include "model_fracture.h"
+#include "model_grow.h"
+#include "model_import.h"
 #include "model_kit.h"
 #include "model_part.h"
 #include "nature_lib.h"
@@ -55,12 +63,54 @@ struct Model {
 	std::vector<Part> parts;
 	int line = 0;
 	bool closed = false;   // (its `end` has been read)
+	// (modeling round 2) its lines as written and its parameters (`model NAME params A 1 B 2`, `$A` in its lines): another model can be made from it with other values
+	// (`model NAME2 from NAME [A v]...`); a model from the library (`library/NAME.model`) waits for the film's load to be read (`library` its name there)
+	std::vector<std::vector<std::string>> raw;
+	std::map<std::string, double> params;
+	std::string library;
+	std::vector<std::string> variants;   // (`variants N`: the models it stands for, one picked for each placement)
 };
 struct Placed {
 	std::string model;
 	Vec3 at{0, 0, 0};   // pbrt's
 	double scale = 1.0, turn = 0.0;
+	std::string id;     // (`as ID`: what `move`, `turn`, `grow`, `show` and `shatter` name it by - and ID.PIECE a piece of it)
 };
+// A line's words with each `$NAME` (or `$NAME*K`, `$NAME/K`, `$NAME+K`, `$NAME-K`, chained) put in from the model's parameters. `error` names a parameter it has not.
+inline std::vector<std::string> substituted(const std::vector<std::string> &t, const std::map<std::string, double> &params, std::string &error) {
+	std::vector<std::string> out;
+	for (const std::string &w : t) {
+		if (w.size() < 2 || w[0] != '$') {
+			out.push_back(w);
+			continue;
+		}
+		std::size_t i = 1;
+		while (i < w.size() && (std::isalnum(static_cast<unsigned char>(w[i])) || w[i] == '_')) ++i;
+		const std::string name = w.substr(1, i - 1);
+		const auto it = params.find(name);
+		if (it == params.end()) {
+			error = "\"" + w + "\": the model has no parameter " + name + " (a `params` on its `model` line)";
+			return t;
+		}
+		double v = it->second;
+		while (i < w.size()) {
+			const char op = w[i++];
+			std::size_t j = i;
+			while (j < w.size() && (std::isdigit(static_cast<unsigned char>(w[j])) || w[j] == '.')) ++j;
+			const double k = std::atof(w.substr(i, j - i).c_str());
+			if (j == i || (op != '*' && op != '/' && op != '+' && op != '-') || (op == '/' && k == 0.0)) {
+				error = "\"" + w + "\": a parameter is followed by *K, /K, +K or -K";
+				return t;
+			}
+			v = op == '*' ? v * k : op == '/' ? v / k : op == '+' ? v + k : v - k;
+			i = j;
+		}
+		char buf[40];
+		std::snprintf(buf, sizeof buf, "%.9g", v);
+		out.push_back(buf);
+	}
+	return out;
+}
 
 namespace detail {
 inline bool num(const std::string &s, double &v) {
@@ -439,8 +489,12 @@ inline std::string modifierLine(Part &p, const std::vector<std::string> &t, bool
 			const std::string w = t[i++];
 			if (w == "size" && numbers(1) && v[0] > 0.0005) d.size = v[0];
 			else if (w == "seed" && numbers(1)) d.seed = static_cast<int>(v[0]);
-			else return "\"" + w + "\": `displace PATTERN AMOUNT [size S] [seed K]` (size above 0.5 mm)";
+			else if (w == "bake") d.bake = true;
+			else return "\"" + w + "\": `displace PATTERN AMOUNT [size S] [seed K] [bake]` (size above 0.5 mm)";
 		}
+		if (p.openKey >= 0) return "`displace` cannot go in a shape key (it splits the mesh: the key could not blend)";
+		if (d.bake && !p.paint.on) p.paint.on = true, p.paint.base = p.colour;   // (a baked pattern needs the piece's uvs and picture)
+		if (d.bake) p.paint.normals = true;
 		p.displaces.push_back(d);
 		p.mods.push_back({"displace", {static_cast<double>(p.displaces.size() - 1)}});
 		return std::string();
@@ -457,14 +511,142 @@ inline std::string modifierLine(Part &p, const std::vector<std::string> &t, bool
 		}
 		if (verb == "mirror" && mod.v.empty() && t.size() != 2) return "`mirror x|y|z`";
 		if ((verb == "array" || verb == "radial") && (mod.v.empty() || mod.v[0] < 1 || mod.v[0] > 500)) return "`" + verb + " N ...` (1 to 500 copies)";
-		p.mods.push_back(mod);
+		if (p.openKey >= 0) {   // (a shape key's modifiers: they must keep its vertices)
+			if (verb == "mirror" || verb == "array" || verb == "radial" || verb == "solidify") return "`" + verb + "` cannot go in a shape key (it adds vertices: the key could not blend)";
+			p.keys[static_cast<std::size_t>(p.openKey)].mods.push_back(mod);
+		} else {
+			p.mods.push_back(mod);
+		}
 		return std::string();
 	}
 	mine = false;
 	return std::string();
 }
-inline std::string modelLine(Model &m, const std::vector<std::string> &t) {
+// One line of a piece (modeling round 2): `tool`, `boolean`, `budget`, `key`, `mesh`, `texture`, `decal`. `mine` false (and "") when the line is not one of these.
+inline std::string round2Line(Part &p, const std::vector<std::string> &t, bool &mine) {
 	using detail::num;
+	std::vector<double> v;
+	std::size_t i = 1;
+	const auto numbers = [&](std::size_t n) {
+		v.assign(n, 0.0);
+		for (std::size_t k = 0; k < n; ++k)
+			if (i + k >= t.size() || !num(t[i + k], v[k])) return false;
+		i += n;
+		return true;
+	};
+	const std::string verb = t[0];
+	mine = true;
+	if (verb == "tool") {
+		if (t.size() != 1) return "`tool` (alone: the piece is not drawn, other pieces use it in `boolean`)";
+		p.tool = true;
+		return std::string();
+	}
+	if (verb == "boolean") {
+		const char *usage = "`boolean cut|add|intersect|blend K PIECE [soft K]` (the PIECE a `tool` piece of the model, written before this one)";
+		Part::Boolean b;
+		if (t.size() < 3) return usage;
+		i = 2;
+		if (t[1] == "cut") b.op = Op::Cut;
+		else if (t[1] == "add") b.op = Op::Add;
+		else if (t[1] == "intersect") b.op = Op::Intersect;
+		else if (t[1] == "blend") {
+			b.op = Op::Blend;
+			if (!numbers(1) || v[0] <= 0) return usage;
+			b.k = v[0];
+		} else return usage;
+		if (i >= t.size()) return usage;
+		b.with = t[i++];
+		if (i < t.size()) {
+			if (t[i++] != "soft" || !numbers(1) || v[0] <= 0) return usage;
+			b.k = v[0];
+		}
+		p.booleans.push_back(b);
+		return std::string();
+	}
+	if (verb == "budget") {
+		if (!numbers(1) || v[0] < 12 || t.size() != 2) return "`budget N`: at most N triangles (12 or more)";
+		p.budget = static_cast<int>(v[0]);
+		return std::string();
+	}
+	if (verb == "key") {
+		if (t.size() != 2) return "`key NAME` (then the modifiers that make it: smile, sad, open, surprised, angry and blink are blended in by feelings and speech)";
+		Part::ShapeKey k;
+		k.name = t[1];
+		p.keys.push_back(k);
+		p.openKey = static_cast<int>(p.keys.size()) - 1;
+		return std::string();
+	}
+	if (verb == "mesh") {
+		const char *usage = "`mesh FILE [fit H] [scale S] [at X Y Z] [turn AX AY AZ]` (a .ply, .obj, .gltf or .glb under film_assets, or a path)";
+		if (t.size() < 2) return usage;
+		const std::string found = film_cache::asset(t[1]), path = found.empty() ? t[1] : found;
+		std::string error, ext;
+		std::vector<unsigned char> image;
+		Mesh m = importMesh(path, error, &image, &ext);
+		if (!error.empty()) return "`mesh " + t[1] + "`: " + error;
+		double fit = 0.0, sc = 1.0;
+		Vec3 at{0, 0, 0}, turn{0, 0, 0};
+		for (i = 2; i < t.size();) {
+			const std::string w = t[i++];
+			if (w == "fit" && numbers(1) && v[0] > 0) fit = v[0];
+			else if (w == "scale" && numbers(1) && v[0] > 0) sc = v[0];
+			else if (w == "at" && numbers(3)) at = {v[0], v[1], v[2]};
+			else if (w == "turn" && numbers(3)) turn = {v[0], v[1], v[2]};
+			else return usage;
+		}
+		if (fit > 0.0) m = fitted(m, fit);
+		m = transformed(m, mul(translate(at), rotate({0, 0, 1}, turn.z), rotate({0, 1, 0}, turn.y), rotate({1, 0, 0}, turn.x), scale(sc)));
+		std::error_code ec;
+		p.sources.push_back(path + "#" + std::to_string(std::filesystem::file_size(path, ec)) + "#" + std::to_string(m.verts.size()));
+		if (!image.empty() && p.texture.empty()) {   // (a glTF's own picture: kept in the temp folder by its contents, for `texture` to find)
+			const std::filesystem::path f = std::filesystem::temp_directory_path() / ("photonsmith_model_" + hashOf(std::string(image.begin(), image.end())).substr(0, 12) + "." + ext);
+			if (!std::filesystem::exists(f, ec)) std::ofstream(f, std::ios::binary).write(reinterpret_cast<const char *>(image.data()), static_cast<std::streamsize>(image.size()));
+			p.texture = f.string();
+		}
+		p.pieces.push_back(m);
+		return std::string();
+	}
+	if (verb == "texture") {
+		const char *usage = "`texture FILE [scale S]`: a picture (under film_assets, or a path) on the piece - on an imported mesh's own uvs, or projected on a box S metres across";
+		if (t.size() < 2) return usage;
+		double sc = 1.0;
+		for (i = 2; i < t.size();) {
+			if (t[i++] != "scale" || !numbers(1) || v[0] <= 0) return usage;
+			sc = v[0];
+		}
+		const bool ownUvs = !p.pieces.empty() && std::all_of(p.pieces.begin(), p.pieces.end(), [](const Mesh &m) { return !m.uvs.empty(); }) && p.sdf.steps.empty() && !p.hasCage;
+		if (ownUvs) p.texture = t[1];
+		else p.paint.on = true, p.paint.base = p.colour, p.paint.image = t[1], p.paint.imageScale = sc;
+		return std::string();
+	}
+	if (verb == "decal") {
+		const char *usage = "`decal FILE at X Y Z toward X Y Z size W H`: a picture stuck on where it is projected (its alpha kept)";
+		Decal d;
+		if (t.size() < 2) return usage;
+		d.file = t[1];
+		for (i = 2; i < t.size();) {
+			const std::string w = t[i++];
+			if (w == "at" && numbers(3)) d.at = {v[0], v[1], v[2]};
+			else if (w == "toward" && numbers(3)) d.toward = {v[0], v[1], v[2]};
+			else if (w == "size" && numbers(2) && v[0] > 0 && v[1] > 0) d.w = v[0], d.h = v[1];
+			else return usage;
+		}
+		if (length(d.toward) < 1e-9) return usage;
+		if (!p.paint.on) p.paint.on = true, p.paint.base = p.colour;
+		p.paint.decals.push_back(d);
+		return std::string();
+	}
+	mine = false;
+	return std::string();
+}
+
+inline std::string modelLine(Model &m, const std::vector<std::string> &raw) {
+	using detail::num;
+	if (raw.empty()) return std::string();
+	m.raw.push_back(raw);
+	std::string bad;
+	const std::vector<std::string> t = substituted(raw, m.params, bad);
+	if (!bad.empty()) return bad;
 	std::vector<double> v;
 	std::size_t i = 1;
 	const auto numbers = [&](std::size_t n) {
@@ -495,15 +677,23 @@ inline std::string modelLine(Model &m, const std::vector<std::string> &t) {
 			} else if (t[i] == "roof" && i + 1 < t.size()) {
 				if (t[i + 1] == "gable") opt["roofgable"] = 1.0;
 				i += 2;
+			} else if (t[i] == "kind" && i + 1 < t.size()) {   // (a tree's: oak, pine, palm, birch)
+				static const std::vector<std::string> kinds = {"oak", "pine", "palm", "birch"};
+				const auto it = std::find(kinds.begin(), kinds.end(), t[i + 1]);
+				if (it == kinds.end()) return "`make tree kind oak|pine|palm|birch`";
+				opt["kind"] = static_cast<double>(it - kinds.begin());
+				i += 2;
 			} else {
 				double x = 0.0;
-				if (i + 1 >= t.size() || !num(t[i + 1], x)) return "\"" + t[i] + "\": `make` takes size, floors, width, depth, storey, windows, roof gable|flat, colour R G B, seed";
+				if (i + 1 >= t.size() || !num(t[i + 1], x))
+					return "\"" + t[i] + "\": `make` takes size, floors, width, depth, storey, windows, roof gable|flat, kind, height, count, legs, arms, tail, eyes, houses, length, "
+										 "furnished, colour R G B, seed";
 				opt[t[i]] = x;
 				i += 2;
 			}
 		}
 		std::string error;
-		const std::vector<Part> made = kit::make(t[1], opt, coloured ? &colour : nullptr, error);
+		const std::vector<Part> made = grow::makeAny(t[1], opt, coloured ? &colour : nullptr, error);
 		if (!error.empty()) return error;
 		m.parts.insert(m.parts.end(), made.begin(), made.end());
 		return std::string();
@@ -536,7 +726,7 @@ inline std::string modelLine(Model &m, const std::vector<std::string> &t) {
 		m.parts.push_back(p);
 	}
 	Part &p = m.parts.back();
-	for (const auto handler : {shapeLine, cageLine, curveLine, paintKitLine, modifierLine}) {
+	for (const auto handler : {round2Line, shapeLine, cageLine, curveLine, paintKitLine, modifierLine}) {
 		bool mine = false;
 		const std::string e = handler(p, t, mine);
 		if (mine) return e;
@@ -545,35 +735,101 @@ inline std::string modelLine(Model &m, const std::vector<std::string> &t) {
 						 "paint, kit, displace, the modifiers, end)";
 }
 
-// ---- drawing ----
-// The name a piece is kept under in the film's cache.
-constexpr int kMeshingVersion = 3;   // (raise it when the way a piece is meshed changes: the cache's old meshes are then made again)
-inline std::string pieceName(const Model &m, const Part &p, int lod) {
-	return "model_" + m.name + "_" + p.name + "_" + hashOf(keyOf(p) + "#v" + std::to_string(kMeshingVersion)).substr(0, 12) + "_lod" + std::to_string(lod);
+// Model `out` made again from `from`'s lines with these parameters: "" or what is wrong.
+inline std::string remade(const Model &from, Model &out, const std::map<std::string, double> &params) {
+	out.params = from.params;
+	for (const auto &[k, v] : params) {
+		if (!from.params.count(k)) return "the model " + from.name + " has no parameter " + k + " (its `model` line's `params`)";
+		out.params[k] = v;
+	}
+	out.parts.clear(), out.raw.clear(), out.closed = false;
+	for (const std::vector<std::string> &line : from.raw)
+		if (const std::string e = modelLine(out, line); !e.empty()) return "the model " + from.name + ", made as " + out.name + ": " + e;
+	return out.closed ? std::string() : "the model " + from.name + " has no `end`";
 }
-// The model's pieces at level of detail `lod`, as scene text (in the model's own space: placed by whatever transform is round it).
+
+// ---- drawing ----
+constexpr int kMeshingVersion = 5;   // (raise it when the way a piece is meshed changes: the cache's old meshes are then made again)
+// A piece's key with its tools' (a piece cut by a tool changes when the tool does).
+inline std::string fullKeyOf(const Model &m, const Part &p, int depth = 0) {
+	std::string key = keyOf(p);
+	for (const Part::Boolean &b : p.booleans)
+		for (const Part &q : m.parts)
+			if (q.name == b.with && depth < 4) key += "|tool:" + fullKeyOf(m, q, depth + 1);
+	return key;
+}
+inline std::string pieceName(const Model &m, const Part &p, int lod) {
+	return "model_" + m.name + "_" + p.name + "_" + hashOf(fullKeyOf(m, p) + "#v" + std::to_string(kMeshingVersion)).substr(0, 12) + "_lod" + std::to_string(lod);
+}
+// The piece's mesh at level of detail `lod`: its own (partMesh), then its booleans with the model's tool pieces (model_boolean.h), then its budget - and at the far levels
+// a quarter or a sixteenth of its triangles (model_decimate.h).
+inline Mesh pieceMesh(const Model &m, const Part &p, int lod, int depth = 0) {
+	Mesh mesh = partMesh(p, lod);
+	if (!p.booleans.empty() && depth < 4 && !mesh.tris.empty()) {
+		Vec3 lo, hi;
+		boxOf(mesh, lo, hi);
+		const double cell = (p.cell > 0.0 ? p.cell : std::max({hi.x - lo.x, hi.y - lo.y, hi.z - lo.z}) / 64.0) * lod;
+		for (const Part::Boolean &b : p.booleans)
+			for (const Part &q : m.parts)
+				if (q.name == b.with) mesh = combined(mesh, pieceMesh(m, q, lod, depth + 1), b.op, b.k, cell);
+		mesh = p.hard ? autoSmooth(mesh, p.smoothAngle) : mesh;
+	}
+	std::size_t target = p.budget > 0 ? static_cast<std::size_t>(p.budget) : mesh.tris.size();
+	if (lod > 1 && mesh.tris.size() > 2000) target = std::min(target, std::max<std::size_t>(500, mesh.tris.size() / static_cast<std::size_t>(lod * lod)));
+	if (target < mesh.tris.size() && mesh.uvs.empty()) {
+		mesh = decimated(mesh, target);
+		if (p.hard) mesh = autoSmooth(mesh, p.smoothAngle);
+	}
+	return mesh;
+}
+// One piece as scene text at level `lod`, in the model's own space: its mesh from the cache, its painted picture and baked normal map (model_texture.h) or its own
+// picture (`texture`), its material.
+inline std::string pieceText(const std::string &film, const Model &m, const Part &p, int lod) {
+	const std::string name = pieceName(m, p, lod);
+	const std::string file = film_cache::ply(film, name, [&]() { return p.paint.on ? boxUnwrapped(pieceMesh(m, p, lod)) : pieceMesh(m, p, lod); });
+	if (file.empty()) return std::string();
+	if (!p.texture.empty() && !p.paint.on) {   // an imported mesh's picture on its own uvs
+		const std::string found = film_cache::asset(p.texture);
+		char buf[600];
+		std::snprintf(buf, sizeof buf, "Texture \"%s_tex\" \"spectrum\" \"imagemap\" \"string filename\" [ \"%s\" ]\n  Material \"coateddiffuse\" \"texture reflectance\" \"%s_tex\" \"float roughness\" [ %.4f ]",
+					  name.c_str(), (found.empty() ? p.texture : found).c_str(), name.c_str(), p.rough);
+		return attr(buf, film_cache::plyShape(file));
+	}
+	std::string picture, normals;
+	if (p.paint.on) {
+		const int N = std::clamp(p.paint.res, 64, 4096);
+		const auto unwrapped = [&](std::vector<double> *curvature) {
+			const Mesh mesh = pieceMesh(m, p, lod);
+			std::vector<int> from;
+			Mesh uv = boxUnwrapped(mesh, &from);
+			if (curvature) {
+				const std::vector<double> k = curvatureOf(mesh);
+				curvature->resize(from.size());
+				for (std::size_t q = 0; q < from.size(); ++q) (*curvature)[q] = k[static_cast<std::size_t>(from[q])];
+			}
+			return uv;
+		};
+		picture = film_sky::picture(film, name + "_paint", N, N, [&](std::vector<float> &rgb) {
+			std::vector<double> kk;
+			const Mesh uv = unwrapped(&kk);
+			paintInto(rgb, uv, kk, p.paint);
+		});
+		if (p.paint.normals) {
+			std::vector<Displace> bakes;
+			for (const Displace &d : p.displaces)
+				if (d.bake) bakes.push_back(d);
+			normals = film_sky::picture(film, name + "_normals", N, N, [&](std::vector<float> &rgb) { normalsInto(rgb, N, unwrapped(nullptr), bakes); });
+		}
+	}
+	std::string material = materialOf(p, name + "_tex", picture);
+	if (!normals.empty()) material += " \"string normalmap\" [ \"" + normals + "\" ]";
+	return attr(material, film_cache::plyShape(file));
+}
+// The model's drawn pieces at level `lod`, as scene text (in the model's own space: placed by whatever transform is round it).
 inline std::string modelText(const std::string &film, const Model &m, int lod) {
 	std::string out;
-	for (const Part &p : m.parts) {
-		const std::string name = pieceName(m, p, lod);
-		// the mesh, unwrapped when it is painted, and its picture: each kept in the cache, both made from the same mesh (partMesh is deterministic)
-		const std::string file = film_cache::ply(film, name, [&]() { return p.paint.on ? boxUnwrapped(partMesh(p, lod)) : partMesh(p, lod); });
-		if (file.empty()) continue;
-		std::string picture;
-		if (p.paint.on) {
-			const int N = std::clamp(p.paint.res, 64, 4096);
-			picture = film_sky::picture(film, name + "_paint", N, N, [&](std::vector<float> &rgb) {
-				const Mesh mesh = partMesh(p, lod);
-				const std::vector<double> k = curvatureOf(mesh);
-				std::vector<int> from;
-				const Mesh uv = boxUnwrapped(mesh, &from);
-				std::vector<double> kk(from.size());
-				for (std::size_t q = 0; q < from.size(); ++q) kk[q] = k[static_cast<std::size_t>(from[q])];
-				paintInto(rgb, uv, kk, p.paint);
-			});
-		}
-		out += attr(materialOf(p, name + "_tex", picture), film_cache::plyShape(file));
-	}
+	for (const Part &p : m.parts)
+		if (!p.tool) out += pieceText(film, m, p, lod);
 	return out;
 }
 // Which level of detail a placement `size` metres across, `distance` from the camera, is drawn at.
@@ -581,7 +837,7 @@ inline int lodFor(double size, double distance) {
 	const double ratio = distance / std::max(0.05, size);
 	return ratio < 25.0 ? 1 : ratio < 100.0 ? 2 : 4;
 }
-// A model's size across (its pieces' boxes at level 1; measured once per model and kept).
+// A model's size across (its pieces' boxes at the coarsest level; measured once per model and kept).
 inline double sizeOf(const std::string &film, const Model &m) {
 	static std::map<std::string, double> known;
 	static std::mutex lock;
@@ -593,35 +849,79 @@ inline double sizeOf(const std::string &film, const Model &m) {
 	}
 	Vec3 lo{1e30, 1e30, 1e30}, hi{-1e30, -1e30, -1e30};
 	for (const Part &p : m.parts) {
-		if (!p.sdf.steps.empty() && !p.hasCage && p.sweeps.empty() && p.lofts.empty() && p.pieces.empty() && p.mods.empty()) {
-			Vec3 a, b;
-			p.sdf.bounds(a, b);
-			lo = {std::min(lo.x, a.x), std::min(lo.y, a.y), std::min(lo.z, a.z)}, hi = {std::max(hi.x, b.x), std::max(hi.y, b.y), std::max(hi.z, b.z)};
-			continue;
-		}
+		if (p.tool) continue;
 		Vec3 a, b;
-		boxOf(partMesh(p, 4), a, b);
+		if (!p.sdf.steps.empty() && !p.hasCage && p.sweeps.empty() && p.lofts.empty() && p.pieces.empty() && p.mods.empty()) p.sdf.bounds(a, b);
+		else boxOf(partMesh(p, 4), a, b);
 		lo = {std::min(lo.x, a.x), std::min(lo.y, a.y), std::min(lo.z, a.z)}, hi = {std::max(hi.x, b.x), std::max(hi.y, b.y), std::max(hi.z, b.z)};
 	}
 	const double size = lo.x > hi.x ? 1.0 : std::max({hi.x - lo.x, hi.y - lo.y, hi.z - lo.z});
 	std::lock_guard<std::mutex> hold(lock);
 	return known[key] = size;
 }
-// Every placed model in a frame seen from pbrt's `eye`: a model placed once is written where it stands; one placed more than once is written once (per level of detail
-// used) as an object and instanced.
-inline std::string placedText(const std::string &film, const std::vector<Model> &models, const std::vector<Placed> &placed, const Vec3 &eye) {
+// What moves a placed model now (the film's `move`, `turn`, `grow`, `show` and `shatter` lines, film_world.cpp DataFilm::modelsAt): by a placement's id, and by
+// "ID.PIECE" for a piece of it.
+struct Motion {
+	std::function<bool(const std::string &)> moves;        // whether anything moves or hides the name (an id, or ID.PIECE)
+	std::function<Mat4(const std::string &)> transform;    // a placement's (story space, the world's) or a piece's (the model's own space)
+	std::function<bool(const std::string &)> shown;
+	std::function<const Shatter *(const std::string &)> shatter;   // a placement's break, if it has one
+	double t = 0.0;
+};
+// A placed model that moves, hides a piece or breaks: written by itself, piece by piece (no instancing), at level `lod`.
+inline std::string movingText(const std::string &film, const Model &m, const Placed &pl, const Mat4 &frame, int lod, const Motion &mo) {
+	const Mat4 base = mo.moves(pl.id) ? mul(mo.transform(pl.id), frame) : frame;
+	std::string out;
+	if (const Shatter *s = mo.shatter ? mo.shatter(pl.id) : nullptr; s && mo.t >= s->t) {   // broken: its chunks where they have flown to
+		const std::vector<Chunk> chunks = chunksOf(film, m.name, m.parts, *s, [&](const Part &p) { return pieceMesh(m, p, 1); });
+		Vec3 lo{1e30, 1e30, 1e30}, hi{-1e30, -1e30, -1e30};
+		for (const Chunk &c : chunks) lo = {std::min(lo.x, c.centre.x), std::min(lo.y, c.centre.y), std::min(lo.z, c.centre.z)}, hi = {std::max(hi.x, c.centre.x), std::max(hi.y, c.centre.y), std::max(hi.z, c.centre.z)};
+		const Vec3 mid = (lo + hi) * 0.5;
+		for (std::size_t k = 0; k < chunks.size(); ++k)
+			out += attr(materialOf(*chunks[k].part), film_cache::placement(mul(base, chunkAt(chunks[k], static_cast<int>(k), mid, *s, mo.t - s->t))) + film_cache::plyShape(chunks[k].file));
+		return out;
+	}
+	for (const Part &p : m.parts) {
+		if (p.tool) continue;
+		const std::string name = pl.id + "." + p.name;
+		if (mo.moves(name) && !mo.shown(name)) continue;
+		const Mat4 piece = mo.moves(name) ? mul(base, mo.transform(name)) : base;
+		out += "AttributeBegin\n" + film_cache::placement(piece) + pieceText(film, m, p, lod) + "AttributeEnd\n";
+	}
+	return out;
+}
+// Every placed model in a frame seen from pbrt's `eye`: one placed once is written where it stands; one placed more than once is written once (per level of detail used)
+// as an object and instanced; one that moves, hides a piece or breaks (`motion`) is written by itself. A placement of a model with variants takes one of them.
+inline std::string placedText(const std::string &film, const std::vector<Model> &models, const std::vector<Placed> &placed, const Vec3 &eye, const Motion &motion = {}) {
 	if (placed.empty()) return std::string();
 	std::map<std::string, const Model *> byName;
 	for (const Model &m : models) byName[m.name] = &m;
 	std::map<std::pair<std::string, int>, std::vector<Mat4>> groups;
-	for (const Placed &pl : placed) {
-		const auto it = byName.find(pl.model);
-		if (it == byName.end()) continue;
-		const double size = sizeOf(film, *it->second) * pl.scale;
-		const int lod = lodFor(size, length(pl.at - eye));
-		groups[{pl.model, lod}].push_back(mul(translate({-pl.at.x, pl.at.y, pl.at.z}), rotate({0, 1, 0}, pl.turn), scale(pl.scale)));
-	}
 	std::string out = "# models (film_model.h)\n", defs;
+	for (std::size_t n = 0; n < placed.size(); ++n) {
+		const Placed &pl = placed[n];
+		auto it = byName.find(pl.model);
+		if (it == byName.end()) continue;
+		if (!it->second->variants.empty()) {   // (one of its variants, by the placement)
+			const std::vector<std::string> &v = it->second->variants;
+			it = byName.find(v[static_cast<std::size_t>(hash01(static_cast<int>(n) * 7919 + 17, 3) * v.size()) % v.size()]);
+			if (it == byName.end()) continue;
+		}
+		const Model &m = *it->second;
+		const double size = sizeOf(film, m) * pl.scale;
+		const int lod = lodFor(size, length(pl.at - eye));
+		const Mat4 frame = mul(translate({-pl.at.x, pl.at.y, pl.at.z}), rotate({0, 1, 0}, pl.turn), scale(pl.scale));
+		bool moving = false;
+		if (!pl.id.empty() && motion.moves) {
+			moving = motion.moves(pl.id) || (motion.shatter && motion.shatter(pl.id));
+			for (const Part &p : m.parts) moving = moving || motion.moves(pl.id + "." + p.name);
+		}
+		if (moving) {
+			if (!motion.moves(pl.id) || motion.shown(pl.id)) out += movingText(film, m, pl, frame, lod, motion);
+			continue;
+		}
+		groups[{m.name, lod}].push_back(frame);
+	}
 	for (const auto &[key, frames] : groups) {
 		const Model &m = *byName[key.first];
 		if (frames.size() == 1) {

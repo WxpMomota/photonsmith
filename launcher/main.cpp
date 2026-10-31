@@ -861,6 +861,7 @@ static bool prepare_cartoon_worker(LaunchArgs &args, cartoon_worker::Job &job) {
 // no file it lists the films found in the scene folders and the files that were left out. Exit status 1 when anything is wrong.
 // `ray_tracer --model-check <film key>`: each model of a film file, piece by piece - its triangles and what is wrong with it (film_model.h, model_doctor.h); exit 1 when
 // something is. `ray_tracer --model-scene <film key> <model> <degrees> OUT.pbrt [W H SPP]`: the model alone on a turntable seen from that angle, to render (film.py model).
+// `ray_tracer --model-export <film key> <model> OUT.obj`: the model's pieces as an OBJ with a .mtl beside it (model_import.h).
 static int model_command(int argc, char** argv) {
 	const std::string mode = argv[1];
 	const cartoon::film_file::DataFilm *film = argc >= 3 ? cartoon::filmFileOf(argv[2]) : nullptr;
@@ -869,6 +870,21 @@ static int model_command(int argc, char** argv) {
 		return EXIT_FAILURE;
 	}
 	const std::string key = film->spec.key.empty() ? std::string("film") : film->spec.key;
+	if (mode == "--model-export") {
+		const cartoon::model::Model *m = nullptr;
+		for (const cartoon::model::Model &x : film->spec.models)
+			if (argc >= 5 && x.name == argv[3]) m = &x;
+		if (!m) {
+			std::cerr << "usage: " << argv[0] << " --model-export <film key> <model> OUT.obj" << std::endl;
+			return EXIT_FAILURE;
+		}
+		std::vector<cartoon::model::Exported> pieces;
+		for (const cartoon::model::Part &p : m->parts)
+			if (!p.tool) pieces.push_back({p.name, p.colour, cartoon::model::pieceMesh(*m, p, 1)});
+		if (!cartoon::model::exportObj(argv[4], pieces)) return EXIT_FAILURE;
+		std::cout << argv[4] << std::endl;
+		return EXIT_SUCCESS;
+	}
 	if (mode == "--model-scene") {
 		const cartoon::model::Model *m = nullptr;
 		for (const cartoon::model::Model &x : film->spec.models)
@@ -889,9 +905,9 @@ static int model_command(int argc, char** argv) {
 	for (const cartoon::model::Model &m : film->spec.models) {
 		std::cout << "model " << m.name << " (" << cartoon::model::sizeOf(key, m) << " m across)" << std::endl;
 		for (const cartoon::model::Part &p : m.parts) {
-			const cartoon::Mesh mesh = cartoon::model::partMesh(p);
+			const cartoon::Mesh mesh = cartoon::model::pieceMesh(m, p, 1);
 			const cartoon::model::Report r = cartoon::model::examine(cartoon::model::welded(mesh, 1e-6));
-			std::cout << "  " << p.name << ": " << r.tris << " triangles" << (r.closed() ? ", closed" : "");
+			std::cout << "  " << p.name << (p.tool ? " (tool)" : "") << ": " << r.tris << " triangles" << (r.closed() ? ", closed" : "");
 			const std::vector<std::string> problems = r.problems();
 			std::cout << (problems.empty() ? ", fine" : "") << std::endl;
 			for (const std::string &q : problems) std::cout << "    - " << q << std::endl;
@@ -1009,7 +1025,7 @@ int main(int argc, char** argv) {
 		return EXIT_SUCCESS;
 	}
 	if (argc >= 2 && std::string(argv[1]) == "--film-check") return film_check_command(argc, argv);
-	if (argc >= 2 && (std::string(argv[1]) == "--model-check" || std::string(argv[1]) == "--model-scene")) return model_command(argc, argv);
+	if (argc >= 2 && (std::string(argv[1]) == "--model-check" || std::string(argv[1]) == "--model-scene" || std::string(argv[1]) == "--model-export")) return model_command(argc, argv);
 	// `ray_tracer --film-shots <key>`: what a tool driving the films needs of one (scripts/anim/film.py doctor), as tab-separated lines: a `film` line (key, name, seconds, fps,
 	// width, height, samples, measured seconds a frame) and a `shot` line for each shot (start, name, its share of the samples: the film's cameras file's `samples`).
 	if (argc >= 2 && std::string(argv[1]) == "--film-shots") {

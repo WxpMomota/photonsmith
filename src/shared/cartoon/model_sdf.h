@@ -180,7 +180,8 @@ inline Mesh dualContour(const F &f, Vec3 lo, Vec3 hi, double cell) {
 				double x[3];
 				Vec3 p = mass;
 				if (solve3(A, b, x)) p = {x[0], x[1], x[2]};
-				p = {std::clamp(p.x, base.x, base.x + cell), std::clamp(p.y, base.y, base.y + cell), std::clamp(p.z, base.z, base.z + cell)};
+				const double in = 1e-3 * cell;   // (held a hair inside its cell: two cells' vertices are never the same point)
+				p = {std::clamp(p.x, base.x + in, base.x + cell - in), std::clamp(p.y, base.y + in, base.y + cell - in), std::clamp(p.z, base.z + in, base.z + cell - in)};
 				index[at(i, j, k)] = static_cast<int>(m.verts.size());
 				m.verts.push_back(p);
 				m.normals.push_back(sdf::normalAt(f, p, h));

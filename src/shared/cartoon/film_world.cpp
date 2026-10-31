@@ -428,15 +428,6 @@ static std::string underTheSea(const Spec &spec, std::string out, const std::str
 }
 // The light under the sea once the frame has its sun (round 15, film_sealight.h): the caustic net over everything in the water, the sun's glints up through the surface
 // with their stars, rain landing on the surface seen from below; and the look's words for a camera at the waterline (film_undersea.h).
-// The film's own models where they are placed, seen from the frame's camera (film_model.h: a model placed many times is written once and instanced, each drawn at the
-// level of detail its distance asks for).
-static std::string placedModels(const Spec &spec, const std::string &header) {
-	if (spec.modelPlaces.empty()) return std::string();
-	Vec3 eye, target;
-	double fov = 40.0;
-	film_subjects::cameraOf(header, eye, target, fov);
-	return model::placedText(spec.key.empty() ? std::string("film") : spec.key, spec.models, spec.modelPlaces, {-eye.x, eye.y, eye.z});
-}
 static std::string underTheSeaLight(const Spec &spec, std::string out, const std::string &header, double t, double nt, double seabed) {
 	Vec3 eye, target;
 	double fov = 40.0;
@@ -693,7 +684,7 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 		out += sealight::moonText(spec.moon, {-eye.x, eye.y, eye.z});
 	}
 	out += dressingAt(t);
-	out += placedModels(spec, header);   // the film's own models where they are placed (film_model.h)
+	out += modelsAt(header, t);   // the film's own models where they are placed (film_model.h)
 	if (!spec.weather.empty() || !spec.emitters.empty()) {   // weather round the camera, and particles (film_particles.h)
 		Vec3 eye, target;
 		double fov = 40.0;
@@ -1633,6 +1624,50 @@ std::string DataFilm::airMedium() const {
 				  "\"float top\" [ %.2f ] \"float thickness\" [ %.2f ] \"float radius\" [ %.2f ]\nMediumInterface \"\" \"air\"\n",
 				  Ma * k, Ma * k, Ma * k, (R.r + Ms) * k, (R.g + Ms) * k, (R.b + Ms) * k, g, -10.0 * H, H, spec.air.radius);
 	return buf;
+}
+
+
+Mat4 DataFilm::animMatrix(const std::string &name, double t) const {
+	Mat4 m = identity();
+	for (const Anim &a : spec.anims) {
+		if (a.name != name) continue;
+		const Vec3 about{a.about[0], a.about[1], a.about[2]};
+		if (a.kind == Kind::Move) m = mul(m, translate({progress(a, t, 0), progress(a, t, 1), progress(a, t, 2)}));
+		else if (a.kind == Kind::Turn) m = mul(m, translate(about), rotate({a.axis[0], a.axis[1], a.axis[2]}, progress(a, t, 0)), translate(about * -1.0));
+		else if (a.kind == Kind::Grow) {
+			const double k = std::max(1e-6, progress(a, t, 0));
+			m = mul(m, translate(about), scale(k), translate(about * -1.0));
+		}
+	}
+	return m;
+}
+
+std::string DataFilm::modelsAt(const std::string &header, double t) const {
+	if (spec.modelPlaces.empty()) return std::string();
+	Vec3 eye, target;
+	double fov = 40.0;
+	film_subjects::cameraOf(header, eye, target, fov);
+	const std::string film = spec.key.empty() ? std::string("film") : spec.key;
+	model::Motion motion;
+	motion.t = t;
+	motion.moves = [this](const std::string &name) { return std::any_of(spec.anims.begin(), spec.anims.end(), [&](const Anim &a) { return a.name == name; }); };
+	motion.shown = [this, t](const std::string &name) { return visible(name, t); };
+	motion.transform = [this, t](const std::string &name) {
+		const Mat4 a = animMatrix(name, t);
+		if (name.find('.') != std::string::npos) return a;   // (a piece: in the model's own space)
+		static const Mat4 mirror = scale(-1.0, 1.0, 1.0);
+		return mul(mirror, a, mirror);                        // (a placement: the world's pbrt space, to story space)
+	};
+	motion.shatter = [this](const std::string &id) -> const model::Shatter * {
+		for (const model::Shatter &s : spec.shatters)
+			if (s.id == id) return &s;
+		return nullptr;
+	};
+	std::string out = model::placedText(film, spec.models, spec.modelPlaces, {-eye.x, eye.y, eye.z}, motion);
+	for (const model::Shatter &s : spec.shatters)   // (a break's dust, round where it stood)
+		for (const model::Placed &pl : spec.modelPlaces)
+			if (pl.id == s.id && t >= s.t) out += undersea::siltText(pl.at, t - s.t, 1.2 * pl.scale, s.seed * 977);
+	return out;
 }
 
 }  // namespace film_file

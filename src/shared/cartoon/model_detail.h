@@ -110,8 +110,10 @@ struct Displace {
 	std::string kind = "noise";
 	double amount = 0.01, size = 0.1;
 	int seed = 1;
+	bool bake = false;   // (modeling round 2: `displace ... bake` - not moved in the geometry, baked into a normal map: model_texture.h)
 };
 inline Mesh displaced(const Mesh &in, const Displace &d) {
+	if (d.bake) return in;   // (only its normal map: the geometry stays)
 	Mesh m = in;
 	if (m.normals.size() != m.verts.size()) sdf::computeNormals(m);
 	m = refined(m, 0.25 * d.size);

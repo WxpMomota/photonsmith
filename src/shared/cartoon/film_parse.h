@@ -191,6 +191,10 @@
 //       mirror x                                                #   `paint`, `displace`, `kit`, and whole models by `make building|chair|table|car|rocket|boat`
 //     end
 //     place    robot  at 0 0 -3  turn 20                        # placed (or `scatter robot N in X0 Z0 X1 Z1`): instanced, drawn coarser far from the camera
+//     place    robot  at 0 0 -3  as r1                          # round 2: named for `move r1`, `turn r1.arm.r ...`, `show r1.eyes ...`, `shatter r1 at T`
+//     character bo robot  at 1 0 -2                             # a model as a character: rigged by its pieces' names (head, eyes, mouth, leg.N, arm.l/r, tail)
+//     model    tall from post  h 3                              # parameters (`model post params h 1`, `$h`), `variants N h lo hi`, library/NAME.model; in a block:
+//                                                               #   tool, boolean, budget, key, mesh FILE, texture, decal, displace ... bake, make tree|creature|street|room
 //     space    stars 1  milkyway 1  sun 60 15                   # the universe (film_space.h, round 10): a set in space - the stars all round, the Milky Way, the sun a
 //                                                               # glowing ball at a bearing and an elevation; no sky, no air
 //     planet   home ocean  at 0 0 -20000  radius 6000           # a planet (film_planets.h): rocky, desert, ice, ocean, gas or lava; `tilt`, `spin SECONDS`
