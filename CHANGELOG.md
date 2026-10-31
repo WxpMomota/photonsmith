@@ -6,6 +6,8 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **Blender import (2026-10-31).** File > Import Blender Scene and `tools/blender_import/import_blend.py`: a `.blend` becomes a scene of My Scenes, run through the user's own Blender with scripts in the file disabled. Modifiers applied, node colours baked, cutouts, particle copies, path hair, lamps and camera carried over, y up for film files, the file's view transform as its tone map, an Eevee scene's glowing meshes as glow only.
+
 * **Films: `swarm` (2026-10-31).** Thousands of glowing particles as one line: streaming in, circling, diving and hovering, fountains, trails behind a moving block; each a fixed function of its number and the time, in a few meshes left out of the light sampling.
 
 * **Films: parents, groups and acting verbs (2026-10-31).** `parent CHILD to OTHER` and `group NAME of A B C` for any block or placement (moves, turns, hides and lights carry down), `hop` with automatic squash and stretch, `blink` and `gaze` (looking at a point or at something that moves).

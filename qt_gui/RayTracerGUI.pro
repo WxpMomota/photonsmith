@@ -60,6 +60,7 @@ SOURCES += \
 	mainwindow_selftest_photo.cpp \
 	mainwindow_selftest_models.cpp \
 	mainwindow_photo_install.cpp \
+	mainwindow_blender_import.cpp \
 	mainwindow_my_scenes.cpp \
 	mainwindow_denoiser.cpp \
 	denoiser_installer.cpp \

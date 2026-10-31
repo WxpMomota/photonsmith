@@ -112,6 +112,10 @@ void MainWindow::createActions() {
 	m_actCopyLog->setStatusTip(tr("Copy the entire log to the clipboard"));
 	connect(m_actCopyLog, &QAction::triggered, this, &MainWindow::copyLogToClipboard);
 
+	m_actImportBlender = new QAction(tr("&Import Blender Scene…"), this);
+	m_actImportBlender->setStatusTip(tr("Turn a .blend file into a scene of My Scenes (needs Blender)"));
+	connect(m_actImportBlender, &QAction::triggered, this, &MainWindow::onImportBlenderScene);
+
 	m_actSaveLog = new QAction(tr("&Save Log…"), this);
 	icon_tint::apply(m_actSaveLog, ":/icons/save.svg", kBody, m_activeTheme.textBody);
 	// Deliberately NOT QKeySequence::Save. In a renderer, Ctrl+S reads as
@@ -157,6 +161,8 @@ void MainWindow::createActions() {
 
 void MainWindow::createMenus() {
 	QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
+	fileMenu->addAction(m_actImportBlender);
+	fileMenu->addSeparator();
 	fileMenu->addAction(m_actOpenFolder);
 	fileMenu->addAction(m_actOpenViewer);
 	fileMenu->addSeparator();

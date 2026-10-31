@@ -101,6 +101,13 @@ void MainWindow::runSelfTest(const QString &mode, const QString &outPrefix) {
 	}
 
 	if (mode == "options") { runOptionsSelfTest(log, shot); return; }
+	if (mode == "blenderimport") {   // RT_SELFTEST_BLEND: a .blend to import, with RAY_TRACER_PBRT_DIR a folder to put it in
+		importBlendFile(qEnvironmentVariable("RT_SELFTEST_BLEND"), [log](const QString &file) {
+			log(file.isEmpty() ? QStringLiteral("RESULT: FAIL nothing imported") : QStringLiteral("RESULT: PASS imported ") + file);
+			QApplication::exit(file.isEmpty() ? 1 : 0);
+		});
+		return;
+	}
 	if (mode == "cartoonui") { runCartoonUiSelfTest(log, shot); return; }   // see mainwindow_selftest_modes.cpp
 	if (mode == "framesstrip") { runFramesStripSelfTest(log, shot); return; }   // see mainwindow_selftest_modes.cpp
 	if (mode == "banner") { runBannerSelfTest(log, shot); return; }   // see mainwindow_selftest_modes.cpp

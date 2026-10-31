@@ -553,6 +553,7 @@ private:
 	QAction *m_actOpenViewer = nullptr;
 	QAction *m_actCopyLog = nullptr;
 	QAction *m_actSaveLog = nullptr;
+	QAction *m_actImportBlender = nullptr;
 	QAction *m_actClearLog = nullptr;
 	QAction *m_actAbout = nullptr;
 	QAction *m_actAboutQt = nullptr;
@@ -1610,6 +1611,8 @@ private:
 	// Delete the scenes the user made (mainwindow_my_scenes.cpp): the Settings tab shows these buttons under the My Scenes category.
 	denoiser_installer::Installer *m_denoiserInstaller = nullptr;
 	QWidget *m_myScenesRow = nullptr; QPushButton *m_deleteSceneButton = nullptr, *m_deleteAllScenesButton = nullptr;
+	void onImportBlenderScene();   // File > Import Blender Scene (mainwindow_blender_import.cpp)
+	void importBlendFile(const QString &blend, const std::function<void(const QString &)> &done = {});
 	QString userSceneFileForId(const QString &id) const;
 	QStringList myScenesIds() const;
 	void updateMyScenesButtons(const QString &category);
