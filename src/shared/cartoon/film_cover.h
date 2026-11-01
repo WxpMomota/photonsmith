@@ -39,6 +39,11 @@ struct Cover {
 	std::string season;   // (`undergrowth season S`; none: the forests')
 };
 
+// Where something heavy is or has just been (pbrt's x z; `age` seconds ago; `reach` how far it pushes): the grass is shoved aside and lies down, and comes back in a few seconds.
+struct Press {
+	double x = 0.0, z = 0.0, reach = 0.5, age = 0.0;
+};
+
 constexpr int kShapes = 3, kDry = 3, kBright = 2, kBladeCols = 8;
 struct Ring {
 	double cell, reach;   // (the squares' size; out to what distance from the camera)
@@ -82,7 +87,7 @@ inline Mesh patchMesh(double size, int blades, int joints, double width, double 
 	const double spread = 0.09 * size;
 	for (int b = 0; b < blades; ++b) {
 		const int s = salt * 131 + b, tussock = static_cast<int>(hash01(s, 10) * kTussocks) % kTussocks, own = salt * 17 + tussock;
-		const bool loose = hash01(s, 11) < 0.3, dead = hash01(s, 12) < 0.16, lying = hash01(s, 13) < 0.1, seeded = heads && !lying && hash01(s, 14) < 0.06;
+		const bool loose = hash01(s, 11) < 0.3, dead = hash01(s, 12) < 0.16, lying = hash01(s, 13) < 0.1, seeded = heads && !lying && hash01(s, 14) < 0.025;
 		const double wx = hash01(s, 1) - 0.5, wz = hash01(s, 2) - 0.5;   // (scattered, or drawn in round a tussock: a gaussian about it, by two chances)
 		const double spin = 2.0 * kPi * wx, reach = spread * std::sqrt(-2.0 * std::log(std::max(1e-6, wz + 0.5)));
 		const Vec3 root = loose ? Vec3{size * wx, 0.0, size * wz} : Vec3{size * (hash01(own, 15) - 0.5) + reach * std::cos(spin), 0.0, size * (hash01(own, 16) - 0.5) + reach * std::sin(spin)};
@@ -96,7 +101,7 @@ inline Mesh patchMesh(double size, int blades, int joints, double width, double 
 				const double u = 0.8 + 0.2 * k / 6.0;
 				const Vec3 at = root + Vec3{0.0, h * u, 0.0} + facing * (lean * u * u), dir = normalize(facing + Vec3{0.3 * std::cos(2.4 * k), -0.5, 0.3 * std::sin(2.4 * k)});
 				const std::size_t from = m.verts.size();
-				nature::addLeaf(m, at, dir, normalize(Vec3{0.0, 1.0, 0.0} + side * 0.4), 0.024, 0.011);
+				nature::addLeaf(m, at, dir, normalize(Vec3{0.0, 1.0, 0.0} + side * 0.4), 0.014, 0.005);
 				for (std::size_t i = from; i < m.verts.size(); ++i) m.uvs[i] = {(kBladeCols - 0.5) / kBladeCols, 0.92};
 			}
 		const int stem = static_cast<int>(m.verts.size());
@@ -202,7 +207,7 @@ inline double yearAt(const Cover &c, const std::vector<forest::Forest> &forests,
 // The film's cover seen from `eye` looking at `target` (story space) with `fovDeg`, at t: the objects it uses and a placement for each square in view. `trees`: the film's forests,
 // under which it is litter and ferns. `snow` how much lies on the land (0 .. 1): it goes under. `wet`, 0 .. 1: rain on the blades. `year`: yearAt.
 inline std::string text(const std::string &film, const terrain::Field &field, const Cover &c, Vec3 eye, Vec3 target, double fovDeg, double t, double snow, const dressing::Gusts &gusts,
-						const std::vector<std::vector<forest::Tree>> &trees, double wet = 0.0, double year = 0.0) {
+						const std::vector<std::vector<forest::Tree>> &trees, double wet = 0.0, double year = 0.0, const std::vector<Press> &presses = {}) {
 	const terrain::Spec &s = field.spec;
 	const Growth g = growthOf(s);
 	if (!c.on || g.density <= 0.0 || snow > 0.5) return std::string();
@@ -276,7 +281,19 @@ inline std::string text(const std::string &film, const terrain::Field &field, co
 				const Mat4 turnIt = rotate({0, 1, 0}, 90.0 * static_cast<int>(hash01(salt, 74) * 4.0));
 				const Vec3 w = under ? Vec3{0.0, 0.0, 0.0} : nature::windLean(foot.x, foot.z, t, 0.18) + dressing::gustAt(gusts, foot.x, foot.z, t) * 0.35;
 				if (under || thin) places += nature::placeObject(laid("litter", true, 1.0), mul(translate(foot), tilt, turnIt));
-				if (!under) places += nature::placeObject(laid(thin ? "thin" : "grass", false, thin ? 0.3 : 1.0), mul(translate(foot), tilt, nature::shearXZ(w.x, w.z), turnIt, scale(1.0, height, 1.0)));
+				// what has walked here: shoved out from under it as it comes, lying down behind it, and getting up again
+				Vec3 shoved{0.0, 0.0, 0.0};
+				double flat = 0.0;
+				if (r < 2)
+					for (const Press &p : presses) {
+						const double d = std::hypot(x - p.x, z - p.z), reach = p.reach + 0.75 * ring.cell;
+						if (d >= reach) continue;
+						const double near_ = 1.0 - d / reach, fresh = std::exp(-p.age / 4.0);
+						flat = std::max(flat, 0.32 * near_ * near_ * fresh);   // (it lies down: it does not go away)
+						if (d > 1e-6) shoved = shoved + Vec3{-(x - p.x) / d, 0.0, (z - p.z) / d} * (1.1 * near_ * fresh);
+					}
+				const Vec3 lean = w + shoved * (1.0 / std::max(1.0, length(shoved) / 1.1));
+				if (!under) places += nature::placeObject(laid(thin ? "thin" : "grass", false, thin ? 0.3 : 1.0), mul(translate(foot), tilt, nature::shearXZ(lean.x, lean.z), turnIt, scale(1.0, height * (1.0 - flat), 1.0)));
 				// here and there, close enough to see: a stone half sunk in the ground, and under the trees a fern
 				if (ring.cell == 3.0) {
 					const auto dressed = [&](const char *what, int kinds, const std::function<std::string(int)> &make, double chance, double sinks, double size) {

@@ -1007,6 +1007,25 @@ std::string DataFilm::waterPlay(const Character &c, const CharacterKind &kind, d
 // Round 16: what the water sounds like (film_dressing.h) - the reef's hush and crackle while the ears are under the water, the waves' wash while they are above
 // it, changing as the camera crosses the waterline (cartoons.cpp leaves an underwater film's `reef` and `sea` beds to here) - and the boats, the dolphins and the
 // whales, and the gannets' plunges, from where they are. `natureAt`: nature's time at a film time; `bedAt`: the seabed's height (pbrt's x z).
+// Where the film's animals are and have just been, near the camera (story space): what the grass has to get out of the way of (film_cover.h).
+static std::vector<cover::Press> pressedBy(const Spec &spec, const terrain::Field *ground, double t, const Vec3 &eyeStory) {
+	std::vector<cover::Press> out;
+	constexpr double kWithin = 60.0;
+	for (const wildlife::Herd &h : spec.herds) {
+		const animals::Species *sp = animals::species(h.kind);
+		if (!sp || sp->bird) continue;
+		for (int i = 0; i < std::min(h.count, 80); ++i) {
+			const Vec3 now = wildlife::animalAt(h, *sp, i, t, ground).at;
+			if (std::hypot(now.x + eyeStory.x, now.z - eyeStory.z) > kWithin) continue;
+			for (const double age : {0.0, 0.8, 1.6, 3.0, 5.0, 8.0}) {
+				const Vec3 at = wildlife::animalAt(h, *sp, i, std::max(0.0, t - age), ground).at;
+				out.push_back({at.x, at.z, 0.55 * sp->length, age});
+			}
+		}
+	}
+	return out;
+}
+
 static void seaSounds(const Spec &spec, audio::Mix &m, const soundscape::Ears &ears, const std::function<double(double)> &natureAt,
 					  const std::function<double(double, double)> &bedAt, const std::function<double(double)> &filmTimeOf) {
 	namespace ss = soundscape;
@@ -1640,7 +1659,7 @@ std::string DataFilm::plantsAt(const std::string &header, double t, double nt) c
 	std::string out;
 	forest::Written trees;
 	for (std::size_t i = 0; i < spec.forests.size() && i < spec.planted.size(); ++i) out += forest::text(film, spec.planted[i], spec.forests[i], nt, t, eye, spec.gusts, weatherAt(t).wet, trees);
-	if (grows) out += cover::text(film, *terrain::fieldOf(spec.terrain), spec.undergrowth, eye, target, fov, nt, weatherAt(t).snow, spec.gusts, spec.planted, weatherAt(t).wet, cover::yearAt(spec.undergrowth, spec.forests, t));
+	if (grows) out += cover::text(film, *terrain::fieldOf(spec.terrain), spec.undergrowth, eye, target, fov, nt, weatherAt(t).snow, spec.gusts, spec.planted, weatherAt(t).wet, cover::yearAt(spec.undergrowth, spec.forests, t), pressedBy(spec, terrain::fieldOf(spec.terrain).get(), nt, eye));
 	return out;
 }
 // The film's swarms at t (film_swarm.h), their discs turned to the camera of `header`.

@@ -2655,6 +2655,30 @@ uvs (its surface cut into near-flat charts along its creases, each laid flat and
 
 **Animals in motion.** (scripts/make_rigged_animals.py) The clips move the whole body: the hips and shoulders tip against each other as the weight goes from side to side, the fetlock sinks under load, the head stays steadier than the neck, and the tail swings at a walk and streams and ripples at a gallop. Standing still an animal breathes and eases its weight from one hind leg to the other.
 
+### Plants and animals, second round (2026-10-31)
+
+**Leaves shine.** (film_forest.h `waxyDefined`) A leaf is 60% the green it was and 40% wax over the same green, a `mix`, with the light it lets through raised to make up for it, so a picture stays as bright as it was. A real cuticle is 3 or 4% of a mirror: the wax here has eta 1.8, as it is only a share of the leaf. Grass is the same; a dead leaf has lost its wax. Rain makes it 65% and smoother.
+
+**A close tree moves in parts.** (film_forest.h `tuftsOf`, `tuftTurn`) Within 38 m a tree's leaves are cut into up to 48 tufts, each its own object about its own middle. The trunk leans as it did; a limb answers late, the further up and out the later; a tuft turns quickly on its own. Nothing is written again from frame to frame. Up close each leaf is also three smaller ones. Further off the tree is one object.
+
+**Leaves have a shape.** (film_forest.h `shapeLeaves`, `leafCutPicture`) Every leaf folds along its midrib, droops and twists its own way. The picture carries brown tips, scorched edges and fungus spots, more in autumn and few in spring. Close to the camera a leaf is cut to a pointed, toothed outline with bites and holes (a Shape's `texture alpha`; on a Mix it now reaches both materials).
+
+**Moss.** (film_moss.h) A near tree of a damp country has a thin skin over the foot of its wood, cut by a picture of where moss has taken hold: thick low down and on the same side of the sky on every tree, whichever way the tree stands. Logs and stones have it on what faces up, and cushions lie on the shaded ground.
+
+**Grass is not a carpet: `undergrowth season S`.** (film_cover.h) It grows in tussocks of their own height, a sixth of it dead straw, a tenth lying flat, and near the camera some gone to seed, with drifts of flowers in a meadow. Where it meets the wood a thin grass runs over the fallen leaves, so there is no line. It keeps the year: the first forest's season and its changes, or `undergrowth season summer|autumn|winter|spring` of its own, each square turning in its own time, and winter's dead grass beaten down.
+
+**Feet stay planted.** (scripts/make_rigged_animals.py, film_animals.h `exactPose`) The clips are solved from where each foot stands, so the bob and sway of the body and the flex of the spine all leave it there. A leg at the end of its stride cannot reach: the heel comes up, and the shoulder or the hip gives the rest. A horse's foot used to slide 52 cm over its time on the ground at a walk, and now 0.7 cm. The eight animals nearest the camera, within 34 m, are posed for themselves at their exact moment, and each foot that is down stands on the land under it, the leg bending or straightening to reach. Slip is highest in the gallops of the bendiest backs: 6.7% of a fox's stride.
+
+**The skin moves.** (scripts/make_rigged_animals.py) A shoulder blade and a haunch slide under the skin of each side with the leg and stand out when it takes the weight, the belly swings a moment late, the flank twitches now and then as an animal stands, and the ears turn to sounds. The barrel now ends in a rounded rump and breast and not a flat disc.
+
+**Faces.** An eye is a wet ball in dark lids, its pupil the shape of its kind's, holding a small sharp sky. A muzzle ends in bare wet skin with dark nostrils, and the mouth is a line along the jaw. An ear is one thin sheet: the sun comes through it red.
+
+**Hair on the herd.** (film_wildlife.h, film_fur.h `clumpPull`) Up to five animals within 22 m have real hair, as many strands as the distance is worth and each as much wider, up to ten times the usual number at 4 m; the ribbons of the rest gather the same way. Hair gathers in tufts at random, lies down the legs, and is short on the face. Each strand takes a dozen patches on the card.
+
+**The land answers.** (film_cover.h `Press`, film_world.cpp `pressedBy`) Grass near the camera is shoved out of the way of whatever walks through it, lies down behind it, and is up again in a few seconds. A running animal throws up crumbs of earth from dry ground. In rain the legs and belly take the mud.
+
+**What these do not change.** The animals' bodies still come from the generator. The way a leg joins the body is the weakest part of them close to the camera, and a scanned model would do more than anything here. Real dust needs a volume that moves with the herd: what is drawn is crumbs of earth, not a cloud. A leaf's gloss is on both its sides, where a real leaf's is mostly on the top. Metal has not been tried with any of this.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

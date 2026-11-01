@@ -555,7 +555,7 @@ TEST(FilmSpectacleFur, StrandsKeepTheirPlacesLieBackAndCoatTheHerd) {
 
 	ff::DataFilm film;
 	ASSERT_EQ(loadFilm("fur", "scene s.pbrt\nlength 10\nterrain hills size 600 height 5 seed 2\nherd deer 3 from 0 0 to 30 0 fur 1\nherd wolves 2 from 0 5 to 30 5\n"
-							  "flock eagles 1 at 0 30 0 feathers 1\nshot 0 A\n key 0 2 -10  0 1 0  50\n",
+							  "flock eagles 1 at 0 30 0 feathers 1\nshot 0 A\n key 0 2 -60  0 1 0  50\n",
 						film),
 			  "");
 	const std::string s = film.sceneAt(2.0);

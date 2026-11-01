@@ -13,6 +13,7 @@
 
 #include <cmath>
 #include <fstream>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -136,14 +137,65 @@ inline std::string eyeShineMaterial(const std::string &kind, double amount) {
 	return buf;
 }
 
+// An animal near the camera is posed for itself: the clip at exactly `phase` (0 .. 1), not the nearest of its few poses, a foot stepping along the ground a little at a time, and each
+// foot that is down set on the land where `place` (the animal's placement, story space) puts it, its leg bending to reach or straightening: the placement tilts a body to the slope
+// under it, and the ground under one hoof is its own. `groundAt`: the land's height at a place in story space.
+inline gltf_skin::Pose exactPose(const Model &m, const std::string &clip, double phase, const Mat4 &place, const std::function<double(double, double)> &groundAt) {
+	const gltf_skin::Rig &rig = m.rig;
+	gltf_skin::Pose pose = gltf_skin::restPose(rig);
+	const auto rest = gltf_skin::worldOf(rig, pose);
+	if (const int c = m.clip(clip); c >= 0) gltf_skin::apply(rig, rig.clips[static_cast<std::size_t>(c)], rig.clips[static_cast<std::size_t>(c)].length * phase, pose);
+	const auto world = gltf_skin::worldOf(rig, pose);
+	const auto at = [](const auto &w, int n) {
+		const auto &e = w[static_cast<std::size_t>(n)];
+		return Vec3{e[12], e[13], e[14]};
+	};
+	const auto nodeOf = [&](const std::string &name) {
+		for (std::size_t i = 0; i < rig.nodes.size(); ++i)
+			if (rig.nodes[i].name == name) return static_cast<int>(i);
+		return -1;
+	};
+	const auto turnAboutX = [&](int node, double angle) {
+		const double dq[4] = {std::sin(0.5 * angle), 0.0, 0.0, std::cos(0.5 * angle)};
+		double out[4];
+		gltf_skin::detail::quatMul(pose[static_cast<std::size_t>(node)].q, dq, out);
+		for (int i = 0; i < 4; ++i) pose[static_cast<std::size_t>(node)].q[i] = out[i];
+		gltf_skin::detail::normalise(pose[static_cast<std::size_t>(node)].q);
+	};
+	const double size = length(transformPoint(place, {1.0, 0.0, 0.0}) - transformPoint(place, {0.0, 0.0, 0.0}));
+	const auto theta = [](const Vec3 &v) { return std::atan2(-v.z, -v.y); };
+	for (const std::string leg : {"hl", "fl", "hr", "fr"}) {
+		const int upper = nodeOf(leg + ".upper"), lower = nodeOf(leg + ".lower"), foot = nodeOf(leg + ".foot");
+		if (upper < 0 || lower < 0 || foot < 0) continue;
+		const Vec3 U = at(world, upper), K = at(world, lower), A = at(world, foot);
+		const double standing = at(rest, foot).y, up = A.y - standing;
+		const double down = 1.0 - smoothstep(0.0, 0.7 * standing, up);   // (a foot in the air is the clip's)
+		if (down <= 0.0) continue;
+		const Vec3 sole = transformPoint(place, {A.x, up, A.z});
+		const double raise = down * std::clamp((groundAt(sole.x, sole.z) - sole.y) / size, -2.0 * standing, 2.0 * standing);
+		const Vec3 now = A - U, wanted = now + Vec3{0.0, raise, 0.0};
+		const double L1 = length(K - U), L2 = length(A - K), d0 = std::hypot(now.y, now.z);
+		const double d1 = std::clamp(std::hypot(wanted.y, wanted.z), std::abs(L1 - L2) + 1e-4, L1 + L2 - 1e-4);
+		const auto opening = [](double a, double b, double c) { return std::acos(std::clamp((a * a + b * b - c * c) / (2.0 * a * b), -1.0, 1.0)); };
+		const double bend = leg[0] == 'f' ? 1.0 : -1.0;
+		const double dUpper = theta(wanted) - theta(now) - bend * (opening(L1, d1, L2) - opening(L1, std::max(d0, 1e-4), L2));
+		const double dLower = bend * (opening(L1, L2, std::max(d0, 1e-4)) - opening(L1, L2, d1));
+		turnAboutX(upper, dUpper);
+		turnAboutX(lower, dLower);
+		turnAboutX(foot, -(dUpper + dLower));   // (the foot stays flat on the ground)
+	}
+	return pose;
+}
+
 // The pbrt object of a kind in a clip's pose k (of posesOf), named `name`: its pieces with the file's colours - its coat and legs painted in `pattern` (film_coats.h,
 // variant `variant`) when it has one - and (`coat` above 0: film_fur.h) its fur or feathers.
 inline std::string poseObject(const Model &m, const std::string &name, const std::string &clip, int k, const std::string &kind = std::string(), double coat = 0.0,
-							  const std::string &pattern = std::string(), int variant = 0, bool wet = false, double eyeshine = 0.0) {
+							  const std::string &pattern = std::string(), int variant = 0, bool wet = false, double eyeshine = 0.0, const gltf_skin::Pose *exact = nullptr, bool mud = false) {
 	const gltf_skin::Rig &rig = m.rig;
 	gltf_skin::Pose pose = gltf_skin::restPose(rig);
 	const int c = m.clip(clip);
-	if (c >= 0) {
+	if (exact) pose = *exact;
+	else if (c >= 0) {
 		const double len = rig.clips[static_cast<std::size_t>(c)].length;
 		gltf_skin::apply(rig, rig.clips[static_cast<std::size_t>(c)], len * k / posesOf(clip), pose);
 	}
@@ -160,8 +212,8 @@ inline std::string poseObject(const Model &m, const std::string &name, const std
 			if (mat.name == "legs") legColour = {mat.baseColor[0], mat.baseColor[1], mat.baseColor[2]};
 		}
 		if (pattern == "natural") coatColour = coats::individual(kind, variant, coatColour), legColour = coatColour;
-		painted = "coat_" + kind + "_" + pattern + "_" + std::to_string(variant) + (wet ? "_wet" : "");
-		textures = "Texture \"" + painted + "\" \"spectrum\" \"imagemap\" \"string filename\" [ \"" + coats::picture(pattern, kind, variant, coatColour, legColour) + "\" ]" +
+		painted = "coat_" + kind + "_" + pattern + "_" + std::to_string(variant) + (wet ? "_wet" : "") + (mud ? "_mud" : "");
+		textures = "Texture \"" + painted + "\" \"spectrum\" \"imagemap\" \"string filename\" [ \"" + coats::picture(pattern, kind, variant, coatColour, legColour, mud) + "\" ]" +
 				   (wet ? " \"float scale\" [ 0.55 ]" : "") + "\n";
 	}
 	for (std::size_t i = 0; i < meshes.size(); ++i) {
@@ -183,9 +235,16 @@ inline std::string poseObject(const Model &m, const std::string &name, const std
 			body += attr(eyeShineMaterial(kind, eyeshine), emitMesh(meshes[i], identity()));
 			continue;
 		}
+		if (mat.name == "ear") {   // (a sheet of skin with blood in it: the light behind it comes through red)
+			const Vec3 skin = pattern == "natural" ? coats::individual(kind, variant, colour) : colour;
+			colours.push_back(Vec3{0.0, 0.0, 0.0});
+			body += attr(translucentMaterial(skin * 0.78, Vec3{0.2 + 0.22 * skin.x, 0.07 + 0.1 * skin.y, 0.04 + 0.07 * skin.z}), emitMesh(meshes[i], identity()));
+			continue;
+		}
 		const bool furred = mat.name == "coat" || mat.name == "legs" || mat.name == "plumage" || mat.name == "head" || mat.name == "tail";   // (not on hooves, antlers, eyes, a beak)
 		colours.push_back(furred ? colour : Vec3{0.0, 0.0, 0.0});
-		body += attr(mat.roughness < 0.5 ? coated(colour, std::max(0.1, mat.roughness)) : diffuseMaterial(colour), emitMesh(meshes[i], identity()));
+		const bool glassy = mat.name == "eyes" || mat.name == "pupil";   // (an eye is wet: it holds a sharp small sky)
+		body += attr(mat.roughness < 0.5 ? coated(colour, std::max(glassy ? 0.03 : 0.1, mat.roughness)) : diffuseMaterial(colour), emitMesh(meshes[i], identity()));
 	}
 	if (coat > 0.0) {   // its fur or feathers, rooted by the rest pose's areas so they keep to their places on the skin
 		std::vector<Mesh> rest, furred, keep;
@@ -205,13 +264,16 @@ inline std::string poseObject(const Model &m, const std::string &name, const std
 // the herd's ribbons. Each strand is rooted on a triangle of the posed body (shared out by the rest pose's areas, its place fixed by its number, so the fur keeps to its
 // spot on the skin), leaves the skin and lies back along the body and a little down, as long as the kind's coat (film_fur.h) - half that on the face, more on the tail and
 // under the belly, shorter on the legs - and coloured from the coat's pattern there (film_coats.h). Written in the world through `place` (the herd's placement, mirrored
-// on the outside: what the posed object's mirrored meshes end up under). `amount` 1 is some 9000 strands a square metre of skin.
-inline std::string heroFur(const std::string &kind, const std::string &clip, int k, const std::string &pattern, int variant, double amount, const Mat4 &place, int seed) {
+// on the outside: what the posed object's mirrored meshes end up under). `amount` 1 is some 9000 strands a square metre of skin; strands thinned for distance are as much wider. `exact`:
+// the pose, when it has one of its own (exactPose). Each is a dozen patches on the card, not the eighty of a hair in a close-up.
+inline std::string heroFur(const std::string &kind, const std::string &clip, int k, const std::string &pattern, int variant, double amount, const Mat4 &place, int seed, const gltf_skin::Pose *exact = nullptr,
+						   bool mud = false, double wider = 1.0) {
 	const std::shared_ptr<const Model> m = modelOf(kind);
 	if (!m || amount <= 0.0) return std::string();
 	const gltf_skin::Rig &rig = m->rig;
 	gltf_skin::Pose pose = gltf_skin::restPose(rig);
-	if (const int c = m->clip(clip); c >= 0) gltf_skin::apply(rig, rig.clips[static_cast<std::size_t>(c)], rig.clips[static_cast<std::size_t>(c)].length * k / posesOf(clip), pose);
+	if (exact) pose = *exact;
+	else if (const int c = m->clip(clip); c >= 0) gltf_skin::apply(rig, rig.clips[static_cast<std::size_t>(c)], rig.clips[static_cast<std::size_t>(c)].length * k / posesOf(clip), pose);
 	std::vector<Mesh> posed, rest;
 	std::vector<gltf_import::Material> materials, restMaterials;
 	piecesOf(rig, pose, posed, materials);
@@ -228,7 +290,7 @@ inline std::string heroFur(const std::string &kind, const std::string &clip, int
 	const double scaleOf = length(transformPoint(place, {1.0, 0.0, 0.0}) - transformPoint(place, {0.0, 0.0, 0.0}));
 	std::map<int, std::string> byColour;   // (strands in a few dozen colours: one material each)
 	std::map<int, Vec3> colourOf;
-	char buf[220];
+	char buf[300];
 	for (std::size_t piece = 0; piece < posed.size() && piece < rest.size(); ++piece) {
 		const std::string &mn = materials[piece].name;
 		if (mn != "coat" && mn != "legs") continue;
@@ -242,7 +304,8 @@ inline std::string heroFur(const std::string &kind, const std::string &clip, int
 			const double want = area * density;
 			const int n = static_cast<int>(want) + (hash01(salt, 1) < want - std::floor(want) ? 1 : 0);
 			for (int j = 0; j < n; ++j) {
-				double u = hash01(salt * 31 + j, 2), v = hash01(salt * 31 + j, 3);
+				const int own = salt * 8191 + j * 131071;   // (each strand's chances its own: counted up, they fell in lines along the body)
+				double u = hash01(own, 2), v = hash01(own, 3);
 				if (u + v > 1.0) u = 1.0 - u, v = 1.0 - v;
 				const auto &pt = P.tris[ti];
 				const Vec3 rootM = P.verts[pt[0]] * (1.0 - u - v) + P.verts[pt[1]] * u + P.verts[pt[2]] * v;
@@ -256,19 +319,22 @@ inline std::string heroFur(const std::string &kind, const std::string &clip, int
 				}
 				double part = 1.0;
 				if (ay >= 0.5) part = 0.6;
-				else if (ax >= 0.75) part = ay < 0.25 ? 0.5 : 1.5;
+				else if (ax >= 0.75) part = ay < 0.25 ? 0.22 : 1.5;   // (short and close on the face: the eyes look out of it)
 				if (ay < 0.5 && ax < 0.75 && std::cos(2.0 * kPi * coats::detail::roundness(ax, ay)) > 0.6) part *= 1.3;
-				const Vec3 colour = pattern.empty() ? flat : coats::colourAt(pattern, variant, coatColour, legColour, ax, ay);
+				const Vec3 colour = pattern.empty() ? flat : coats::colourAt(pattern, variant, coatColour, legColour, ax, ay, mud);
 				const Vec3 root = transformPoint(place, rootM);
 				const Vec3 nrm = normalize(transformPoint(place, rootM + nM) - root);
-				Vec3 lie = back - nrm * dot(back, nrm);
+				const Vec3 way = ay >= 0.5 ? down * 0.9 + back * 0.3 : back;   // (a coat lies back along the body and down the legs)
+				Vec3 lie = way - nrm * dot(way, nrm);
 				lie = length(lie) > 1e-6 ? normalize(lie) : down;
-				const double L = coat.length * part * scaleOf * (0.7 + 0.6 * hash01(salt * 31 + j, 4));
+				const double L = coat.length * part * scaleOf * (0.7 + 0.6 * hash01(own, 4));
+				const Vec3 restAt = R.verts[t[0]] * (1.0 - u - v) + R.verts[t[1]] * u + R.verts[t[2]] * v;
+				const Vec3 pull = transformPoint(place, rootM + fur::clumpPull(restAt, L / scaleOf)) - root;   // (the tips of a tuft gather)
 				const Vec3 d1 = normalize(nrm * 0.55 + lie * 0.45), d2 = normalize(nrm * 0.15 + lie * 0.75 + down * 0.25);
-				const Vec3 p0 = root - nrm * (0.05 * L), p1 = root + d1 * (0.35 * L), p2 = p1 + d2 * (0.35 * L), p3 = p2 + normalize(d2 + down * 0.3) * (0.35 * L);
+				const Vec3 p0 = root - nrm * (0.05 * L), p1 = root + d1 * (0.35 * L), p2 = p1 + d2 * (0.35 * L) + pull * 0.35, p3 = p2 + normalize(d2 + down * 0.3) * (0.35 * L) + pull * 0.65;
 				const int key = static_cast<int>(std::lround(colour.x * 12)) * 400 + static_cast<int>(std::lround(colour.y * 12)) * 20 + static_cast<int>(std::lround(colour.z * 12));
 				colourOf[key] = colour;
-				std::snprintf(buf, sizeof buf, "Shape \"curve\" \"string type\" \"cylinder\" \"float width0\" [ %.5f ] \"float width1\" [ %.5f ] \"point3 P\" [", 0.0012 * scaleOf, 0.0003 * scaleOf);
+				std::snprintf(buf, sizeof buf, "Shape \"curve\" \"string type\" \"cylinder\" \"integer dicelength\" 3 \"integer diceradial\" 4 \"float width0\" [ %.5f ] \"float width1\" [ %.5f ] \"point3 P\" [", 0.0012 * scaleOf * wider, 0.0003 * scaleOf * wider);
 				std::string &out = byColour[key];
 				out += buf;
 				for (const Vec3 &q : {p0, p1, p2, p3}) {
@@ -282,7 +348,7 @@ inline std::string heroFur(const std::string &kind, const std::string &clip, int
 	std::string text = "# a hero's fur of strands (film_animals.h heroFur)\n";
 	for (const auto &[key, strands] : byColour) {
 		const Vec3 c = colourOf[key];
-		const auto tone = [](double x) { return std::pow(std::clamp(x, 0.02, 0.95), 1.6); };   // (pbrt's hair reflectance is a thick coat's: one layer looks lighter)
+		const auto tone = [](double x) { return std::pow(std::clamp(x, 0.02, 0.95), 1.2); };   // (pbrt's hair reflectance is a thick coat's: one layer looks lighter)
 		std::snprintf(buf, sizeof buf, "AttributeBegin\nMaterial \"hair\" \"rgb reflectance\" [ %.4f %.4f %.4f ] \"float beta_m\" [ 0.35 ] \"float beta_n\" [ 0.35 ]\n", tone(c.x), tone(c.y), tone(c.z));
 		text += buf + strands + "AttributeEnd\n";
 	}
@@ -303,6 +369,13 @@ struct Poses {
 			const std::shared_ptr<const Model> m = modelOf(kind);
 			if (m) text += poseObject(*m, name, clip, k, kind, coat, pattern, variant, wet, eyeshine);
 		}
+		return name;
+	}
+	// The same for one animal's pose of its own (exactPose): written once, for it alone. `whose`: a name no other animal of the frame has.
+	std::string exactName(const std::string &kind, const std::string &clip, const gltf_skin::Pose &pose, const std::string &whose, std::string &text, double coat, const std::string &pattern, int variant, bool wet, bool mud) {
+		const std::string name = "anim_own_" + kind + "_" + whose + (eyeshine > 0.0 ? "_shine" + std::to_string(static_cast<int>(std::lround(eyeshine * 100.0))) : std::string());
+		if (written.insert(name).second)
+			if (const std::shared_ptr<const Model> m = modelOf(kind)) text += poseObject(*m, name, clip, 0, kind, coat, pattern, variant, wet, eyeshine, &pose, mud);
 		return name;
 	}
 };

@@ -38,6 +38,25 @@ inline Coat coatOf(const std::string &kind) {
 	return c;
 }
 
+// Where a strand's tip is drawn, from its root's place on the skin in the rest pose: towards the middle of its tuft, by no more than most of its length. Tufts are some 3 cm across and lie
+// at random, the nearest of a point in each cell round about: on a plain grid, hair lying along the body lined them up into stripes.
+inline Vec3 clumpPull(const Vec3 &rest, double length) {
+	constexpr double kCell = 0.03;
+	const int cx = static_cast<int>(std::floor(rest.x / kCell)), cy = static_cast<int>(std::floor(rest.y / kCell)), cz = static_cast<int>(std::floor(rest.z / kCell));
+	Vec3 to{0.0, 0.0, 0.0};
+	double nearest = 1e30;
+	for (int k = -1; k <= 1; ++k)
+		for (int j = -1; j <= 1; ++j)
+			for (int i = -1; i <= 1; ++i) {
+				const int cell = (cx + i) * 73856093 ^ (cy + j) * 19349663 ^ (cz + k) * 83492791;
+				const Vec3 middle{(cx + i + hash01(cell, 21)) * kCell, (cy + j + hash01(cell, 22)) * kCell, (cz + k + hash01(cell, 23)) * kCell};
+				const Vec3 d = middle - rest;
+				if (const double e = dot(d, d); e < nearest) nearest = e, to = d;
+			}
+	const double d = std::sqrt(nearest);
+	return d < 1e-9 ? Vec3{0.0, 0.0, 0.0} : to * (std::min(d, 0.8 * length) / d);
+}
+
 // The strands on a posed body - its pieces as posed (`posed`) and in the rest pose (`rest`, the same triangles: the strands are shared out by the rest pose's areas),
 // each piece's colour - as scene text (`amount` 1 the coat's number of strands).
 inline std::string strandsText(const std::vector<Mesh> &posed, const std::vector<Mesh> &rest, const std::vector<Vec3> &colours, const Coat &coat, double amount) {
@@ -58,7 +77,8 @@ inline std::string strandsText(const std::vector<Mesh> &posed, const std::vector
 			const double want = area * perArea;
 			const int n = static_cast<int>(want) + (hash01(salt, 1) < want - std::floor(want) ? 1 : 0);
 			for (int k = 0; k < n; ++k) {
-				double u = hash01(salt * 31 + k, 2), v = hash01(salt * 31 + k, 3);
+				const int own = salt * 8191 + k * 131071;
+				double u = hash01(own, 2), v = hash01(own, 3);
 				if (u + v > 1.0) u = 1.0 - u, v = 1.0 - v;
 				const auto &pt = m.tris[ti];
 				const Vec3 root = m.verts[pt[0]] * (1.0 - u - v) + m.verts[pt[1]] * u + m.verts[pt[2]] * v;
@@ -68,12 +88,15 @@ inline std::string strandsText(const std::vector<Mesh> &posed, const std::vector
 				// lying back along the body (the model faces +z) and drooping a little, each a little its own way
 				Vec3 back = Vec3{0.0, 0.0, -1.0} - nrm * (-nrm.z);
 				if (length(back) < 1e-6) back = Vec3{0.0, -1.0, 0.0} - nrm * (-nrm.y);
-				back = normalize(back + Vec3{(hash01(salt * 31 + k, 4) - 0.5) * 0.6, -0.2, (hash01(salt * 31 + k, 5) - 0.5) * 0.3});
-				const double L = coat.length * (0.6 + 0.8 * hash01(salt * 31 + k, 6));
+				back = normalize(back + Vec3{(hash01(own, 4) - 0.5) * 0.6, -0.2, (hash01(own, 5) - 0.5) * 0.3});
+				const double L = coat.length * (0.6 + 0.8 * hash01(own, 6));
 				const Vec3 d = normalize(nrm * (1.0 - coat.lie) + back * coat.lie);
 				// a tapered ribbon in two segments along a curve that leaves the skin and lies back, flat to the skin
 				const Vec3 side = normalize(cross(nrm, d) + Vec3{1e-9, 0.0, 0.0}) * (0.5 * coat.width * L);
-				const Vec3 c0 = root - nrm * (0.05 * L), c1 = root + nrm * (0.22 * L) + d * (0.45 * L), c2 = root + d * L + nrm * (0.08 * L) + Vec3{0.0, -0.1 * L, 0.0};
+				// hair does not lie hair by hair: the tips of a few centimetres of coat gather, and the skin shows in the partings between them
+				const auto &rt = r.tris[ti];
+				const Vec3 restAt = r.verts[rt[0]] * (1.0 - u - v) + r.verts[rt[1]] * u + r.verts[rt[2]] * v;
+				const Vec3 c0 = root - nrm * (0.05 * L), c1 = root + nrm * (0.22 * L) + d * (0.45 * L), c2 = root + d * L + nrm * (0.08 * L) + Vec3{0.0, -0.1 * L, 0.0} + clumpPull(restAt, L);
 				const double tip = coat.feathers ? 0.6 : 0.1;
 				const int base = static_cast<int>(mesh.verts.size());
 				for (const auto &[c, w] : {std::pair<Vec3, double>{c0, 1.0}, {c1, 0.5 * (1.0 + tip)}, {c2, tip}}) {

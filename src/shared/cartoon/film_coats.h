@@ -155,7 +155,7 @@ inline double roundness(double x, double y) {
 
 // The coat's colour at a point (ax, ay) of its picture (0..1, row 0 at the top), in a pattern and variant, from its model's coat and leg colours: the picture's pixels,
 // and a hero's strands of fur (film_fur.h) take theirs from it too.
-inline Vec3 colourAt(const std::string &pattern, int variant, Vec3 coat, Vec3 legs, double ax, double ay) {
+inline Vec3 colourAt(const std::string &pattern, int variant, Vec3 coat, Vec3 legs, double ax, double ay, bool mud = false) {
 	Vec3 base = coat, ink{0.03, 0.025, 0.02}, belly{0.92, 0.88, 0.80};
 	if (pattern == "tiger") base = {0.86, 0.45, 0.12}, belly = {0.95, 0.93, 0.88};
 	if (pattern == "cheetah" || pattern == "leopard") base = {0.80, 0.55, 0.22}, belly = {0.93, 0.88, 0.76};
@@ -183,17 +183,23 @@ inline Vec3 colourAt(const std::string &pattern, int variant, Vec3 coat, Vec3 le
 			c = lerp(c, c * 1.25, 0.6 * under);
 		}
 	}
-	return lerp(c, ink, d);
+	c = lerp(c, ink, d);
+	if (mud) {   // where it has been: the legs splashed from the foot up, and the belly from below, in dried and wet flecks
+		const double splash = smoothstep(0.42, 0.62, nature::fbm2(ax * 26.0, ay * 26.0, 77 + variant));
+		const double up = ay >= 0.5 ? smoothstep(0.35, 0.9, std::clamp(ax / 0.5, 0.0, 1.0)) : ax < 0.5 ? 0.8 * under : 0.0;
+		c = lerp(c, lerp(Vec3{0.1, 0.075, 0.05}, Vec3{0.22, 0.17, 0.11}, nature::noise2(ax * 40.0, ay * 40.0, 79)), std::clamp(up * (0.35 + 0.65 * splash), 0.0, 0.92));
+	}
+	return c;
 }
 
 // The coat's picture of a kind in a pattern and variant (its scene path), from its model's coat and leg colours.
-inline std::string picture(const std::string &pattern, const std::string &kind, int variant, Vec3 coat, Vec3 legs) {
+inline std::string picture(const std::string &pattern, const std::string &kind, int variant, Vec3 coat, Vec3 legs, bool mud = false) {
 	char name[160];
-	std::snprintf(name, sizeof name, "coat_v5_%s_%s_%d_%.3f_%.3f_%.3f", pattern.c_str(), kind.c_str(), variant, coat.x, coat.y, coat.z);
+	std::snprintf(name, sizeof name, "coat_v5_%s_%s_%d_%.3f_%.3f_%.3f%s", pattern.c_str(), kind.c_str(), variant, coat.x, coat.y, coat.z, mud ? "_mud" : "");
 	return film_sky::picture("_coats", name, kSize, kSize, [&](std::vector<float> &rgb) {
 		for (int y = 0; y < kSize; ++y)
 			for (int x = 0; x < kSize; ++x) {
-				const Vec3 c = colourAt(pattern, variant, coat, legs, (x + 0.5) / kSize, (y + 0.5) / kSize);
+				const Vec3 c = colourAt(pattern, variant, coat, legs, (x + 0.5) / kSize, (y + 0.5) / kSize, mud);
 				const std::size_t i = static_cast<std::size_t>(y * kSize + x) * 3;
 				rgb[i] = static_cast<float>(c.x), rgb[i + 1] = static_cast<float>(c.y), rgb[i + 2] = static_cast<float>(c.z);
 			}

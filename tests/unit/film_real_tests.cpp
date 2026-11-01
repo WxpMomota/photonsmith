@@ -552,3 +552,130 @@ TEST(FilmReal, GrassKeepsTheYear) {
 	EXPECT_DOUBLE_EQ(cover::yearAt({}, {f}, 13.0), 1.6);
 	EXPECT_LT(cover::yearAt(own, {f}, 13.0), 0.0) << "its own season, whatever the trees do";
 }
+
+namespace {
+// Where a rig's joint is at a time of a clip, in the model's space.
+V3 jointAt(const cartoon::animals::Model &m, const std::string &clip, double seconds, const std::string &joint) {
+	const gltf_skin::Rig &rig = m.rig;
+	gltf_skin::Pose pose = gltf_skin::restPose(rig);
+	gltf_skin::apply(rig, rig.clips[static_cast<std::size_t>(m.clip(clip))], seconds, pose);
+	const auto world = gltf_skin::worldOf(rig, pose);
+	for (std::size_t i = 0; i < rig.nodes.size(); ++i)
+		if (rig.nodes[i].name == joint) return {world[i][12], world[i][13], world[i][14]};
+	return {0.0, 0.0, 0.0};
+}
+}  // namespace
+
+// A foot that is down stays where it was put: over the middle of its time on the ground it keeps still on ground passing back at the animal's pace, at each gait, on every kind that walks.
+TEST(FilmReal, FeetStayPlanted) {
+	namespace animals = cartoon::animals;
+	struct Gait {
+		const char *clip;
+		double duty;
+	};
+	for (const char *kind : {"horses", "deer", "wolves", "zebras", "bears"}) {
+		const auto model = animals::modelOf(kind);
+		const animals::Species *sp = animals::species(kind);
+		ASSERT_TRUE(model && sp) << kind;
+		const Gait gaits[2] = {{"walk", 0.65}, {"trot", 0.45}};
+		for (const Gait &g : gaits) {
+			const double stride = std::string(g.clip) == "walk" ? sp->walkStride : sp->trotStride;
+			for (const char *leg : {"hl", "fl", "hr", "fr"}) {
+				// its time down: the part of the cycle when it is lowest
+				double lowest = 1e30, when = 0.0;
+				for (int k = 0; k < 64; ++k)
+					if (const double y = jointAt(*model, g.clip, k / 64.0, std::string(leg) + ".foot").y; y < lowest) lowest = y, when = k / 64.0;
+				double most = -1e30, least = 1e30;
+				for (int k = -6; k <= 6; ++k) {
+					const double t = when + 0.2 * g.duty * k / 6.0;
+					const double z = jointAt(*model, g.clip, t - std::floor(t), std::string(leg) + ".foot").z + stride * t;
+					most = std::max(most, z), least = std::min(least, z);
+				}
+				EXPECT_LT(most - least, 0.012 * stride + 0.01) << kind << " " << g.clip << " " << leg;
+			}
+		}
+	}
+}
+
+// Near the camera an animal's foot stands on the land under it, whatever the body's tilt says.
+TEST(FilmReal, AFootStandsOnTheLandUnderIt) {
+	namespace animals = cartoon::animals;
+	const auto model = animals::modelOf("horses");
+	ASSERT_TRUE(model);
+	const cartoon::Mat4 place = cartoon::translate(V3{0.0, 1.0, 0.0});
+	const auto bumpy = [](double x, double z) { return 1.0 + 0.05 * std::sin(3.0 * x) + 0.04 * std::cos(2.0 * z); };
+	const gltf_skin::Pose flat = animals::exactPose(*model, "idle", 0.1, place, [](double, double) { return 1.0; });
+	const gltf_skin::Pose set = animals::exactPose(*model, "idle", 0.1, place, bumpy);
+	const auto footOf = [&](const gltf_skin::Pose &pose, const std::string &leg) {
+		const auto world = gltf_skin::worldOf(model->rig, pose);
+		for (std::size_t i = 0; i < model->rig.nodes.size(); ++i)
+			if (model->rig.nodes[i].name == leg + ".foot") return V3{world[i][12], world[i][13], world[i][14]};
+		return V3{0.0, 0.0, 0.0};
+	};
+	for (const char *leg : {"hl", "fl", "hr", "fr"}) {
+		const V3 a = footOf(flat, leg), b = footOf(set, leg);
+		EXPECT_NEAR(b.y - a.y, bumpy(b.x, b.z) - 1.0, 0.02) << leg;
+		EXPECT_NEAR(b.x, a.x, 0.02) << "the leg bends in its own plane";
+	}
+}
+
+// An eye holds a small sharp sky, an ear lets the light through, and what is under the skin moves: the blade with the leg, the flank in a twitch.
+TEST(FilmReal, AnimalsHaveFacesAndSoftParts) {
+	namespace animals = cartoon::animals;
+	const auto model = animals::modelOf("deer");
+	ASSERT_TRUE(model);
+	const std::string object = animals::poseObject(*model, "test_deer", "walk", 0, "deer", 0.0, "natural", 0);
+	EXPECT_NE(object.find("\"float roughness\" [ 0.0300 ]"), std::string::npos) << "the eyes";
+	EXPECT_NE(object.find("\"diffusetransmission\""), std::string::npos) << "the ears";
+	std::set<int> nameless;
+	double most = -1e30, least = 1e30, still = 0.0;
+	for (int k = 0; k < 32; ++k) {
+		const V3 blade = jointAt(*model, "walk", k / 32.0, "blade.l");
+		most = std::max(most, blade.z), least = std::min(least, blade.z);
+		still = std::max(still, std::abs(jointAt(*model, "idle", 0.9 + k * 0.01, "flank.r").x - jointAt(*model, "idle", 2.0, "flank.r").x));
+	}
+	EXPECT_GT(most - least, 0.08) << "the shoulder blade rides on the leg";
+	EXPECT_GT(still, 0.002) << "the skin shivers";
+}
+
+// Hair lies in tufts at random, not in rows, and no further than most of its length.
+TEST(FilmReal, FurGathersInTufts) {
+	namespace fur = cartoon::fur;
+	double most = 0.0;
+	std::set<int> ways;
+	for (int k = 0; k < 400; ++k) {
+		const V3 p{0.002 * k, 0.3 + 0.001 * k, -0.5};
+		const V3 pull = fur::clumpPull(p, 0.05);
+		most = std::max(most, length(pull));
+		ways.insert(static_cast<int>(std::floor(std::atan2(pull.y, pull.x) * 4.0)));
+	}
+	EXPECT_LE(most, 0.04 + 1e-9);
+	EXPECT_GT(most, 0.005);
+	EXPECT_GE(ways.size(), 8u);
+}
+
+// A coat that has been in the mud has it on its legs and under its belly, not along its back.
+TEST(FilmReal, MudGoesWhereItWouldGo) {
+	namespace coats = cartoon::coats;
+	const V3 coat{0.5, 0.35, 0.2};
+	const auto change = [&](double ax, double ay) { return length(coats::colourAt("natural", 0, coat, coat, ax, ay, true) - coats::colourAt("natural", 0, coat, coat, ax, ay, false)); };
+	double foot = 0.0, back = 0.0;
+	for (int k = 0; k < 40; ++k) foot += change(0.45, 0.5 + 0.1 * k / 40.0), back += change(0.25, 0.24 + 0.01 * k / 40.0);
+	EXPECT_GT(foot, 3.0 * back + 1e-3);
+}
+
+// What walks through grass shoves it aside and it lies down; a little later it has got up again.
+TEST(FilmReal, GrassMakesWayForWhatWalksThroughIt) {
+	namespace cover = cartoon::cover;
+	cartoon::film_file::DataFilm unused;
+	(void)unused;
+	terrain::Spec spec;
+	spec.kind = "hills", spec.size = 200.0, spec.height = 0.5, spec.seed = 3;
+	const auto field = terrain::fieldOf(spec);
+	ASSERT_TRUE(field);
+	const auto frame = [&](const std::vector<cover::Press> &presses) { return cover::text("photonsmith-test-press", *field, {}, {0.0, 1.5, 6.0}, {0.0, 0.0, 0.0}, 45.0, 1.0, 0.0, {}, {}, 0.0, 0.0, presses); };
+	const std::string alone = frame({});
+	EXPECT_NE(frame({{0.0, 2.0, 0.6, 0.0}}), alone);
+	EXPECT_NE(frame({{0.0, 2.0, 0.6, 0.0}}), frame({{0.0, 2.0, 0.6, 3.0}})) << "it comes back";
+	EXPECT_EQ(frame({{0.0, 400.0, 0.6, 0.0}}), alone) << "nothing near it";
+}

@@ -605,11 +605,32 @@ inline std::string wakeText(Vec3 at, Vec3 dir, double speed, double size, double
 	return m.tris.empty() ? std::string() : attr(diffuseMaterial({0.85, 0.88, 0.88}), emitMesh(m, identity()));
 }
 
+// What the hooves of a running animal throw up behind them: crumbs of earth and bits of turf, thrown low, each a few millimetres across, gone in half a second.
+inline std::string kickedUp(Vec3 at, Vec3 dir, double speed, double size, double t, int seed) {
+	std::string out;
+	const Vec3 side{-dir.z, 0.0, dir.x};
+	constexpr double kRate = 40.0, kLife = 0.5;
+	const int per = std::clamp(static_cast<int>(speed * 1.2), 2, 16);
+	for (int k = 0; k < static_cast<int>(kRate * kLife); ++k) {
+		const double born = std::floor(t * kRate) / kRate - k / kRate, age = t - born;
+		const int sk = static_cast<int>(std::lround(born * kRate)) * 977 + seed;
+		for (int j = 0; j < per; ++j) {
+			const Vec3 origin = at + dir * ((hash01(sk + j, 1) < 0.5 ? 0.45 : -0.45) * size) + side * ((hash01(sk + j, 2) < 0.5 ? 0.18 : -0.18) * size);
+			const Vec3 v = Vec3{0.0, 0.8 + 0.22 * speed * hash01(sk + j, 3), 0.0} + side * (0.8 * (hash01(sk + j, 4) - 0.5)) - dir * (0.12 * speed * hash01(sk + j, 5));
+			const Vec3 p = origin + v * age + Vec3{0.0, -4.9 * age * age, 0.0};
+			if (p.y >= at.y) out += detail::drop(p, 0.003 + 0.006 * hash01(sk + j, 6));
+		}
+	}
+	return out;
+}
+
 // A herd at t, as scene text: each animal walking from `from` towards `to` in a loose bunch, standing on the land, stopping now and then to graze (wolves: to look round),
 // fleeing at a gallop from `flee` on; its pose from its kind's clips (film_animals.h) through `poses`.
-// `eye`: the camera (pbrt's, null: unknown); the two animals nearest it within kCloseUp metres are drawn with real hair, as a `hero` is. `rain` how wet the land is, 0 .. 1: a coat out
-// in it goes dark and glossy.
-constexpr double kCloseUp = 14.0;
+// `eye`: the camera (pbrt's, null: unknown); the kMostOwn animals nearest it within kOwnPose metres are posed for themselves, their feet on the land (animals::exactPose), and the kMostHair
+// nearest within kCloseUp are drawn with real hair, as a `hero` is, thinning with distance and as much wider. `rain` how wet the land is, 0 .. 1: a coat out in it goes dark and glossy,
+// and legs and belly take the mud; on dry land a running animal raises dust.
+constexpr double kCloseUp = 22.0, kOwnPose = 34.0, kDustWithin = 90.0;
+constexpr std::size_t kMostHair = 5, kMostOwn = 8;
 inline std::string herdText(const Herd &h, double t, const terrain::Field *ground, animals::Poses &poses, const std::vector<Herd> &herds = {}, const std::vector<Hunt> &hunts = {},
 						   double waterLevel = -1e30, const Vec3 *eye = nullptr, double rain = 0.0) {
 	const animals::Species *sp = animals::species(h.kind);
@@ -632,13 +653,14 @@ inline std::string herdText(const Herd &h, double t, const terrain::Field *groun
 	std::string out = "# a herd of " + h.kind + " (film_wildlife.h)\n";
 	const std::string pattern = h.coat.empty() ? coats::defaultFor(h.kind) : h.coat == "plain" ? std::string() : h.coat;   // (each animal one of three variants of it)
 	std::vector<std::pair<double, int>> closest;   // (how far each is from the camera)
-	if (eye && h.fur > 0.0 && h.kind != "elephants")
+	if (eye)
 		for (int i = 0; i < h.count; ++i) {
 			const Vec3 at = static_cast<std::size_t>(i) < chased.size() ? chased[static_cast<std::size_t>(i)].at : animalAt(h, *sp, i, t, ground).at;
-			if (const double d = length(at - *eye); d < kCloseUp) closest.push_back({d, i});
+			if (const double d = length(at - *eye); d < kOwnPose) closest.push_back({d, i});
 		}
 	std::sort(closest.begin(), closest.end());
-	if (closest.size() > 2) closest.resize(2);
+	if (closest.size() > kMostOwn) closest.resize(kMostOwn);
+	const bool hairy = h.fur > 0.0 && h.kind != "elephants";
 	for (int i = 0; i < h.count + h.young; ++i) {
 		const bool child = i >= h.count;   // (a young one: following its mother, half her size, its legs stepping twice as often)
 		const int mother = child ? (i - h.count) % h.count : i, s = h.seed * 61 + i;
@@ -665,7 +687,10 @@ inline std::string herdText(const Herd &h, double t, const terrain::Field *groun
 			clip = a.clip;
 			k = static_cast<int>(std::floor(a.cycles * animals::posesOf(a.clip)));
 		}
-		const bool closeUp = std::any_of(closest.begin(), closest.end(), [i](const std::pair<double, int> &c) { return c.second == i; });
+		const auto rankOf = std::find_if(closest.begin(), closest.end(), [i](const std::pair<double, int> &c) { return c.second == i; });
+		const std::size_t rank = static_cast<std::size_t>(rankOf - closest.begin());
+		const double away = rankOf == closest.end() ? 1e30 : rankOf->first;
+		const bool closeUp = hairy && rank < kMostHair && away < kCloseUp;
 		const bool hero = i < h.heroes || closeUp;   // (a hero's fur is its strands, not the herd's ribbons)
 		// the water: in it (spray and a wake), or just out of it (wet, dripping, shaking itself)
 		double wet = 0.0, shake = 0.0;
@@ -702,7 +727,6 @@ inline std::string herdText(const Herd &h, double t, const terrain::Field *groun
 				}
 			}
 		}
-		pose = poses.poseName(h.kind, clip, k, out, hero ? 0.0 : h.kind == "elephants" ? 0.0 : h.fur, pattern, i % coats::variantsOf(pattern), wet > 0.0 || rain > 0.35);
 		const Vec3 storyAt{-p.x, p.y, p.z}, storyFwd{-dir.x, 0.0, dir.z};
 		// leaning into a turn, as a running animal does (its weight against the turn: tan(lean) = v w / g, its speed times how fast it turns)
 		double lean = 0.0;
@@ -712,13 +736,31 @@ inline std::string herdText(const Herd &h, double t, const terrain::Field *groun
 			lean = std::clamp(std::atan(v * w / 9.81) * 180.0 / kPi, -25.0, 25.0);
 		}
 		const Mat4 placing = mul(translate(storyAt), detail::facing(storyFwd, {0, 1, 0}), rotate({0, 1, 0}, turn), rotate({0, 0, 1}, a.fallen ? 80.0 : lean + shake + roll), rotate({1, 0, 0}, -pitch), scale((child ? 0.5 : 1.0) * (0.9 + 0.2 * hash01(s, 8))));
+		const int variant = i % coats::variantsOf(pattern);
+		const double coatOn = hero ? 0.0 : h.kind == "elephants" ? 0.0 : h.fur;
+		const bool glossy = wet > 0.0 || rain > 0.35, mud = rain > 0.15;
+		std::unique_ptr<gltf_skin::Pose> own;
+		if (rankOf != closest.end() && !a.fallen)
+			if (const std::shared_ptr<const animals::Model> model = animals::modelOf(h.kind)) {
+				const double len = clip == "graze" ? 4.0 : 5.0, cycles = a.going.paused ? t / len + hash01(s, 11) : a.cycles;
+				own = std::make_unique<gltf_skin::Pose>(animals::exactPose(*model, clip, cycles - std::floor(cycles), placing, [&](double x, double z) { return ground ? ground->heightAt(-x, z) : 0.0; }));
+				pose = poses.exactName(h.kind, clip, *own, std::to_string(h.seed) + "_" + std::to_string(static_cast<int>(std::lround(h.fx * 7.0 + h.fz * 13.0))) + "_" + std::to_string(i), out, coatOn, pattern, variant, glossy, mud);
+			}
+		if (!own) pose = poses.poseName(h.kind, clip, k, out, coatOn, pattern, variant, glossy);
 		out += nature::placeObject(pose, placing);
+		if (eye && rain < 0.1 && a.going.speed > 3.0 && !a.going.paused && length(p - *eye) < kDustWithin) {   // (dry ground thrown up from the hooves: its own colour, a little paler)
+			const Vec3 ground0 = ground ? terrain::colourAt(*ground, p.x, p.z) : Vec3{0.4, 0.34, 0.26};
+			const std::string dust = kickedUp(p, dir, a.going.speed, sp->length * (child ? 0.5 : 1.0), t, s + 7);
+			if (!dust.empty()) out += "AttributeBegin\n" + diffuseMaterial(lerp(ground0, Vec3{0.3, 0.24, 0.17}, 0.6)) + "\n" + dust + "AttributeEnd\n";
+		}
 		if (!watery.empty()) out += "AttributeBegin\nMaterial \"dielectric\" \"float eta\" [ 1.33 ]\n" + watery + "AttributeEnd\n";   // (water: its wake and drops)
 		if (!spray.empty()) out += "AttributeBegin\nMaterial \"diffuse\" \"rgb reflectance\" [ 0.9 0.92 0.93 ]\n" + spray + "AttributeEnd\n";   // (spray: white with the air in it)
 		if (hero) {
 			const Mat4 mirror = scale(-1.0, 1.0, 1.0);
 			k = ((k % animals::posesOf(clip)) + animals::posesOf(clip)) % animals::posesOf(clip);
-			out += animals::heroFur(h.kind, clip, k, pattern, i % coats::variantsOf(pattern), i < h.heroes ? h.heroFur : 0.6, mul(mirror, placing), s);   // (the object's meshes are mirrored as emitMesh writes them: the fur is placed as they end up)
+			const double share = i < h.heroes ? 1.0 : std::clamp(14.0 / std::max(1.0, away), 0.0, 3.2);   // (as many as are worth it at this distance, and a thick coat for a close-up)
+			const double thin = share * share;
+			out += animals::heroFur(h.kind, clip, k, pattern, variant, i < h.heroes ? h.heroFur : 0.6 * thin, mul(mirror, placing), s, own.get(), mud, thin < 1.0 ? std::sqrt(1.0 / thin) : 1.0);   // (the object's meshes are mirrored as emitMesh writes them: the fur is placed as they end up)
 		}
 	}
 	return out;
