@@ -2,7 +2,7 @@
 // model_surface.h -- modeling round 3: what is done to a piece's surface.
 //
 //   fur LENGTH [density N] [width W] [colour R G B] [curl C] [droop D]      (part 6) strands grown from the piece: N a square metre (4000), each a curve LENGTH long
-//                                                                             that droops and curls - fur, grass on a hill, moss, a fuzzy toy
+//                                                                             that droops and curls - fur, grass on a hill, moss, a fuzzy toy (`strands FILE`, groomed elsewhere: model_strands.h)
 //   cloth W D [at X Y Z] [res N] [wave A]                                   (part 6) a sheet W x D dropped from above (at X Y Z, its middle) onto the model's other
 //                                                                             pieces and the ground, and left as it settles - a tablecloth, a cape on a chair, a
 //                                                                             tarpaulin; `wave A` keeps it rippling (a flag held at one edge)

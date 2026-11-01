@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -115,6 +116,50 @@ TEST(FilmModel3, PoseInAFilmKeepsAnImportedMeshsPicture) {
 	EXPECT_NE(bent.find("strip.png"), std::string::npos) << "its picture stays on as it bends";
 	EXPECT_NE(bent.find("point2 uv"), std::string::npos) << "and its uvs";
 	EXPECT_NE(problemWith(text.substr(0, text.find("pose s")) + "pose s nobone 1 0  2 70\n"), "");
+}
+// Fur groomed outside the film goes where the skin goes: a strand on the bent part of a piece bends with it, one on the rest stays put, and a piece's own `fur` is not lost when it is posed.
+TEST(FilmModel3, GroomedStrandsFollowThePiecesBones) {
+	const std::filesystem::path d = std::filesystem::temp_directory_path() / "photonsmith_model3_test_strands";
+	std::filesystem::create_directories(d);
+	std::ofstream(d / "strip.obj", std::ios::binary) << "v -0.1 0 0\nv 0.1 0 0\nv 0.1 1 0\nv -0.1 1 0\nv -0.1 2 0\nv 0.1 2 0\nf 1 2 3\nf 1 3 4\nf 4 3 6\nf 4 6 5\n";
+	{
+		std::ofstream f(d / "fur.bin", std::ios::binary);
+		const std::uint32_t groups = 1, strands = 2;
+		const float head[5] = {0.8f, 0.3f, 0.1f, 0.01f, 0.001f};
+		const float points[24] = {0, 0.1f, 0, 0, 0.1f, 0.05f, 0, 0.1f, 0.1f, 0, 0.1f, 0.15f, 0, 1.9f, 0, 0, 1.9f, 0.05f, 0, 1.9f, 0.1f, 0, 1.9f, 0.15f};
+		f.write("RTSTRANDS1", 10);
+		f.write(reinterpret_cast<const char *>(&groups), 4);
+		f.write(reinterpret_cast<const char *>(head), sizeof head);
+		f.write(reinterpret_cast<const char *>(&strands), 4);
+		f.write(reinterpret_cast<const char *>(points), sizeof points);
+	}
+	const std::string text = "model strip\n  piece body\n    mesh " + (d / "strip.obj").generic_string() + "\n    strands " + (d / "fur.bin").generic_string() + "\n"
+							 "    bone ear from 0 1 0 to 0 2 0 radius 0.6\nend\nplace strip at 0 0 0 as s\npose s ear axis 0 0 1  1 0  2 70\n";
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("strands", kHead + text + kShot, film), "");
+	const auto curves = [](const std::string &scene) {
+		std::vector<std::string> out;
+		std::istringstream in(scene);
+		for (std::string l; std::getline(in, l);)
+			if (l.find("Shape \"curve\"") != std::string::npos) out.push_back(l);
+		return out;
+	};
+	const std::vector<std::string> rest = curves(film.sceneAt(0.5)), bent = curves(film.sceneAt(2.5));
+	ASSERT_EQ(rest.size(), 2u);
+	ASSERT_EQ(bent.size(), 2u);
+	EXPECT_EQ(rest[0], bent[0]) << "out of the bone's reach it stays";
+	EXPECT_NE(rest[1], bent[1]) << "on the bent part it goes with the skin";
+	const std::shared_ptr<const model::StrandSet> set = model::strandsOf((d / "fur.bin").generic_string());
+	ASSERT_TRUE(set);
+	EXPECT_EQ(set->count(), 2u);
+	EXPECT_EQ(curves(model::strandsText(*set, 2)).size(), 1u) << "a model far off draws one in four of them";
+	EXPECT_FALSE(model::strandsOf((d / "missing.bin").generic_string()));
+
+	const std::string furred = "model strip\n  piece body\n    mesh " + (d / "strip.obj").generic_string() + "\n    fur 0.1 density 40\n"
+							   "    bone ear from 0 1 0 to 0 2 0 radius 0.6\nend\nplace strip at 0 0 0 as s\npose s ear axis 0 0 1  1 0  2 70\n";
+	ff::DataFilm posed;
+	ASSERT_EQ(loadFilm("posedfur", kHead + furred + kShot, posed), "");
+	EXPECT_FALSE(curves(posed.sceneAt(2.5)).empty()) << "its own fur stays on while it is posed";
 }
 // A bone of a limited reach shares a piece with bones that have none: they keep the rest of the skin, so a character with an ear of its own still walks.
 TEST(FilmModel3, ABoneOfLimitedReachLeavesTheOtherBonesTheirSkin) {

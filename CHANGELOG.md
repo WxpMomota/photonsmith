@@ -6,6 +6,8 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **Groomed fur that follows the bones (2026-10-31).** `strands FILE` on a model's piece draws curves made by a tool of your own, each following the bones at its root and thinning out with distance. A piece's `fur` no longer vanishes while it is posed.
+
 * **A fire that lives through a story (2026-10-31).** `fire` takes `sizes` and `leans` keyed over time, so a flame can shrink to a coal, bend in the wind and roar back, with `detail` and `bright` for a fire close to the camera, and `light off`, `sparks off` and `sound off` for a film that lights and scores it itself.
 
 * **Animals up close and in motion (2026-10-31).** The animals nearest the camera get real hair by themselves, coats go dark and glossy in rain, noses are dark and damp, and an animal tilts with the ground under it. The clips now move the whole body: weight shifting from side to side, fetlocks sinking under load, the head held steadier than the neck, a tail that swings and streams, and breathing when it stands still.

@@ -69,6 +69,7 @@ struct Part {
 	bool skin = false;                  // a character's continuous skin, bent by bones (model_skin.h)
 	std::vector<Bone> bones;
 	Fur fur;                            // strands grown from it (model_surface.h)
+	std::string strands;                // (`strands FILE`: fur groomed elsewhere, following its bones: model_strands.h)
 	std::vector<Cloth> cloths;          // sheets dropped onto the model (model_surface.h; the rest of the model is what they fall onto)
 	std::vector<Stroke> strokes;        // sculpting brushes (each at its place among the modifiers: a modifier "stroke" with v[0] its index)
 	std::vector<Region> regions;        // parts of its surface in materials of their own
