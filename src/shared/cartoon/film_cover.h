@@ -25,6 +25,7 @@
 #include "film_cache.h"
 #include "film_dressing.h"
 #include "film_forest.h"
+#include "film_moss.h"
 #include "film_sky.h"
 #include "film_terrain.h"
 #include "nature_lib.h"
@@ -35,6 +36,7 @@ namespace cover {
 struct Cover {
 	bool on = true;
 	double amount = 1.0;
+	std::string season;   // (`undergrowth season S`; none: the forests')
 };
 
 constexpr int kShapes = 3, kDry = 3, kBright = 2, kBladeCols = 8;
@@ -71,19 +73,36 @@ inline Growth growthOf(const terrain::Spec &s) {
 }
 
 namespace detail {
-// A square of `blades` blades, `size` across, its middle at the origin, each blade with its own place, height, lean and column of the picture (u) and its height up it (v).
-inline Mesh patchMesh(double size, int blades, int joints, double width, double tall, int salt) {
+// A square of `blades` blades, `size` across, its middle at the origin, each blade with its own place, height, lean and column of the picture (u) and its height up it (v). Grass is not
+// a carpet: it grows in tussocks of their own height with thinner ground between them, a share of it has died where it stood (the picture's last two columns are straw) or lies flat
+// under the rest, and close to the camera some has gone to seed (`heads`).
+inline Mesh patchMesh(double size, int blades, int joints, double width, double tall, int salt, bool heads = false) {
 	Mesh m;
+	constexpr int kTussocks = 6;
+	const double spread = 0.09 * size;
 	for (int b = 0; b < blades; ++b) {
-		const int s = salt * 131 + b;
-		const Vec3 root{size * (hash01(s, 1) - 0.5), 0.0, size * (hash01(s, 2) - 0.5)};
-		const double h = tall * (0.45 + 0.75 * hash01(s, 3)), a = 2.0 * kPi * hash01(s, 4), lean = h * (0.15 + 0.6 * hash01(s, 5));
+		const int s = salt * 131 + b, tussock = static_cast<int>(hash01(s, 10) * kTussocks) % kTussocks, own = salt * 17 + tussock;
+		const bool loose = hash01(s, 11) < 0.3, dead = hash01(s, 12) < 0.16, lying = hash01(s, 13) < 0.1, seeded = heads && !lying && hash01(s, 14) < 0.06;
+		const double wx = hash01(s, 1) - 0.5, wz = hash01(s, 2) - 0.5;   // (scattered, or drawn in round a tussock: a gaussian about it, by two chances)
+		const double spin = 2.0 * kPi * wx, reach = spread * std::sqrt(-2.0 * std::log(std::max(1e-6, wz + 0.5)));
+		const Vec3 root = loose ? Vec3{size * wx, 0.0, size * wz} : Vec3{size * (hash01(own, 15) - 0.5) + reach * std::cos(spin), 0.0, size * (hash01(own, 16) - 0.5) + reach * std::sin(spin)};
+		const double own_h = 0.6 + 0.75 * hash01(own, 17);
+		const double h = tall * (0.45 + 0.75 * hash01(s, 3)) * (loose ? 0.8 : own_h) * (lying ? 0.5 : 1.0) * (seeded ? 1.3 : 1.0);
+		const double a = 2.0 * kPi * hash01(s, 4), lean = h * (lying ? 1.5 : 0.15 + 0.6 * hash01(s, 5));
 		const Vec3 facing{std::cos(a), 0.0, std::sin(a)}, side{-facing.z, 0.0, facing.x};
-		const double col = (std::floor(hash01(s, 6) * kBladeCols) + 0.5) / kBladeCols;
-		const int base = static_cast<int>(m.verts.size());
+		const double col = dead ? (kBladeCols - 1.5 + std::floor(hash01(s, 6) * 2.0)) / kBladeCols : (std::floor(hash01(s, 6) * (kBladeCols - 2)) + 0.5) / kBladeCols;
+		if (seeded)   // a head of grain up the last of the stem, a dozen husks hanging to one side
+			for (int k = 0; k < 7; ++k) {
+				const double u = 0.8 + 0.2 * k / 6.0;
+				const Vec3 at = root + Vec3{0.0, h * u, 0.0} + facing * (lean * u * u), dir = normalize(facing + Vec3{0.3 * std::cos(2.4 * k), -0.5, 0.3 * std::sin(2.4 * k)});
+				const std::size_t from = m.verts.size();
+				nature::addLeaf(m, at, dir, normalize(Vec3{0.0, 1.0, 0.0} + side * 0.4), 0.024, 0.011);
+				for (std::size_t i = from; i < m.verts.size(); ++i) m.uvs[i] = {(kBladeCols - 0.5) / kBladeCols, 0.92};
+			}
+		const int stem = static_cast<int>(m.verts.size());
 		const Vec3 normal = normalize(facing + Vec3{0.0, 0.55, 0.0});
 		for (int j = 0; j <= joints; ++j) {
-			const double u = static_cast<double>(j) / (joints + 1), w = width * (1.0 - u * u);
+			const double u = static_cast<double>(j) / (joints + 1), w = width * (1.0 - u * u) * (seeded ? 0.5 : 1.0);
 			const Vec3 at = root + Vec3{0.0, h * u, 0.0} + facing * (lean * u * u);
 			m.verts.push_back(at - side * w), m.verts.push_back(at + side * w);
 			m.normals.push_back(normal), m.normals.push_back(normal);
@@ -93,11 +112,11 @@ inline Mesh patchMesh(double size, int blades, int joints, double width, double 
 		m.normals.push_back(normal);
 		m.uvs.push_back({col, 0.98});
 		for (int j = 0; j < joints; ++j) {
-			const int a0 = base + 2 * j;
+			const int a0 = stem + 2 * j;
 			m.tris.push_back({a0, a0 + 1, a0 + 3});
 			m.tris.push_back({a0, a0 + 3, a0 + 2});
 		}
-		const int top = base + 2 * joints;
+		const int top = stem + 2 * joints;
 		m.tris.push_back({top, top + 1, top + 2});
 	}
 	return m;
@@ -108,13 +127,31 @@ inline Mesh litterMesh(double size, int leaves, double leafSize, int salt) {
 	for (int k = 0; k < leaves; ++k) {
 		const int s = salt * 173 + k;
 		const Vec3 at{size * (hash01(s, 1) - 0.5), 0.015 + 0.03 * hash01(s, 2), size * (hash01(s, 3) - 0.5)};
-		const double a = 2.0 * kPi * hash01(s, 4), len = leafSize * (0.6 + 0.8 * hash01(s, 5));
+		const double a = 2.0 * kPi * hash01(s, 4), len = leafSize * (0.4 + 0.75 * hash01(s, 5));
 		const std::size_t from = m.verts.size();
-		nature::addLeaf(m, at, {std::cos(a), 0.12 * (hash01(s, 6) - 0.5), std::sin(a)}, normalize(Vec3{0.3 * (hash01(s, 7) - 0.5), 1.0, 0.3 * (hash01(s, 8) - 0.5)}), len, len * 0.6);
+		nature::addLeaf(m, at, {std::cos(a), 0.12 * (hash01(s, 6) - 0.5), std::sin(a)}, normalize(Vec3{0.3 * (hash01(s, 7) - 0.5), 1.0, 0.3 * (hash01(s, 8) - 0.5)}), len, len * 0.55);
 		const double col = (std::floor(hash01(s, 9) * kBladeCols) + 0.5) / kBladeCols;
 		for (std::size_t i = from; i < m.verts.size(); ++i) m.uvs[i] = {col, 0.2 + 0.6 * m.uvs[i].second};
 	}
+	forest::detail::shapeLeaves(m, 0, salt + 3);   // (dry ones curl)
 	return m;
+}
+// A few wild flowers on a stem each, about the origin, in `n` heads of five petals: what shows in the grass of a meadow.
+inline void addFlowers(Mesh &stems, Mesh &petals, int n, double spread, int salt) {
+	for (int k = 0; k < n; ++k) {
+		const int s = salt * 37 + k;
+		const double h = 0.22 + 0.3 * hash01(s, 1), a = 2.0 * kPi * hash01(s, 2), r = spread * std::sqrt(hash01(s, 3));
+		const Vec3 root{r * std::cos(a), 0.0, r * std::sin(a)}, top = root + Vec3{0.1 * h * (hash01(s, 4) - 0.5), h, 0.1 * h * (hash01(s, 5) - 0.5)};
+		const int b = static_cast<int>(stems.verts.size());
+		for (const Vec3 &p : {root + Vec3{-0.002, 0.0, 0.0}, root + Vec3{0.002, 0.0, 0.0}, top})
+			stems.verts.push_back(p), stems.normals.push_back({0.0, 0.0, 1.0});
+		stems.tris.push_back({b, b + 1, b + 2});
+		const Vec3 facing = normalize(Vec3{0.5 * (hash01(s, 6) - 0.5), 1.0, 0.5 * (hash01(s, 7) - 0.5)});
+		for (int p = 0; p < 5; ++p) {
+			const double t = 2.0 * kPi * p / 5.0;
+			nature::addLeaf(petals, top, {std::cos(t), 0.12, std::sin(t)}, facing, 0.022, 0.016);
+		}
+	}
 }
 inline Vec3 colourFor(const Growth &g, int dry, int bright) {
 	const Vec3 c = lerp(g.green, g.straw, dry / (kDry - 1.0));
@@ -122,7 +159,7 @@ inline Vec3 colourFor(const Growth &g, int dry, int bright) {
 }
 // A picture of blades in `colour`: a column each, dark at the root, where they shade each other, and paler at the tip. Light through a blade is yellower, and with what it reflects
 // never more than came in.
-inline std::string bladeMaterial(const std::string &film, const std::string &name, Vec3 colour, bool leaves, double wet) {
+inline std::string bladeMaterial(const std::string &film, const std::string &name, Vec3 colour, Vec3 straw, bool leaves, double wet) {
 	constexpr int W = 128, H = 32;
 	const auto paint = [&](std::vector<float> &rgb, bool through) {
 		for (int y = 0; y < H; ++y)
@@ -130,7 +167,8 @@ inline std::string bladeMaterial(const std::string &film, const std::string &nam
 				const int col = x * kBladeCols / W;
 				const double v = 1.0 - (y + 0.5) / H;
 				const Vec3 own = lerp(colour, Vec3{colour.y * 1.05, colour.y, colour.z * 0.7}, 0.5 * hash01(col, 61)) * (0.7 + 0.6 * hash01(col, 62));
-				Vec3 c = leaves ? lerp(own, Vec3{0.3, 0.17, 0.07} * (0.5 + 0.9 * hash01(col, 63)), 0.7) : own * (0.45 + 0.75 * smoothstep(0.0, 0.8, v));
+				const Vec3 fallen = hash01(col, 64) < 0.4 ? Vec3{0.11, 0.08, 0.05} : Vec3{0.25, 0.15, 0.07};   // (a dead leaf: last year's dark, this year's brown)
+				Vec3 c = leaves ? lerp(own, fallen * (0.5 + 0.9 * hash01(col, 63)), 0.82) : col >= kBladeCols - 2 ? straw * (0.7 + 0.5 * hash01(col, 65)) * (0.75 + 0.35 * v) : own * (0.45 + 0.75 * smoothstep(0.0, 0.8, v));
 				const Vec3 reflected = c;
 				if (through) c = Vec3{c.x * 1.1 + 0.03, c.y * 1.2 + 0.03, c.z * 0.8} * (leaves ? 1.0 : 1.0 / (1.0 - forest::detail::kWax));
 				const double most = through ? 0.9 - std::max({reflected.x, reflected.y, reflected.z}) : 0.9;
@@ -138,7 +176,7 @@ inline std::string bladeMaterial(const std::string &film, const std::string &nam
 				px[0] = static_cast<float>(std::min(c.x, most)), px[1] = static_cast<float>(std::min(c.y, most)), px[2] = static_cast<float>(std::min(c.z, most));
 			}
 	};
-	const std::string r = name + "_r2", t = name + "_t2";
+	const std::string r = name + "_r3", t = name + "_t3";
 	const std::string reflects = film_sky::picture(film, r, W, H, [&](std::vector<float> &rgb) { paint(rgb, false); });
 	const std::string passes = film_sky::picture(film, t, W, H, [&](std::vector<float> &rgb) { paint(rgb, true); });
 	const std::string matte = "\"texture reflectance\" \"" + r + "\" \"texture transmittance\" \"" + t + "\"";
@@ -148,10 +186,23 @@ inline std::string bladeMaterial(const std::string &film, const std::string &nam
 }
 }  // namespace detail
 
+// How far the year has gone for what grows at filmT: -0.6 spring (fresh), 0 summer, 1 autumn (drying), 1.6 winter (dead and beaten down). A film's forests say, unless `undergrowth
+// season` does.
+inline double seasonLevel(const std::string &season) { return season == "spring" ? -0.6 : season == "autumn" ? 1.0 : season == "winter" ? 1.6 : 0.0; }
+inline double yearAt(const Cover &c, const std::vector<forest::Forest> &forests, double filmT) {
+	if (!c.season.empty()) return seasonLevel(c.season);
+	if (forests.empty()) return 0.0;
+	const forest::Forest &f = forests[0];
+	double level = seasonLevel(f.season);
+	if (!f.seasonTo.empty()) level = lerp(level, seasonLevel(f.seasonTo), smoothstep(f.turn0, f.turn1, filmT));
+	for (const forest::Forest::Change &ch : f.then) level = lerp(level, seasonLevel(ch.to), smoothstep(ch.t0, ch.t1, filmT));
+	return level;
+}
+
 // The film's cover seen from `eye` looking at `target` (story space) with `fovDeg`, at t: the objects it uses and a placement for each square in view. `trees`: the film's forests,
-// under which it is litter and ferns. `snow` how much lies on the land (0 .. 1): it goes under. `wet`, 0 .. 1: rain on the blades.
+// under which it is litter and ferns. `snow` how much lies on the land (0 .. 1): it goes under. `wet`, 0 .. 1: rain on the blades. `year`: yearAt.
 inline std::string text(const std::string &film, const terrain::Field &field, const Cover &c, Vec3 eye, Vec3 target, double fovDeg, double t, double snow, const dressing::Gusts &gusts,
-						const std::vector<std::vector<forest::Tree>> &trees, double wet = 0.0) {
+						const std::vector<std::vector<forest::Tree>> &trees, double wet = 0.0, double year = 0.0) {
 	const terrain::Spec &s = field.spec;
 	const Growth g = growthOf(s);
 	if (!c.on || g.density <= 0.0 || snow > 0.5) return std::string();
@@ -194,45 +245,77 @@ inline std::string text(const std::string &film, const terrain::Field &field, co
 				const Vec3 n = field.normalAt(x, z, 0.5 * ring.cell);
 				if (n.y < 0.84 || y < above) continue;
 				if (s.snowLine() < 1e8 && y - s.y > s.snowLine() * 0.9) continue;
-				const bool under = !shaded.empty() && underTrees(x, z, 3.4 + 2.2 * hash01(salt, 75));
+				const double reach = 3.4 + 2.2 * hash01(salt, 75);
+				const bool under = !shaded.empty() && underTrees(x, z, reach);
+				const bool thin = !under && !shaded.empty() && underTrees(x, z, reach + 3.2);   // (where the grass gives way to the wood: a thin grass over the leaves, and no line between them)
 				const Vec3 ground = terrain::colourAt(field, x, z);
 				const double dryness = ground.x / std::max(1e-4, ground.y), light = ground.x + ground.y + ground.z;
-				const int dry = dryness > 1.0 ? 2 : dryness > 0.72 ? 1 : 0, bright = light > 0.42 ? 1 : 0;
+				// the year: each square turns in its own time, drier as it goes on, and the dead grass of winter is beaten down
+				const double turned = year + 0.8 * (hash01(salt, 82) - 0.5);
+				const int dry = std::clamp((dryness > 1.0 ? 2 : dryness > 0.72 ? 1 : 0) + static_cast<int>(std::lround(turned)), 0, kDry - 1), bright = light > 0.42 || year < -0.3 ? 1 : 0;
+				const double height = year > 1.2 ? lerp(1.0, 0.55, smoothstep(1.2, 1.6, year)) : 1.0;
 				const int shape = static_cast<int>(hash01(salt, 73) * kShapes) % kShapes;
-				char id[80];
-				std::snprintf(id, sizeof id, "cover_%s_%d_%d_%d_%d", under ? "litter" : "grass", static_cast<int>(r), shape, dry, bright);
-				if (made.insert(id).second) {
-					const std::string name = id;
-					const double keep = std::clamp(c.amount, 0.05, 3.0);
-					const std::string file = film_cache::ply(film, name + (keep == 1.0 ? "" : "_" + std::to_string(static_cast<int>(keep * 100.0))), [&] {
-						return under ? detail::litterMesh(ring.cell, static_cast<int>(ring.blades * 0.35 * keep), std::max(0.09, 0.03 * ring.cell), 1 + shape)
-									 : detail::patchMesh(ring.cell, static_cast<int>(ring.blades * keep * g.density), ring.joints, ring.width, g.tall, 5 + shape + 11 * static_cast<int>(r));
-					});
-					objects += nature::objectBegin(name) + "  AttributeBegin\n  " + detail::bladeMaterial(film, name, detail::colourFor(g, dry, bright), under, wet) + "\n" + film_cache::plyShape(file) + "  AttributeEnd\n" + nature::objectEnd();
-				}
+				const auto laid = [&](const char *what, bool leaves, double share) {   // (one of the square's objects, written once)
+					char id[80];
+					std::snprintf(id, sizeof id, "cover_%s_%d_%d_%d_%d", what, static_cast<int>(r), shape, dry, bright);
+					if (made.insert(id).second) {
+						const std::string name = id;
+						const double keep = std::clamp(c.amount, 0.05, 3.0);
+						const std::string file = film_cache::ply(film, name + (keep == 1.0 ? "" : "_" + std::to_string(static_cast<int>(keep * 100.0))), [&] {
+							return leaves ? detail::litterMesh(ring.cell, static_cast<int>(ring.blades * 0.35 * keep), std::max(0.07, 0.03 * ring.cell), 1 + shape)
+										  : detail::patchMesh(ring.cell, static_cast<int>(ring.blades * keep * g.density * share), ring.joints, ring.width, g.tall, 5 + shape + 11 * static_cast<int>(r), r < 2);
+						});
+						objects += nature::objectBegin(name) + "  AttributeBegin\n  " + detail::bladeMaterial(film, name, detail::colourFor(g, dry, bright), detail::colourFor(g, kDry - 1, bright), leaves, wet) + "\n" +
+								   film_cache::plyShape(file) + "  AttributeEnd\n" + nature::objectEnd();
+					}
+					return std::string(id);
+				};
 				// tilted to lie on the ground, and leaning with the wind
 				const Mat4 tilt = {1, 0, 0, 0, n.x / n.y, 1, -n.z / n.y, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 				const Vec3 foot{-x, y - 0.02, z};
+				const Mat4 turnIt = rotate({0, 1, 0}, 90.0 * static_cast<int>(hash01(salt, 74) * 4.0));
 				const Vec3 w = under ? Vec3{0.0, 0.0, 0.0} : nature::windLean(foot.x, foot.z, t, 0.18) + dressing::gustAt(gusts, foot.x, foot.z, t) * 0.35;
-				places += nature::placeObject(id, mul(translate(foot), tilt, nature::shearXZ(w.x, w.z), rotate({0, 1, 0}, 90.0 * static_cast<int>(hash01(salt, 74) * 4.0))));
+				if (under || thin) places += nature::placeObject(laid("litter", true, 1.0), mul(translate(foot), tilt, turnIt));
+				if (!under) places += nature::placeObject(laid(thin ? "thin" : "grass", false, thin ? 0.3 : 1.0), mul(translate(foot), tilt, nature::shearXZ(w.x, w.z), turnIt, scale(1.0, height, 1.0)));
 				// here and there, close enough to see: a stone half sunk in the ground, and under the trees a fern
 				if (ring.cell == 3.0) {
 					const auto dressed = [&](const char *what, int kinds, const std::function<std::string(int)> &make, double chance, double sinks, double size) {
-						if (hash01(salt, 76) > chance) return;
-						const int which = static_cast<int>(hash01(salt, 77) * kinds) % kinds;
+						const int own = salt * 31 + what[0] * 131 + what[1];
+						if (hash01(own, 76) > chance) return;
+						const int which = static_cast<int>(hash01(own, 77) * kinds) % kinds;
 						const std::string name = std::string("cover_") + what + std::to_string(which);
 						if (made.insert(name).second) objects += make(which);
-						const Vec3 at{-(x + ring.cell * (hash01(salt, 78) - 0.5)), y - sinks, z + ring.cell * (hash01(salt, 79) - 0.5)};
-						places += nature::placeObject(name, mul(translate(at), rotate({0, 1, 0}, 360.0 * hash01(salt, 80)), scale(size * (0.6 + 0.9 * hash01(salt, 81)))));
+						const Vec3 at{-(x + ring.cell * (hash01(own, 78) - 0.5)), y - sinks, z + ring.cell * (hash01(own, 79) - 0.5)};
+						places += nature::placeObject(name, mul(translate(at), rotate({0, 1, 0}, 360.0 * hash01(own, 80)), scale(size * (0.6 + 0.9 * hash01(own, 81)))));
 					};
 					if (under) dressed("fern", 2, [&](int k) {
 						const std::string file = film_cache::ply(film, "cover_fern" + std::to_string(k), [&] { return nature::fern(9, 0.9, 700 + k); });
 						return nature::objectBegin("cover_fern" + std::to_string(k)) + "  AttributeBegin\n  " + translucentMaterial({0.07, 0.17, 0.04}, {0.10, 0.22, 0.04}) + "\n" + film_cache::plyShape(file) + "  AttributeEnd\n" + nature::objectEnd();
 					}, 0.45, 0.02, 1.0);
+					if (under) dressed("cushion", 2, [&](int k) {   // (a cushion of moss on the shaded ground)
+						const std::string name = "cover_cushion" + std::to_string(k);
+						const std::string file = film_cache::ply(film, name, [&] {
+							Mesh low = nature::rock(1.0, 740 + k);
+							for (Vec3 &p : low.verts) p.y *= 0.3;
+							return moss::topSkin(low, 0.8, 0.0);
+						});
+						return nature::objectBegin(name) + moss::shape(film, name, file, moss::kTop) + nature::objectEnd();
+					}, 0.28, 0.06, 1.0);
+					if (!under && year < 0.7 && g.density >= 1.0 && nature::fbm2(x / 34.0, z / 34.0, 83) > 0.53) dressed("bloom", 3, [&](int k) {   // (a meadow's flowers, in drifts)
+						static const Vec3 kinds[3] = {{0.86, 0.85, 0.8}, {0.8, 0.62, 0.1}, {0.46, 0.3, 0.7}};
+						Mesh stems, petals;
+						detail::addFlowers(stems, petals, 26, 1.3, 760 + k);
+						const std::string a = film_cache::ply(film, "cover_bloom_stems" + std::to_string(k), [&] { return stems; }), b = film_cache::ply(film, "cover_bloom_petals" + std::to_string(k), [&] { return petals; });
+						return nature::objectBegin("cover_bloom" + std::to_string(k)) + "  AttributeBegin\n  " + translucentMaterial({0.08, 0.17, 0.05}, {0.1, 0.2, 0.05}) + "\n" + film_cache::plyShape(a) + "  AttributeEnd\n  AttributeBegin\n  " +
+							   translucentMaterial(kinds[k], kinds[k] * 0.35) + "\n" + film_cache::plyShape(b) + "  AttributeEnd\n" + nature::objectEnd();
+					}, 0.6, 0.0, 1.0);
+					const bool damp = s.biome.empty() || s.biome == "jungle" || s.biome == "tundra";
 					dressed("stone", 3, [&](int k) {
-						const std::string file = film_cache::ply(film, "cover_stone" + std::to_string(k), [&] { return nature::rock(0.5, 720 + k); });
+						const std::string name = "cover_stone" + std::to_string(k);
+						const std::string file = film_cache::ply(film, name, [&] { return nature::rock(0.5, 720 + k); });
+						const std::string top = damp ? film_cache::ply(film, name + "_moss", [&] { return moss::topSkin(nature::rock(0.5, 720 + k), 0.8, 0.004); }) : std::string();
 						const Vec3 rock = lerp(ground, Vec3{0.3, 0.29, 0.27}, 0.7);
-						return nature::objectBegin("cover_stone" + std::to_string(k)) + "  AttributeBegin\n  " + diffuseMaterial(rock) + "\n" + film_cache::plyShape(file) + "  AttributeEnd\n" + nature::objectEnd();
+						return nature::objectBegin(name) + "  AttributeBegin\n  " + diffuseMaterial(rock) + "\n" + film_cache::plyShape(file) + "  AttributeEnd\n" + moss::shape(film, name, top, moss::kTop) + nature::objectEnd();
 					}, 0.12, 0.08, 1.0);
 				}
 			}

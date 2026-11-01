@@ -489,3 +489,66 @@ TEST(FilmReal, ForestsShareTheirObjects) {
 	EXPECT_EQ(two.find("ObjectBegin"), std::string::npos);
 	EXPECT_NE(two.find("_close_t0\""), std::string::npos) << "the second still places its tufts";
 }
+
+// Moss lies on the wood, low down, and on one side of the sky whichever way a tree stands.
+TEST(FilmReal, MossGrowsLowOnTheDampSide) {
+	namespace moss = cartoon::moss;
+	const Mesh trunk = cartoon::nature::trunk(9.0, 0.3, 0.0, 5);
+	const Mesh skin = moss::trunkSkin(trunk);
+	ASSERT_FALSE(skin.tris.empty());
+	EXPECT_LT(skin.tris.size(), trunk.tris.size());
+	for (const V3 &p : skin.verts) EXPECT_LT(p.y, moss::kReach + 0.02);
+	ASSERT_EQ(skin.uvs.size(), skin.verts.size());
+	for (const auto &t : skin.tris) {   // (no triangle stretched the whole way round across the seam of the angle)
+		const double a = skin.uvs[static_cast<std::size_t>(t[0])].first, b = skin.uvs[static_cast<std::size_t>(t[1])].first, c = skin.uvs[static_cast<std::size_t>(t[2])].first;
+		EXPECT_LT(std::max({a, b, c}) - std::min({a, b, c}), 0.3);
+	}
+	const V3 north{0.0, 0.0, -1.0};
+	for (const double turn : {0.0, 70.0, 140.0, 233.0, 310.0}) {
+		const cartoon::Mat4 place = cartoon::rotate({0, 1, 0}, turn);
+		const double a = 2.0 * cartoon::kPi * moss::sideFor(place, north) / moss::kSides;
+		EXPECT_GT(dot(cartoon::transformPoint(place, V3{std::cos(a), 0.0, std::sin(a)}), north), 0.7) << turn;
+	}
+	Mesh dome = cartoon::nature::rock(1.0, 3);
+	const Mesh top = moss::topSkin(dome, 0.8, 0.0);
+	ASSERT_FALSE(top.tris.empty());
+	EXPECT_LT(top.tris.size(), dome.tris.size()) << "only what faces up";
+}
+
+// Grass is not a carpet: tussocks with thinner ground between them, some of it dead, some lying down, and close to the camera some gone to seed.
+TEST(FilmReal, GrassGrowsInTussocks) {
+	namespace cover = cartoon::cover;
+	const Mesh plain = cover::detail::patchMesh(1.0, 900, 3, 0.0045, 0.32, 9), seeded = cover::detail::patchMesh(1.0, 900, 3, 0.0045, 0.32, 9, true);
+	EXPECT_GT(seeded.tris.size(), plain.tris.size() + 200u) << "heads of grain";
+	int cells[5][5] = {{0}}, straw = 0;
+	for (std::size_t i = 0; i < plain.verts.size(); ++i) {
+		++cells[std::clamp(static_cast<int>((plain.verts[i].x + 0.5) * 5.0), 0, 4)][std::clamp(static_cast<int>((plain.verts[i].z + 0.5) * 5.0), 0, 4)];
+		straw += plain.uvs[i].first > (cover::kBladeCols - 2.0) / cover::kBladeCols;
+	}
+	int lo = 1 << 30, hi = 0;
+	for (const auto &row : cells)
+		for (const int c : row) lo = std::min(lo, c), hi = std::max(hi, c);
+	EXPECT_GT(hi, 3 * lo) << "uneven";
+	EXPECT_GT(straw, static_cast<int>(plain.verts.size() / 12));
+	EXPECT_LT(straw, static_cast<int>(plain.verts.size() / 4));
+}
+
+// The grass keeps the forest's year, or its own, each through the change of season.
+TEST(FilmReal, GrassKeepsTheYear) {
+	namespace cover = cartoon::cover;
+	forest::Forest f;
+	f.season = "summer", f.seasonTo = "autumn", f.turn0 = 2.0, f.turn1 = 6.0;
+	forest::Forest::Change winter;
+	winter.to = "winter", winter.t0 = 8.0, winter.t1 = 12.0;
+	f.then.push_back(winter);
+	const cover::Cover own = [] {
+		cover::Cover c;
+		c.season = "spring";
+		return c;
+	}();
+	EXPECT_DOUBLE_EQ(cover::yearAt({}, {}, 1.0), 0.0) << "no forest: summer";
+	EXPECT_DOUBLE_EQ(cover::yearAt({}, {f}, 1.0), 0.0);
+	EXPECT_DOUBLE_EQ(cover::yearAt({}, {f}, 7.0), 1.0);
+	EXPECT_DOUBLE_EQ(cover::yearAt({}, {f}, 13.0), 1.6);
+	EXPECT_LT(cover::yearAt(own, {f}, 13.0), 0.0) << "its own season, whatever the trees do";
+}

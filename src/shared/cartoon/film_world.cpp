@@ -1640,7 +1640,7 @@ std::string DataFilm::plantsAt(const std::string &header, double t, double nt) c
 	std::string out;
 	forest::Written trees;
 	for (std::size_t i = 0; i < spec.forests.size() && i < spec.planted.size(); ++i) out += forest::text(film, spec.planted[i], spec.forests[i], nt, t, eye, spec.gusts, weatherAt(t).wet, trees);
-	if (grows) out += cover::text(film, *terrain::fieldOf(spec.terrain), spec.undergrowth, eye, target, fov, nt, weatherAt(t).snow, spec.gusts, spec.planted, weatherAt(t).wet);
+	if (grows) out += cover::text(film, *terrain::fieldOf(spec.terrain), spec.undergrowth, eye, target, fov, nt, weatherAt(t).snow, spec.gusts, spec.planted, weatherAt(t).wet, cover::yearAt(spec.undergrowth, spec.forests, t));
 	return out;
 }
 // The film's swarms at t (film_swarm.h), their discs turned to the camera of `header`.

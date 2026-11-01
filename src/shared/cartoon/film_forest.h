@@ -29,6 +29,7 @@
 #include "cartoon_lib.h"
 #include "film_cache.h"
 #include "film_dressing.h"
+#include "film_moss.h"
 #include "film_sky.h"
 #include "film_terrain.h"
 #include "nature_lib.h"
@@ -325,7 +326,7 @@ inline Grown grow(const std::string &sp, int v, bool winter, bool spring) {
 		addInto(g.wood, nature::trunk(trunkH, 0.32, 0.25 * (hash01(salt, 2) - 0.5), salt), identity());
 		addRoots(g, 7, 1.1, 0.14, salt);
 		Crown crown;
-		crown.root = {0.0, trunkH * 0.95, 0.0}, crown.centre = {0.0, trunkH + 3.2, 0.0}, crown.radii = {4.2, 3.4, 4.2};
+		crown.root = {0.0, trunkH * 0.95, 0.0}, crown.centre = {0.0, trunkH + 3.2, 0.0}, crown.radii = {4.2, 3.4, 4.2}, crown.trunk = 0.16;   // (no thicker than the trunk it grows from)
 		colonise(g, crown, salt, winter, spring);
 	} else if (sp == "birch") {
 		const double trunkH = 4.5 + 1.5 * hash01(salt, 1);
@@ -810,6 +811,17 @@ inline Mesh shareOf(const Mesh &m, double keep, int per, int salt) {
 inline std::string objectName(const std::string &sp, int v, const std::string &season, bool full) {
 	return "forest_" + sp + "_" + std::to_string(v) + "_" + season + (full ? "_near" : "_far");
 }
+// The moss of a near tree (film_moss.h): the object of its skin with the damp on side `side`, or of a log's, on what faces up. None on a species of dry country.
+inline bool mossy(const std::string &sp) { return sp == "broadleaf" || sp == "birch" || sp == "conifer" || sp == "kapok" || sp == "snag" || sp == "log"; }
+inline std::string mossName(const std::string &sp, int v, int side) { return "forest_moss_" + sp + "_" + std::to_string(v) + "_" + std::to_string(side); }
+inline std::string mossText(const std::string &film, const std::string &sp, int v, int side) {
+	const std::string name = mossName(sp, v, side);
+	const std::string file = film_cache::ply(film, "forest_moss_" + sp + "_" + std::to_string(v), [&] {
+		const detail::Grown g = detail::grow(sp, v, true, false);
+		return sp == "log" ? moss::topSkin(g.wood, 3.0, 0.008) : moss::trunkSkin(g.wood);
+	});
+	return nature::objectBegin(name) + moss::shape(film, name, file, side) + nature::objectEnd();
+}
 // The objects of a close tree's tufts, named `base`_t0.. (`foliage`: its leaves), each with what `used` says; `present` gets the numbers of those that hold anything (the last of the
 // tuftsOf(sp, v).size() + 1 is what does not move). What is on the land is then the tree's own object, with the wood, and these.
 inline std::string tuftObjects(const std::string &film, const std::string &base, const std::vector<Vec3> &at, const std::function<std::vector<Mesh>()> &cut, std::vector<int> &present) {
@@ -1029,14 +1041,21 @@ inline std::string text(const std::string &film, const std::vector<Tree> &trees,
 		};
 		const Vec3 w = stiff ? Vec3{0.0, 0.0, 0.0} : windAt(t);
 		const Mat4 whole = mul(translate(foot), nature::shearXZ(w.x, w.z), rotate({0, 1, 0}, tr.turn), scale(size));
+		const auto mossOn = [&] {   // (near trees: the same side of the sky on all of them)
+			if (!full || !mossy(sp)) return;
+			const int side = sp == "log" ? moss::kTop : moss::sideFor(rotate({0, 1, 0}, tr.turn), {0.0, 0.0, -1.0});
+			places += nature::placeObject(need(mossName(sp, v, side), [&] { return mossText(film, sp, v, side); }), whole);
+		};
 		if (!close) {
 			places += nature::placeObject(object(nullptr), whole);
+			mossOn();
 			continue;
 		}
 		std::vector<int> got;
 		const std::string name = object(&got);
 		if (!got.empty()) tuftsThere[name] = got;
 		places += nature::placeObject(name, whole);
+		mossOn();
 		const std::vector<Vec3> &at = detail::tuftsOf(sp, v);
 		for (const int k : tuftsThere[name]) {
 			const std::string tuft = name + "_t" + std::to_string(k);

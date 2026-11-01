@@ -1009,7 +1009,8 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		double amount = 0.0;
 		if (t.size() == 2 && t[1] == "off") s.undergrowth.on = false;
 		else if (t.size() == 3 && t[1] == "amount" && number(t[2], amount) && amount > 0.0 && amount <= 3.0) s.undergrowth.amount = amount;
-		else return fail("`undergrowth off`, or `undergrowth amount A` (above 0, up to 3)");
+		else if (t.size() == 3 && t[1] == "season" && std::find(forest::seasons().begin(), forest::seasons().end(), t[2]) != forest::seasons().end()) s.undergrowth.season = t[2];
+		else return fail("`undergrowth off`, `undergrowth amount A` (above 0, up to 3), or `undergrowth season S` (summer, autumn, winter or spring)");
 	} else if (verb == "swarm") {
 		swarm::Swarm sw;
 		if (const std::string e = swarm::parse(detail::tokens(line), sw); !e.empty()) return fail(e);
