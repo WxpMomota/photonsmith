@@ -457,6 +457,19 @@ inline std::string planetshineText(const std::vector<planets::Planet> &bodies, d
 	}
 	return out;
 }
+// The look line's words for a black hole of `lens 1` seen from `eye` looking at `target` (pbrt's), `fov` degrees (lens_look.h, black_hole_lens.h).
+inline std::string holeLook(const BlackHole &b, const Vec3 &eye, const Vec3 &target, double fov, double t) {
+	const Vec3 ahead = normalize(target - eye), right = normalize(cross(ahead, Vec3{0.0, 1.0, 0.0})), up = cross(right, ahead), to = b.at - eye;
+	const double away = dot(to, ahead);
+	if (away <= 0.0) return std::string();   // (behind the camera)
+	Vec3 n, e1, e2;
+	blackHoleFrame(b, n, e1, e2);
+	const double scale = 1.0 / std::tan(0.5 * fov * kPi / 180.0);
+	char words[320];
+	std::snprintf(words, sizeof words, " hole 1 hole-x %.5f hole-y %.5f hole-size %.6f hole-nx %.5f hole-ny %.5f hole-nz %.5f hole-disc %.3f hole-bright %.3f hole-fov %.3f hole-time %.3f hole-spin %.3f", dot(to, right) / away * scale, dot(to, up) / away * scale,
+				  b.radius / away * scale, dot(n, right), dot(n, up), dot(n, ahead), b.disc, b.brightness, fov, t, b.spin);
+	return words;
+}
 // A frame's scene text with the look of space (`space ... flare F bloom B`): the lens's flare and glow added to its `# @rt-look` line (lens_look.h; later words win), or a
 // line of their own at its top. As it was when neither is asked for.
 inline std::string withSpaceLook(std::string scene, double flare, double bloom) {

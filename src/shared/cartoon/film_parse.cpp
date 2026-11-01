@@ -102,6 +102,10 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 			if (!shotText.empty() || s.shots.back().following || s.shots.back().coverage) return "the shot \"" + s.shots.back().name + "\" has a `fly` line and `key`, `follow` or `auto` lines too";
 			return std::string();
 		}
+		if (s.shots.back().descending) {   // (from orbit to the ground: film_planetfall.h)
+			if (!shotText.empty() || s.shots.back().following || s.shots.back().coverage) return "the shot \"" + s.shots.back().name + "\" has a `descend` line and `key`, `follow` or `auto` lines too";
+			return std::string();
+		}
 		if (s.shots.back().spaceCam.kind != cosmos::SpaceCam::None) {   // (a journey in space: film_voyage.h)
 			if (!shotText.empty() || s.shots.back().following || s.shots.back().coverage) return "the shot \"" + s.shots.back().name + "\" has a `spacecam` line and `key`, `follow` or `auto` lines too";
 			return std::string();
@@ -706,6 +710,9 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 				}
 			}
 			if (shot.fly.size() < 2) return fail("`fly X Z X Z [X Z ...] [height H] [look X Y Z] [fov F]`: at least two waypoints");
+		} else if (verb == "descend") {   // from orbit to the ground (film_planetfall.h)
+			if (s.shots.empty()) return fail("`descend` belongs to a shot: start one with `shot 0 NAME` first");
+			s.shots.back().descending = true;
 		} else if (verb == "spacecam") {   // a journey in space (film_voyage.h)
 			if (s.shots.empty()) return fail("`spacecam` belongs to a shot: start one with `shot 0 NAME` first");
 			if (const std::string e = cosmos::spaceCamLine(detail::tokens(line), s.shots.back().spaceCam); !e.empty()) return fail(e);
@@ -889,7 +896,8 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 			return fail("`biome` is the land's: the film needs a `terrain` line");
 		}
 		s.terrain.biome = s.biome;
-		if (s.forests.empty() && s.biome != "arctic") {
+		const bool bare = s.biome == "arctic" || s.biome == "rust" || s.biome == "frost" || s.biome == "glass" || s.biome == "moonrock";
+		if (s.forests.empty() && !bare) {
 			forest::Forest f;
 			f.kind = s.biome;
 			const double perSquareMetre = s.biome == "jungle" ? 0.003 : s.biome == "savanna" ? 0.0004 : s.biome == "desert" ? 0.0007 : 0.001;
@@ -900,7 +908,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 		if (s.ambience.empty()) {
 			if (s.biome == "jungle") s.ambience = {{"birds", 0.7}, {"crickets", 0.5}};
 			else if (s.biome == "savanna") s.ambience = {{"crickets", 0.4}, {"wind", 0.4}};
-			else s.ambience = {{"wind", s.biome == "desert" ? 0.6 : 0.8}};
+			else if (s.biome != "moonrock") s.ambience = {{"wind", s.biome == "desert" ? 0.6 : 0.8}};   // (no air, no sound)
 		}
 	}
 	if (s.hasTerrain) {   // on a terrain, heights are above the ground: what is placed and who is brought in stand on it
@@ -1084,6 +1092,8 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 		}
 		if (std::none_of(s.ambience.begin(), s.ambience.end(), [](const dressing::Ambience &am) { return am.kind == "wind"; })) s.ambience.push_back({"wind", 0.5 + 0.5 * st.strength});
 	}
+	if (s.fall.on && !s.hasTerrain) return fail("`planetfall` comes down to a film's land: it needs a `terrain`");
+	if (s.fall.on && !s.hasSky) return fail("`planetfall` needs a `sky`");
 	if (s.air.on) {   // (one medium round the camera)
 		if (s.hasMist || s.fog.on || s.hasUnderwater) {
 			n = 0;

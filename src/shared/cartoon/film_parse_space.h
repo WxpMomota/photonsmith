@@ -9,7 +9,7 @@ namespace film_file {
 
 // Whether `verb` is a space line's.
 inline bool isSpaceVerb(const std::string &verb) {
-	static const std::vector<std::string> k = {"space", "planet", "moon", "nebula", "galaxy", "star", "blackhole", "comet", "asteroids", "remnant", "ship", "astronaut", "descent", "orbit", "burn", "laser", "explode", "shield", "gravity", "footprints", "blob", "drift", "interior", "hologram", "screen", "label", "orbitline", "scalebar", "compare"};
+	static const std::vector<std::string> k = {"space", "planet", "moon", "nebula", "galaxy", "star", "blackhole", "comet", "asteroids", "remnant", "ship", "astronaut", "descent", "orbit", "burn", "laser", "explode", "shield", "gravity", "footprints", "blob", "drift", "interior", "hologram", "screen", "label", "orbitline", "scalebar", "compare", "planetfall"};
 	return std::find(k.begin(), k.end(), verb) != k.end();
 }
 // Whether an `orbit` line is a ship's (`orbit SHIP ...`: a ship named before it, or before any shot) rather than a shot's camera going round someone (film_parse.cpp).
@@ -240,7 +240,7 @@ inline std::string blackHoleLine(Spec &s, const std::vector<std::string> &t) {
 	cosmos::BlackHole b;
 	bool sized = false;
 	std::string kind;
-	const std::string e = bodyLine(t, "`blackhole NAME at X Y Z radius R [disc D] [tilt DEGREES] [turn DEGREES] [spin S] [jets L] [brightness B] [seed N]` (radius 10 to 100000 m, "
+	const std::string e = bodyLine(t, "`blackhole NAME at X Y Z radius R [disc D] [tilt DEGREES] [turn DEGREES] [spin S] [jets L] [brightness B] [lens 1] [seed N]` (radius 10 to 100000 m, "
 									  "disc 4 to 30 radii, jets 0 or 2 to 60 radii)",
 								   {}, b.name, kind, b.at, [&](const std::string &w, double a) {
 									   if (w == "radius" && a >= 10.0 && a <= 100000.0) return b.radius = a, sized = true;
@@ -249,6 +249,7 @@ inline std::string blackHoleLine(Spec &s, const std::vector<std::string> &t) {
 									   if (w == "turn") return b.turn = a, true;
 									   if (w == "spin" && a >= -5.0 && a <= 5.0) return b.spin = a, true;
 									   if (w == "jets" && (a == 0.0 || (a >= 2.0 && a <= 60.0))) return b.jets = a, true;
+								   if (w == "lens") return b.lens = a > 0.0, true;
 									   if (w == "brightness" && a > 0.0 && a <= 20.0) return b.brightness = a, true;
 									   if (w == "seed") return b.seed = detail::seedOf(a), true;
 									   return false;
@@ -572,10 +573,37 @@ inline std::string shieldLine(Spec &s, const std::vector<std::string> &t) {
 	return std::string();
 }
 
+// `planetfall KIND ...`: from orbit to the film's land (film_planetfall.h).
+inline std::string planetfallLine(Spec &s, const std::vector<std::string> &t) {
+	using detail::number;
+	const std::string usage = "`planetfall KIND [from H] [to H] [at T] [over D] [radius R] [land X Z] [heading B] [clouds C] [seed N]`: rocky, desert, ice, ocean or lava; heights in metres, and a shot with `descend` follows it";
+	planetfall::Fall &f = s.fall;
+	if (t.size() < 2 || std::find(planets::kinds().begin(), planets::kinds().end(), t[1]) == planets::kinds().end() || t[1] == "gas") return usage;
+	f.on = true, f.kind = t[1];
+	for (std::size_t i = 2; i < t.size(); i += 2) {
+		double a = 0.0, b = 0.0;
+		if (i + 1 >= t.size() || !number(t[i + 1], a)) return usage;
+		if (t[i] == "from" && a > 100.0) f.from = a;
+		else if (t[i] == "to" && a > 0.5) f.to = a;
+		else if (t[i] == "at" && a >= 0.0) {
+			const double over = f.t1 - f.t0;
+			f.t0 = a, f.t1 = a + over;
+		} else if (t[i] == "over" && a > 0.0) f.t1 = f.t0 + a;
+		else if (t[i] == "radius" && a >= 1e5) f.radius = a;
+		else if (t[i] == "heading") f.heading = a;
+		else if (t[i] == "clouds" && a >= 0.0 && a <= 1.0) f.clouds = a;
+		else if (t[i] == "seed") f.seed = static_cast<int>(a);
+		else if (t[i] == "land" && i + 2 < t.size() && number(t[i + 2], b)) f.x = a, f.z = b, ++i;
+		else return usage;
+	}
+	return std::string();
+}
+
 // One space line: what it says goes into `s`. "" or what is wrong with it.
 inline std::string spaceLine(Spec &s, const std::string &verb, const std::string &line) {
 	const std::vector<std::string> t = detail::tokens(line);
 	if (verb == "space") return spaceSetLine(s, t);
+	if (verb == "planetfall") return planetfallLine(s, t);
 	if (verb == "planet") return planetLine(s, t);
 	if (verb == "moon") return moonLine(s, t);
 	if (verb == "nebula") return nebulaLine(s, t);

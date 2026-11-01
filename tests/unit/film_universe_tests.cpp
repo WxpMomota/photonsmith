@@ -894,3 +894,89 @@ TEST(FilmUniverseReview, ADescentOverLandIsHeardAndWhatWasOverBeforeTheFilmIsNot
 	EXPECT_EQ(mixOf("pastblast", "space hum 0\nremnant crab at 0 0 -40000 size 12000 blast -200\n", 4.0), 0.0) << "a supernova that blew up long before";
 	EXPECT_EQ(mixOf("pastlanding", "space hum 0\ndescent pod from 0 2000 -3000 to 0 0 -300 start -60 land -30 size 10\n", 4.0), 0.0) << "a craft that landed before the film";
 }
+
+// From orbit to the ground in one shot: the height falls by a share of itself each moment, the camera comes level, the sky is worked out a few dozen times and not a frame, and past a
+// sheet of cloud the sheet is gone.
+TEST(FilmPlanetfall, OrbitToTheGroundInOneShot) {
+	namespace pf = cartoon::planetfall;
+	pf::Fall f;
+	f.from = 300000.0, f.to = 5.0, f.t0 = 1.0, f.t1 = 11.0;
+	EXPECT_DOUBLE_EQ(pf::heightAt(f, 0.0), 300000.0);
+	EXPECT_NEAR(pf::heightAt(f, 11.0), 5.0, 1e-9);
+	EXPECT_NEAR(pf::heightAt(f, 6.0), std::sqrt(300000.0 * 5.0), 1e-6) << "halfway is the middle of the logarithm";
+	cartoon::Vec3 eye, target;
+	pf::cameraAt(f, 0.0, 10.0, eye, target);
+	EXPECT_NEAR(eye.y, 300010.0, 1e-6);
+	EXPECT_LT(target.y, eye.y);
+	pf::cameraAt(f, 11.0, 10.0, eye, target);
+	EXPECT_NEAR(eye.x, 0.0, 1e-6);
+	EXPECT_NEAR(eye.z, 0.0, 1e-6) << "it comes down where it said";
+	std::set<double> skies;
+	for (double h = 5.0; h < 300000.0; h *= 1.01) skies.insert(pf::skyHeight(h));
+	EXPECT_LT(skies.size(), 200u);
+	EXPECT_EQ(pf::starsAt(100.0), 0.0);
+	EXPECT_EQ(pf::starsAt(200000.0), 1.0);
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("fall", "scene s.pbrt\nlength 12\nterrain hills size 800 height 10 seed 2\nsky 10:00 10:00\nplanetfall ocean from 200000 to 6 over 10\nshot 0 Down\n descend\n", film), "");
+	EXPECT_NE(film.sceneAt(0.0).find("fall_cloud1"), std::string::npos) << "seen from above";
+	EXPECT_EQ(film.sceneAt(10.0).find("fall_cloud"), std::string::npos) << "and left behind";
+	EXPECT_NE(film.sceneAt(0.0).find("fall_ground"), std::string::npos);
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("fall2", "scene s.pbrt\nlength 12\nplanetfall ocean\n", bad).find("terrain"), std::string::npos);
+	EXPECT_NE(loadFilm("fall3", "scene s.pbrt\nlength 12\nterrain hills size 800 height 10\nsky 10:00 10:00\nplanetfall gas\n", bad).find("rocky"), std::string::npos);
+}
+
+// Other worlds: their ground, a field of crystal, vents that blow in their own time, a glowing wood and what walks in it.
+TEST(FilmOtherWorlds, GroundPlantsAndCreatures) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("otherworld", "scene s.pbrt\nlength 8\nterrain hills size 300 height 4 seed 2\nbiome bloom plants 30\nsky 10:00 10:00\nspires 20 in -20 -20 20 20 height 6\nplumes 3 in -20 -20 20 0 height 12\nherd striders 3 from -5 0 to 20 0\nherd crawlers 2 from -5 4 to 20 4\nshot 0 A\n key 0 2 18  0 2 0  50\n", film), "");
+	ASSERT_FALSE(film.spec.planted.empty());
+	std::set<std::string> grown;
+	for (const cartoon::forest::Tree &t : film.spec.planted[0]) grown.insert(t.species);
+	EXPECT_TRUE(grown.count("glowcap") || grown.count("frond"));
+	const std::string s = film.sceneAt(2.0);
+	EXPECT_NE(s.find("# spires (film_alien.h)"), std::string::npos);
+	EXPECT_NE(s.find("Material \"dielectric\" \"float eta\" [ 1.52 ]"), std::string::npos) << "clear crystal";
+	EXPECT_NE(s.find("anim_"), std::string::npos) << "the creatures have their model";
+	bool blows = false;
+	for (double t = 0.0; t < 16.0 && !blows; t += 1.0) blows = film.sceneAt(std::min(7.9, t * 0.5)).find("# plumes (film_alien.h)") != std::string::npos;
+	EXPECT_TRUE(blows);
+	const auto g = cartoon::forest::detail::grow("glowcap", 1, false, false);
+	EXPECT_FALSE(g.blossom.tris.empty()) << "its spots";
+	EXPECT_NE(cartoon::forest::detail::blossomMaterial("glowcap", 1).find("AreaLightSource"), std::string::npos);
+	EXPECT_EQ(cartoon::forest::detail::blossomMaterial("oak", 1).find("AreaLightSource"), std::string::npos);
+}
+
+// A black hole as light goes round it: the shadow is about 2.6 of its radii across each way, light close to it is bent far more than light further off, and a star behind it shows in a ring.
+TEST(FilmBlackHole, LightGoesRoundIt) {
+	namespace lens = black_hole_lens;
+	EXPECT_LT(lens::bendOf(2.5), 0.0) << "fell in";
+	EXPECT_GT(lens::bendOf(2.7), 1.5);
+	EXPECT_NEAR(lens::bendOf(50.0), 2.0 / 50.0, 0.012) << "far off, Einstein's 2 Rs / b";
+	EXPECT_GT(lens::bendOf(5.0), lens::bendOf(10.0));
+	constexpr int W = 240, H = 160;
+	std::vector<float> img(static_cast<std::size_t>(W) * H * 3, 0.0f);
+	const auto at = [&](int x, int y, int c) -> float & { return img[(static_cast<std::size_t>(y) * W + x) * 3 + c]; };
+	for (int y = 0; y < H; ++y)
+		for (int x = 0; x < W; ++x)
+			for (int c = 0; c < 3; ++c) at(x, y, c) = 0.5f;
+	lens::Params p;
+	p.size = 0.12, p.disc = 0.0, p.fov = 30.0;
+	lens::apply(img.data(), W, H, p);
+	EXPECT_EQ(at(W / 2, H / 2, 0), 0.0f) << "the shadow";
+	EXPECT_EQ(at(W / 2 + 15, H / 2, 0), 0.0f) << "2.6 radii is 19 pixels here";
+	EXPECT_NEAR(at(W / 2 + 70, H / 2, 0), 0.5f, 0.01f) << "the sky";
+	lens::Params d;
+	d.size = 0.12, d.disc = 12.0, d.nx = 0.0, d.ny = 1.0, d.nz = 0.2, d.fov = 30.0;
+	std::vector<float> dark(static_cast<std::size_t>(W) * H * 3, 0.0f);
+	lens::apply(dark.data(), W, H, d);
+	const auto light = [&](int x, int y) { return dark[(static_cast<std::size_t>(y) * W + x) * 3]; };
+	double left = 0.0, right = 0.0, over = 0.0;
+	for (int y = 0; y < H; ++y)
+		for (int x = 0; x < W; ++x) {
+			(x < W / 2 ? left : right) += light(x, y);
+			if (y < H / 2 - 22) over += light(x, y);
+		}
+	EXPECT_GT(std::max(left, right), 1.3 * std::min(left, right)) << "the side coming towards the camera is brighter";
+	EXPECT_GT(over, 0.0) << "the far side of the disc shows up over the top";
+}

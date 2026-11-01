@@ -249,7 +249,8 @@ static std::string universeText(const Spec &spec, const std::string &header, dou
 		Vec3 eye, target;
 		double fov = 40.0;
 		film_subjects::cameraOf(header, eye, target, fov);
-		for (const cosmos::BlackHole &b : spec.blackHoles) out += cosmos::blackHoleText(b, nt, {-eye.x, eye.y, eye.z});
+		for (const cosmos::BlackHole &b : spec.blackHoles)
+			if (!b.lens) out += cosmos::blackHoleText(b, nt, {-eye.x, eye.y, eye.z});
 	}
 	for (std::size_t k = 0; k < spec.shots.size(); ++k) {   // a jump to hyperspace under way (film_voyage.h)
 		const Shot &shot = spec.shots[k];
@@ -695,7 +696,22 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 		dressing::SkyOptics optics = spec.optics;
 		optics.exposure = exposureAt(t);
 		optics.softSun = !spec.forests.empty();
-		out += "# the sun and sky at " + std::to_string(dressing::hourAt(spec.sky, t, spec.storyEnd)) + " h (film_dressing.h)\n" + dressing::skyText(spec.key, spec.sky, t, spec.storyEnd, rainbow, storm, optics);
+		dressing::Sky sky = spec.sky;
+		if (spec.fall.on && spec.hasTerrain) {   // (from orbit: the sky as it is from up there, the stars coming out in it, and the planet going on past the land: film_planetfall.h)
+			const std::shared_ptr<const terrain::Field> land = terrain::fieldOf(spec.terrain);
+			Vec3 eye, target;
+			double fov = 40.0;
+			film_subjects::cameraOf(header, eye, target, fov);
+			const double h = std::max(1.0, eye.y - land->heightAt(spec.fall.x, spec.fall.z));
+			sky.physical = true, sky.altitude = planetfall::skyHeight(h);
+			if (const double shown = planetfall::starsAt(h); shown > 0.0) {
+				space::Space stars;
+				stars.on = true, stars.sun = false, stars.stars = shown, stars.milkyWay = shown;
+				out += space::spaceText(spec.key.empty() ? std::string("film") : spec.key, stars);
+			}
+			out += planetfall::text(spec.key.empty() ? std::string("film") : spec.key, *land, spec.fall, h);
+		}
+		out += "# the sun and sky at " + std::to_string(dressing::hourAt(spec.sky, t, spec.storyEnd)) + " h (film_dressing.h)\n" + dressing::skyText(spec.key, sky, t, spec.storyEnd, rainbow, storm, optics);
 	}
 	if (spec.moon.on) {   // (round 17: `moonlight` - after the sun, so the sea's caustics and glints take the sun's light while it is up)
 		Vec3 eye, target;
@@ -845,6 +861,13 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 		out = underTheSeaLight(spec, out, header, t, nt, seabedAt(-eye.x, eye.z));
 		if (spec.toon.on) out = undersea::bubblesGrouped(out);   // (round 17: a toon film draws no ink round its bubbles)
 	}
+	for (const cosmos::BlackHole &b : spec.blackHoles)
+		if (b.lens) {   // (bent light, on the finished picture: where it is in this frame, for the look line)
+			Vec3 eye, target;
+			double fov = 40.0;
+			if (film_subjects::cameraOf(header, eye, target, fov)) out = night::withWords(out, cosmos::holeLook(b, {-eye.x, eye.y, eye.z}, {-target.x, target.y, target.z}, fov, nt));
+			break;
+		}
 	return spec.space.on ? cosmos::withSpaceLook(space::recentred(out), spec.space.flare, spec.space.bloom) : out;   // (a floating origin for a film in space: film_space.h)
 }
 
@@ -1691,6 +1714,11 @@ std::string DataFilm::plantsAt(const std::string &header, double t, double nt) c
 	const std::string film = spec.key.empty() ? std::string("film") : spec.key;
 	std::string out;
 	forest::Written trees;
+	if (!spec.plumes.empty() || !spec.spires.empty()) {   // (film_alien.h)
+		const terrain::Field *land = spec.hasTerrain ? terrain::fieldOf(spec.terrain).get() : nullptr;
+		for (std::size_t i = 0; i < spec.spires.size(); ++i) out += alien::spiresText(film, spec.spires[i], land);
+		for (std::size_t i = 0; i < spec.plumes.size(); ++i) out += alien::plumesText(film, spec.plumes[i], land, nt, {-eye.x, eye.y, eye.z}, "plumes" + std::to_string(i));
+	}
 	for (std::size_t i = 0; i < spec.forests.size() && i < spec.planted.size(); ++i) out += forest::text(film, spec.planted[i], spec.forests[i], nt, t, eye, spec.gusts, weatherAt(t).wet, trees);
 	if (grows && weatherAt(t).wet < 0.2 && weatherAt(t).snow <= 0.0) {   // (rain washes the air clean)
 		std::vector<Vec3> near_;

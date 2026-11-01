@@ -463,6 +463,30 @@ inline Vec3 biomePaint(const Spec &s, double px, double pz, double frac, double 
 		const double snow = std::max(smoothstep(0.55, 0.7, frac + 0.15 * (var - 0.5)), smoothstep(0.35, 0.6, wet) * smoothstep(0.66, 0.8, patch));   // (the heights, and drifts in hollows)
 		return lerp(c, Vec3{0.82, 0.84, 0.88}, snow * (1.0 - smoothstep(0.2, 0.32, steep)));
 	}
+	// (other worlds)
+	if (s.biome == "rust") {   // red-brown rock under an orange sky, dark tar where it lies low
+		Vec3 c = lerp(Vec3{0.3, 0.13, 0.07}, Vec3{0.46, 0.2, 0.09}, var) * (0.85 + 0.3 * fine);
+		c = lerp(c, Vec3{0.16, 0.08, 0.06} * (0.8 + 0.4 * var), smoothstep(0.1, 0.22, steep));
+		return lerp(c, Vec3{0.03, 0.025, 0.025}, 0.8 * smoothstep(0.3, 0.75, wet));
+	}
+	if (s.biome == "frost") {   // a frozen moon: pale ice crossed by long dark cracks
+		Vec3 c = lerp(Vec3{0.62, 0.72, 0.8}, Vec3{0.86, 0.9, 0.93}, var) * (0.94 + 0.1 * fine);
+		const double crack = 1.0 - smoothstep(0.0, 0.009, std::abs(detail::fbm(px / 70.0, pz / 70.0, salt + 31, 4) - 0.5));
+		return lerp(c, Vec3{0.3, 0.17, 0.1}, 0.85 * crack);
+	}
+	if (s.biome == "glass") {   // black sand with a sheen of green, for a field of crystal
+		const Vec3 c = lerp(Vec3{0.05, 0.055, 0.06}, Vec3{0.1, 0.13, 0.12}, var) * (0.75 + 0.5 * fine);
+		return lerp(c, Vec3{0.17, 0.2, 0.2} * (0.8 + 0.3 * var), smoothstep(0.1, 0.25, steep));
+	}
+	if (s.biome == "moonrock") {   // grey dust and bright crater rims
+		const Vec3 c = lerp(Vec3{0.2, 0.195, 0.19}, Vec3{0.33, 0.325, 0.31}, var) * (0.85 + 0.3 * fine);
+		return lerp(c, Vec3{0.5, 0.49, 0.47}, smoothstep(0.12, 0.26, steep));
+	}
+	if (s.biome == "bloom") {   // a living world: violet moss on dark ground, teal where it is wet
+		Vec3 c = lerp(Vec3{0.11, 0.05, 0.16}, Vec3{0.24, 0.1, 0.3}, var) * (0.8 + 0.4 * fine);
+		c = lerp(c, Vec3{0.03, 0.2, 0.2}, 0.7 * smoothstep(0.15, 0.6, wet));
+		return lerp(c, Vec3{0.1, 0.09, 0.12} * (0.85 + 0.3 * var), smoothstep(0.14, 0.28, steep));
+	}
 	// arctic
 	Vec3 c = Vec3{0.82, 0.84, 0.88} * (0.95 + 0.07 * fine) * (0.97 + 0.04 * var);
 	c = lerp(c, Vec3{0.40, 0.56, 0.67} * (0.9 + 0.2 * fine), smoothstep(0.1, 0.22, steep));   // (blue ice)

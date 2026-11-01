@@ -38,7 +38,7 @@ inline const std::vector<std::string> &flockKinds() {
 	return k;
 }
 inline const std::vector<std::string> &herdKinds() {
-	static const std::vector<std::string> k = {"deer", "horses", "wolves", "lions", "zebras", "giraffes", "elephants", "bears", "foxes", "rabbits", "penguins", "snakes"};
+	static const std::vector<std::string> k = {"deer", "horses", "wolves", "lions", "zebras", "giraffes", "elephants", "bears", "foxes", "rabbits", "penguins", "snakes", "striders", "crawlers"};
 	return k;
 }
 
@@ -672,7 +672,8 @@ inline std::string herdText(const Herd &h, double t, const terrain::Field *groun
 		}
 	std::sort(closest.begin(), closest.end());
 	if (closest.size() > kMostOwn) closest.resize(kMostOwn);
-	const bool hairy = h.fur > 0.0 && h.kind != "elephants";
+	const bool bareSkin = h.kind == "elephants" || h.kind == "striders" || h.kind == "crawlers";
+	const bool hairy = h.fur > 0.0 && !bareSkin;
 	for (int i = 0; i < h.count + h.young; ++i) {
 		const bool child = i >= h.count;   // (a young one: following its mother, half her size, its legs stepping twice as often)
 		const int mother = child ? (i - h.count) % h.count : i, s = h.seed * 61 + i;
@@ -772,7 +773,7 @@ inline std::string herdText(const Herd &h, double t, const terrain::Field *groun
 		}
 		const Mat4 placing = mul(translate(storyAt), detail::facing(storyFwd, {0, 1, 0}), rotate({0, 1, 0}, turn), rotate({0, 0, 1}, a.fallen ? 80.0 : lean + shake + roll), rotate({1, 0, 0}, -pitch), scale((child ? 0.5 : 1.0) * (0.9 + 0.2 * hash01(s, 8))));
 		const int variant = i % coats::variantsOf(pattern);
-		const double coatOn = hero ? 0.0 : h.kind == "elephants" ? 0.0 : h.fur;
+		const double coatOn = hero || bareSkin ? 0.0 : h.fur;
 		const bool glossy = wet > 0.0 || rain > 0.35, mud = rain > 0.15;
 		std::unique_ptr<gltf_skin::Pose> own;
 		if (rankOf != closest.end() && !a.fallen)

@@ -61,6 +61,8 @@
 #include "film_soundscape.h"
 #include "film_forest.h"
 #include "film_air.h"
+#include "film_alien.h"
+#include "film_planetfall.h"
 #include "film_cover.h"
 #include "film_skyfx.h"
 #include "film_cache.h"
@@ -160,6 +162,7 @@ struct Shot {
 	int blades = 0;                                        // (`aperture R blades N rotation D ratio A`: the lens's blades, aperture_shape.h; under 3 round)
 	double bladesRotation = 0.0, apertureRatio = 1.0;
 	cosmos::SpaceCam spaceCam;   // (`spacecam`) a journey in space (film_voyage.h)
+	bool descending = false;     // (`descend`) the film's `planetfall`, from orbit to the ground (film_planetfall.h)
 	shot_lighting::Lighting lighting;   // (`lighting`) key, fill and rim lights round the subject, from the camera
 	std::string lightOn;                // ... on this character's chest ("": what the camera looks at)
 };
@@ -336,6 +339,9 @@ struct Spec {
 	surround::Surround around;                    // (`surround FILE ...`: film_surround.h)
 	cover::Cover undergrowth;                     // (what grows on the land by itself, unless `undergrowth off`: film_cover.h)
 	airborne::Motes motes;                        // (what hangs in the air, unless `motes off`: film_air.h)
+	planetfall::Fall fall;                        // (`planetfall`: the planet round the land, for a camera that comes down from orbit: film_planetfall.h)
+	std::vector<alien::Plumes> plumes;            // (`plumes`, `spires`: what stands on another world: film_alien.h)
+	std::vector<alien::Spires> spires;
 	std::vector<Character> characters;
 	// props with physics: the block they move, and the line that says so
 	std::vector<std::pair<std::string, physics::Bounce>> bounces;

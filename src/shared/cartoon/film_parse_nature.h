@@ -866,11 +866,11 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		s.forests.push_back(f);
 	} else if (verb == "biome") {   // the land as a biome: savanna, jungle, desert, tundra or arctic
 		const std::vector<std::string> t = detail::tokens(line);
-		static const std::vector<std::string> biomes = {"savanna", "jungle", "desert", "tundra", "arctic"};
+		static const std::vector<std::string> biomes = {"savanna", "jungle", "desert", "tundra", "arctic", "rust", "frost", "glass", "moonrock", "bloom"};
 		double count = 0.0;
 		if (t.size() < 2 || std::find(biomes.begin(), biomes.end(), t[1]) == biomes.end() ||
 			!(t.size() == 2 || (t.size() == 4 && t[2] == "plants" && number(t[3], count) && count >= 0.0 && count <= 50000.0)))
-			return fail("`biome NAME [plants N]`: savanna, jungle, desert, tundra or arctic - the land's colours, its plants (N of them; by the land's size when not given) and its sound");
+			return fail("`biome NAME [plants N]`: savanna, jungle, desert, tundra or arctic, or another world's rust, frost, glass, moonrock or bloom - the land's colours, its plants (N of them; by the land's size when not given) and its sound");
 		s.biome = t[1];
 		if (t.size() == 4) s.biomeTrees = static_cast<int>(count);
 	} else if (verb == "flowers") {   // a meadow of wild flowers, opening and closing (film_flowers.h)
@@ -1011,6 +1011,34 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		else if (t.size() == 3 && t[1] == "amount" && number(t[2], amount) && amount > 0.0 && amount <= 3.0) s.undergrowth.amount = amount;
 		else if (t.size() == 3 && t[1] == "season" && std::find(forest::seasons().begin(), forest::seasons().end(), t[2]) != forest::seasons().end()) s.undergrowth.season = t[2];
 		else return fail("`undergrowth off`, `undergrowth amount A` (above 0, up to 3), or `undergrowth season S` (summer, autumn, winter or spring)");
+	} else if (verb == "plumes" || verb == "spires") {   // what stands on another world (film_alien.h)
+		const std::vector<std::string> t = detail::tokens(line);
+		const std::string usage = verb == "plumes" ? "`plumes N [in X0 Z0 X1 Z1] [height H] [seed K]`: vents of ice or dust that blow in their own time" : "`spires N [in X0 Z0 X1 Z1] [height H] [colour R G B] [seed K]`: a field of crystal, clear glass unless it has a colour";
+		alien::Plumes g;
+		alien::Spires f;
+		double n = 0.0;
+		if (t.size() < 2 || !number(t[1], n) || n < 1.0 || n > 20000.0) return fail(usage);
+		g.count = f.count = static_cast<int>(n);
+		for (std::size_t i = 2; i < t.size();) {
+			double a = 0.0, b = 0.0, c = 0.0, d = 0.0;
+			if (t[i] == "in" && i + 4 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && number(t[i + 3], c) && number(t[i + 4], d)) {
+				g.x0 = f.x0 = a, g.z0 = f.z0 = b, g.x1 = f.x1 = c, g.z1 = f.z1 = d;
+				i += 5;
+			} else if (t[i] == "height" && i + 1 < t.size() && number(t[i + 1], a) && a > 0.0) {
+				g.height = f.height = a;
+				i += 2;
+			} else if (t[i] == "seed" && i + 1 < t.size() && number(t[i + 1], a)) {
+				g.seed = f.seed = static_cast<int>(a);
+				i += 2;
+			} else if (t[i] == "colour" && verb == "spires" && i + 3 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && number(t[i + 3], c)) {
+				f.colour = {a, b, c};
+				i += 4;
+			} else {
+				return fail(usage);
+			}
+		}
+		if (verb == "plumes") s.plumes.push_back(g);
+		else s.spires.push_back(f);
 	} else if (verb == "motes") {   // film_air.h
 		const std::vector<std::string> t = detail::tokens(line);
 		double amount = 0.0;

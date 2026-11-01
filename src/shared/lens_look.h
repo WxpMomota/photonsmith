@@ -22,6 +22,7 @@
 // And the picture on paper or film (print_look.h, made on the finished picture by the program that writes it): `halftone SIZE` (a comic's dots), `watercolor W`,
 // `vintage V` (an old film print; `vintage-tone`, and `seed`: the frame's, which a film writes).
 
+#include "black_hole_lens.h"
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -92,7 +93,11 @@ struct Look {
 	// A flat port in front of the lens (round 16: an underwater housing): `distort K` bows straight lines outwards towards the edges (pincushion: K above 0), `fringe F`
 	// splits the colours there - the red pulled out, the blue in - as the water and the port's glass bend them differently.
 	double distort = 0.0, fringe = 0.0;
-	bool active() const { return shimmer > 0.0 || waterline > -1.0 || drops > 0.0 || distort != 0.0 || fringe != 0.0 || paint > 0.0 || sunbeams > 0.0 || bloom > 0.0 || flare > 0.0 || star > 0.0 || vignette > 0.0 || warmth != 0.0 || saturation != 1.0 || graded(); }
+	// A black hole, as light really goes round it (black_hole_lens.h: `hole 1`, and hole-x, hole-y, hole-size, hole-nx, hole-ny, hole-nz, hole-disc, hole-bright, hole-fov, hole-time,
+	// hole-spin, which a film writes for each frame from where the hole and the camera are).
+	bool hole = false;
+	black_hole_lens::Params holeLens;
+	bool active() const { return hole || shimmer > 0.0 || waterline > -1.0 || drops > 0.0 || distort != 0.0 || fringe != 0.0 || paint > 0.0 || sunbeams > 0.0 || bloom > 0.0 || flare > 0.0 || star > 0.0 || vignette > 0.0 || warmth != 0.0 || saturation != 1.0 || graded(); }
 };
 
 // Values that were set (a flag, a scene line) override `base`; a negative bloom/vignette or a saturation below 0 means "not given" in `given`.
@@ -157,6 +162,18 @@ inline std::string parse(const std::string &text, Look &out) {
 		if (!(in >> v) || !std::isfinite(v)) return "\"" + word + "\" needs a number after it";
 		if (word == "bloom") out.bloom = std::clamp(v, 0.0, 1.0);
 		else if (word == "bloom-radius") out.bloomRadius = std::clamp(v, 0.001, 0.5);
+		else if (word == "hole") out.hole = v > 0.0;
+		else if (word == "hole-x") out.holeLens.x = v;
+		else if (word == "hole-y") out.holeLens.y = v;
+		else if (word == "hole-size") out.holeLens.size = v;
+		else if (word == "hole-nx") out.holeLens.nx = v;
+		else if (word == "hole-ny") out.holeLens.ny = v;
+		else if (word == "hole-nz") out.holeLens.nz = v;
+		else if (word == "hole-disc") out.holeLens.disc = v;
+		else if (word == "hole-bright") out.holeLens.brightness = v;
+		else if (word == "hole-fov") out.holeLens.fov = v;
+		else if (word == "hole-time") out.holeLens.time = v;
+		else if (word == "hole-spin") out.holeLens.spin = v;
 		else if (word == "flare") out.flare = std::clamp(v, 0.0, 1.0);
 		else if (word == "star") out.star = std::clamp(v, 0.0, 1.0);
 		else if (word == "star-points") out.starPoints = std::clamp(static_cast<int>(std::lround(v)), 2, 16);
@@ -299,6 +316,7 @@ inline void apply(float *rgb, int w, int h, const Look &look) {
 	for (std::size_t i = 0; i < n * 3; ++i)
 		if (!std::isfinite(rgb[i])) rgb[i] = 0.0f;
 
+	if (look.hole) black_hole_lens::apply(rgb, w, h, look.holeLens);   // (before the lens's own flare and glow: it is out there, and they catch its light)
 	if (look.shimmer > 0.0) {   // heat shimmer first: it is in the air, in front of the lens (see Look::shimmer)
 		const std::vector<float> src(rgb, rgb + n * 3);
 		const double T = look.shimmerTime, A = look.shimmer * h;

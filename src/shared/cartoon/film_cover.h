@@ -77,7 +77,8 @@ inline Growth growthOf(const terrain::Spec &s) {
 	if (s.biome == "jungle") return {{0.07, 0.17, 0.04}, {0.14, 0.2, 0.06}, 0.4, 1.0};
 	if (s.biome == "desert") return {{0.3, 0.27, 0.13}, {0.42, 0.36, 0.2}, 0.22, 0.18};
 	if (s.biome == "tundra") return {{0.17, 0.17, 0.08}, {0.32, 0.26, 0.13}, 0.1, 0.8};
-	if (s.biome == "arctic" || s.kind == "dunes" || s.kind == "canyon") return {{0, 0, 0}, {0, 0, 0}, 0.0, 0.0};
+	if (s.biome == "bloom") return {{0.2, 0.08, 0.3}, {0.05, 0.25, 0.27}, 0.28, 0.8};   // (a violet sward, teal where it is dry)
+	if (s.biome == "arctic" || s.biome == "rust" || s.biome == "frost" || s.biome == "glass" || s.biome == "moonrock" || s.kind == "dunes" || s.kind == "canyon") return {{0, 0, 0}, {0, 0, 0}, 0.0, 0.0};
 	return {{0.085, 0.19, 0.05}, {0.34, 0.31, 0.12}, 0.32, 1.0};
 }
 

@@ -366,6 +366,7 @@ struct BlackHole {
 	std::string name;
 	Vec3 at{0.0, 0.0, -30000.0};
 	double radius = 2000.0, disc = 8.0, tilt = 8.0, turn = 0.0, spin = 1.0, jets = 0.0, brightness = 1.0;
+	bool lens = false;   // (`lens 1`: as light really goes round it, on the finished picture: black_hole_lens.h. Its words for the look line: holeLook)
 	int seed = 1;
 };
 // Its disc's frame (pbrt's): the axis n and two directions e1, e2 in its plane.

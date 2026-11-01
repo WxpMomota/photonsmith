@@ -495,6 +495,13 @@ SPECIES = {
                    body=(0.48, 0.40, 0.32), legs=(0.45, 0.38, 0.30), feet=(0.85, 0.82, 0.78), extra=(0.95, 0.94, 0.92), swing=(28, 34, 42), tailHang=False, whiteTail=True,
                    gaits={"walk": ((0.0, 0.3, 0.0, 0.3), 0.55), "trot": ((0.0, 0.4, 0.0, 0.4), 0.4), "run": ((0.0, 0.45, 0.04, 0.5), 0.3)}, hop=True, flexRun=14),
 }
+# Creatures of other worlds, from the same generator: a strider on long thin legs with a small body slung between them and a long searching neck; a low broad crawler.
+SPECIES.update({
+    "strider": dict(H=2.4, Lb=0.8, barrel=(0.2, 0.24), neck=1.3, neckUp=38, head=0.42, headR=0.08, tail=0.9, tailR=0.03, ears=0.2, hoof=True, antlers=False, mane=False,
+                    body=(0.12, 0.3, 0.32), legs=(0.08, 0.2, 0.24), feet=(0.05, 0.1, 0.1), extra=(0.9, 0.5, 0.2), swing=(16, 20, 26), legThick=0.7),
+    "crawler": dict(H=0.6, Lb=1.2, barrel=(0.36, 0.22), neck=0.2, neckUp=8, head=0.4, headR=0.16, tail=1.0, tailR=0.09, ears=0.0, hoof=False, antlers=False, mane=False,
+                    body=(0.34, 0.14, 0.36), legs=(0.28, 0.1, 0.3), feet=(0.1, 0.05, 0.1), extra=(0.1, 0.5, 0.45), swing=(22, 26, 32), tailHang=False, flexRun=12, bushy=0.8),
+})
 GAITS = {   # (each foot's start of stance as a share of the cycle: left hind, left fore, right hind, right fore), the share of the cycle a foot is down
     "walk": ((0.0, 0.25, 0.5, 0.75), 0.65),
     "trot": ((0.0, 0.5, 0.5, 0.0), 0.45),

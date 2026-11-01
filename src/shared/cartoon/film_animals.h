@@ -50,6 +50,8 @@ inline const Species *species(const std::string &kind) {
 		{"zebras", {"zebra.glb", 1.279, 2.282, 4.412, 2.2, 4.8, 1.4, 14.0, 1.15, true, false}},
 		{"giraffes", {"giraffe.glb", 2.225, 3.896, 7.800, 3.0, 6.5, 1.6, 12.0, 1.3, true, false}},
 		{"elephants", {"elephant.glb", 2.061, 3.694, 6.589, 2.6, 99.0, 1.4, 6.0, 1.9, true, false}},
+		{"striders", {"strider.glb", 1.832, 3.284, 6.314, 2.4, 5.0, 1.2, 11.0, 0.8, true, false}},   // (other worlds' creatures)
+		{"crawlers", {"crawler.glb", 0.622, 1.052, 1.908, 1.1, 2.4, 0.7, 5.0, 1.2, false, false}},
 		{"bears", {"bear.glb", 0.947, 1.627, 3.180, 1.8, 4.0, 1.1, 11.0, 1.15, false, false}},
 		{"foxes", {"fox.glb", 0.394, 0.666, 1.404, 1.3, 2.8, 1.0, 12.0, 0.45, false, false}},
 		// (each its own way of going: a rabbit hops, a penguin waddles and never runs, a snake slithers - a wave running back along it carries it a wavelength a cycle)
