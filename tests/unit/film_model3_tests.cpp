@@ -152,14 +152,47 @@ TEST(FilmModel3, GroomedStrandsFollowThePiecesBones) {
 	const std::shared_ptr<const model::StrandSet> set = model::strandsOf((d / "fur.bin").generic_string());
 	ASSERT_TRUE(set);
 	EXPECT_EQ(set->count(), 2u);
-	EXPECT_EQ(curves(model::strandsText(*set, 2)).size(), 1u) << "a model far off draws one in four of them";
+	const std::vector<std::string> far_ = curves(model::strandsText(*set, 2));
+	ASSERT_EQ(far_.size(), 1u) << "a model far off draws one in four of them";
+	EXPECT_NE(far_[0].find("\"float width0\" 0.04000"), std::string::npos) << "four times as wide, so the coat covers what it did: " << far_[0];
+	EXPECT_NE(model::strandsText(*set, 1, nullptr, 5, 6).find("\"integer dicelength\" 5 \"integer diceradial\" 6"), std::string::npos);
 	EXPECT_FALSE(model::strandsOf((d / "missing.bin").generic_string()));
+	// a line of big coordinates is not cut off
+	std::vector<float> big(12, -123456.789f);
+	model::StrandSet huge;
+	model::StrandGroup bigGroup;
+	bigGroup.points = big;
+	huge.groups.push_back(bigGroup);
+	EXPECT_NE(model::strandsText(huge, 1).find(" ]\n"), std::string::npos);
 
 	const std::string furred = "model strip\n  piece body\n    mesh " + (d / "strip.obj").generic_string() + "\n    fur 0.1 density 40\n"
 							   "    bone ear from 0 1 0 to 0 2 0 radius 0.6\nend\nplace strip at 0 0 0 as s\npose s ear axis 0 0 1  1 0  2 70\n";
 	ff::DataFilm posed;
 	ASSERT_EQ(loadFilm("posedfur", kHead + furred + kShot, posed), "");
-	EXPECT_FALSE(curves(posed.sceneAt(2.5)).empty()) << "its own fur stays on while it is posed";
+	const std::vector<std::string> a = curves(posed.sceneAt(1.5)), b = curves(posed.sceneAt(2.0));
+	ASSERT_FALSE(a.empty()) << "its own fur stays on while it is posed";
+	ASSERT_EQ(a.size(), b.size()) << "the same hairs every frame";
+	int same = 0;
+	for (std::size_t k = 0; k < a.size(); ++k) same += a[k] == b[k];
+	EXPECT_GT(same, 0) << "a bone moves only the hairs in its reach: the rest do not boil";
+	EXPECT_LT(same, static_cast<int>(a.size())) << "and those it reaches go with the skin";
+
+	// a piece that wobbles, flexes or vanishes takes its hair with it
+	const std::string gone = "model strip\n  piece body\n    mesh " + (d / "strip.obj").generic_string() + "\n    strands " + (d / "fur.bin").generic_string() + "\nend\nplace strip at 0 0 0 as s\nvanish s from 1 to 2\n";
+	ff::DataFilm going;
+	ASSERT_EQ(loadFilm("vanishing", kHead + gone + kShot, going), "");
+	EXPECT_EQ(curves(going.sceneAt(0.5)).size(), 2u);
+	EXPECT_TRUE(curves(going.sceneAt(2.5)).empty()) << "nothing is left hanging in the air";
+
+	// every copy of a model with hair has its hair: curves are not kept in an object
+	const std::string twice = "model strip\n  piece body\n    mesh " + (d / "strip.obj").generic_string() + "\n    strands " + (d / "fur.bin").generic_string() + "\nend\nplace strip at 0 0 0\nplace strip at 3 0 0\n";
+	ff::DataFilm pair;
+	ASSERT_EQ(loadFilm("twofoxes", kHead + twice + kShot, pair), "");
+	EXPECT_EQ(curves(pair.sceneAt(0.5)).size(), 4u);
+
+	EXPECT_NE(problemWith("model strip\n  piece body\n    mesh " + (d / "strip.obj").generic_string() + "\n    strands " + (d / "no-such.bin").generic_string() + "\nend\n"), "") << "a coat that is not there is said";
+	EXPECT_NE(problemWith("model strip\n  piece body\n    mesh " + (d / "strip.obj").generic_string() + "\n    strands " + (d / "strip.obj").generic_string() + "\nend\n"), "") << "nor is a file that is something else";
+	EXPECT_NE(problemWith("model strip\n  piece body\n    mesh " + (d / "strip.obj").generic_string() + "\n    strands " + (d / "fur.bin").generic_string() + " dice 0 2\nend\n"), "");
 }
 // A bone of a limited reach shares a piece with bones that have none: they keep the rest of the skin, so a character with an ear of its own still walks.
 TEST(FilmModel3, ABoneOfLimitedReachLeavesTheOtherBonesTheirSkin) {
@@ -411,7 +444,7 @@ TEST(FilmModel3, MechanismsAndPhysics) {
 TEST(FilmModel3, FurClothAndCovering) {
 	model::Fur f;
 	f.on = true, f.density = 2000;
-	const std::string fur = model::furText(cartoon::uvSphere(0.3, 24, 12), f);
+	const std::string fur = model::furText(model::furPoints(cartoon::uvSphere(0.3, 24, 12), f), f);
 	EXPECT_GT(std::count(fur.begin(), fur.end(), '\n'), 1000) << "about 2000 a square metre over its 1.1 m2";
 	EXPECT_NE(fur.find("\"curve\""), std::string::npos);
 	const cartoon::Mesh ball = cartoon::uvSphere(0.4, 24, 12);

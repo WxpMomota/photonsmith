@@ -1442,8 +1442,7 @@ static bool build_loaded_pbrt_scene(
 	const std::shared_ptr<const PbrtBuiltScene> built = s_pbrtBuiltSceneCache.get_or_build(builtKey,
 		[&](PbrtBuiltScene& out) -> bool {
 			// The scene is copied only when something has to change in it: an object moved, or a shape OptiX cannot trace turned into triangles.
-			const bool hasQuadrics = !loaded.scene.cones.empty() || !loaded.scene.paraboloids.empty() ||
-									 std::any_of(loaded.scene.curves.begin(), loaded.scene.curves.end(), [](const pbrt_flatten::Curve& c) { return c.diceTriangles; });   // (and strands that asked to be triangles)
+			const bool hasQuadrics = !loaded.scene.cones.empty() || !loaded.scene.paraboloids.empty();
 			pbrt_flatten::FlatScene edited;
 			const pbrt_flatten::FlatScene* source = &loaded.scene;
 			if (moved || hasQuadrics) {
@@ -1459,7 +1458,7 @@ static bool build_loaded_pbrt_scene(
 			// approximation, drawn instead of dropped.
 			if (hasQuadrics) {
 				const size_t added = gpu_tessellate::tessellateForBackend(edited, gpu_tessellate::TessellationCaps::conesAndParaboloids(), nullptr);
-				std::cerr << "[OptiX] " << loaded.scene.cones.size() << " cone(s), " << loaded.scene.paraboloids.size() << " paraboloid(s) and fine strands tessellated into " << added
+				std::cerr << "[OptiX] " << loaded.scene.cones.size() << " cone(s) and " << loaded.scene.paraboloids.size() << " paraboloid(s) tessellated into " << added
 				          << " triangles (an approximation of the exact shape).\n";
 			}
 			out.stats = pbrt_gpu::build(*source, out.sceneData);

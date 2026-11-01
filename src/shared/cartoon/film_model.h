@@ -696,8 +696,16 @@ inline std::string round3Line(Part &p, const std::vector<std::string> &t, bool &
 		return std::string();
 	}
 	if (verb == "strands") {
-		if (t.size() != 2) return "`strands FILE`: fur groomed by a tool of your own, following the piece's bones (model_strands.h)";
-		p.strands = t[1];
+		const char *usage = "`strands FILE [dice RINGS SIDES]` (under film_assets, or a path): fur groomed by a tool of your own, going where the piece's skin goes (model_strands.h)";
+		if (t.size() != 2 && t.size() != 5) return usage;
+		const std::string found = film_cache::asset(t[1]), path = found.empty() ? t[1] : found;
+		if (!strandsOf(path)) return "`strands " + t[1] + "`: no such file, or not a file of strands (model_strands.h)";
+		p.strands = path;
+		if (t.size() == 5) {
+			i = 3;
+			if (t[2] != "dice" || !numbers(2) || v[0] < 1 || v[0] > 32 || v[1] < 3 || v[1] > 16) return usage;
+			p.strandRings = static_cast<int>(v[0]), p.strandSides = static_cast<int>(v[1]);
+		}
 		return std::string();
 	}
 	if (verb == "fur") {
@@ -1070,10 +1078,10 @@ inline std::string pieceText(const std::string &film, const Model &m, const Part
 	if (p.fur.on) {
 		Fur f = p.fur;
 		f.density /= lod * lod;   // (fewer strands far off)
-		extra = furText(pieceMesh(m, p, lod), f);
+		extra = furText(furPoints(pieceMesh(m, p, lod), f), f);
 	}
 	if (!p.strands.empty())
-		if (const std::shared_ptr<const StrandSet> set = strandsOf(p.strands)) extra += strandsText(*set, lod);
+		if (const std::shared_ptr<const StrandSet> set = strandsOf(p.strands)) extra += strandsText(*set, lod, nullptr, p.strandRings, p.strandSides);
 	if (const std::string regions = regionsText(film, m, p, lod, name); !regions.empty()) return regions + extra;
 	const std::string file = film_cache::ply(film, name, [&]() { return p.paint.on ? uvMeshOf(p, pieceMesh(m, p, lod), nullptr) : pieceMesh(m, p, lod); });
 	if (file.empty()) return extra;
@@ -1209,9 +1217,26 @@ inline std::string movingText(const std::string &film, const Model &m, const Pla
 		// (round 3) its shape over time: built up, flexed, wobbling, rippling, breaking up - written out as it is now
 		bool reshaped = false;
 		Mesh mesh;
-		std::vector<Mat4> bonePoses;   // (as the film has turned its bones now: its strands follow them)
+		// (its hair goes where its skin goes: the strands' control points ride through every reshaping below as loose vertices after the skin's, and are taken off again at the end)
+		Fur furNow = p.fur;
+		furNow.density /= lod * lod;
+		const std::shared_ptr<const StrandSet> strands = p.strands.empty() ? nullptr : strandsOf(p.strands);
+		std::size_t skinVerts = 0, furLoose = 0;
 		const auto meshNow = [&]() -> Mesh & {
-			if (!reshaped) mesh = pieceMesh(m, p, lod), reshaped = true;
+			if (!reshaped) {
+				mesh = pieceMesh(m, p, lod), reshaped = true;
+				skinVerts = mesh.verts.size();
+				if (p.fur.on) {
+					const std::vector<Vec3> points = furPoints(mesh, furNow);
+					furLoose = points.size();
+					mesh.verts.insert(mesh.verts.end(), points.begin(), points.end());
+				}
+				if (strands) {
+					const std::vector<Vec3> points = strandPoints(*strands);
+					mesh.verts.insert(mesh.verts.end(), points.begin(), points.end());
+				}
+				if (!mesh.normals.empty()) mesh.normals.resize(mesh.verts.size(), Vec3{0, 1, 0});
+			}
 			return mesh;
 		};
 		if (mo.anim) {
@@ -1227,8 +1252,7 @@ inline std::string movingText(const std::string &film, const Model &m, const Pla
 					if (q.id == pl.id)
 						for (std::size_t b = 0; b < p.bones.size(); ++b)
 							if (p.bones[b].name == q.bone) own[b] = mul(own[b], translate(p.bones[b].a), rotate(q.axis, keyedAt(q.keys, mo.t)), translate(p.bones[b].a * -1.0));
-				bonePoses = chainedPoses(p.bones, own);
-				meshNow() = skinned(meshNow(), weightsOf(meshNow(), p.bones), bonePoses);
+				meshNow() = skinned(meshNow(), weightsOf(meshNow(), p.bones), chainedPoses(p.bones, own));
 			}
 			for (const Flex &f : mo.anim->flexes)
 				if (f.name == name) meshNow() = flexed(meshNow(), f.kind, keyedAt(f.keys, mo.t));
@@ -1246,29 +1270,25 @@ inline std::string movingText(const std::string &film, const Model &m, const Pla
 					const Vec3 local = transformPoint(invertAffine(base), transformPoint(base, Vec3{0, 0, 0}) + lag) - Vec3{0, 0, 0};
 					meshNow() = wobbled(meshNow(), local);
 				}
-			for (const Vanish &v : mo.anim->vanishes)
-				if (v.id == pl.id && mo.t > v.t0) meshNow() = vanished(meshNow(), std::clamp((mo.t - v.t0) / std::max(1e-6, v.t1 - v.t0), 0.0, 1.0), k + 1);
 		}
 		for (const Cloth &c : p.cloths)
 			if (c.wave > 0.0) meshNow() = rippled(meshNow(), c.wave, mo.t);
+		double fall = 0.0;   // (how far it has vanished)
+		if (mo.anim)
+			for (const Vanish &v : mo.anim->vanishes)
+				if (v.id == pl.id && mo.t > v.t0) fall = std::max(fall, std::clamp((mo.t - v.t0) / std::max(1e-6, v.t1 - v.t0), 0.0, 1.0));
+		if (fall > 0.0) meshNow();
 		if (reshaped) {
+			// its hair off the mesh again: as the reshaping left it
+			const std::vector<Vec3> loose(mesh.verts.begin() + static_cast<std::ptrdiff_t>(skinVerts), mesh.verts.end());
+			mesh.verts.resize(skinVerts);
+			if (!mesh.normals.empty()) mesh.normals.resize(skinVerts);
+			if (fall > 0.0) mesh = vanished(mesh, fall, k + 1);
 			Part look = p;
 			look.paint.on = false;
 			if (!mesh.tris.empty()) out += attr(!p.texture.empty() && !p.paint.on ? picturedMaterial(p, pieceName(m, p, lod) + "_now") : materialOf(look), emitMesh(mesh, piece));
-			std::string hair;   // (its fur, grown from the skin as it is now, and its strands, on the same bones)
-			if (p.fur.on) {
-				Fur f = p.fur;
-				f.density /= lod * lod;
-				hair = furText(mesh, f);
-			}
-			if (!p.strands.empty())
-				if (const std::shared_ptr<const StrandSet> set = strandsOf(p.strands)) {
-					if (bonePoses.empty()) hair += strandsText(*set, lod);
-					else {
-						const Weights w = weightsOf(set->roots, p.bones);
-						hair += strandsText(*set, lod, &w, &bonePoses);
-					}
-				}
+			std::string hair = furText(std::vector<Vec3>(loose.begin(), loose.begin() + static_cast<std::ptrdiff_t>(furLoose)), furNow, fall);
+			if (strands) hair += strandsText(*strands, lod, loose.data() + furLoose, p.strandRings, p.strandSides, fall);
 			if (!hair.empty()) out += "AttributeBegin\n" + film_cache::placement(piece) + hair + "AttributeEnd\n";
 			continue;
 		}
@@ -1305,8 +1325,9 @@ inline std::string placedText(const std::string &film, const std::vector<Model> 
 	}
 	for (const auto &[key, frames] : groups) {
 		const Model &m = *byName[key.first];
-		if (frames.size() == 1) {
-			out += "AttributeBegin\n" + film_cache::placement(frames[0]) + modelText(film, m, key.second) + "AttributeEnd\n";
+		const bool hairy = std::any_of(m.parts.begin(), m.parts.end(), [](const Part &p) { return p.fur.on || !p.strands.empty(); });
+		if (frames.size() == 1 || hairy) {   // (curves are not kept in an object: every copy of a model with hair is written out)
+			for (const Mat4 &f : frames) out += "AttributeBegin\n" + film_cache::placement(f) + modelText(film, m, key.second) + "AttributeEnd\n";
 			continue;
 		}
 		const std::string object = "model_" + m.name + "_lod" + std::to_string(key.second);

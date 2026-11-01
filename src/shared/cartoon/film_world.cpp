@@ -1159,12 +1159,12 @@ void DataFilm::soundscape(audio::Mix &m) const {
 	for (std::size_t i = 0; i < spec.fires.size(); ++i) {
 		const fire::Fire &f = spec.fires[i];
 		if (!f.sound) continue;
-		const double g = 0.12 * f.size;
-		ss::lay(m, ears, f.t0, f.t1, 0.25, [&f](double) { return f.at + Vec3{0.0, 0.3 * f.size, 0.0}; }, [g](double) { return g; }, ss::roar(120.0, 700.0, 0.6, 201u + static_cast<unsigned>(i)), 4.0);
+		ss::lay(m, ears, f.t0, f.t1, 0.25, [&f](double t) { return f.at + Vec3{0.0, 0.3 * f.sizeAt(t), 0.0}; }, [&f](double t) { return 0.12 * f.sizeAt(t); }, ss::roar(120.0, 700.0, 0.6, 201u + static_cast<unsigned>(i)), 4.0);
 		double t = std::max(0.0, f.t0);
 		for (unsigned k = 0; t < std::min(f.t1, T); ++k) {
-			ss::place(m, ears, t, f.at + Vec3{0.0, 0.4 * f.size, 0.0}, ss::crackle(301u + k), 0.3 * f.size * (0.4 + audio::unit(311u + k)), 4.0);
-			t += -std::log(std::max(1e-6, 1.0 - audio::unit(331u + k + 7919u * static_cast<unsigned>(i)))) / (8.0 * f.size);
+			const double size = f.sizeAt(t);   // (a fire dying down crackles less often and more softly)
+			ss::place(m, ears, t, f.at + Vec3{0.0, 0.4 * size, 0.0}, ss::crackle(301u + k), 0.3 * size * (0.4 + audio::unit(311u + k)), 4.0);
+			t += -std::log(std::max(1e-6, 1.0 - audio::unit(331u + k + 7919u * static_cast<unsigned>(i)))) / (8.0 * size);
 		}
 	}
 	for (std::size_t i = 0; i < spec.wildfires.size(); ++i) {

@@ -94,6 +94,7 @@ inline std::string fireLine(Spec &s, const std::string &verb, const std::string 
 			for (i += 1; i + 1 < t.size() && number(t[i], a) && number(t[i + 1], b); i += 2) {
 				if (!keys.empty() && a <= keys.back().first) return fail("a fire's keys go forward in time");
 				if (tall && (b < 0.05 || b > 100.0)) return fail("a fire is 0.05 to 100 m tall");
+				if (!tall && std::abs(b) > 0.35) return fail("a fire leans at most 0.35 of its height: further, its tips leave the grid its gas is in");
 				keys.emplace_back(a, b);
 			}
 			if (keys.empty()) return fail(usage);
@@ -132,7 +133,10 @@ inline std::string fireLine(Spec &s, const std::string &verb, const std::string 
 			return fail("\"" + t[i] + "\": " + usage);
 		}
 	}
-	if (verb == "fire") s.fires.push_back(fi);
+	if (verb == "fire") {
+		for (const auto &key : fi.sizes) fi.size = key == fi.sizes.front() ? key.second : std::max(fi.size, key.second);   // (with `sizes`, its `size` is the tallest it gets: its sparks and its smoke's scale)
+		s.fires.push_back(fi);
+	}
 	else if (verb == "lava") s.lavas.push_back(la);
 	else if (verb == "volcano") {
 		if (vo.lightning > 0 && vo.column <= 0.0) return fail("lightning flickers in an ash column: give the volcano a `column H`");

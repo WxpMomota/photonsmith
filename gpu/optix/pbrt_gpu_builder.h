@@ -1039,6 +1039,8 @@ inline void addBilinearPatches(BuildCtx &c) {
 	stats.bilinearPatches = out.bilinearPatches.size();
 }
 
+#include "pbrt_gpu_strands.h"
+
 inline void addCurves(BuildCtx &c) {
 	using namespace detail;
 	const auto &scene = c.scene;
@@ -1061,6 +1063,7 @@ inline void addCurves(BuildCtx &c) {
 	// PBRT_SUPPORT.md), not an oversight; pbrt-v4's own GPU dicing has the
 	// identical divergence for the identical reason.
 	for (const pbrt_flatten::Curve &cv : scene.curves) {
+		if (asTriangles(scene, cv)) continue;   // (addStrandTriangles)
 		const int matIdx = materialIndex(cv.material, cv.areaLight);
 		const int n_length = cv.diceLength, n_radial = cv.diceRadial;
 		std::vector<curve_tessellate::Quad> quads;
@@ -1974,6 +1977,7 @@ inline BuildStats build(const pbrt_flatten::FlatScene &scene, SceneData &out) {
 	addCurves(c);
 	addDisksAndCylinders(c);
 	addTrianglesAndQuads(c);
+	addStrandTriangles(c);
 	addInstances(c);
 	addInfiniteLight(c);
 	addPunctualLights(c);

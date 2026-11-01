@@ -236,6 +236,17 @@ TEST(FilmReal, AFireCanChangeOverTheFilm) {
 	EXPECT_DOUBLE_EQ(plain.sizeAt(3.0), plain.size) << "with no keys, its size";
 	EXPECT_NE(ff::fireLine(s, "fire", "fire at 0 0 0 sizes 5 1  2 3"), "") << "keys go forward";
 	EXPECT_NE(ff::fireLine(s, "fire", "fire at 0 0 0 sizes 1 500"), "") << "and stay a fire's size";
+	EXPECT_NE(ff::fireLine(s, "fire", "fire at 0 0 0 leans 0 0.5"), "") << "tips stay in its grid";
+	ff::Spec dying;
+	ASSERT_EQ(ff::fireLine(dying, "fire", "fire at 0 0 0 sizes 0 6  10 0.6"), "");
+	EXPECT_DOUBLE_EQ(dying.fires[0].size, 6.0) << "with no `size`, the tallest of its `sizes`: its sparks start from there, not from a fire of 1.2 m";
+	namespace particles = cartoon::particles;
+	particles::Emitter e;
+	e.kind = "sparks", e.at = {0, 0, 0}, e.t0 = 0.0, e.t1 = 20.0, e.rate = 100.0;
+	particles::Emitter dies = e;
+	dies.strength = {{0.0, 1.0}, {10.0, 0.1}};
+	const auto count = [](const std::string &text) { std::size_t n = 0; for (std::size_t at = text.find("Shape"); at != std::string::npos; at = text.find("Shape", at + 1)) ++n; return n; };
+	EXPECT_LT(2 * count(particles::emitterText(dies, 15.0)), count(particles::emitterText(e, 15.0))) << "a fire dying down throws fewer sparks";
 	EXPECT_NE(firefx::flameText("f", {0, 0, 0}, 2.0, 1.0, 1, 10).find("LightSource"), std::string::npos);
 	const std::string dark = firefx::flameText("f", {0, 0, 0}, 2.0, 1.0, 1, 10, 0.0, 1.0, false);
 	EXPECT_EQ(dark.find("LightSource"), std::string::npos) << "its light left to the scene";

@@ -42,21 +42,19 @@ struct Fur {
 	Vec3 colour{0.55, 0.4, 0.25};
 	int seed = 1;
 };
-// The strands as pbrt curves, in the mirrored space a placed PLY is in (x negated: film_cache::placement). At most 60000 strands.
-inline std::string furText(const Mesh &m, const Fur &f) {
+// The strands' control points, four a strand: at most 60000 strands. Grown from one mesh and kept, a coat is the same hairs every frame: regrown from a skin that is bending, the picks by
+// area would land on other triangles and the whole coat would boil.
+inline std::vector<Vec3> furPoints(const Mesh &m, const Fur &f) {
 	double area = 0.0;
 	std::vector<double> run;
 	for (const auto &t : m.tris) {
 		area += 0.5 * length(cross(m.verts[t[1]] - m.verts[t[0]], m.verts[t[2]] - m.verts[t[0]]));
 		run.push_back(area);
 	}
-	if (area <= 0.0) return std::string();
+	std::vector<Vec3> out;
+	if (area <= 0.0) return out;
 	const int n = static_cast<int>(std::min(60000.0, f.density * area));
-	std::string out;
-	out.reserve(static_cast<std::size_t>(n) * 200);
-	char buf[400];
-	std::snprintf(buf, sizeof buf, "  Material \"coateddiffuse\" \"rgb reflectance\" [ %.4f %.4f %.4f ] \"float roughness\" [ 0.5 ]\n", f.colour.x, f.colour.y, f.colour.z);
-	out += buf;
+	out.reserve(static_cast<std::size_t>(n) * 4);
 	for (int k = 0; k < n; ++k) {
 		const double pick = hash01(k * 7919 + f.seed, 1) * area;
 		const std::size_t t = static_cast<std::size_t>(std::lower_bound(run.begin(), run.end(), pick) - run.begin());
@@ -69,6 +67,21 @@ inline std::string furText(const Mesh &m, const Fur &f) {
 		const double L = f.length * (0.7 + 0.6 * hash01(k * 7919 + f.seed, 4));
 		const Vec3 curl{f.curl * (hash01(k, f.seed + 5) - 0.5), 0.0, f.curl * (hash01(k, f.seed + 6) - 0.5)};
 		const Vec3 p1 = p + n0 * (0.35 * L), p2 = p + n0 * (0.7 * L) + (curl + Vec3{0, -f.droop, 0}) * (0.3 * L), p3 = p + n0 * (0.9 * L) + (curl * 1.6 + Vec3{0, -f.droop, 0}) * (0.7 * L);
+		out.push_back(p), out.push_back(p1), out.push_back(p2), out.push_back(p3);
+	}
+	return out;
+}
+// Those strands as pbrt curves, in the mirrored space a placed PLY is in (x negated: film_cache::placement). `fall`: the share that have fallen away (a piece that vanishes).
+inline std::string furText(const std::vector<Vec3> &points, const Fur &f, double fall = 0.0) {
+	if (points.empty()) return std::string();
+	std::string out;
+	out.reserve(points.size() / 4 * 200);
+	char buf[400];
+	std::snprintf(buf, sizeof buf, "  Material \"coateddiffuse\" \"rgb reflectance\" [ %.4f %.4f %.4f ] \"float roughness\" [ 0.5 ]\n", f.colour.x, f.colour.y, f.colour.z);
+	out += buf;
+	for (std::size_t k = 0; k + 3 < points.size(); k += 4) {
+		if (fall > 0.0 && hash01(static_cast<int>(k), 92) < fall) continue;
+		const Vec3 &p = points[k], &p1 = points[k + 1], &p2 = points[k + 2], &p3 = points[k + 3];
 		std::snprintf(buf, sizeof buf, "  Shape \"curve\" \"string type\" \"cylinder\" \"float width0\" [ %.5f ] \"float width1\" [ %.5f ] \"point3 P\" [ %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f ]\n",
 					  f.width, 0.25 * f.width, -p.x, p.y, p.z, -p1.x, p1.y, p1.z, -p2.x, p2.y, p2.z, -p3.x, p3.y, p3.z);
 		out += buf;

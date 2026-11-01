@@ -105,23 +105,16 @@ TEST(GpuTessellateTest, AShapeOfAnInterfaceMaterialIsSkipped) {
 	EXPECT_TRUE(s.cones.empty() && s.paraboloids.empty()) << "they are dropped, not left for the backend";
 }
 
-// A strand can say how finely it is diced, and ask for triangles, which the card's hardware tests. A hair that says nothing stays OptiX's own eighty patches.
-TEST(GpuTessellateTest, AFineStrandChoosesItsDicingAndCanBeTriangles) {
+// A strand says how finely it is diced. OptiX's own dicing is in its builder (pbrt_gpu_lamp_material_tests.cpp); a backend with no curves of its own honours it here.
+TEST(GpuTessellateTest, AFineStrandChoosesItsDicing) {
 	pbrt_flatten::FlatScene s = sceneWithEveryKind();
 	ASSERT_EQ(s.curves.size(), 1u);
 	pbrt_flatten::Curve fine = s.curves[0];
-	fine.diceLength = 3, fine.diceRadial = 3, fine.diceTriangles = true;
+	fine.diceLength = 3, fine.diceRadial = 3;
 	s.curves.push_back(fine);
 	s.cones.clear(), s.paraboloids.clear(), s.bilinearPatches.clear();
-	EXPECT_EQ(tessellateForBackend(s, TessellationCaps::conesAndParaboloids(), nullptr), size_t(3 * 3 * 2));
-	ASSERT_EQ(s.curves.size(), 1u) << "only the strand that asked: the other is diced by the backend";
-	EXPECT_FALSE(s.curves[0].diceTriangles);
-
-	pbrt_flatten::FlatScene metal = sceneWithEveryKind();
-	metal.curves.push_back(fine);
-	metal.cones.clear(), metal.paraboloids.clear(), metal.bilinearPatches.clear();
-	EXPECT_EQ(tessellateForBackend(metal, TessellationCaps::all(), nullptr), size_t(10 * 8 * 2 + 3 * 3 * 2)) << "a backend with no curves of its own honours the dicing too";
-	EXPECT_TRUE(metal.curves.empty());
+	EXPECT_EQ(tessellateForBackend(s, TessellationCaps::all(), nullptr), size_t(10 * 8 * 2 + 3 * 3 * 2));
+	EXPECT_TRUE(s.curves.empty());
 }
 
 TEST(GpuTessellateTest, MaterialAndAreaLightCarryOverToTheTriangles) {

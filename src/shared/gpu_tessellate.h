@@ -170,7 +170,7 @@ inline size_t tessellateForBackend(pbrt_flatten::FlatScene& scene, const Tessell
     // Curve: every Bezier segment becomes a tapered tube, 8-sided unless the curve says otherwise (the same dicing density OptiX
     // uses); width interpolates across the WHOLE curve, as in pbrt-v4. Flat-shaded.
     for (const pbrt_flatten::Curve& cv : scene.curves) {
-        if (!caps.curves && !cv.diceTriangles) continue;
+        if (!caps.curves) break;
         if (isInterface(cv.material)) continue;
         std::vector<curve_tessellate::Quad> quads;
         for (int seg = 0; seg < cv.nSegments; ++seg) {
@@ -210,7 +210,6 @@ inline size_t tessellateForBackend(pbrt_flatten::FlatScene& scene, const Tessell
     if (caps.cones) scene.cones.clear();
     if (caps.paraboloids) scene.paraboloids.clear();
     if (caps.curves) scene.curves.clear();
-    else scene.curves.erase(std::remove_if(scene.curves.begin(), scene.curves.end(), [](const pbrt_flatten::Curve& c) { return c.diceTriangles; }), scene.curves.end());
     if (caps.texturedQuadrics) { scene.disks = std::move(keptDisks); scene.cylinders = std::move(keptCylinders); scene.spheres = std::move(keptSpheres); }
     return out.size();
 }

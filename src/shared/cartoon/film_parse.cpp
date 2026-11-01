@@ -994,6 +994,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 		if (!f.sparks) continue;
 		particles::Emitter e;
 		e.kind = "sparks", e.at = f.at + Vec3{0.0, 0.3 * f.size, 0.0}, e.t0 = std::max(0.0, f.t0), e.t1 = std::min(s.length, f.t1), e.rate = 12.0 * f.size, e.speed = 1.5 * std::sqrt(f.size);
+		for (const auto &key : f.sizes) e.strength.emplace_back(key.first, key.second / f.size);   // (`size` is the tallest of a fire's `sizes`, and it throws sparks as it burns)
 		s.emitters.push_back(e);
 	}
 	if (s.hasTerrain)

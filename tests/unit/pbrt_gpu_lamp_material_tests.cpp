@@ -25,6 +25,8 @@ SceneData buildScene(const std::string& body) {
 	return scene;
 }
 
+const char* const kStrand = "\"point3 P\" [ 0 0 0  0 1 0  0 2 0  0 3 0 ] \"float width\" 0.01";
+
 std::string lamp(const std::string& material, double x) {
 	return "AttributeBegin\n  " + material + "\n  AreaLightSource \"diffuse\" \"rgb L\" [ 4 4 4 ]\n  Translate " + std::to_string(x) +
 	       " 0 0\n  Shape \"sphere\" \"float radius\" [ 0.5 ]\nAttributeEnd\n";
@@ -38,6 +40,32 @@ std::vector<const MaterialData*> lampMaterials(const SceneData& scene) {
 }
 
 }  // namespace
+
+// A curve says how it is diced, and a fine strand can be triangles, which the card's hardware tests, not patches. A hair stays on patches (a triangle carries no fibre direction for its
+// shader), and so does a strand that gives out light (the light sampling knows it as patches).
+TEST(PbrtGpuStrands, AStrandIsDicedAsItSays) {
+	const std::string shape = std::string("Shape \"curve\" ");
+	const std::string fine = shape + "\"integer dicelength\" 3 \"integer diceradial\" 3 \"bool dicetriangles\" true " + kStrand + "\n";
+
+	const SceneData plain = buildScene(shape + kStrand + "\n");
+	EXPECT_EQ(plain.bilinearPatches.size(), 10u * 8u) << "a hair that says nothing is as it was";
+	EXPECT_TRUE(plain.triangles.empty());
+
+	const SceneData diced = buildScene(shape + "\"integer dicelength\" 2 \"integer diceradial\" 3 " + kStrand + "\n");
+	EXPECT_EQ(diced.bilinearPatches.size(), 2u * 3u);
+
+	const SceneData triangles = buildScene(fine);
+	EXPECT_EQ(triangles.triangles.size(), 3u * 3u * 2u);
+	EXPECT_TRUE(triangles.bilinearPatches.empty());
+
+	const SceneData hair = buildScene("Material \"hair\"\n" + fine);
+	EXPECT_EQ(hair.bilinearPatches.size(), 3u * 3u) << "a hair material needs the patches' fibre direction";
+	EXPECT_TRUE(hair.triangles.empty());
+
+	const SceneData glowing = buildScene("AreaLightSource \"diffuse\" \"rgb L\" [ 1 1 1 ]\n" + fine);
+	EXPECT_EQ(glowing.bilinearPatches.size(), 3u * 3u);
+	EXPECT_TRUE(glowing.triangles.empty());
+}
 
 TEST(PbrtGpuLampMaterial, ADefaultLampReflectsAndABlackBodyDoesNot) {
 	const SceneData scene = buildScene("WorldBegin\n" + lamp("", 0) + lamp("Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]", 2));

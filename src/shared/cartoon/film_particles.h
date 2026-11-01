@@ -32,6 +32,7 @@ struct Emitter {
 	Vec3 at;
 	double t0 = 0.0, t1 = 0.0, rate = 60.0, speed = 0.0;
 	int count = 0;   // (a burst) how many
+	std::vector<std::pair<double, double>> strength;   // over time (seconds, 0 to 1), in order: the share of its `rate` that is thrown then (none: all of it). A fire dying down throws fewer.
 };
 inline const std::vector<std::string> &weatherKinds() {
 	static const std::vector<std::string> k = {"rain", "snow", "leaves", "dust", "ash"};
@@ -44,6 +45,12 @@ inline const std::vector<std::string> &emitterKinds() {
 
 namespace detail {
 inline double u01(int a, int b) { return hash01(a, b); }
+inline double strengthAt(const std::vector<std::pair<double, double>> &keys, double t) {
+	if (t <= keys.front().first) return keys.front().second;
+	for (std::size_t k = 1; k < keys.size(); ++k)
+		if (t <= keys[k].first) return keys[k - 1].second + (keys[k].second - keys[k - 1].second) * (t - keys[k - 1].first) / std::max(1e-9, keys[k].first - keys[k - 1].first);
+	return keys.back().second;
+}
 inline void num(std::string &out, double v) {
 	char buf[24];
 	std::snprintf(buf, sizeof buf, "%.4f ", v);
@@ -188,6 +195,7 @@ inline std::string emitterText(const Emitter &e, double t) {
 		const double born = burst ? e.t0 : e.t0 + n / e.rate;
 		const double age = t - born, mine = life * (0.6 + 0.6 * detail::u01(n, 11));
 		if (age < 0.0 || age > mine) continue;
+		if (!e.strength.empty() && detail::u01(n, 15) > detail::strengthAt(e.strength, born)) continue;
 		// thrown upward and out, at a speed of its own
 		const double a = 6.28318 * detail::u01(n, 12), up = e.kind == "dust" ? 0.3 + 0.4 * detail::u01(n, 13) : 0.5 + 0.5 * detail::u01(n, 13);
 		const double v = speed * (0.5 + 0.7 * detail::u01(n, 14));

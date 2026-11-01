@@ -599,7 +599,7 @@ struct Curve {
 	// a strand thinner than a pixel looks the same at a tenth of that, and fur by the hundred thousand is mostly these patches: their memory and the time to build their BVH each frame.
 	int diceLength = 10, diceRadial = 8;
 	// ("bool dicetriangles", also ours) Diced into triangles, which the card's ray tracing hardware tests, not bilinear patches, which a program of ours tests: much faster for a coat of
-	// fine strands. Flat-shaded, and no fibre direction reaches a hair material, so for strands in a plain material.
+	// fine strands. Flat-shaded. A strand in a hair material or one that gives out light stays on patches (OptiX: pbrt_gpu_builder.h): a triangle carries no fibre direction for hair.
 	bool diceTriangles = false;
 	// Ribbon only - one shading normal per segment ENDPOINT (nSegments+1
 	// total, world space, unit length, transformed via transformNormal not
