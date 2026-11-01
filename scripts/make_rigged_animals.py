@@ -1,5 +1,8 @@
 """Makes the films' rigged animals (src/shared/cartoon/film_animals.h): skinned glTF 2.0 models with their clips, in pbrt_scenes/film_assets/library/animals/.
 
+  one skin                        a quadruped's trunk, neck, upper legs and the masses of its shoulders and haunches are drawn as tubes and blobs and then fused (`fuse`): a distance
+                                  field of them, blended where they meet, and one surface round it. A leg grows out of the body; it is not a tube pushed into a tube.
+
   deer.glb, horse.glb, wolf.glb   a quadruped each, from one generator: a skeleton of a pelvis and a chest (the spine), a neck and a head, a tail, and four legs of three
                                   bones (the upper leg, the lower leg, the foot), and a body lofted round it - a barrel, a neck, a head with its muzzle, ears, eyes, a tail,
                                   hooves or paws, a deer's antlers, a horse's mane - skinned smoothly across the joints (each ring of a tube weighted between the bones it
@@ -153,6 +156,190 @@ def panel(mesh, outline, thickness, skins, normal):
             mesh.vertex(add(p, mul(nrm, side * thickness / 2)), mul(nrm, side), s)
         for k in range(1, len(outline) - 1):
             mesh.idx += [base, base + k, base + k + 1] if side > 0 else [base, base + k + 1, base + k]
+
+
+class Source:
+    """A tube to be fused: rings as tube() takes them, with where each falls along the coat's picture (`along`), the `rect` of the picture and the `mesh` it goes to. No rect: a mass under
+    the skin, which shapes it and gives it no colour of its own."""
+    def __init__(self, centres, radii, skins, up=(0, 1, 0), rect=None, mesh=None, along=None):
+        self.centres, self.radii, self.skins, self.rect, self.mesh = centres, radii, skins, rect, mesh
+        n = len(centres)
+        self.along = along or [i / max(1, n - 1) for i in range(n)]
+        self.frames = []
+        for i in range(n):
+            t = norm(sub(centres[min(i + 1, n - 1)], centres[max(i - 1, 0)]))
+            u = cross(norm(up), t)
+            if math.sqrt(dot(u, u)) < 1e-6:
+                u = cross([1, 0, 0], t)
+            u = norm(u)
+            self.frames.append((t, u, cross(t, u)))
+
+    def near(self, p, i):
+        """How far `p` is outside segment i of it (below 0: inside), where along the segment, and its place across: (distance, w, x, y, a, b)."""
+        c0, c1 = self.centres[i], self.centres[i + 1]
+        s = sub(c1, c0)
+        w = max(0.0, min(1.0, dot(sub(p, c0), s) / max(1e-12, dot(s, s))))
+        c = lerp(c0, c1, w)
+        f0, f1 = self.frames[i], self.frames[i + 1]
+        u, v = lerp(f0[1], f1[1], w), lerp(f0[2], f1[2], w)
+        a = max(1e-5, self.radii[i][0] + (self.radii[i + 1][0] - self.radii[i][0]) * w)
+        b = max(1e-5, self.radii[i][1] + (self.radii[i + 1][1] - self.radii[i][1]) * w)
+        q = sub(p, c)
+        x, y = dot(q, u), dot(q, v)
+        k = math.sqrt((x / a) ** 2 + (y / b) ** 2)
+        r = math.sqrt(x * x + y * y)
+        d = r * (1.0 - 1.0 / k) if k > 1e-6 else -min(a, b)
+        if w <= 0.0 or w >= 1.0:
+            axial = abs(dot(q, f0[0] if w <= 0.0 else f1[0]))
+            if (w <= 0.0 and i == 0) or (w >= 1.0 and i + 2 == len(self.centres)):   # (past an end of the tube: rounded off)
+                d = math.sqrt(max(d, 0.0) ** 2 + axial * axial) if d > 0.0 else max(d, axial - 1e-9)
+            else:   # (past a ring within it: the outer corner of a bend is still inside, and no more than that)
+                d = max(d, axial - 0.75 * math.sqrt(dot(s, s)))
+        return d, w, x, y, a, b
+
+
+def fuse(sources, h, blend, softSkin):
+    """One surface round `sources`, cells `h` across, blended over `blend` where they meet, its triangles and their points going to the sources' meshes: a distance field (each tube stamped
+    over its own box, as most of space is empty) and surface nets. Each point follows the bones of the nearest tubes, shared by how near they are; each triangle takes the coat's picture
+    of the one tube nearest all of it, so the picture does not smear across the join."""
+    lo = [min(c[k] - max(r) for s in sources for c, r in zip(s.centres, s.radii)) - 4 * h - blend for k in range(3)]
+    hi = [max(c[k] + max(r) for s in sources for c, r in zip(s.centres, s.radii)) + 4 * h + blend for k in range(3)]
+    nx, ny, nz = [int((hi[k] - lo[k]) / h) + 2 for k in range(3)]
+    far_ = 1e3
+    field = [far_] * (nx * ny * nz)
+    index = lambda x, y, z: x + nx * (y + ny * z)
+    band = 3 * h + blend
+    for s in sources:
+        own = {}
+        for i in range(len(s.centres) - 1):
+            r = max(max(s.radii[i]), max(s.radii[i + 1])) + band
+            box0 = [max(0, int((min(s.centres[i][k], s.centres[i + 1][k]) - r - lo[k]) / h)) for k in range(3)]
+            box1 = [min((nx, ny, nz)[k] - 1, int((max(s.centres[i][k], s.centres[i + 1][k]) + r - lo[k]) / h) + 1) for k in range(3)]
+            for z in range(box0[2], box1[2] + 1):
+                for y in range(box0[1], box1[1] + 1):
+                    base = nx * (y + ny * z)
+                    for x in range(box0[0], box1[0] + 1):
+                        d = s.near([lo[0] + x * h, lo[1] + y * h, lo[2] + z * h], i)[0]
+                        at = base + x
+                        was = own.get(at)
+                        if was is None or d < was:
+                            own[at] = d
+        for at, d in own.items():   # (smooth union: a fillet `blend` wide where it meets what is there)
+            e = field[at]
+            w = max(blend - abs(e - d), 0.0) / blend
+            field[at] = min(e, d) - w * w * blend * 0.25
+    # surface nets: a point in each cell the surface passes through, a quad across each edge it cuts
+    corners = [(i & 1, (i >> 1) & 1, (i >> 2) & 1) for i in range(8)]
+    edges = [(0, 1), (2, 3), (4, 5), (6, 7), (0, 2), (1, 3), (4, 6), (5, 7), (0, 4), (1, 5), (2, 6), (3, 7)]
+    cell, points = {}, []
+    for z in range(nz - 1):
+        for y in range(ny - 1):
+            for x in range(nx - 1):
+                f = [field[index(x + c[0], y + c[1], z + c[2])] for c in corners]
+                if min(f) >= 0.0 or max(f) < 0.0:
+                    continue
+                total, count = [0.0, 0.0, 0.0], 0
+                for a, b in edges:
+                    if (f[a] < 0.0) != (f[b] < 0.0):
+                        w = f[a] / (f[a] - f[b])
+                        total = add(total, lerp(corners[a], corners[b], w))
+                        count += 1
+                cell[(x, y, z)] = len(points)
+                points.append([lo[k] + ((x, y, z)[k] + total[k] / count) * h for k in range(3)])
+    quads = []
+    for (x, y, z), _ in list(cell.items()):
+        here = field[index(x, y, z)]
+        for axis, step in ((0, (1, 0, 0)), (1, (0, 1, 0)), (2, (0, 0, 1))):
+            there = field[index(x + step[0], y + step[1], z + step[2])]
+            if (here < 0.0) == (there < 0.0):
+                continue
+            p, q = (axis + 1) % 3, (axis + 2) % 3
+            around = []
+            for a, b in ((0, 0), (1, 0), (1, 1), (0, 1)):
+                c = [x, y, z]
+                c[p] -= a
+                c[q] -= b
+                around.append(cell.get(tuple(c)))
+            if None not in around:
+                quads.append(around if here < 0.0 else around[::-1])
+    # once over with the neighbours' average, for the steps of the grid
+    linked = [set() for _ in points]
+    for q in quads:
+        for i in range(4):
+            linked[q[i]].add(q[(i + 1) % 4])
+            linked[q[i]].add(q[(i + 3) % 4])
+    for _ in range(2):
+        moved = []
+        for i, p in enumerate(points):
+            if linked[i]:
+                mean = [sum(points[j][k] for j in linked[i]) / len(linked[i]) for k in range(3)]
+                moved.append(lerp(p, mean, 0.6))
+            else:
+                moved.append(p)
+        points = moved
+    tris = []
+    for a, b, c, d in quads:
+        tris += [(a, b, c), (a, c, d)]
+    normals = [[0.0, 0.0, 0.0] for _ in points]
+    for a, b, c in tris:
+        n = cross(sub(points[b], points[a]), sub(points[c], points[a]))
+        for v in (a, b, c):
+            normals[v] = add(normals[v], n)
+    # what each point follows, and which tube is nearest it
+    nearest, skins = [], []
+    for p in points:
+        reach = []
+        for t, s in enumerate(sources):
+            best = None
+            for i in range(len(s.centres) - 1):
+                mid = lerp(s.centres[i], s.centres[i + 1], 0.5)
+                if best is not None and math.sqrt(dot(sub(p, mid), sub(p, mid))) > best[0] + 3.0 * max(s.radii[i]) + 3.0 * blend:
+                    continue
+                d, w, x, y, a, b = s.near(p, i)
+                if best is None or d < best[0]:
+                    best = (d, i, w, x, y)
+            reach.append((best[0], t, best[1], best[2], best[3], best[4]))
+        least = min(r[0] for r in reach)
+        weights = {}
+        for d, t, i, w, x, y in reach:
+            share = math.exp(-((d - least) / (0.5 * blend)) ** 2)
+            if share < 0.03:
+                continue
+            for skin, part in ((sources[t].skins[i], 1.0 - w), (sources[t].skins[i + 1], w)):
+                for joint, value in skin:
+                    weights[joint] = weights.get(joint, 0.0) + value * part * share
+        skins.append(softSkin(p, sorted(weights.items(), key=lambda jw: -jw[1])[:4]))
+        coloured = [r for r in reach if sources[r[1]].rect]
+        nearest.append({r[1]: r for r in coloured})
+    made = {}
+    def placeOf(t, v):   # (where a point falls on the coat's picture, seen from tube t)
+        r = nearest[v].get(t)
+        s = sources[t]
+        if r is None:
+            return None
+        _, _, i, w, x, y = r
+        a = (s.along[i] + (s.along[i + 1] - s.along[i]) * w)
+        turn = (math.atan2(y, x) + math.pi / 2.0) / (2.0 * math.pi) % 1.0
+        return (s.rect[0] + (s.rect[2] - s.rect[0]) * a, turn)
+    for a, b, c in tris:
+        scores = {}
+        for v in (a, b, c):
+            for t, r in nearest[v].items():
+                scores[t] = scores.get(t, 0.0) + r[0]
+        t = min(scores, key=lambda k: scores[k] + (1e3 if any(k not in nearest[v] for v in (a, b, c)) else 0.0))
+        s = sources[t]
+        uv = [placeOf(t, v) for v in (a, b, c)]
+        turns = [q[1] for q in uv]
+        if max(turns) - min(turns) > 0.5:   # (across the seam under the belly: all on one side of it)
+            uv = [(q[0], 0.999 if q[1] < 0.5 else q[1]) for q in uv]
+        ids = []
+        for v, q in zip((a, b, c), uv):
+            key = (v, t, q[1] == 0.999)
+            if key not in made:
+                made[key] = s.mesh.vertex(points[v], normals[v], skins[v], (q[0], s.rect[1] + (s.rect[3] - s.rect[1]) * q[1]))
+            ids.append(made[key])
+        s.mesh.idx += [ids[0], ids[2], ids[1]]
+    return len(points), len(tris)
 
 
 def sheet(mesh, base, tip, wide, cup, skin, rows=7, columns=6):
@@ -369,7 +556,7 @@ def quadruped(name, s):
         radii.append((width, 0.5 * (top - under)))
         wc = min(1.0, max(0.0, (u - 0.35) / 0.3))
         skins.append([(J["pelvis"], 1 - wc), (J["chest"], wc)])
-    tube(body, centres, radii, skins, sides=24, rect=(0.0, 0.0, 0.5, 0.5), skinAt=softSkin)
+    fused = [Source(centres, radii, skins, rect=(0.0, 0.0, 0.5, 0.5), mesh=body)]
     # the neck: an arched crest from the withers to the poll, deep at its base and narrowing to the throat
     centres, radii, skins = [], [], []
     neckStart = add(neckBase, [0, -0.16 * H, -0.14 * H])
@@ -382,7 +569,7 @@ def quadruped(name, s):
         centres.append(p)
         radii.append(r)
         skins.append([(J["chest"], max(0.0, 1 - 2.5 * u)), (J["neck"], min(1.0, 2.5 * u) * (1 - max(0.0, (u - 0.7) / 0.3))), (J["head"], max(0.0, (u - 0.7) / 0.3))])
-    tube(body, centres, radii, skins, sides=16, rect=(0.5, 0.0, 0.5 + 0.25 * min(1.0, s["neck"] / 0.8), 0.5))
+    fused.append(Source(centres, radii, skins, rect=(0.5, 0.0, 0.5 + 0.25 * min(1.0, s["neck"] / 0.8), 0.5), mesh=body))
     # the head: from the poll down to the muzzle, wide at the forehead, deep at the jaw, narrowing along the nose and flaring a little at the nostrils
     hd = [0, -math.sin(math.radians(35)), math.cos(math.radians(35))]
     below = norm(cross(hd, [1, 0, 0]))
@@ -526,11 +713,29 @@ def quadruped(name, s):
         if s.get("pillar"):   # (an elephant's legs: pillars, hardly narrowing to the foot)
             radii = radii[:3] + [(0.75 * thick, 0.8 * thick)] * (len(rings) - 3)
         legIndex = [l for l, _, _ in LEGS].index(leg)
-        tube(belly, centres, radii, skins, sides=14, up=(0, 0, 1), rect=(0.0, 0.5 + 0.125 * legIndex, 0.5, 0.5 + 0.125 * (legIndex + 1)))
+        # the thigh or the forearm's top is part of the body's one skin, down past the knee, where the lean lower leg comes out of it
+        rows = (0.5 + 0.125 * legIndex, 0.5 + 0.125 * (legIndex + 1))
+        cut, end = 5, 9
+        last = len(centres) - 1
+        tapered = radii[:end - 2] + [(radii[end - 2][0] * 0.95, radii[end - 2][1] * 0.95), (radii[end - 1][0] * 0.7, radii[end - 1][1] * 0.7)]   # (it goes in under the lower leg's skin)
+        fused.append(Source(centres[:end], tapered, skins[:end], up=(0, 0, 1), rect=(0.0, rows[0], 0.5, rows[1]), mesh=belly, along=[i / last for i in range(end)]))
+        tube(belly, centres[cut:], [(radii[cut][0] * 0.9, radii[cut][1] * 0.9)] + radii[cut + 1:], skins[cut:], sides=14, up=(0, 0, 1), rect=(0.5 * cut / last, rows[0], 0.5, rows[1]))
         if s["hoof"]:
             tube(feet, [add(ground, [0, 0.07 * H, -0.01 * H]), add(ground, [0, 0.002, 0.012 * H])], [(0.21 * thick, 0.2 * thick), (0.26 * thick, 0.28 * thick)], [[(f_, 1.0)]] * 2, sides=10, up=(0, 0, 1))
         else:   # a paw: a pad forward of the foot
             tube(feet, [add(ground, [0, 0.03 * H, -0.03 * H]), add(ground, [0, 0.025 * H, 0.06 * H])], [(0.25 * thick, 0.14 * thick), (0.2 * thick, 0.1 * thick)], [[(f_, 1.0)]] * 2, sides=10)
+    # what fills the skin out where a leg meets the body: the shoulder over its blade, the haunch, the breast between the forelegs
+    for side in (1, -1):
+        for bone, leg, at, wide, long_ in (("chest", "fl", [side * rx * 0.72, shoulderY - 0.17 * H, Lb / 2 + 0.01 * H], 0.4 * rx, 0.2 * H),
+                                           ("pelvis", "hl", [side * rx * 0.74, hipY - 0.17 * H, -Lb / 2 - 0.05 * H], 0.48 * rx, 0.24 * H)):
+            along = [add(at, [0, long_ * u, 0.12 * long_ * u]) for u in (1.0, 0.75, 0.3, -0.3, -0.75, -1.0)]
+            sizes = [(wide * k, 0.6 * long_ * k) for k in (0.05, 0.66, 1.0, 0.85, 0.6, 0.3)]   # (a muscle tapers down into its tendon)
+            fused.append(Source(along, sizes, [[(J[bone], 1.0 - u), (J[leg + ".upper"], u)] for u in (0.0, 0.1, 0.35, 0.65, 0.9, 1.0)]))
+    if not s.get("hop"):
+        at = [0, shoulderY - 0.25 * H, Lb / 2 + 0.17 * H]
+        fused.append(Source([add(at, [0, 0.1 * H * u, 0.03 * H * u]) for u in (1.0, 0.5, -0.5, -1.0)], [(rx * k, rx * k * 0.8) for k in (0.08, 0.5, 0.5, 0.08)], [[(J["chest"], 1.0)]] * 4))
+    points, triangles = fuse(fused, 0.015 * (H + 3.0 * rx), 0.05 * H, softSkin)
+    print("  %s: one skin of %d points, %d triangles" % (name, points, triangles))
     materials = [material("coat", s["body"]), material("legs", s["legs"]), material("hooves", s["feet"], 0.5), material("extra", s["extra"], 0.6),
                  material("eyes", EYES.get(name, (None, (0.02, 0.015, 0.01)))[1], 0.03), material("pupil", (0.004, 0.004, 0.004), 0.03),
                  material("nose", NOSES.get(name, (0.05, 0.04, 0.04)), 0.16), material("ear", s["body"], 0.9), material("lid", (0.012, 0.01, 0.01), 0.45)]
