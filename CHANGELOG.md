@@ -6,6 +6,8 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **Smart power that gets out of the way (2026-10-31).** Typing and browsing no longer pause a render: measured, a film frame keeps other work on the card waiting 0.2 ms. It makes room only when something needs the card (a game, a full-screen film, another program on the card or the processor, the card short of memory, or a real wait while someone is at the computer), within seconds on the wavefront renderer, which now pauses between samples and not after a frame, and goes back to full power ten seconds later instead of ninety. Its GUI, the desktop's drawing, other adapters and a film playing no longer count as other programs on the card.
+
 * **Fine strands that cost less (2026-10-31).** A `Shape "curve"` can say how finely the GPU dices it and ask for triangles, which the card's ray tracing hardware tests, in place of the eighty bilinear patches a hair close to the camera needs. Fur of 345,000 strands: a 1080p frame's card memory from 14.5 GB to 10 GB and a close-up from 50 s to 40 s, the picture the same side by side.
 
 * **Groomed fur that follows the bones (2026-10-31).** `strands FILE` on a model's piece draws curves made by a tool of your own, each following the bones at its root and thinning out with distance. A piece's `fur` no longer vanishes while it is posed.

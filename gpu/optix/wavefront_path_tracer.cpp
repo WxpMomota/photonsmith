@@ -24,6 +24,7 @@
 #include <optix_stack_size.h>
 #include "optix_module_parallel.h"
 #include "adaptive_sampling_report.h"   // --adaptive's log line
+#include "../../src/shared/render_yield.h"
 #include <cuda.h>
 #include <algorithm>
 #include <fstream>
@@ -1022,6 +1023,7 @@ void WavefrontPathTracer::renderSampleLoop(RenderCall &rc) {
 	// launches and round trips to the GPU however few rays it has, and at 50 bounces that was most of an adaptive render.
 	int adaptiveLive = numPixels;   // (the pixels still sampled at the last count)
 	for (int sampleIdx = 0, batch = 1; sampleIdx < samples_per_pixel; sampleIdx += batch) {
+		render_yield::between();   // (the place inside a frame where a render can leave the card to someone who needs it: smart_power.h)
 		batch = 1;
 		if (rc.adaptive) {
 			const int room = queueCapacity_ / (adaptiveLive > 0 ? adaptiveLive : 1);

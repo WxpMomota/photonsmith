@@ -978,13 +978,13 @@ void MainWindow::buildQualityRows(QWidget *basicTab, QFormLayout *renderLayout) 
 // is replaced for holding too much memory (launcher --background / --gpu-device / --worker-max-mb). All remembered between runs and passed to the renderer only when
 // they differ from its own defaults, which are the full power of the computer: no background mode, the first card, no memory limit.
 void MainWindow::buildMachineRows(QWidget *basicTab, QFormLayout *renderLayout) {
-	// Full power; Smart, which is full power while nobody uses the computer and a guest while it is busy (launcher/smart_power.h; it reads the signs on Windows only, so the Mac
+	// Full power; Smart, which is full power unless something needs the graphics card, and then a guest (launcher/smart_power.h; it reads the signs on Windows only, so the Mac
 	// does not offer it); or a render that is always a polite guest so the computer stays usable: lower CPU and GPU priority, half the CPU cores, one worker and one frame at a
 	// time, a pause after every video frame (launcher/background_mode.h). Applies to renders and videos, not to Live Preview (which runs inside this program).
 	m_powerCombo = new QComboBox(basicTab);
 	m_powerCombo->addItem(tr("Full power (fastest)"), QStringLiteral("full"));
 #ifndef Q_OS_MAC
-	m_powerCombo->addItem(tr("Smart: full power while the PC is not in use"), QStringLiteral("smart"));
+	m_powerCombo->addItem(tr("Smart: full power unless a game or heavy program needs it"), QStringLiteral("smart"));
 #endif
 	m_powerCombo->addItem(tr("Keep the PC responsive while rendering"), QStringLiteral("background"));
 	styleComboBox(m_powerCombo);
@@ -992,10 +992,10 @@ void MainWindow::buildMachineRows(QWidget *basicTab, QFormLayout *renderLayout) 
 		tr("Full power: the render uses all of the computer - every CPU core, the graphics card\n"
 		"flat out - and finishes as soon as it can.\n\n"
 #ifndef Q_OS_MAC
-		"Smart: full power while nobody uses the computer; as soon as it is busy - the keyboard or\n"
-		"mouse used in the last minute, a full-screen game or film, another program working the\n"
-		"graphics card or the processor - a video pauses after every frame, as below, until it has\n"
-		"been free for half a minute. A frame already rendering is finished first.\n\n"
+		"Smart: full power, even while you type or browse, which a render does not get in the way\n"
+		"of. When something needs the graphics card - a full-screen game or film, another program\n"
+		"working the card or the processor, or the card running short - a video makes room within\n"
+		"seconds, and goes back to full power ten seconds after it is free.\n\n"
 #endif
 		"Keep the PC responsive: renders politely so you can use the computer meanwhile - a lower\n"
 		"CPU priority, half of the CPU cores, and a video pauses after every frame for as long as\n"
@@ -1015,8 +1015,8 @@ void MainWindow::buildMachineRows(QWidget *basicTab, QFormLayout *renderLayout) 
 		tr("How much of the computer a render or a video takes. Full power, the default, uses "
 		"everything and is the fastest. "
 #ifndef Q_OS_MAC
-		"Smart uses everything while nobody is using the computer, and leaves room as soon as "
-		"someone is (or a game, a film or another heavy program runs). "
+		"Smart uses everything, even while you type or browse, and leaves room as soon as a game, "
+		"a full-screen film or another heavy program needs the graphics card. "
 #endif
 		"Keep the PC responsive always leaves room for other programs "
 		"(lower priority, half the CPU cores, a pause after every video frame), so a video takes "

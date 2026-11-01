@@ -1,22 +1,29 @@
 #pragma once
-// smart_power.h -- the GUI's Power "Smart" (--smart-power, or RAY_TRACER_BACKGROUND=auto): a video renders at full power while the computer is free, and as a polite guest (the pauses of
-// --background, background_mode.h) while it is busy. RunPolicy (run_policy.h) decides what a busy computer changes; this finds out whether it is busy.
+// smart_power.h -- the GUI's Power "Smart" (--smart-power, or RAY_TRACER_BACKGROUND=auto): a video renders at full power unless something needs the graphics card, and then as a polite
+// guest (the pauses of --background, background_mode.h). RunPolicy (run_policy.h) decides what that changes; this finds out when it is needed.
 //
-// Busy (busyReason) means any of:
-//   * a key or the mouse was used in the last minute (RAY_TRACER_SMART_IDLE_SECONDS) - someone is at the computer;
-//   * Windows says a full-screen program, a game or a presentation is running (a film watched without touching anything);
-//   * other programs keep one of the graphics card's engines 15% busy or more, or half of the processor (a game, a second render, a compile left running).
-// A busy computer stays busy until 30 s after the last sign of it, so that a short lull does not start the card at full power under a game.
+// Someone typing or browsing does not need it. Measured on an RTX 5080, a tiny piece of graphics work sent 60 times a second waited 0.2 ms on an idle card and 0.2 ms beside a film frame
+// (worst 4.7 ms), and the render runs at a lower priority anyway, so a key or the mouse does not pause anything. What does (busyReason):
+//   * Windows says a full-screen program, a game or a presentation is running;
+//   * other programs keep the graphics card's 3D or compute engines 15% busy or more, or half of the processor (a game, a second render, a compile left running);
+//   * someone is at the computer (a key or the mouse in the last minute: RAY_TRACER_SMART_IDLE_SECONDS) and work on the card is really being kept waiting: a tiny job four times a second
+//     takes 33 ms or more (GpuCanary; two frames overflowing the card's memory stalled it for seconds);
+//   * another program wants the card's memory and it has run out (a frame of a film can hold 10 GB: the card's own check then stops a worker: video_render.h).
+// It counts other programs on the card the render uses: not this program's GUI, not the desktop's own drawing (dwm), not another adapter, not a film playing (its video engines).
+// A busy computer stays busy until 10 s after the last sign of it, so that a short lull does not start the card at full power under a game.
 //
-// One process watches: the one that renders the video (Monitor, every two seconds, started by start()). It says what it finds through a named event that the workers and frame runs it
-// starts read (busyNow(); its name is in RAY_TRACER_SMART_EVENT, which they inherit). While the computer is busy each of the N frames rendered at once pauses N times as long as
-// background mode's one would (RunPolicy::smartFrames), so that the duty holds for the graphics card as a whole - N workers each pausing as one would keep it as busy as ever. (Taking
-// turns instead - one frame at a time under a lock - was tried and dropped: a frame that hangs holding the lock makes the healthy workers waiting for it look hung to the watchdog.)
-// The decision is made as a frame ends: a frame already rendering when someone sits down is finished at full speed (at most one frame's time late), and a pause ends as soon as the
-// computer is free again (pauseWhileBusy).
+// One process watches: the one that renders the video (Monitor, started by start()): four times a second for the signs that cost nothing, twice a second for the counters. It says what
+// it finds through a named event that the workers and frame runs it starts read (busyNow(); its name is in RAY_TRACER_SMART_EVENT, which they inherit). While the computer is busy each of
+// the N frames rendered at once pauses N times as long as background mode's one would (RunPolicy::smartFrames), so that the duty holds for the graphics card as a whole - N workers each
+// pausing as one would keep it as busy as ever. (Taking turns instead - one frame at a time under a lock - was tried and dropped: a frame that hangs holding the lock makes the healthy
+// workers waiting for it look hung to the watchdog.)
+// The wavefront renderer goes back to the program between samples, so a worker pauses there too (yieldInsideFrames), which makes room within seconds however long a frame takes (measured:
+// 3.4 s from a test program starting to the verdict), and with gaps a fraction of a second long, which is what a game needs. The default renderer sends a frame to the card in one go, so it can only wait for the frame's end. A pause ends as soon
+// as the computer is free again (pauseWhileBusy). RAY_TRACER_SMART_BUSY=1 says busy whatever the signs, for testing.
 // Other systems than Windows do not read these signs: there Smart is Keep the PC responsive (run_policy.h).
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstdlib>
 #include <cstdio>
@@ -24,6 +31,9 @@
 #include <thread>
 #include <utility>
 #include <vector>
+
+#include "gpu_memory.h"
+#include "../src/shared/render_yield.h"
 
 #ifdef _WIN32
 #include <iostream>
@@ -33,6 +43,11 @@
 #include <shellapi.h>
 #include <pdh.h>
 #include <pdhmsg.h>
+#include <tlhelp32.h>
+#include <d3d11.h>
+#include <dxgi.h>
+#undef interface   // (Windows' COM headers define these two, and the film code has variables of those names)
+#undef small
 #endif
 
 namespace smart_power {
@@ -46,14 +61,19 @@ struct Signals {
 	bool fullScreen = false;      // a full-screen program, a game or a presentation
 	double otherGpuPercent = 0;   // other programs' share of the graphics card's busiest engine
 	double otherCpuPercent = 0;   // other programs' share of the processor (all its cores)
+	double gpuWaitMs = 0;         // how long a tiny piece of graphics work has been waiting for the card lately (GpuCanary)
+	double otherGpuMemoryMb = 0;  // the card's memory held by other programs
+	double freeGpuMemoryMb = 1e9; // the card's memory nobody holds
 };
 
 // When the computer counts as busy.
 struct Limits {
-	double idleSeconds = 60;
+	double idleSeconds = 60;   // someone is at the computer until this long after the last key or mouse movement
 	double gpuPercent = 15;
 	double cpuPercent = 50;
-	double holdSeconds = 30;   // busy until this long after the last sign of it
+	double gpuWaitMs = 33;     // (a frame of the desktop at 30 Hz: past this, someone at the computer sees it)
+	double freeMemoryMb = 1024, otherMemoryMb = 2048;   // the card is short of memory for someone else: under this free, with others holding this much
+	double holdSeconds = 10;   // busy until this long after the last sign of it
 
 	// The defaults, with RAY_TRACER_SMART_IDLE_SECONDS (5 to 3600) for the time after the last key or mouse movement.
 	static Limits fromEnvironment() {
@@ -69,8 +89,11 @@ struct Limits {
 // Why the computer is busy, in words for the log; empty when it is free.
 inline std::string busyReason(const Signals &s, const Limits &l) {
 	char percent[32];
+#ifdef _MSC_VER
+#pragma warning(suppress : 4996)
+#endif
+	if (const char *test = std::getenv("RAY_TRACER_SMART_BUSY"); test && *test && *test != '0') return "RAY_TRACER_SMART_BUSY says so";
 	if (s.fullScreen) return "a full-screen program is running";
-	if (s.idleSeconds < l.idleSeconds) return "someone is using it";
 	if (s.otherGpuPercent >= l.gpuPercent) {
 		std::snprintf(percent, sizeof(percent), "%.0f%%", s.otherGpuPercent);
 		return std::string("another program keeps the graphics card ") + percent + " busy";
@@ -79,6 +102,11 @@ inline std::string busyReason(const Signals &s, const Limits &l) {
 		std::snprintf(percent, sizeof(percent), "%.0f%%", s.otherCpuPercent);
 		return std::string("other programs keep the processor ") + percent + " busy";
 	}
+	if (s.idleSeconds < l.idleSeconds && s.gpuWaitMs >= l.gpuWaitMs) {
+		std::snprintf(percent, sizeof(percent), "%.0f ms", s.gpuWaitMs);
+		return std::string("someone is using it and work on the graphics card waits ") + percent;
+	}
+	if (s.freeGpuMemoryMb < l.freeMemoryMb && s.otherGpuMemoryMb >= l.otherMemoryMb) return "another program needs the graphics card's memory";
 	return std::string();
 }
 
@@ -121,14 +149,23 @@ inline int pidOfEngineInstance(const std::string &name, std::string *engine = nu
 	return static_cast<int>(pid);
 }
 
+// Whether an engine counts: on the card the render uses (`adapter`, its "luid_..." name; empty: any), and one a render competes for. The video engines play films and copy engines move
+// memory, beside the render, not in its way.
+inline bool engineCounts(const std::string &engine, const std::string &adapter) {
+	if (!adapter.empty() && engine.find(adapter) == std::string::npos) return false;
+	for (const char *free : {"engtype_VideoDecode", "engtype_VideoEncode", "engtype_VideoProcessing", "engtype_Copy", "engtype_Security", "engtype_OFA"})
+		if (engine.find(free) != std::string::npos) return false;
+	return true;
+}
+
 // The busiest engine's share, in percent, taken by the processes `ours` says are not ours: each engine's instances are summed over those processes, and the largest sum is returned.
 template <class Ours>
-double othersOnBusiestEngine(const std::vector<std::pair<std::string, double>> &instances, const Ours &ours) {
+double othersOnBusiestEngine(const std::vector<std::pair<std::string, double>> &instances, const Ours &ours, const std::string &adapter = std::string()) {
 	std::vector<std::pair<std::string, double>> engines;   // (a few dozen engines: a list is plenty)
 	for (const auto &[name, percent] : instances) {
 		std::string engine;
 		const int pid = pidOfEngineInstance(name, &engine);
-		if (pid < 0 || ours(pid)) continue;
+		if (pid < 0 || ours(pid) || !engineCounts(engine, adapter)) continue;
 		auto it = std::find_if(engines.begin(), engines.end(), [&](const auto &e) { return e.first == engine; });
 		if (it == engines.end()) engines.emplace_back(engine, percent);
 		else it->second += percent;
@@ -158,21 +195,39 @@ inline bool fullScreenProgram() {
 	return state == QUNS_BUSY || state == QUNS_RUNNING_D3D_FULL_SCREEN || state == QUNS_PRESENTATION_MODE;
 }
 
-// Whether a process is one of ours: this program, under the same path (the workers and frame runs it starts are; so is another render of this program).
+// Whether a process does not count as another program: this program under the same path (the workers and frame runs it starts are; so is another render of this program), its GUI beside
+// it, and what only shows the desktop: its own drawing (dwm) and Chrome Remote Desktop, which kept 11% of the 3D engine by itself and tripped the 15% with nothing else running. dwm is one no
+// program may open, so these are found by name in the list of processes.
 class OurProcesses {
   public:
-	OurProcesses() : self_(pathOf(GetCurrentProcessId())) {}
+	OurProcesses() : self_(pathOf(GetCurrentProcessId())) {
+		gui_ = self_.substr(0, self_.find_last_of(L"\\/") + 1) + L"RayTracerGUI.exe";
+	}
 	bool operator()(int pid) {
 		if (static_cast<DWORD>(pid) == GetCurrentProcessId()) return true;
 		if (const auto it = known_.find(pid); it != known_.end()) return it->second;
 		if (known_.size() > 4096) known_.clear();
 		const std::wstring path = pathOf(static_cast<DWORD>(pid));
-		return known_[pid] = !path.empty() && _wcsicmp(path.c_str(), self_.c_str()) == 0;
+		return known_[pid] = (!path.empty() && (_wcsicmp(path.c_str(), self_.c_str()) == 0 || _wcsicmp(path.c_str(), gui_.c_str()) == 0)) || showsTheDesktop(static_cast<DWORD>(pid));
 	}
 	// Forgets what it found (process ids are used again after a process ends).
 	void forget() { known_.clear(); }
 
   private:
+	static bool showsTheDesktop(DWORD pid) {
+		const HANDLE all = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+		if (all == INVALID_HANDLE_VALUE) return false;
+		PROCESSENTRY32W entry{};
+		entry.dwSize = sizeof(entry);
+		bool desktop = false;
+		for (BOOL more = Process32FirstW(all, &entry); more; more = Process32NextW(all, &entry))
+			if (entry.th32ProcessID == pid) {
+				desktop = _wcsicmp(entry.szExeFile, L"dwm.exe") == 0 || _wcsicmp(entry.szExeFile, L"remoting_desktop.exe") == 0;
+				break;
+			}
+		CloseHandle(all);
+		return desktop;
+	}
 	static std::wstring pathOf(DWORD pid) {
 		std::wstring path;
 		if (HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid)) {
@@ -183,8 +238,92 @@ class OurProcesses {
 		}
 		return path;
 	}
-	std::wstring self_;
+	std::wstring self_, gui_;
 	std::unordered_map<int, bool> known_;
+};
+
+// The graphics card a render uses (the one with the most memory of its own), named as the GPU counters name it. Looked up in dxgi.dll so that nothing more is linked.
+struct Adapter {
+	IDXGIAdapter1 *adapter = nullptr;
+	std::string luid;     // "luid_0x00000000_0x0000D1A3"
+};
+inline Adapter mainAdapter() {
+	Adapter out;
+	using CreateFn = HRESULT(WINAPI *)(REFIID, void **);
+	const HMODULE dxgi = LoadLibraryA("dxgi.dll");
+	const CreateFn create = dxgi ? reinterpret_cast<CreateFn>(reinterpret_cast<void *>(GetProcAddress(dxgi, "CreateDXGIFactory1"))) : nullptr;
+	IDXGIFactory1 *factory = nullptr;
+	if (!create || FAILED(create(__uuidof(IDXGIFactory1), reinterpret_cast<void **>(&factory)))) return out;
+	IDXGIAdapter1 *a = nullptr;
+	SIZE_T most = 0;
+	for (UINT i = 0; factory->EnumAdapters1(i, &a) != DXGI_ERROR_NOT_FOUND; ++i) {
+		DXGI_ADAPTER_DESC1 d;
+		if (SUCCEEDED(a->GetDesc1(&d)) && d.DedicatedVideoMemory > most) {
+			most = d.DedicatedVideoMemory;
+			char name[64];
+			std::snprintf(name, sizeof(name), "luid_0x%08lX_0x%08lX", static_cast<unsigned long>(d.AdapterLuid.HighPart), d.AdapterLuid.LowPart);
+			if (out.adapter) out.adapter->Release();
+			out.adapter = a, out.luid = name;
+		} else {
+			a->Release();
+		}
+	}
+	factory->Release();
+	return out;
+}
+
+// What a program feels: four times a second a tiny piece of graphics work goes to the card and is timed until it is done. Its own thread at normal priority, as a card that is stalled would
+// hold it for seconds. A reading is the middle of the last eight, so one late piece is not a verdict (a film frame's scene going up to the card held single pieces 150 to 250 ms), unless
+// one has been out for a second: a card stalled that long need not wait for the middle. Nothing is linked: d3d11.dll is looked up, and with no device it reads 0.
+class GpuCanary {
+  public:
+	explicit GpuCanary(IDXGIAdapter1 *adapter) {
+		if (!adapter) return;
+		using CreateFn = HRESULT(WINAPI *)(IDXGIAdapter *, D3D_DRIVER_TYPE, HMODULE, UINT, const D3D_FEATURE_LEVEL *, UINT, UINT, ID3D11Device **, D3D_FEATURE_LEVEL *, ID3D11DeviceContext **);
+		const HMODULE d3d = LoadLibraryA("d3d11.dll");
+		const CreateFn create = d3d ? reinterpret_cast<CreateFn>(reinterpret_cast<void *>(GetProcAddress(d3d, "D3D11CreateDevice"))) : nullptr;
+		if (!create || FAILED(create(adapter, D3D_DRIVER_TYPE_UNKNOWN, nullptr, 0, nullptr, 0, D3D11_SDK_VERSION, &device_, nullptr, &context_))) return;
+		D3D11_TEXTURE2D_DESC td{};
+		td.Width = td.Height = 64, td.MipLevels = td.ArraySize = 1, td.Format = DXGI_FORMAT_R8G8B8A8_UNORM, td.SampleDesc.Count = 1, td.Usage = D3D11_USAGE_DEFAULT, td.BindFlags = D3D11_BIND_RENDER_TARGET;
+		D3D11_QUERY_DESC qd{};
+		qd.Query = D3D11_QUERY_EVENT;
+		if (FAILED(device_->CreateTexture2D(&td, nullptr, &texture_)) || FAILED(device_->CreateRenderTargetView(texture_, nullptr, &target_)) || FAILED(device_->CreateQuery(&qd, &query_))) return;
+		std::thread([this] { run(); }).detach();
+	}
+	double readingMs() const {
+		const double out = outFor_.load();
+		return (std::max)(middle_.load(), out >= 1000.0 ? out : 0.0);
+	}
+
+  private:
+	void run() {
+		std::vector<double> last(8, 0.0);
+		const float colour[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+		for (std::size_t n = 0;; ++n) {
+			const auto start = std::chrono::steady_clock::now();
+			context_->ClearRenderTargetView(target_, colour);
+			context_->End(query_);
+			context_->Flush();
+			BOOL done = FALSE;
+			for (int spin = 0; context_->GetData(query_, &done, sizeof(done), 0) != S_OK; ++spin) {
+				outFor_ = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+				if (spin < 2000) std::this_thread::yield();
+				else std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			}
+			last[n % last.size()] = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+			outFor_ = 0.0;
+			std::vector<double> sorted = last;
+			std::sort(sorted.begin(), sorted.end());
+			middle_ = sorted[sorted.size() / 2];
+			std::this_thread::sleep_for(std::chrono::milliseconds(250));
+		}
+	}
+	ID3D11Device *device_ = nullptr;
+	ID3D11DeviceContext *context_ = nullptr;
+	ID3D11Texture2D *texture_ = nullptr;
+	ID3D11RenderTargetView *target_ = nullptr;
+	ID3D11Query *query_ = nullptr;
+	std::atomic<double> middle_{0.0}, outFor_{0.0};
 };
 
 // Windows' "GPU Engine" performance counters (pdh.dll, looked up so that nothing more is linked): each engine's busy share per process since the last reading.
@@ -203,7 +342,8 @@ class GpuEngines {
 			return;
 		}
 		if (add_(query_, L"\\GPU Engine(*)\\Utilization Percentage", 0, &counter_) != ERROR_SUCCESS) counter_ = nullptr;
-		else collect_(query_);   // (a rate: the first reading is the start of the first interval)
+		if (add_(query_, L"\\GPU Process Memory(*)\\Dedicated Usage", 0, &memory_) != ERROR_SUCCESS) memory_ = nullptr;
+		if (counter_ || memory_) collect_(query_);   // (a rate: the first reading is the start of the first interval)
 	}
 	~GpuEngines() {
 		if (query_) close_(query_);
@@ -211,16 +351,38 @@ class GpuEngines {
 	GpuEngines(const GpuEngines &) = delete;
 	GpuEngines &operator=(const GpuEngines &) = delete;
 
-	// Other programs' share of the busiest engine since the last call, in percent; -1 when the counters cannot be read.
+	// Reads the counters: what others() and memoryOf() report comes from this reading. False when they cannot be read.
+	bool collect() { return (counter_ || memory_) && collect_(query_) == ERROR_SUCCESS; }
+	// Other programs' share of the busiest engine since the last reading, in percent, on the card named `adapter`; -1 when the counters cannot be read.
 	template <class Ours>
-	double others(Ours &ours) {
-		if (!counter_ || collect_(query_) != ERROR_SUCCESS) return -1.0;
+	double others(Ours &ours, const std::string &adapter) {
+		std::vector<std::pair<std::string, double>> instances;
+		if (!read(counter_, instances)) return -1.0;
+		return othersOnBusiestEngine(instances, [&](int pid) { return ours(pid); }, adapter);
+	}
+	// How much of the card's memory other programs hold, in megabytes. (These counters cannot say what is free: they gave the desktop's own process 10.8 GB when the driver said 558 MB of the
+	// card was in use.)
+	template <class Ours>
+	double memoryOf(Ours &ours, const std::string &adapter) {
+		std::vector<std::pair<std::string, double>> instances;
+		double others = 0.0;
+		if (!read(memory_, instances)) return others;
+		for (const auto &[name, bytes] : instances) {
+			std::string where;
+			const int pid = pidOfEngineInstance(name, &where);
+			if (pid >= 0 && !ours(pid) && (adapter.empty() || where.find(adapter) != std::string::npos)) others += bytes / (1024.0 * 1024.0);
+		}
+		return others;
+	}
+
+  private:
+	bool read(PDH_HCOUNTER counter, std::vector<std::pair<std::string, double>> &instances) {
+		if (!counter) return false;
 		DWORD bytes = 0, count = 0;
-		if (array_(counter_, PDH_FMT_DOUBLE, &bytes, &count, nullptr) != static_cast<PDH_STATUS>(PDH_MORE_DATA) || bytes == 0) return count == 0 ? 0.0 : -1.0;
+		if (array_(counter, PDH_FMT_DOUBLE, &bytes, &count, nullptr) != static_cast<PDH_STATUS>(PDH_MORE_DATA) || bytes == 0) return count == 0;
 		std::vector<unsigned char> buffer(bytes);
 		auto *items = reinterpret_cast<PDH_FMT_COUNTERVALUE_ITEM_W *>(buffer.data());
-		if (array_(counter_, PDH_FMT_DOUBLE, &bytes, &count, items) != ERROR_SUCCESS) return -1.0;
-		std::vector<std::pair<std::string, double>> instances;
+		if (array_(counter, PDH_FMT_DOUBLE, &bytes, &count, items) != ERROR_SUCCESS) return false;
 		instances.reserve(count);
 		for (DWORD i = 0; i < count; ++i) {
 			if (items[i].FmtValue.CStatus != PDH_CSTATUS_VALID_DATA && items[i].FmtValue.CStatus != PDH_CSTATUS_NEW_DATA) continue;
@@ -228,10 +390,8 @@ class GpuEngines {
 			for (const wchar_t *c = items[i].szName; c && *c; ++c) name += static_cast<char>(*c < 128 ? *c : '?');   // (the names are ASCII)
 			instances.emplace_back(std::move(name), items[i].FmtValue.doubleValue);
 		}
-		return othersOnBusiestEngine(instances, [&](int pid) { return ours(pid); });
+		return true;
 	}
-
-  private:
 	using OpenFn = PDH_STATUS(WINAPI *)(LPCWSTR, DWORD_PTR, PDH_HQUERY *);
 	using AddFn = PDH_STATUS(WINAPI *)(PDH_HQUERY, LPCWSTR, DWORD_PTR, PDH_HCOUNTER *);
 	using CollectFn = PDH_STATUS(WINAPI *)(PDH_HQUERY);
@@ -248,7 +408,7 @@ class GpuEngines {
 	ArrayFn array_ = nullptr;
 	CloseFn close_ = nullptr;
 	PDH_HQUERY query_ = nullptr;
-	PDH_HCOUNTER counter_ = nullptr;
+	PDH_HCOUNTER counter_ = nullptr, memory_ = nullptr;
 };
 
 // Other programs' share of the processor since the last reading: the whole computer's busy time less this process's and that of the programs it started (their job object counts the
@@ -284,28 +444,43 @@ class Processor {
 	unsigned long long busy_ = 0, ours_ = 0, total_ = 0;
 };
 
-// Reads every sign at once. The rates (the graphics card, the processor) are over the time since the readers' last reading.
-inline Signals read(GpuEngines &gpu, Processor &cpu, OurProcesses &ours) {
-	Signals s;
+// The signs that cost nothing to read (a key or the mouse, a full-screen program).
+inline void readQuick(Signals &s) {
 	s.idleSeconds = secondsSinceInput();
 	s.fullScreen = fullScreenProgram();
-	s.otherGpuPercent = (std::max)(0.0, gpu.others(ours));
+}
+// The signs behind counters. The rates (the graphics card, the processor) are over the time since the readers' last reading.
+inline void readCounters(Signals &s, GpuEngines &gpu, Processor &cpu, OurProcesses &ours, const Adapter &card) {
+	if (gpu.collect()) {
+		s.otherGpuPercent = (std::max)(0.0, gpu.others(ours, card.luid));
+		s.otherGpuMemoryMb = gpu.memoryOf(ours, card.luid);
+		const Limits limits;
+		s.freeGpuMemoryMb = 1e9;
+		if (s.otherGpuMemoryMb >= limits.otherMemoryMb)   // (asked of the driver only when it matters: it loads a library each time)
+			if (const long long free = gpu_memory::freeMb(0)) s.freeGpuMemoryMb = static_cast<double>(free);
+	}
 	s.otherCpuPercent = (std::max)(0.0, cpu.others());
-	return s;
 }
 
-// Reads the computer every two seconds for as long as the program runs, and keeps `event` set while it is busy. Says in the log when the verdict changes.
+// Reads the computer for as long as the program runs, and keeps `event` set while it is busy. Says in the log when the verdict changes.
 class Monitor {
   public:
-	explicit Monitor(HANDLE event) : event_(event), decision_(Limits::fromEnvironment()) {
+	explicit Monitor(HANDLE event) : event_(event), decision_(Limits::fromEnvironment()), card_(mainAdapter()), canary_(card_.adapter) {
+		readCounters(now_, gpu_, cpu_, ours_, card_);
 		sample(true);
 		std::thread([this] {
 			// The render runs below normal priority (background_mode::apply), and a thread of it at that priority does not run at all while other programs keep every core busy -
-			// exactly when it has something to say (measured: never a reading in 105 s beside a program on all cores). It wakes every two seconds for a moment, so it may run first.
+			// exactly when it has something to say (measured: never a reading in 105 s beside a program on all cores). It wakes for a moment at a time, so it may run first. (A reading of
+			// the counters took 0.6 ms with 520 of them, the quick signs 45 microseconds.)
 			SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 			for (int n = 1;; ++n) {
-				std::this_thread::sleep_for(std::chrono::seconds(2));
-				if (n % 150 == 0) ours_.forget();   // (every five minutes)
+				std::this_thread::sleep_for(std::chrono::milliseconds(250));
+				if (n % 1200 == 0) ours_.forget();   // (every five minutes)
+				if (n % 2 == 0) {   // (twice a second, and the last two readings taken together, so that one blip of a program's drawing is not a game)
+					const double before = now_.otherGpuPercent;
+					readCounters(now_, gpu_, cpu_, ours_, card_);
+					now_.otherGpuPercent = 0.5 * (before + now_.otherGpuPercent);
+				}
 				sample(false);
 			}
 		}).detach();
@@ -313,20 +488,25 @@ class Monitor {
 
   private:
 	void sample(bool first) {
-		const Signals s = read(gpu_, cpu_, ours_);
+		readQuick(now_);
+		now_.gpuWaitMs = canary_.readingMs();
+		const Signals &s = now_;
 		const double now = std::chrono::duration<double>(std::chrono::steady_clock::now() - start_).count();
 		const bool changed = decision_.update(s, now);
 		if (decision_.busy()) SetEvent(event_);
 		else ResetEvent(event_);
 		if (changed || first)
-			std::cout << "\nSmart power: " << (decision_.busy() ? "the computer is busy (" + decision_.reason() + "): a pause after every frame." : std::string("the computer is free: full power."))
+			std::cout << "\nSmart power: " << (decision_.busy() ? "the computer is busy (" + decision_.reason() + "): making room." : std::string("nothing needs the computer's graphics card: full power."))
 					  << std::endl;
 	}
 	HANDLE event_;
 	Decision decision_;
+	Adapter card_;
 	GpuEngines gpu_;
 	Processor cpu_;
 	OurProcesses ours_;
+	GpuCanary canary_;
+	Signals now_;
 	const std::chrono::steady_clock::time_point start_ = std::chrono::steady_clock::now();
 };
 
@@ -372,13 +552,51 @@ inline void pauseWhileBusy(double seconds) {
 		std::this_thread::sleep_for((std::min)(std::chrono::duration<double>(0.5), std::chrono::duration<double>(until - std::chrono::steady_clock::now())));
 }
 
+// A worker's pause inside a frame. Between two of a frame's samples: while the computer is busy, the work done since the last one is paid for at once with a pause, `pausePerWork` times as long
+// (RunPolicy::pauseSecondsAfter(1, true)), so a game has gaps a fraction of a second long, starting at once, and not a pause after a frame half a minute later.
+struct InFrame {
+	double pausePerWork = 1.0;
+	std::chrono::steady_clock::time_point since = std::chrono::steady_clock::now();
+	std::atomic<double> paidFor{0.0};   // (seconds of this frame's work and pauses already settled: the pause at its end leaves them out)
+};
+inline InFrame &inFrame() {
+	static InFrame state;
+	return state;
+}
+inline void betweenSamples() {
+	InFrame &f = inFrame();
+	const auto now = std::chrono::steady_clock::now();
+	const double work = std::chrono::duration<double>(now - f.since).count();
+	if (work < 0.05) return;   // (a batch of samples a time: often enough to keep the gaps short)
+	if (busyNow()) {
+		pauseWhileBusy(work * f.pausePerWork);
+		f.since = std::chrono::steady_clock::now();
+		f.paidFor = f.paidFor.load() + std::chrono::duration<double>(f.since - now).count() + work;
+	} else {
+		f.since = now;
+	}
+}
+// From now on a worker pauses inside frames too, on a renderer that goes back to the program between samples.
+inline void yieldInsideFrames(double pausePerWork) {
+	inFrame().pausePerWork = pausePerWork;
+	render_yield::hook() = &betweenSamples;
+}
+// How much of the time since the last call was work and pauses settled inside the frame.
+inline double takePaidFor() { return inFrame().paidFor.exchange(0.0); }
+
 // One reading of every sign over `seconds`, for --diagnose.
 inline Signals readOnce(double seconds) {
 	GpuEngines gpu;
 	Processor cpu;
 	OurProcesses ours;
+	const Adapter card = mainAdapter();
+	GpuCanary canary(card.adapter);
 	std::this_thread::sleep_for(std::chrono::duration<double>(seconds));
-	return read(gpu, cpu, ours);
+	Signals s;
+	readQuick(s);
+	readCounters(s, gpu, cpu, ours, card);
+	s.gpuWaitMs = canary.readingMs();
+	return s;
 }
 
 #else  // not Windows: no signs are read (RunPolicy makes Smart a background run there)
@@ -386,6 +604,8 @@ inline Signals readOnce(double seconds) {
 inline bool start() { return false; }
 inline bool busyNow() { return true; }
 inline void pauseWhileBusy(double seconds) { std::this_thread::sleep_for(std::chrono::duration<double>(seconds)); }
+inline void yieldInsideFrames(double) {}
+inline double takePaidFor() { return 0.0; }
 
 #endif
 

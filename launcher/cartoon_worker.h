@@ -146,6 +146,7 @@ struct Job {
 inline int run(const Job &job, const LaunchArgs &args, const RenderSetup &setup, const std::function<int(const LaunchArgs &, const RenderSetup &)> &render) {
 	std::filesystem::create_directories(job.scenes);
 	const RunPolicy policy = RunPolicy::from(args);
+	if (policy.smart) smart_power::yieldInsideFrames(policy.pauseSecondsAfter(1.0, true));   // (it renders in this process, and pays for its own frames: see background_mode::pauseAfter)
 	const ParentWatch parent;   // (POSIX: ends this worker with the launcher that started it; process.h)
 	for (int frame : job.list) {
 		if (parent.parentGone()) {

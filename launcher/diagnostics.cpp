@@ -232,9 +232,9 @@ void append_smart_power(std::ostringstream& report) {
 #ifdef _WIN32
 	const smart_power::Signals s = smart_power::readOnce(0.5);
 	const std::string why = smart_power::busyReason(s, smart_power::Limits::fromEnvironment());
-	char line[256];
-	std::snprintf(line, sizeof(line), "last key or mouse %.0f s ago, full-screen program %s, other programs on the graphics card %.0f%%, on the processor %.0f%%",
-				  s.idleSeconds, s.fullScreen ? "yes" : "no", s.otherGpuPercent, s.otherCpuPercent);
+	char line[320];
+	std::snprintf(line, sizeof(line), "last key or mouse %.0f s ago, full-screen program %s, other programs on the graphics card %.0f%% and %.0f MB of it, %.0f MB free, on the processor %.0f%%, work on the card waits %.1f ms",
+				  s.idleSeconds, s.fullScreen ? "yes" : "no", s.otherGpuPercent, s.otherGpuMemoryMb, s.freeGpuMemoryMb, s.otherCpuPercent, s.gpuWaitMs);
 	report << "Smart Power: " << (why.empty() ? std::string("free") : "busy (" + why + ")") << "; " << line << "\n";
 #else
 	report << "Smart Power: not read on this system (Smart renders like Keep the PC responsive)\n";

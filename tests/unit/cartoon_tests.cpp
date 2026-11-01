@@ -1846,14 +1846,26 @@ TEST(RunPolicy, SmartPowerIsFullPowerUntilTheComputerIsBusy) {
 	EXPECT_EQ(RunPolicy::from(LaunchArgs()).pauseSecondsAfter(2.0, true), 0.0) << "full power never pauses";
 }
 
-TEST(SmartPower, ABusyComputerIsOneInUseOrWorkedByAnotherProgramAndStaysBusyForHalfAMinute) {
+TEST(SmartPower, OnlyWhatNeedsTheCardMakesTheComputerBusyAndItIsFreeAgainTenSecondsLater) {
 	const smart_power::Limits limits;
 	smart_power::Signals idle;
 	idle.idleSeconds = 600;
 	EXPECT_EQ(smart_power::busyReason(idle, limits), "");
 	smart_power::Signals s = idle;
-	s.idleSeconds = 5;
-	EXPECT_EQ(smart_power::busyReason(s, limits), "someone is using it");
+	s.idleSeconds = 1;
+	EXPECT_EQ(smart_power::busyReason(s, limits), "") << "someone typing or browsing costs the render nothing: a film frame kept other work on the card waiting 4.7 ms at worst";
+	s.gpuWaitMs = 40;
+	EXPECT_EQ(smart_power::busyReason(s, limits), "someone is using it and work on the graphics card waits 40 ms");
+	s.gpuWaitMs = 10;
+	EXPECT_EQ(smart_power::busyReason(s, limits), "") << "a wait nobody sees";
+	s = idle;
+	s.gpuWaitMs = 40;
+	EXPECT_EQ(smart_power::busyReason(s, limits), "") << "nobody there to feel it: the render's own frames are not worth a pause";
+	s = idle;
+	s.freeGpuMemoryMb = 500, s.otherGpuMemoryMb = 6000;
+	EXPECT_EQ(smart_power::busyReason(s, limits), "another program needs the graphics card's memory");
+	s.otherGpuMemoryMb = 300;
+	EXPECT_EQ(smart_power::busyReason(s, limits), "") << "a card full of the render itself is the workers' business (hooks.cardFull)";
 	s = idle;
 	s.fullScreen = true;
 	EXPECT_EQ(smart_power::busyReason(s, limits), "a full-screen program is running");
@@ -1868,15 +1880,23 @@ TEST(SmartPower, ABusyComputerIsOneInUseOrWorkedByAnotherProgramAndStaysBusyForH
 	smart_power::Decision d(limits);
 	EXPECT_FALSE(d.update(idle, 0.0)) << "free from the start: no change";
 	EXPECT_FALSE(d.busy());
-	smart_power::Signals used = idle;
-	used.idleSeconds = 1;
-	EXPECT_TRUE(d.update(used, 10.0));
+	smart_power::Signals game = idle;
+	game.otherGpuPercent = 60;
+	EXPECT_TRUE(d.update(game, 10.0));
 	EXPECT_TRUE(d.busy());
-	EXPECT_EQ(d.reason(), "someone is using it");
-	EXPECT_FALSE(d.update(idle, 30.0)) << "a lull of 20 s: still busy";
+	EXPECT_EQ(d.reason(), "another program keeps the graphics card 60% busy");
+	EXPECT_FALSE(d.update(idle, 15.0)) << "a lull of 5 s: still busy";
 	EXPECT_TRUE(d.busy());
-	EXPECT_TRUE(d.update(idle, 40.5)) << "30 s after the last sign: free";
+	EXPECT_TRUE(d.update(idle, 20.5)) << "10 s after the last sign: free";
 	EXPECT_FALSE(d.busy());
+
+	set_env_var("RAY_TRACER_SMART_BUSY", "1");
+	EXPECT_EQ(smart_power::busyReason(idle, limits), "RAY_TRACER_SMART_BUSY says so");
+#ifdef _WIN32
+	_putenv_s("RAY_TRACER_SMART_BUSY", "");
+#else
+	unsetenv("RAY_TRACER_SMART_BUSY");
+#endif
 
 	set_env_var("RAY_TRACER_SMART_IDLE_SECONDS", "300");
 	EXPECT_EQ(smart_power::Limits::fromEnvironment().idleSeconds, 300);
@@ -1907,6 +1927,16 @@ TEST(SmartPower, OtherProgramsShareOfTheGraphicsCardIsTheirsOnItsBusiestEngine) 
 	const auto ours = [](int pid) { return pid == 10; };
 	EXPECT_DOUBLE_EQ(smart_power::othersOnBusiestEngine(instances, ours), 13.0);
 	EXPECT_DOUBLE_EQ(smart_power::othersOnBusiestEngine(instances, [](int) { return true; }), 0.0);
+
+	// not what is out of the render's way: another adapter, a film playing, memory being copied
+	const std::vector<std::pair<std::string, double>> beside = {
+		{"pid_20_luid_0x0_0x2_phys_0_eng_0_engtype_3D", 80.0},
+		{"pid_21_luid_0x0_0x1_phys_0_eng_4_engtype_VideoDecode", 70.0},
+		{"pid_22_luid_0x0_0x1_phys_0_eng_5_engtype_Copy", 60.0},
+		{"pid_23_luid_0x0_0x1_phys_0_eng_0_engtype_3D", 5.0},
+	};
+	EXPECT_DOUBLE_EQ(smart_power::othersOnBusiestEngine(beside, ours, "luid_0x0_0x1"), 5.0);
+	EXPECT_DOUBLE_EQ(smart_power::othersOnBusiestEngine(beside, ours), 80.0) << "no adapter named: all of them";
 }
 
 #ifdef _WIN32
@@ -1936,6 +1966,25 @@ TEST(SmartPower, WorkersReadTheVerdictAndAPauseEndsWhenTheComputerIsFree) {
 	freeAgain.join();
 	EXPECT_GT(paused, 0.6) << "it paused while the computer was busy";
 	EXPECT_LT(paused, 2.0) << "and went on soon after it was free, not after 30 s";
+
+	// inside a frame: work is paid for between samples while the computer is busy, the pause at the frame's end leaves it out, and with nothing installed the renderer's call does nothing
+	render_yield::between();
+	smart_power::takePaidFor();
+	smart_power::yieldInsideFrames(1.0);
+	smart_power::inFrame().since = std::chrono::steady_clock::now() - std::chrono::milliseconds(200);
+	render_yield::between();
+	EXPECT_DOUBLE_EQ(smart_power::takePaidFor(), 0.0) << "a free computer: nothing to pay";
+	SetEvent(event);
+	smart_power::inFrame().since = std::chrono::steady_clock::now() - std::chrono::milliseconds(200);
+	t0 = std::chrono::steady_clock::now();
+	render_yield::between();
+	const double slept = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+	ResetEvent(event);
+	EXPECT_GT(slept, 0.15) << "a pause as long as the work, at once";
+	EXPECT_LT(slept, 1.0);
+	EXPECT_NEAR(smart_power::takePaidFor(), 0.2 + slept, 0.1) << "the work and the pause, both settled";
+	EXPECT_DOUBLE_EQ(smart_power::takePaidFor(), 0.0);
+	render_yield::hook() = nullptr;
 
 	_putenv_s(smart_power::kEventVariable, "");
 	EXPECT_TRUE(smart_power::busyNow()) << "nobody watching: polite";

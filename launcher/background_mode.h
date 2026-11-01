@@ -13,8 +13,9 @@
 //   * half of the CPU cores for a CPU render (unless RAY_TRACER_THREADS says otherwise).
 // The pauses (pauseAfter) make a video take about twice as long even when nothing else is running; the priorities cost nothing then.
 //
-// Smart mode (--smart-power, the GUI's Power "Smart") takes the priorities (not the halved CPU threads) all the time and the pauses only while the computer is busy (smart_power.h).
+// Smart mode (--smart-power, the GUI's Power "Smart") takes the priorities (not the halved CPU threads) all the time and the pauses only while something needs the card (smart_power.h).
 
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <string>
@@ -69,13 +70,15 @@ inline std::string apply(const RunPolicy &policy) {
 			done += ", " + s + " CPU threads";
 		}
 	}
-	if (policy.smart) done += ", all of the computer while it is free and a video paused " + std::to_string(100 - policy.dutyPercent) + "% of the time between frames while it is busy";
+	if (policy.smart) done += ", all of the computer unless something needs the graphics card, and then a video paused " + std::to_string(100 - policy.dutyPercent) + "% of the time";
 	else done += ", paused " + std::to_string(100 - policy.dutyPercent) + "% of the time between frames";
 	return done;
 }
 
-// Sleeps for policy.pauseSecondsAfter(workSeconds): nothing outside background mode; in smart mode only while the computer is busy, and no longer than it stays busy.
+// Sleeps for policy.pauseSecondsAfter(workSeconds): nothing outside background mode; in smart mode only while the computer is busy, and no longer than it stays busy. What was already paid
+// for inside the frame (a worker on a renderer that pauses between samples: smart_power.h) is left out.
 inline void pauseAfter(const RunPolicy &policy, double workSeconds) {
+	if (policy.smart) workSeconds = (std::max)(0.0, workSeconds - smart_power::takePaidFor());
 	const double s = policy.pauseSecondsAfter(workSeconds, !policy.smart || smart_power::busyNow());
 	if (s <= 0.0) return;
 	if (policy.smart) smart_power::pauseWhileBusy(s);
