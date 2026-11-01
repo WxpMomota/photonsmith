@@ -381,13 +381,13 @@ TEST(FilmForest, TreesGrowWhereTheLandSuitsThemAndAreDrawnNearOrFar) {
 	const auto summer = forest::detail::grow("broadleaf", 1, false, false), winter = forest::detail::grow("broadleaf", 1, true, false);
 	EXPECT_GT(summer.foliage.tris.size(), 10000u);
 	EXPECT_TRUE(winter.foliage.tris.empty());
-	EXPECT_GT(winter.wood.tris.size(), summer.wood.tris.size()) << "(bare, more twigs show)";
+	EXPECT_EQ(winter.wood.tris.size(), summer.wood.tris.size()) << "(the same shoots, bare)";
 	for (const std::string &sp : forest::species()) {
 		EXPECT_FALSE(forest::detail::grow(sp, 0, false, false).wood.tris.empty() && forest::detail::grow(sp, 0, false, false).foliage.tris.empty()) << sp;
 		EXPECT_FALSE(forest::detail::growFar(sp, 0, false).foliage.tris.empty()) << sp;
 	}
 	EXPECT_NE(forest::detail::foliageOf("broadleaf", "autumn", 0).x, forest::detail::foliageOf("broadleaf", "summer", 0).x) << "autumn colours";
-	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"forest oak", "conifer, broadleaf, birch, palm, shrub, acacia, kapok, cactus or fern"},
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"forest elm", "conifer, pine, oak, beech, broadleaf, birch, palm, shrub, acacia, kapok, cactus or fern"},
 																						 {"forest mixed 100 season monsoon", "a forest takes"},
 																						 {"forest mixed 0", "1 to 50000 trees"}}) {
 		ff::DataFilm bad;
@@ -1355,4 +1355,22 @@ TEST(FilmPlants, SeasonsChainSummerToAutumnThenWinter) {
 TEST(FilmFile, AFilmMayStartWithTheMarkOfUtf8) {
 	ff::DataFilm film;
 	EXPECT_EQ(loadNature("utf8mark", "\xEF\xBB\xBFscene s.pbrt\nlength 4\n", film), "");
+}
+
+// A camera among trees opens up for the shade; the sun through them is soft; the grass carries the dew at dawn and keeps a `motes` line of its own.
+TEST(FilmForest, TheLightInAWood) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadNature("woodlight", "scene s.pbrt\nlength 8\nterrain hills size 400 height 2 seed 3\nsky 6:30 12:30\nmotes amount 2\nforest oak 120 in -20 -20 20 20 seed 2\nshot 0 In\n key 0 1.6 0  0 1.6 -10  50\nshot 4 Out\n key 0 1.6 150  0 1.6 100  50\n", film), "");
+	EXPECT_DOUBLE_EQ(film.spec.motes.amount, 2.0);
+	const std::string in = film.sceneAt(1.0), out = film.sceneAt(5.0);
+	std::size_t suns = 0;
+	for (std::size_t p = in.find("LightSource \"distant\""); p != std::string::npos; p = in.find("LightSource \"distant\"", p + 1)) ++suns;
+	EXPECT_GE(suns, 4u) << "the sun as a disc";
+	const auto stops = [](const std::string &s) {
+		const std::size_t at = s.find("\"float iso\"");
+		return at == std::string::npos ? std::string() : s.substr(at, 40);
+	};
+	EXPECT_NE(stops(in), stops(out)) << "more light let in under the trees";
+	ASSERT_EQ(loadNature("woodlight2", "scene s.pbrt\nlength 8\nterrain hills size 400 height 2 seed 3\nsky 6:30 12:30\nshot 0 A\n key 0 1.6 0  0 1.6 -10  50\n", film), "");
+	EXPECT_NE(film.sceneAt(0.2), film.sceneAt(7.9)) << "the dew goes";
 }

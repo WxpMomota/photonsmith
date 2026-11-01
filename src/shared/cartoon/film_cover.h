@@ -39,6 +39,10 @@ struct Cover {
 	std::string season;   // (`undergrowth season S`; none: the forests')
 };
 
+// A way the film's animals keep to (pbrt's x z, from and to): the grass is thin along it and the earth shows through.
+struct Trail {
+	double x0 = 0.0, z0 = 0.0, x1 = 0.0, z1 = 0.0, wide = 1.0;
+};
 // Where something heavy is or has just been (pbrt's x z; `age` seconds ago; `reach` how far it pushes): the grass is shoved aside and lies down, and comes back in a few seconds.
 struct Press {
 	double x = 0.0, z = 0.0, reach = 0.5, age = 0.0;
@@ -141,6 +145,71 @@ inline Mesh litterMesh(double size, int leaves, double leafSize, int salt) {
 	forest::detail::shapeLeaves(m, 0, salt + 3);   // (dry ones curl)
 	return m;
 }
+// What lies between the blades near the camera: stones the size of a thumbnail or a fist half sunk, broken dead stems, and bits of twig. `stones` and `stems` are two meshes, for two
+// materials.
+inline void addLitter(Mesh &stones, Mesh &stems, double size, int count, int salt) {
+	for (int k = 0; k < count; ++k) {
+		const int s = salt * 211 + k;
+		const Vec3 at{size * (hash01(s, 1) - 0.5), 0.0, size * (hash01(s, 2) - 0.5)};
+		if (hash01(s, 3) < 0.45) {
+			const double r = 0.008 + 0.028 * std::pow(hash01(s, 4), 2.5);
+			Mesh pebble = uvSphere(1.0, 6, 4);
+			const Vec3 squash{r * (0.8 + 0.5 * hash01(s, 5)), r * (0.45 + 0.3 * hash01(s, 6)), r * (0.8 + 0.5 * hash01(s, 7))};
+			const int base = static_cast<int>(stones.verts.size());
+			for (std::size_t i = 0; i < pebble.verts.size(); ++i) {
+				const Vec3 &v = pebble.verts[i];
+				const double lump = 0.8 + 0.4 * hash01(s + static_cast<int>(i), 8);
+				stones.verts.push_back(at + Vec3{v.x * squash.x * lump, v.y * squash.y * lump, v.z * squash.z * lump});
+				stones.normals.push_back(normalize(Vec3{v.x / squash.x, v.y / squash.y, v.z / squash.z}));
+			}
+			for (const auto &t : pebble.tris) stones.tris.push_back({t[0] + base, t[1] + base, t[2] + base});
+		} else {
+			const double a = 2.0 * kPi * hash01(s, 9), len = 0.05 + 0.2 * hash01(s, 10), w = 0.0015 + 0.002 * hash01(s, 11), lift = 0.004 + 0.03 * hash01(s, 12);
+			const Vec3 d{std::cos(a) * len, lift, std::sin(a) * len}, side{-std::sin(a) * w, 0.0, std::cos(a) * w};
+			const int base = static_cast<int>(stems.verts.size());
+			for (const Vec3 &p : {at - side + Vec3{0.0, 0.004, 0.0}, at + side + Vec3{0.0, 0.004, 0.0}, at + d + side, at + d - side}) stems.verts.push_back(p), stems.normals.push_back({0.0, 1.0, 0.0});
+			stems.tris.push_back({base, base + 1, base + 2}), stems.tris.push_back({base, base + 2, base + 3});
+		}
+	}
+}
+// The earth itself, near the camera: a skin over the ground of a square, cut to blotches, in the colours of soil rather than the far colour of the land. Its uv in metres of its picture.
+inline Mesh earthSkin(double size) {
+	Mesh m;
+	const double h = 0.5 * size;
+	m.verts = {{-h, 0.012, -h}, {h, 0.012, -h}, {h, 0.012, h}, {-h, 0.012, h}};
+	m.normals.assign(4, Vec3{0.0, 1.0, 0.0});
+	m.uvs = {{0.0, 0.0}, {size, 0.0}, {size, size}, {0.0, size}};
+	m.tris = {{0, 2, 1}, {0, 3, 2}};
+	return m;
+}
+inline std::string earthMaterial(const std::string &film, const std::string &name, Vec3 ground, const std::string &mesh, bool bare) {
+	constexpr int W = 256;
+	const std::string colours = film_sky::picture(film, "earth1_" + std::to_string(static_cast<int>(ground.x * 20)) + "_" + std::to_string(static_cast<int>(ground.y * 20)), W, W, [&](std::vector<float> &rgb) {
+		const Vec3 soil = lerp(Vec3{0.16, 0.115, 0.075}, ground, 0.2);
+		for (int y = 0; y < W; ++y)
+			for (int x = 0; x < W; ++x) {
+				const double a = 2.0 * kPi * x / W, b = 2.0 * kPi * y / W;
+				const double big = nature::fbm2(2.0 * std::cos(a) + 3.0 * std::cos(b), 2.0 * std::sin(a) + 3.0 * std::sin(b), 61), fine = nature::fbm2(9.0 * std::cos(a) + 13.0 * std::cos(b), 9.0 * std::sin(a) + 13.0 * std::sin(b), 62);
+				const Vec3 c = soil * (0.55 + 0.9 * big) * (0.75 + 0.5 * fine);
+				float *px = &rgb[(static_cast<std::size_t>(y) * W + x) * 3];
+				px[0] = static_cast<float>(c.x), px[1] = static_cast<float>(c.y), px[2] = static_cast<float>(c.z);
+			}
+	});
+	const std::string cut = film_sky::picture(film, std::string("earth1_cut") + (bare ? "b" : ""), W, W, [&](std::vector<float> &rgb) {
+		for (int y = 0; y < W; ++y)
+			for (int x = 0; x < W; ++x) {
+				const double a = 2.0 * kPi * x / W, b = 2.0 * kPi * y / W;
+				const double n = nature::fbm2(1.7 * std::cos(a) + 2.6 * std::cos(b), 1.7 * std::sin(a) + 2.6 * std::sin(b), 63);
+				const float keep = static_cast<float>(smoothstep(bare ? 0.3 : 0.47, (bare ? 0.3 : 0.47) + 0.05, n));
+				float *px = &rgb[(static_cast<std::size_t>(y) * W + x) * 3];
+				px[0] = px[1] = px[2] = keep;
+			}
+	});
+	std::string shape = film_cache::plyShape(mesh);
+	shape.pop_back();
+	return "Texture \"" + name + "_c\" \"spectrum\" \"imagemap\" \"string filename\" [ \"" + colours + "\" ]\n  Texture \"" + name + "_a\" \"float\" \"imagemap\" \"string filename\" [ \"" + cut +
+		   "\" ]\n  Material \"diffuse\" \"texture reflectance\" \"" + name + "_c\"\n" + shape + " \"texture alpha\" \"" + name + "_a\"\n";
+}
 // A few wild flowers on a stem each, about the origin, in `n` heads of five petals: what shows in the grass of a meadow.
 inline void addFlowers(Mesh &stems, Mesh &petals, int n, double spread, int salt) {
 	for (int k = 0; k < n; ++k) {
@@ -207,7 +276,7 @@ inline double yearAt(const Cover &c, const std::vector<forest::Forest> &forests,
 // The film's cover seen from `eye` looking at `target` (story space) with `fovDeg`, at t: the objects it uses and a placement for each square in view. `trees`: the film's forests,
 // under which it is litter and ferns. `snow` how much lies on the land (0 .. 1): it goes under. `wet`, 0 .. 1: rain on the blades. `year`: yearAt.
 inline std::string text(const std::string &film, const terrain::Field &field, const Cover &c, Vec3 eye, Vec3 target, double fovDeg, double t, double snow, const dressing::Gusts &gusts,
-						const std::vector<std::vector<forest::Tree>> &trees, double wet = 0.0, double year = 0.0, const std::vector<Press> &presses = {}) {
+						const std::vector<std::vector<forest::Tree>> &trees, double wet = 0.0, double year = 0.0, const std::vector<Press> &presses = {}, const std::vector<Trail> &trails = {}) {
 	const terrain::Spec &s = field.spec;
 	const Growth g = growthOf(s);
 	if (!c.on || g.density <= 0.0 || snow > 0.5) return std::string();
@@ -252,7 +321,13 @@ inline std::string text(const std::string &film, const terrain::Field &field, co
 				if (s.snowLine() < 1e8 && y - s.y > s.snowLine() * 0.9) continue;
 				const double reach = 3.4 + 2.2 * hash01(salt, 75);
 				const bool under = !shaded.empty() && underTrees(x, z, reach);
-				const bool thin = !under && !shaded.empty() && underTrees(x, z, reach + 3.2);   // (where the grass gives way to the wood: a thin grass over the leaves, and no line between them)
+				const bool wooded = !under && !shaded.empty() && underTrees(x, z, reach + 3.2);   // (where the grass gives way to the wood: a thin grass over the leaves, and no line between them)
+				bool worn = false;   // (and along a way the animals keep to, thin over bare earth)
+				for (const Trail &tr : trails) {
+					const double dx = tr.x1 - tr.x0, dz = tr.z1 - tr.z0, along = std::clamp(((x - tr.x0) * dx + (z - tr.z0) * dz) / std::max(1e-9, dx * dx + dz * dz), 0.0, 1.0);
+					if (std::hypot(x - tr.x0 - dx * along, z - tr.z0 - dz * along) < tr.wide + 0.25 * ring.cell) worn = true;
+				}
+				const bool thin = wooded || worn;
 				const Vec3 ground = terrain::colourAt(field, x, z);
 				const double dryness = ground.x / std::max(1e-4, ground.y), light = ground.x + ground.y + ground.z;
 				// the year: each square turns in its own time, drier as it goes on, and the dead grass of winter is beaten down
@@ -280,7 +355,26 @@ inline std::string text(const std::string &film, const terrain::Field &field, co
 				const Vec3 foot{-x, y - 0.02, z};
 				const Mat4 turnIt = rotate({0, 1, 0}, 90.0 * static_cast<int>(hash01(salt, 74) * 4.0));
 				const Vec3 w = under ? Vec3{0.0, 0.0, 0.0} : nature::windLean(foot.x, foot.z, t, 0.18) + dressing::gustAt(gusts, foot.x, foot.z, t) * 0.35;
-				if (under || thin) places += nature::placeObject(laid("litter", true, 1.0), mul(translate(foot), tilt, turnIt));
+				if (under || wooded) places += nature::placeObject(laid("litter", true, 1.0), mul(translate(foot), tilt, turnIt));
+				if (r <= 1 && !under) {   // near the camera: the earth between the blades, what lies on it
+					const std::string earth = std::string("cover_earth") + (worn ? "b" : "") + "_" + std::to_string(r) + "_" + std::to_string(shape);
+					if (made.insert(earth).second) {
+						const std::string file = film_cache::ply(film, "cover_earth_" + std::to_string(r), [&] { return detail::earthSkin(ring.cell); });
+						objects += nature::objectBegin(earth) + "  AttributeBegin\n  " + detail::earthMaterial(film, earth, ground, file, worn) + "  AttributeEnd\n" + nature::objectEnd();
+					}
+					places += nature::placeObject(earth, mul(translate(foot), tilt, turnIt));
+				}
+				if (r == 0) {
+					const std::string bits = "cover_bits" + std::to_string(shape);
+					if (made.insert(bits).second) {
+						Mesh stones, stems;
+						detail::addLitter(stones, stems, ring.cell, 34, 780 + shape);
+						const std::string a = film_cache::ply(film, bits + "_stones", [&] { return stones; }), b = film_cache::ply(film, bits + "_stems", [&] { return stems; });
+						objects += nature::objectBegin(bits) + "  AttributeBegin\n  " + diffuseMaterial({0.3, 0.28, 0.25}) + "\n" + film_cache::plyShape(a) + "  AttributeEnd\n  AttributeBegin\n  " + diffuseMaterial({0.32, 0.26, 0.17}) + "\n" +
+								   film_cache::plyShape(b) + "  AttributeEnd\n" + nature::objectEnd();
+					}
+					places += nature::placeObject(bits, mul(translate(foot), tilt, turnIt));
+				}
 				// what has walked here: shoved out from under it as it comes, lying down behind it, and getting up again
 				Vec3 shoved{0.0, 0.0, 0.0};
 				double flat = 0.0;

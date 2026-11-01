@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "cartoon_lib.h"
+#include "film_air.h"
 #include "film_animals.h"
 #include "film_terrain.h"
 #include "nature_lib.h"
@@ -643,7 +644,7 @@ inline double arrival(const Herd &h, const animals::Species &sp, int i, double t
 constexpr double kCloseUp = 22.0, kOwnPose = 34.0, kDustWithin = 90.0;
 constexpr std::size_t kMostHair = 5, kMostOwn = 8;
 inline std::string herdText(const Herd &h, double t, const terrain::Field *ground, animals::Poses &poses, const std::vector<Herd> &herds = {}, const std::vector<Hunt> &hunts = {},
-						   double waterLevel = -1e30, const Vec3 *eye = nullptr, double rain = 0.0) {
+						   double waterLevel = -1e30, const Vec3 *eye = nullptr, double rain = 0.0, const std::string &film = std::string(), bool cold = false) {
 	const animals::Species *sp = animals::species(h.kind);
 	if (!sp) return std::string();
 	// in a hunt that has begun: its animals where the chase has them (now and a tenth of a second ago, for the lean)
@@ -789,6 +790,24 @@ inline std::string herdText(const Herd &h, double t, const terrain::Field *groun
 			const Vec3 ground0 = ground ? terrain::colourAt(*ground, p.x, p.z) : Vec3{0.4, 0.34, 0.26};
 			const std::string dust = kickedUp(p, dir, a.going.speed, sp->length * (child ? 0.5 : 1.0), t, s + 7);
 			if (!dust.empty()) out += "AttributeBegin\n" + diffuseMaterial(lerp(ground0, Vec3{0.3, 0.24, 0.17}, 0.6)) + "\n" + dust + "AttributeEnd\n";
+			if (!film.empty()) {   // (and the cloud of what was too fine to fall, hanging behind it and thinning)
+				std::vector<airborne::Puff> cloud;
+				const double size = sp->length * (child ? 0.5 : 1.0);
+				for (int q = 0; q < 12; ++q) {
+					const double age = 0.12 + 0.17 * q + 0.1 * hash01(s + q, 31);
+					const Vec3 at = p - dir * (a.going.speed * 0.7 * age + 0.4 * size) + Vec3{0.5 * size * (hash01(s + q, 32) - 0.5), 0.2 * size + 0.5 * age * size, 0.5 * size * (hash01(s + q, 33) - 0.5)};
+					cloud.push_back({at, size * (0.45 + 0.75 * age), 0.32 * (1.0 - age / 2.4)});
+				}
+				out += airborne::puffsText(film, cloud, lerp(ground0, Vec3{0.72, 0.65, 0.52}, 0.5), *eye, "dust" + std::to_string(s));
+			}
+		}
+		if (cold && eye && !film.empty() && length(p - *eye) < 40.0) {   // (its breath, in cold air, out and gone with each slow rise of its chest)
+			const double size = sp->length * (child ? 0.5 : 1.0), cycle = 2.6 + 0.8 * hash01(s, 34), u = t / cycle + hash01(s, 35), age = (u - std::floor(u)) * cycle;
+			if (age < 1.3) {
+				const Vec3 nose = p + dir * (0.95 * size) + Vec3{0.0, 0.85 * size, 0.0};
+				const std::vector<airborne::Puff> breath = {{nose + dir * (0.5 * age), 0.05 * size + 0.14 * age * size, 0.3 * (1.0 - age / 1.3)}, {nose + dir * (0.8 * age) + Vec3{0.0, 0.1 * age, 0.0}, 0.03 * size + 0.1 * age * size, 0.22 * (1.0 - age / 1.3)}};
+				out += airborne::puffsText(film, breath, {0.82, 0.84, 0.86}, *eye, "breath" + std::to_string(s));
+			}
 		}
 		if (!watery.empty()) out += "AttributeBegin\nMaterial \"dielectric\" \"float eta\" [ 1.33 ]\n" + watery + "AttributeEnd\n";   // (water: its wake and drops)
 		if (!spray.empty()) out += "AttributeBegin\nMaterial \"diffuse\" \"rgb reflectance\" [ 0.9 0.92 0.93 ]\n" + spray + "AttributeEnd\n";   // (spray: white with the air in it)

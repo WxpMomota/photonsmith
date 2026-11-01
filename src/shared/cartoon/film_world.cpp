@@ -532,6 +532,23 @@ static double underTheSeaExposure(const Spec &spec, const std::string &header) {
 	return undersea::depthExposure(spec.underwater, spec.seas[0].level - eye.y);
 }
 
+// How much a camera opens up among trees. An eye adapts to the shade of a wood and a film's camera is set for it; left at the exposure of the open sky a wood is a black wall. By how
+// much crown there is overhead (the trees within a few of their own widths, by how near), up to a stop and a quarter. An `exposure F` of the film's own is left alone.
+static double inTheWoodExposure(const Spec &spec, const std::string &header) {
+	if (spec.planted.empty() || (!spec.exposureAuto && spec.exposure != 1.0)) return 1.0;
+	Vec3 eye, target;
+	double fov = 40.0;
+	if (!film_subjects::cameraOf(header, eye, target, fov)) return 1.0;
+	double over = 0.0;
+	for (const std::vector<forest::Tree> &trees : spec.planted)
+		for (const forest::Tree &tree : trees) {
+			if (tree.species == "shrub" || tree.species == "fern" || tree.species == "log" || tree.species == "cactus") continue;
+			const double reach = 8.0 * tree.scale, d = std::hypot(tree.at.x - eye.x, tree.at.z - eye.z);
+			if (d < reach && eye.y - tree.at.y < 8.0 * tree.scale) over += 1.0 - smoothstep(0.25 * reach, reach, d);
+		}
+	return 1.0 + 1.4 * (1.0 - std::exp(-over / 3.0));
+}
+
 std::string DataFilm::worldAt(const std::string &given, double t) const {
 	const double nt = natureAt(t);   // (nature's time: the clouds, the water, the aurora, the wind, the animals; `timelapse`, `slowmo`)
 	std::string header = spec.hasUnderwater ? undersea::floated(given, spec.seas[0], nt, !spec.shots.empty() && spec.shots[shotAt(t)].waterline) : given;   // (a camera at the surface floats on it: film_undersea.h)
@@ -541,7 +558,7 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 		if (film_subjects::cameraOf(header, eye, target, fov) && undersea::waterlineOf(spec.seas[0], nt, {-eye.x, eye.y, eye.z}).where != undersea::Waterline::Above)
 			header = undersea::throughFlatPort(header);
 	}
-	std::string out = film_camera::exposed(header, exposureAt(t) * underTheSeaExposure(spec, header));
+	std::string out = film_camera::exposed(header, exposureAt(t) * underTheSeaExposure(spec, header) * inTheWoodExposure(spec, header));
 	if (spec.hasUnderwater) {
 		SeaCast cast;
 		if (spec.vignettes.any())
@@ -677,6 +694,7 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 		storm.level = spec.storm.levelAt(t), storm.kind = spec.storm.kind;
 		dressing::SkyOptics optics = spec.optics;
 		optics.exposure = exposureAt(t);
+		optics.softSun = !spec.forests.empty();
 		out += "# the sun and sky at " + std::to_string(dressing::hourAt(spec.sky, t, spec.storyEnd)) + " h (film_dressing.h)\n" + dressing::skyText(spec.key, spec.sky, t, spec.storyEnd, rainbow, storm, optics);
 	}
 	if (spec.moon.on) {   // (round 17: `moonlight` - after the sun, so the sea's caustics and glints take the sun's light while it is up)
@@ -758,7 +776,7 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 		double herdFov = 40.0;
 		const bool seen = film_subjects::cameraOf(header, herdEye, herdTarget, herdFov);
 		herdEye.x = -herdEye.x;   // (pbrt's)
-		for (const wildlife::Herd &h : spec.herds) out += wildlife::herdText(h, nt, ground.get(), poses, spec.herds, spec.hunts, spec.seas.empty() ? -1e30 : spec.seas[0].level, seen ? &herdEye : nullptr, weatherAt(t).wet);
+		for (const wildlife::Herd &h : spec.herds) out += wildlife::herdText(h, nt, ground.get(), poses, spec.herds, spec.hunts, spec.seas.empty() ? -1e30 : spec.seas[0].level, seen ? &herdEye : nullptr, weatherAt(t).wet, spec.key.empty() ? std::string("film") : spec.key, weatherAt(t).snow > 0.0 || (!spec.forests.empty() && cover::yearAt(spec.undergrowth, spec.forests, t) > 1.2));
 		for (const wildlife::Flight &f : spec.flights) out += wildlife::flightText(f, nt, poses);
 	}
 	if (spec.sealife.any()) {   // life under the sea (film_sealife.h)
@@ -1007,6 +1025,21 @@ std::string DataFilm::waterPlay(const Character &c, const CharacterKind &kind, d
 // Round 16: what the water sounds like (film_dressing.h) - the reef's hush and crackle while the ears are under the water, the waves' wash while they are above
 // it, changing as the camera crosses the waterline (cartoons.cpp leaves an underwater film's `reef` and `sea` beds to here) - and the boats, the dolphins and the
 // whales, and the gannets' plunges, from where they are. `natureAt`: nature's time at a film time; `bedAt`: the seabed's height (pbrt's x z).
+// How much dew lies on the grass at t: it is there at dawn, and the sun takes it off through the morning.
+static double dewAt(const Spec &spec, double t) {
+	if (!spec.hasSky) return 0.0;
+	double el = 0.0, facing = 0.0;
+	const double hour = dressing::hourAt(spec.sky, t, spec.storyEnd);
+	dressing::sunAt(spec.sky, hour, el, facing);
+	return hour < 12.0 ? 0.55 * (1.0 - smoothstep(4.0, 22.0, el)) : 0.0;
+}
+// The ways the film's herds keep to (film_cover.h).
+static std::vector<cover::Trail> trailsOf(const Spec &spec) {
+	std::vector<cover::Trail> out;
+	for (const wildlife::Herd &h : spec.herds)
+		if (const animals::Species *sp = animals::species(h.kind); sp && !sp->bird) out.push_back({h.fx, h.fz, h.tx, h.tz, 0.35 * sp->length + 0.3});
+	return out;
+}
 // Where the film's animals are and have just been, near the camera (story space): what the grass has to get out of the way of (film_cover.h).
 static std::vector<cover::Press> pressedBy(const Spec &spec, const terrain::Field *ground, double t, const Vec3 &eyeStory) {
 	std::vector<cover::Press> out;
@@ -1659,7 +1692,14 @@ std::string DataFilm::plantsAt(const std::string &header, double t, double nt) c
 	std::string out;
 	forest::Written trees;
 	for (std::size_t i = 0; i < spec.forests.size() && i < spec.planted.size(); ++i) out += forest::text(film, spec.planted[i], spec.forests[i], nt, t, eye, spec.gusts, weatherAt(t).wet, trees);
-	if (grows) out += cover::text(film, *terrain::fieldOf(spec.terrain), spec.undergrowth, eye, target, fov, nt, weatherAt(t).snow, spec.gusts, spec.planted, weatherAt(t).wet, cover::yearAt(spec.undergrowth, spec.forests, t), pressedBy(spec, terrain::fieldOf(spec.terrain).get(), nt, eye));
+	if (grows && weatherAt(t).wet < 0.2 && weatherAt(t).snow <= 0.0) {   // (rain washes the air clean)
+		std::vector<Vec3> near_;
+		for (const std::vector<forest::Tree> &trees : spec.planted)
+			for (const forest::Tree &tree : trees)
+				if (std::hypot(tree.at.x + eye.x, tree.at.z - eye.z) < 22.0 && tree.species != "log") near_.push_back(tree.at);
+		out += airborne::motesText(spec.motes, {-eye.x, eye.y, eye.z}, nt, spec.gusts.strength > 0.0 ? 0.0 : 1.0, near_);
+	}
+	if (grows) out += cover::text(film, *terrain::fieldOf(spec.terrain), spec.undergrowth, eye, target, fov, nt, weatherAt(t).snow, spec.gusts, spec.planted, std::max(weatherAt(t).wet, dewAt(spec, t)), cover::yearAt(spec.undergrowth, spec.forests, t), pressedBy(spec, terrain::fieldOf(spec.terrain).get(), nt, eye), trailsOf(spec));
 	return out;
 }
 // The film's swarms at t (film_swarm.h), their discs turned to the camera of `header`.

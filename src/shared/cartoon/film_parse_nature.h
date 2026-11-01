@@ -812,7 +812,7 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		const std::vector<std::string> t = detail::tokens(line);
 		forest::Forest f;
 		if (t.size() < 2 || std::find(forest::kinds().begin(), forest::kinds().end(), t[1]) == forest::kinds().end())
-			return fail("`forest KIND [COUNT] [in X0 Z0 X1 Z1] [below H] [above H] [steep S] [scale A B] [near D] [season S] [seed N]`: conifer, broadleaf, birch, palm, shrub, acacia, kapok, cactus or fern, or a mix: mixed, savanna, jungle, desert or tundra");
+			return fail("`forest KIND [COUNT] [in X0 Z0 X1 Z1] [below H] [above H] [steep S] [scale A B] [near D] [season S] [seed N]`: conifer, pine, oak, beech, broadleaf, birch, palm, shrub, acacia, kapok, cactus or fern, or a mix: mixed, savanna, jungle, desert or tundra");
 		f.kind = t[1];
 		std::size_t i = 2;
 		double count = 0.0;
@@ -1011,6 +1011,12 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		else if (t.size() == 3 && t[1] == "amount" && number(t[2], amount) && amount > 0.0 && amount <= 3.0) s.undergrowth.amount = amount;
 		else if (t.size() == 3 && t[1] == "season" && std::find(forest::seasons().begin(), forest::seasons().end(), t[2]) != forest::seasons().end()) s.undergrowth.season = t[2];
 		else return fail("`undergrowth off`, `undergrowth amount A` (above 0, up to 3), or `undergrowth season S` (summer, autumn, winter or spring)");
+	} else if (verb == "motes") {   // film_air.h
+		const std::vector<std::string> t = detail::tokens(line);
+		double amount = 0.0;
+		if (t.size() == 2 && t[1] == "off") s.motes.on = false;
+		else if (t.size() == 3 && t[1] == "amount" && number(t[2], amount) && amount > 0.0 && amount <= 4.0) s.motes.amount = amount;
+		else return fail("`motes off`, or `motes amount A` (above 0, up to 4): the pollen and seeds in the air");
 	} else if (verb == "swarm") {
 		swarm::Swarm sw;
 		if (const std::string e = swarm::parse(detail::tokens(line), sw); !e.empty()) return fail(e);

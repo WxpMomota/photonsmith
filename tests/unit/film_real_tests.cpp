@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <map>
 #include <set>
@@ -301,7 +302,7 @@ TEST(FilmReal, ACrownIsGrownNotFilled) {
 	const auto summer = d::grow("broadleaf", 2, false, false), winter = d::grow("broadleaf", 2, true, false);
 	EXPECT_TRUE(winter.foliage.tris.empty());
 	EXPECT_GT(summer.foliage.tris.size(), 10000u);
-	EXPECT_GT(winter.wood.tris.size(), summer.wood.tris.size());
+	EXPECT_EQ(winter.wood.tris.size(), summer.wood.tris.size());
 }
 
 // Bark tiles with no seam, stands in ridges where it should and is smooth where it should, and every part of a tree carries it.
@@ -732,4 +733,72 @@ TEST(FilmReal, AnimalsDoThingsWhenTheyStop) {
 	bool suckles = false;
 	for (double t = 20.0; t < 90.0 && !suckles; t += 7.0) suckles = frame(t).find("anim_deer_suckle_") != std::string::npos;
 	EXPECT_TRUE(suckles);
+}
+
+// Each species has its own habit: an oak broad and low, a beech tall and domed, a pine bare to a high crown; and leaves sit along twigs that stay when they fall.
+TEST(FilmReal, TreesHaveTheirOwnHabit) {
+	namespace d = forest::detail;
+	const auto spread = [](const Mesh &m) {
+		double wide = 0.0, top = 0.0, low = 1e30;
+		for (const V3 &p : m.verts) wide = std::max(wide, std::hypot(p.x, p.z)), top = std::max(top, p.y), low = std::min(low, p.y);
+		return std::array<double, 3>{wide, top, low};
+	};
+	const auto oak = spread(d::grow("oak", 0, false, false).foliage), beech = spread(d::grow("beech", 0, false, false).foliage), pine = spread(d::grow("pine", 0, false, false).foliage);
+	EXPECT_GT(oak[0] / oak[1], beech[0] / beech[1]) << "broad, against tall";
+	EXPECT_GT(pine[2], 0.45 * pine[1]) << "a pine's lower trunk is bare";
+	const d::Grown summer = d::grow("oak", 1, false, false), winter = d::grow("oak", 1, true, false);
+	EXPECT_TRUE(winter.foliage.tris.empty());
+	EXPECT_EQ(summer.wood.verts.size(), winter.wood.verts.size()) << "the same shoots, with their leaves or without";
+	for (const std::string &sp : {"oak", "beech"}) EXPECT_NE(d::foliageOf(sp, "autumn", 0).x, d::foliageOf(sp, "summer", 0).x) << sp;
+	EXPECT_TRUE(d::deciduous("beech"));
+	EXPECT_FALSE(d::deciduous("pine"));
+}
+
+// Rain darkens bark and puts a shine on it, and stands on a close tree's leaves.
+TEST(FilmReal, RainWetsTheTrees) {
+	namespace d = forest::detail;
+	EXPECT_NE(d::barkMaterial("photonsmith-test-wet", "oak", 0.0).find("\"float roughness\" [ 0.800 ]"), std::string::npos);
+	const std::string wet = d::barkMaterial("photonsmith-test-wet", "oak", 1.0);
+	EXPECT_NE(wet.find("\"float roughness\" [ 0.220 ]"), std::string::npos);
+	EXPECT_NE(wet.find("\"float scale\" [ 0.450 ]"), std::string::npos);
+	forest::Forest f;
+	forest::Tree tree;
+	tree.species = "oak", tree.at = {0.0, 0.0, -10.0};
+	const std::vector<forest::Tree> trees = {tree};
+	EXPECT_EQ(forest::text("photonsmith-test-wet", trees, f, 1.0, 1.0, {0.0, 2.0, 0.0}).find("_beads"), std::string::npos);
+	const std::string rain = forest::text("photonsmith-test-wet", trees, f, 1.0, 1.0, {0.0, 2.0, 0.0}, {}, 0.8);
+	EXPECT_NE(rain.find("_beads"), std::string::npos);
+	EXPECT_NE(rain.find("\"float radius\" [ 0.0028 ]"), std::string::npos) << "a drop on its way down";
+}
+
+// Near the camera the ground is earth, with what lies on it; along a herd's way it is worn thin.
+TEST(FilmReal, TheGroundIsEarth) {
+	namespace cover = cartoon::cover;
+	terrain::Spec spec;
+	spec.kind = "hills", spec.size = 200.0, spec.height = 0.5, spec.seed = 3;
+	const auto field = terrain::fieldOf(spec);
+	ASSERT_TRUE(field);
+	const auto frame = [&](const std::vector<cover::Trail> &trails) { return cover::text("photonsmith-test-earth", *field, {}, {0.0, 1.5, 6.0}, {0.0, 0.0, 0.0}, 45.0, 1.0, 0.0, {}, {}, 0.0, 0.0, {}, trails); };
+	const std::string plain = frame({});
+	EXPECT_NE(plain.find("cover_earth_0_"), std::string::npos);
+	EXPECT_NE(plain.find("cover_bits"), std::string::npos);
+	EXPECT_EQ(plain.find("cover_earthb"), std::string::npos);
+	const std::string worn = frame({{-50.0, 2.0, 50.0, 2.0, 1.0}});
+	EXPECT_NE(worn.find("cover_earthb"), std::string::npos);
+	EXPECT_NE(worn.find("cover_thin_"), std::string::npos);
+}
+
+// The air has specks in it round the camera, fixed to the land, and none when it is `off`; a puff is a square of soft alpha that faces the camera.
+TEST(FilmReal, TheAirIsAlive) {
+	namespace airborne = cartoon::airborne;
+	airborne::Motes motes;
+	const V3 eye{1.0, 2.0, 3.0};
+	const std::string a = airborne::motesText(motes, eye, 1.0, 1.0, {V3{4.0, 0.0, 4.0}}), b = airborne::motesText(motes, eye, 1.04, 1.0, {V3{4.0, 0.0, 4.0}});
+	EXPECT_NE(a.find("Shape \"sphere\""), std::string::npos);
+	EXPECT_NE(a, b) << "they drift";
+	motes.on = false;
+	EXPECT_EQ(airborne::motesText(motes, eye, 1.0, 1.0, {}), "");
+	const std::string puffs = airborne::puffsText("photonsmith-test-air", {{V3{0.0, 1.0, 0.0}, 0.5, 0.2}, {V3{1.0, 1.0, 0.0}, 0.5, 0.2}}, {0.6, 0.5, 0.4}, eye, "t");
+	EXPECT_NE(puffs.find("\"texture alpha\""), std::string::npos);
+	EXPECT_NE(puffs.find("0 1 2 0 2 3 4 5 6 4 6 7"), std::string::npos) << "two squares, in one mesh of a thickness";
 }

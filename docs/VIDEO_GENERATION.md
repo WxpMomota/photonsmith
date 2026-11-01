@@ -2677,7 +2677,29 @@ uvs (its surface cut into near-flat charts along its creases, each laid flat and
 
 **The land answers.** (film_cover.h `Press`, film_world.cpp `pressedBy`) Grass near the camera is shoved out of the way of whatever walks through it, lies down behind it, and is up again in a few seconds. A running animal throws up crumbs of earth from dry ground. In rain the legs and belly take the mud.
 
-**What these do not change.** The animals' bodies still come from the generator. The way a leg joins the body is the weakest part of them close to the camera, and a scanned model would do more than anything here. Real dust needs a volume that moves with the herd: what is drawn is crumbs of earth, not a cloud. A leaf's gloss is on both its sides, where a real leaf's is mostly on the top. Metal has not been tried with any of this.
+**What these do not change.** The animals' bodies still come from the generator, and a scanned model would do more than anything here. A leaf's gloss is on both its sides, where a real leaf's is mostly on the top. Metal has not been tried with any of this.
+
+### Plants and animals, third round (2026-11-01)
+
+**One skin.** (scripts/make_rigged_animals.py `Source`, `fuse`) A quadruped's trunk, neck, upper legs and the masses of its shoulders, haunches and breast are drawn as tubes and blobs, then fused: a distance field blended where they meet, and one surface round it (surface nets). Each point follows the bones of the nearest tubes, shared by how near they are; each triangle takes the coat's picture from one tube. The lean lower leg comes out of it past the knee. About 15,000 triangles a body.
+
+**Heads.** Each family has its own skull (`SKULLS`): a grazer's long and deep, a dog's with a stop and a narrow muzzle, a cat's short and blunt, a bear's broad, a rabbit's round, each fused with brow ridges and cheeks. The lower jaw is its own bone with a dark mouth and a tongue: it chews at grass, a wolf, fox or lion pants at a trot and a gallop. The upper lids blink.
+
+**Coats in layers.** (film_animals.h `heroFur`) Seven strands in ten are short pale underfur; the rest are guard hairs half as long again, darkening to their tips. The hair turns about whorls on the flank and chest, and when wet it gathers in points and lies closer.
+
+**Something to do.** (film_wildlife.h, film_animals.h `pauseClip`) A pause is the animal's own: it grazes or stands, shakes itself, stamps at a fly, turns round to its flank, or drinks at the water. A young one goes to its mother to feed. Once a herd has reached the end of its way about half of it lies down, each in its own time. One standing within 16 m of the camera may turn its head and watch it.
+
+**Trees of their own: `forest oak`, `forest beech`, `forest pine`.** (film_forest.h) An oak is low and broad on a short thick trunk, a beech a smooth grey column under a tall dome, a pine a bare red-brown trunk with a high irregular top. A `mixed` wood has them by height. A branch ends in a spray of thin shoots with the leaves along them in turn, each on its stalk facing the light; in winter the same shoots show against the sky.
+
+**The light in a wood.** (film_world.cpp `inTheWoodExposure`, film_dressing.h `softSun`) A camera opens up by up to 1.25 stops for the crown overhead, unless the film sets an `exposure F` of its own. The sun of a film with forests is four lights a third of a degree apart, so its light through leaves falls in soft patches.
+
+**Real ground.** (film_cover.h `earthSkin`, `addLitter`, `Trail`) Near the camera a skin of soil, cut to blotches, lies between the blades, with stones and dead stems on it. Along the line of a herd's way the grass is thin and the earth shows.
+
+**A wet world.** Rain darkens bark and gives it a shine, stands in beads on the leaves of a close tree and drips through its crown. Dew lies on the grass at dawn and the sun takes it off by mid-morning.
+
+**The air: `motes off`, `motes amount A`.** (film_air.h) Pollen and seeds hang round the camera and midges dance by the trees in still air; rain and snow clear them. A running herd on dry ground raises a soft cloud, and breath shows in the cold (snow, or a forest's winter). Both are camera-facing squares with a soft alpha, a few triangles each where a volume would take the wavefront renderer.
+
+**What these do not change.** The join at the knee can still show a crease in a hard bend, and a lying animal's hind feet stick out a little. A scanned model remains the larger step. Metal has not been tried with any of this.
 
 ## Examples
 

@@ -187,6 +187,7 @@ struct SkyStorm {
 struct SkyOptics {
 	double halo = 0.0, fogbow = 0.0, rays = 0.0, alpenglow = 0.0;
 	double exposure = 1.0;   // (the frame's: the green flash is divided by it, so it shows green, not white, however far the camera has opened up)
+	bool softSun = false;    // (the sun as the half degree of sky it is, not a point: its light through leaves falls in soft patches, sharp near what casts them)
 	bool greenFlash = false;
 };
 inline std::string skyText(const std::string &film, const Sky &s, double t, double length, double rainbow = 0.0, const SkyStorm &storm = SkyStorm(), const SkyOptics &optics = SkyOptics()) {
@@ -216,9 +217,15 @@ inline std::string skyText(const std::string &film, const Sky &s, double t, doub
 	char buf[400];
 	std::string out;
 	if (sunUp > 0.0) {
-		std::snprintf(buf, sizeof buf, "LightSource \"distant\" \"point3 from\" [ %.5f %.5f %.5f ] \"point3 to\" [ 0 0 0 ] \"rgb L\" [ %.5f %.5f %.5f ]\n", toward.x, toward.y, toward.z,
-					  sun.colour.r * sun.irradiance * sunUp, sun.colour.g * sun.irradiance * sunUp, sun.colour.b * sun.irradiance * sunUp);
-		out += buf;
+		const int parts = optics.softSun ? 4 : 1;
+		const Vec3 across = normalize(cross(toward, Vec3{0.0, 1.0, 0.0}) + Vec3{1e-6, 0.0, 0.0}), upward = cross(across, toward);
+		for (int k = 0; k < parts; ++k) {
+			const double spread = parts > 1 ? std::tan(0.2 * d2r) : 0.0, a = 0.5 * kPi * k + 0.4;
+			const Vec3 from = normalize(toward + across * (spread * std::cos(a)) + upward * (spread * std::sin(a)));
+			std::snprintf(buf, sizeof buf, "LightSource \"distant\" \"point3 from\" [ %.5f %.5f %.5f ] \"point3 to\" [ 0 0 0 ] \"rgb L\" [ %.5f %.5f %.5f ]\n", from.x, from.y, from.z,
+						  sun.colour.r * sun.irradiance * sunUp / parts, sun.colour.g * sun.irradiance * sunUp / parts, sun.colour.b * sun.irradiance * sunUp / parts);
+			out += buf;
+		}
 	}
 	(void)twilight, (void)path, (void)error;
 	film_sky::Spec fs;
