@@ -6,6 +6,7 @@
 // The file (little-endian): "RTSTRANDS1", a uint32 count of groups, then each group: float r g b (its colour), float width0 width1 (at root and tip), uint32 strands, and
 // 12 floats a strand (four control points, root first), in the piece's own space, as its mesh's vertices are.
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -43,7 +44,7 @@ inline std::shared_ptr<const StrandSet> strandsOf(const std::string &path) {
 	std::error_code ec;
 	const std::uintmax_t bytes = std::filesystem::file_size(path, ec);
 	if (ec) return nullptr;
-	const std::string key = path + "#" + std::to_string(bytes) + "#" + std::to_string(std::filesystem::last_write_time(path, ec).time_since_epoch().count());
+	const std::string key = path + "#" + std::to_string(bytes) + "#" + std::to_string(static_cast<long long>(std::filesystem::last_write_time(path, ec).time_since_epoch().count()));   // (128 bits on a Mac)
 	static std::mutex lock;
 	static std::map<std::string, std::shared_ptr<const StrandSet>> read;
 	const std::lock_guard<std::mutex> hold(lock);
