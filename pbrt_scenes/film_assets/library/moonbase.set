@@ -1,0 +1,7 @@
+# A small moon: grey dust and crater rims under a black sky full of stars, a blue world hanging over the horizon. For cartoons in space (`cast nova`, `cast robot`).
+scene    void.pbrt
+terrain  hills  size 260  height 5  seed 11
+biome    moonrock
+space    stars 1  milkyway 0.7  sun 60 30
+planet   home  ocean  at -2200 900 -5200  radius 700
+spires   30  in -60 -70 60 -30  height 3  colour 0.4 0.42 0.5  seed 3

@@ -81,7 +81,23 @@ struct Line {
 	double rate = 1.0, pitch = 0.0;
 	bool caption = true;
 	int line = 0;   // (the film file's line)
+	bool radio = false;   // (heard over a radio: thin, a little hard, with a hiss and a click at each end: film_file.cpp speak)
+	double delay = 0.0;   // (... from this many seconds away: what is said is heard so much later)
 };
+// A voice as it comes over a radio: only the middle of its sound, driven a little hard, in a bed of hiss that opens and shuts with a click.
+inline void overTheRadio(std::vector<float> &sound, unsigned seed) {
+	const double hp = 1.0 - std::exp(-2.0 * kPi * 420.0 / audio::kRate), lp = 1.0 - std::exp(-2.0 * kPi * 2600.0 / audio::kRate);
+	double low = 0.0, top = 0.0;
+	unsigned state = seed * 2654435761u + 1u;
+	const std::size_t n = sound.size(), edge = static_cast<std::size_t>(0.012 * audio::kRate);
+	for (std::size_t i = 0; i < n; ++i) {
+		low += hp * (sound[i] - low);
+		top += lp * ((sound[i] - low) - top);
+		state = state * 1664525u + 1013904223u;
+		const double hiss = 0.018 * (static_cast<double>(state >> 8) / 8388608.0 - 1.0), click = i < edge || i + edge > n ? 0.12 * ((i % 40) < 20 ? 1.0 : -1.0) : 0.0;
+		sound[i] = static_cast<float>(std::tanh(3.2 * top) * 0.62 + hiss + click);
+	}
+}
 
 struct Syllable {
 	double t0 = 0.0, t1 = 0.0;   // the voiced part (film time)

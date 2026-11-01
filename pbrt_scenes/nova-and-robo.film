@@ -1,0 +1,79 @@
+# Nova and Robo: a starter for cartoons in space. A small astronaut and a small robot on a small moon, a voice from home that takes its time to arrive, and nothing to hear but breathing.
+# Everything in it is from the film library (`set moonbase`, `cast nova`, `cast robot`), so a new story needs only new lines. The toon look draws it as a cartoon. In the vacuum the only sound is
+# `ambience breath`; a line said `radio` comes over the suit's radio, and `delay S` is how long it took to get here. `hud` lines are the helmet's display; `flightpath` draws the way home on the sky.
+film    nova-and-robo
+name    Nova and Robo
+about   A small astronaut and a small robot on a small moon, and a voice from home that takes its time to arrive.
+tags    space, cartoon
+still   12
+toon    bands 3  lines 2.5  saturation 1.25
+title   at 0.5 for 3
+
+part "The long walk"
+set     moonbase
+length  11
+gravity 1.62
+ambience breath 1
+cast    nova  at -4 0 6  facing 180
+walk    nova  0.5 0.8   -1.5 1
+hud     "AIR 96%"  at -0.84 0.82  size 0.035
+hud     "HOME 384,400 KM"  at 0.5 0.82  size 0.035  from 3
+say     nova  6.5 "Hello? Can anyone hear me?" radio
+shot 0 A long way from anywhere
+  key   -9 3.5 12   -2 1 2   36
+  key   -7 2.6 9   -1.5 1 1   36
+  subject nova
+
+part "Mission control" dissolve 0.8
+set     void
+length  7
+ambience night 0.3
+space   stars 1  milkyway 0.5  sun 60 12
+interior cockpit  at 0 0 4  facing 180  length 8  light 0.9 0.95 1
+screen  board  at 1.4 1.5 -1.4  show radar  size 1.2 0.8  facing 300  bright 1.4
+hologram home  globe  at 0.9 1.1 0.4  size 0.5  colour 0.4 0.8 1
+cast    chief as pip  at -0.5 0 -0.6  facing 0
+gesture chief  "cheer" 3 3.4 5 5.4
+say     chief  2.2 "We hear you, Nova! Look behind you."
+shot 0 The room
+  key   0.7 1.3 3.2   -0.2 0.9 -0.8   44
+  subject chief
+
+part "Who is that?" dissolve 0.8
+set     moonbase
+length  12
+gravity 1.62
+ambience breath 1
+cast    nova  at -1.5 0 1  facing 0
+cast    robot  at 2 0 -3  facing 0
+cast    chief as pip  at 60 0 60
+walk    robot  1 0.8   -0.4 -0.6
+hud     "AIR 94%"  at -0.84 0.82  size 0.035
+say     chief   0.2 "We hear you, Nova! Look behind you." radio delay 1.3
+gesture nova  "nod" 3.4 3.8 5 5.6
+gesture nova  "wave" 6.5 7 8 8.5
+gesture robot  "cheer" 8 8.5 10.5 11
+say     nova  6.8 "Oh! Hello, you."
+shot 0 Nova turns
+  key   -3.6 1.1 2.6   -1 0.75 -0.4   34
+  subject nova
+shot 5.5 Two small friends
+  key   3 1.2 2.4   -0.8 0.7 -0.2   36
+  subject robot
+
+part "Home" dissolve 1
+set     moonbase
+length  10
+gravity 1.62
+ambience breath 1
+cast    nova  at -0.7 0 0  facing 150
+cast    robot  at 0.6 0 0.2  facing 210
+planet  here  rocky  at 0 -40 0  radius 1
+flightpath here home "HOME"  from 3  over 4
+gesture nova  "cheer" 5 5.5 8.5 9
+gesture robot  "cheer" 5.3 5.8 8.5 9
+say     nova  5.2 "There it is. Home." radio
+shot 0 Looking up
+  key   1 0.5 4.6   -1.4 2.8 -8   38
+  key   1.4 0.45 5   -1.8 3.4 -8   38
+  subject nova

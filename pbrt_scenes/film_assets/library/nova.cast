@@ -1,0 +1,5 @@
+# Nova: a small astronaut, a child with a big round head in a bubble of glass (nova.glb, made by scripts/make_rigged_astronaut.py), with clips to idle, walk, wave, cheer and nod.
+kind    nova
+rigged  nova.glb  height 1.16
+pitch   6
+rate    1.08

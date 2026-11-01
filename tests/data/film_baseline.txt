@@ -87,6 +87,11 @@ nomai-signal|29|6d012e403f5aae8b|Dawn
 nomai-signal|30|aa74bbe804b47bd3|The campfire
 nomai-signal|31|74a424ee2211f3a2|Pulling away
 nomai-signal|32|da4aefe2b100fae9|The title
+nova-and-robo|1|bff91f3f5e479fe5|A long way from anywhere
+nova-and-robo|2|126c53f87302de54|The room
+nova-and-robo|3|addca0bd57f6cfda|Nova turns
+nova-and-robo|4|c451e2d3014a4faa|Two small friends
+nova-and-robo|5|0b6cdb59c8b3f055|Looking up
 orrery|1|2784ffb350302bc9|Wide orbit
 orrery|2|62cd47bd19dfe413|Close-up on the third planet
 orrery|3|e551c7b694fdf8f1|Rising look down
@@ -111,6 +116,20 @@ pip-goes-out|2|2176887f580d9f79|The lantern lights
 pip-goes-out|3|2b3b1421b9e36ba8|Into the sun
 pip-goes-out|4|a0549e6fb8f1094e|Cheering
 pip-goes-out|5|3c333a32d94cf28f|Credits
+powers-of-ten|1|8383e53c3a9e8fae|Up
+powers-of-ten|2|d57f2839c3ca2b31|Out
+powers-of-ten|3|fbe7bced4ff12287|Out
+powers-of-ten|4|e6c2e3578c30e6ab|Out
+powers-of-ten|5|57815a077810a6f9|Out
+powers-of-ten|6|71063532960b1e84|Out
+powers-of-ten|7|fa63cffcd4b31884|Out
+powers-of-ten|8|fde234bdfd1fd2eb|Home
+powers-of-ten|9|4653f93e7bf5935e|Home
+powers-of-ten|10|5ad9bc0efc6e514f|Home
+powers-of-ten|11|ca1b9ba2b169bf99|Home
+powers-of-ten|12|e875c1bbbdcf0fe1|Home
+powers-of-ten|13|cbf4a2aaba4b8c1a|Home
+powers-of-ten|14|5e102c4983e455ea|Down
 seasons-wood|1|84c52ef70426765e|The meadow wakes
 seasons-wood|2|ab058121154d8305|Following the sun
 seasons-wood|3|c494140232f05640|The wood turns
@@ -270,8 +289,8 @@ valley-of-mists|6|9d02312d22761bb1|Morning
 worlds-beyond|1|9f2e49ebbcd613c6|Into the night
 worlds-beyond|2|c4496f48cb100f81|Past the fire
 worlds-beyond|3|ca9dd28c22e01e3d|The comet goes by
-worlds-beyond|4|5054694141512158|The station turns
-worlds-beyond|5|71f1f9f934b9bd81|On his tail
-worlds-beyond|6|c199dd04841ebc11|The cruiser
+worlds-beyond|4|1116a0542a3cbb47|The station turns
+worlds-beyond|5|df69ebeed554074d|On his tail
+worlds-beyond|6|e796f9f9c8f08794|The cruiser
 worlds-beyond|7|f31e72b1a3d2e26e|Hyperspace
 worlds-beyond|8|2d77a01c90033514|Home at last

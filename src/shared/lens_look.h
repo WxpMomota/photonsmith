@@ -23,6 +23,7 @@
 // `vintage V` (an old film print; `vintage-tone`, and `seed`: the frame's, which a film writes).
 
 #include "black_hole_lens.h"
+#include "cosmic_event.h"
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -97,7 +98,10 @@ struct Look {
 	// hole-spin, which a film writes for each frame from where the hole and the camera are).
 	bool hole = false;
 	black_hole_lens::Params holeLens;
-	bool active() const { return hole || shimmer > 0.0 || waterline > -1.0 || drops > 0.0 || distort != 0.0 || fringe != 0.0 || paint > 0.0 || sunbeams > 0.0 || bloom > 0.0 || flare > 0.0 || star > 0.0 || vignette > 0.0 || warmth != 0.0 || saturation != 1.0 || graded(); }
+	// Great things happening in the sky (cosmic_event.h: `event 1` starts one, and event-kind, event-count, event-seed, event-x, -y, -z, event-size, event-u, event-tilt, event-bright, event-eye-x,
+	// -y, -z, event-target-x, -y, -z and event-fov go with it; a film writes them for each frame).
+	std::vector<cosmic_event::Params> events;
+	bool active() const { return hole || !events.empty() || shimmer > 0.0 || waterline > -1.0 || drops > 0.0 || distort != 0.0 || fringe != 0.0 || paint > 0.0 || sunbeams > 0.0 || bloom > 0.0 || flare > 0.0 || star > 0.0 || vignette > 0.0 || warmth != 0.0 || saturation != 1.0 || graded(); }
 };
 
 // Values that were set (a flag, a scene line) override `base`; a negative bloom/vignette or a saturation below 0 means "not given" in `given`.
@@ -162,6 +166,29 @@ inline std::string parse(const std::string &text, Look &out) {
 		if (!(in >> v) || !std::isfinite(v)) return "\"" + word + "\" needs a number after it";
 		if (word == "bloom") out.bloom = std::clamp(v, 0.0, 1.0);
 		else if (word == "bloom-radius") out.bloomRadius = std::clamp(v, 0.001, 0.5);
+		else if (word == "event") out.events.emplace_back();
+		else if (word.rfind("event-", 0) == 0) {
+			if (out.events.empty()) return "\"" + word + "\" comes after `event 1`";
+			cosmic_event::Params &e = out.events.back();
+			if (word == "event-kind") e.kind = static_cast<int>(v);
+			else if (word == "event-count") e.count = std::clamp(static_cast<int>(v), 1, 40000);
+			else if (word == "event-seed") e.seed = static_cast<int>(v);
+			else if (word == "event-x") e.x = v;
+			else if (word == "event-y") e.y = v;
+			else if (word == "event-z") e.z = v;
+			else if (word == "event-size") e.size = std::max(1e-6, v);
+			else if (word == "event-u") e.u = v;
+			else if (word == "event-tilt") e.tilt = v;
+			else if (word == "event-bright") e.brightness = v;
+			else if (word == "event-eye-x") e.eye[0] = v;
+			else if (word == "event-eye-y") e.eye[1] = v;
+			else if (word == "event-eye-z") e.eye[2] = v;
+			else if (word == "event-target-x") e.target[0] = v;
+			else if (word == "event-target-y") e.target[1] = v;
+			else if (word == "event-target-z") e.target[2] = v;
+			else if (word == "event-fov") e.fov = std::clamp(v, 0.01, 179.0);
+			else return "unknown word \"" + word + "\"";
+		}
 		else if (word == "hole") out.hole = v > 0.0;
 		else if (word == "hole-x") out.holeLens.x = v;
 		else if (word == "hole-y") out.holeLens.y = v;
@@ -316,6 +343,7 @@ inline void apply(float *rgb, int w, int h, const Look &look) {
 	for (std::size_t i = 0; i < n * 3; ++i)
 		if (!std::isfinite(rgb[i])) rgb[i] = 0.0f;
 
+	for (const cosmic_event::Params &e : look.events) cosmic_event::apply(rgb, w, h, e);   // (out there too, and behind what a black hole bends)
 	if (look.hole) black_hole_lens::apply(rgb, w, h, look.holeLens);   // (before the lens's own flare and glow: it is out there, and they catch its light)
 	if (look.shimmer > 0.0) {   // heat shimmer first: it is in the air, in front of the lens (see Look::shimmer)
 		const std::vector<float> src(rgb, rgb + n * 3);

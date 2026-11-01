@@ -2701,6 +2701,48 @@ uvs (its surface cut into near-flat charts along its creases, each laid flat and
 
 **What these do not change.** The join at the knee can still show a crease in a hard bend, and a lying animal's hind feet stick out a little. A scanned model remains the larger step. Metal has not been tried with any of this.
 
+### Cartoons of space and the universe (2026-11-01)
+
+Ten things for films about space. **`pbrt_scenes/powers-of-ten.film`** and **`pbrt_scenes/nova-and-robo.film`** use most of them.
+
+**Orbit to the ground in one shot.** `planetfall KIND [from H] [to H] [at T] [over D] [radius R] [land X Z] [heading B] [clouds C] [seed N] [straight]` in a film with a `terrain`, and a shot with `descend` in place of `key` lines. Round the terrain the planet goes on, past the horizon of the highest camera, meshed and painted by the logarithm of the distance so that it is as fine from any height; the camera falls through two sheets of cloud; the physical sky is worked out from its height, so the stars come out as the air thins (film_planetfall.h). With `from` below `to` it rises instead, and with `straight` it looks straight down at one steady pace.
+
+**Other worlds.** `biome rust|frost|glass|moonrock|bloom`; `spires N in X0 Z0 X1 Z1 [height H] [colour R G B]`, crystal; `plumes N in ...`, vents that blow in their own time (film_alien.h); forest kinds `glowcap` and `frond`; `herd striders` and `herd crawlers`. `planet` works in a film on land, as something hanging in the sky.
+
+**A true black hole.** `blackhole ... lens 1` bends the finished picture as the Schwarzschild orbit equation says, and draws the disc through it: the arch over the top, the ring under it, the side coming towards you brighter, the Einstein ring (black_hole_lens.h). It bends what is behind it, not what is near it.
+
+**Great things happening.** `event KIND at X Y Z size S [from T] [over D] [count N] [tilt DEGREES] [brightness B] [seed N]` (cosmic_event.h).
+
+| KIND | What it is |
+|---|---|
+| `collision` | Two spiral galaxies falling through each other. The stars are followed step by step and feel only the two centres (Toomre and Toomre, 1972), so the tails and the bridge come of themselves. Most of the action is in the first third: give it a long `over` |
+| `disc` | A star being born with its planets: spirals winding up at each radius's own pace, rings swept clean by the planets growing in them |
+| `merger` | Two neutron stars spiralling in, the flash, and a shell of what was thrown out growing and reddening |
+| `web` | The cosmic web: galaxies along filaments between knots |
+| `stars` | A ball of suns the camera can go in among |
+
+S is how wide the whole of it is. They are drawn on the finished picture: each star's light is added, in a fine layer and a soft one, so there is no noise, no flicker and almost no render time, and a galaxy stays as bright to the eye from any distance. The price is that **nothing in the scene can pass in front of one**: keep ships and planets out of that patch of sky.
+
+**Powers of ten.** One look from the ground to the web and back: `planetfall ... straight`, then parts of `spacecam zoom X Y Z from D0 to D1 ... steady`, each stretch at its own scale, with dissolves. `steady` keeps one pace from end to end, so the parts join up. A `hud` line names the distance.
+
+**Astronauts who can act.** On an `astronaut` line, `does float|wave|point|work|reach` is what its arms are doing, and `face on` opens the visor on a lit face. With `tumble 0` it stands upright, and `facing DEGREES` turns it. Its joints fold in rings and its gloves have fingers.
+
+**Ships and great works.** A `ship`'s hull is covered in panels and pipes; a freighter has corrugated containers, frames, fuel tanks and an open engine bell. New kinds: `habitat` (a wheel with land inside it), `ringworld` and `dyson`.
+
+**A cartoon cast for space.** `set moonbase`, `cast nova` (a child astronaut in a bubble helmet; scripts/make_rigged_astronaut.py) and `cast robot`, with `toon bands 3 lines 2.5 saturation 1.25` and `gravity 1.62`.
+
+**Telling a mission.**
+
+```
+ambience breath 1                                       # inside a helmet, the only sound there is
+say     nova  6.5 "Can anyone hear me?" radio           # thin, a little hard, a hiss and a click at each end
+say     kai   2 "We hear you!" radio delay 1.3          # ... from far away: what is said arrives later
+hud     "AIR 96%"  at -0.84 0.82  size 0.035  from 2    # words fixed to the frame, X and Y -1 to 1, X the left edge
+flightpath earth mars "THE WAY"  from 3  over 4         # a dashed arc on the sky between two planets or ships, a marker going along it
+```
+
+A mission control cutaway is a part of its own with `interior cockpit`, `screen` and `hologram` (film_interior.h, film_screens.h); a voice said in the room can be the same line said `radio delay` in the next part.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

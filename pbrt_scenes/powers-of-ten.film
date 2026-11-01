@@ -1,0 +1,201 @@
+# Powers of Ten: one look, from a child reaching up in a field out to the web of galaxies and home again, ten times further every second and a half. After Charles and Ray Eames's
+# film of 1977. Each stretch of the way is a part of its own, at its own scale (the planets in kilometres, the stars in light years, the web in millions of them), the camera going
+# at one steady pace (`planetfall ... straight`, `spacecam zoom ... steady`), with a dissolve where one scale hands on to the next. Written out by hand it would be a long file of
+# sums: a line of the display (`hud`) names how far away we are.
+# Two things are not to scale: the planets' orbits are drawn because the planets themselves would be too small to see, and the neighbouring galaxies are about three times too big, or they would be specks.
+film    powers-of-ten
+name    Powers of Ten
+about   One look, from a child reaching up in a field out to the web of galaxies and home again, ten times further every second and a half.
+tags    space, explainer
+still   30
+
+part "Up from the field"
+scene   film_assets/wild/set.pbrt
+terrain hills  size 3000  height 8  seed 4
+sky     11:00 11:00  physical  altitude 100
+mute    birds
+forest  mixed 200  in -900 -900 900 900  near 1500
+footing ground
+cast    pip-child  at 0 0 0  facing 0
+gesture pip-child  "cheer" 0 0.6 40 41
+length  9.5
+planetfall ocean  from 2  to 300000  at 1  over 8  clouds 0.45  straight
+hud     "10 metres"  at -0.86 -0.84  size 0.04  from 2.08  to 3.63
+hud     "100 metres"  at -0.86 -0.84  size 0.04  from 3.63  to 5.17
+hud     "1 km"  at -0.86 -0.84  size 0.04  from 5.17  to 6.72
+hud     "10 km"  at -0.86 -0.84  size 0.04  from 6.72  to 8.26
+hud     "100 km"  at -0.86 -0.84  size 0.04  from 8.26  to 9.00
+shot 0 Up
+  descend
+
+part "The Earth" dissolve 1
+set     void
+length  3.37
+space   stars 1  milkyway 0.6  sun 60 12  bloom 0.08
+planet  home  ocean  at 0 0 0  radius 6371  tilt 23  air 1  clouds 0.6
+moon    moon  rocky  of home  radius 1737  orbit 384400  period 2000  phase 40
+orbitline moon  colour 0.55 0.65 0.8  dashed
+hud     "10,000 km"  at -0.86 -0.84  size 0.04  from 0.07  to 1.57
+hud     "100,000 km"  at -0.86 -0.84  size 0.04  from 1.57  to 3.07
+hud     "1 million km"  at -0.86 -0.84  size 0.04  from 3.07  to 3.37
+shot 0 Out
+  spacecam zoom  0 0 0  from 9000  to 1.6e+06  bearing 20  elevation 28  fov 40  steady
+
+part "The planets" dissolve 1
+set     void
+length  3.45
+space   stars 1  milkyway 0.6  sun off  bloom 0.1
+star    sol  at 0 0 0  radius 696  kind sun  brightness 2
+planet  hub  rocky  at 0 0 0  radius 1
+moon    mercury  rocky   of hub  radius 2.4   orbit 58000    period 90    phase 20
+moon    venus    desert  of hub  radius 6     orbit 108000   period 220   phase 100
+moon    earth    ocean   of hub  radius 6.4   orbit 150000   period 365   phase 210
+moon    mars     desert  of hub  radius 3.4   orbit 230000   period 690   phase 300
+moon    jupiter  gas     of hub  radius 70    orbit 780000   period 4300  phase 70
+moon    saturn   gas     of hub  radius 60    orbit 1400000  period 9000  phase 150
+moon    uranus   gas     of hub  radius 25    orbit 2900000  period 30000 phase 250
+moon    neptune  gas     of hub  radius 25    orbit 4500000  period 60000 phase 330
+orbitline mercury  colour 0.5 0.55 0.7
+orbitline venus    colour 0.5 0.55 0.7
+orbitline earth    colour 0.5 0.8 1
+orbitline mars     colour 0.5 0.55 0.7
+orbitline jupiter  colour 0.5 0.55 0.7
+orbitline saturn   colour 0.5 0.55 0.7
+orbitline uranus   colour 0.5 0.55 0.7
+orbitline neptune  colour 0.5 0.55 0.7
+hud     "7 times Earth to Sun"  at -0.86 -0.84  size 0.04  from 0.78  to 2.28
+hud     "67 times Earth to Sun"  at -0.86 -0.84  size 0.04  from 2.28  to 3.45
+shot 0 Out
+  spacecam zoom  0 0 0  from 300000  to 6e+07  bearing 20  elevation 28  fov 40  steady
+
+part "The nearest stars" dissolve 1
+set     void
+length  4.58
+space   stars 0  milkyway 0.5  sun off  bloom 0.12
+event   stars  at 0 0 0  size 600  count 16000
+hud     "1 light year"  at -0.86 -0.84  size 0.04  from 0.18  to 1.68
+hud     "10 light years"  at -0.86 -0.84  size 0.04  from 1.68  to 3.18
+hud     "100 light years"  at -0.86 -0.84  size 0.04  from 3.18  to 4.58
+shot 0 Out
+  spacecam zoom  0 0 0  from 0.8  to 900  bearing 20  elevation 28  fov 40  steady
+
+part "The Milky Way" dissolve 1
+set     void
+length  2.84
+space   stars 0  milkyway 0  sun off  bloom 0.1
+galaxy  ours  at 0 0 0  size 100000  tilt -12  turn 30  brightness 2
+hud     "10,000 light years"  at -0.86 -0.84  size 0.04  from 0.10  to 1.60
+hud     "100,000 light years"  at -0.86 -0.84  size 0.04  from 1.60  to 2.84
+shot 0 Out
+  spacecam zoom  0 0 0  from 9000  to 700000  bearing 20  elevation 28  fov 40  steady
+
+part "Our neighbours" dissolve 1
+set     void
+length  1.95
+space   stars 0  milkyway 0  sun off  bloom 0.1
+galaxy  ours  at 0 0 0  size 100000  tilt -12  turn 30  brightness 2
+galaxy  andromeda  at -900000 -300000 -1700000  size 320000  tilt -40  turn 50  brightness 3  seed 3
+galaxy  triangle   at -300000 -1100000 -1500000  size 200000  tilt -20  turn 10  brightness 3  seed 5
+galaxy  barred     at 500000 200000 -1900000  size 240000  kind barred  tilt -30  turn 70  brightness 3  seed 7
+galaxy  round1     at -1500000 400000 -2300000  size 200000  kind elliptical  tilt 40  brightness 3  seed 2
+galaxy  round2     at 200000 -700000 -2600000  size 160000  kind elliptical  tilt 40  brightness 3  seed 9
+hud     "1 million light years"  at -0.86 -0.84  size 0.04  from 0.27  to 1.77
+shot 0 Out
+  spacecam zoom  0 0 0  from 700000  to 1.4e+07  bearing 20  elevation 28  fov 40  steady
+
+part "The web" dissolve 1
+set     void
+length  4.76
+space   stars 0  milkyway 0  sun off  bloom 0.15
+event   web  at 0 0 0  size 6000  count 40000  tilt 15
+hud     "10 million light years"  at -0.86 -0.84  size 0.04  from 0.18  to 1.68
+hud     "100 million light years"  at -0.86 -0.84  size 0.04  from 1.68  to 3.18
+hud     "1,000 million light years"  at -0.86 -0.84  size 0.04  from 3.18  to 4.68
+shot 0 Out
+  spacecam zoom  0 0 0  from 8  to 12000  bearing 20  elevation 28  fov 40  steady
+
+part "The web, going home" dissolve 0.6
+set     void
+length  2.50
+space   stars 0  milkyway 0  sun off  bloom 0.15
+event   web  at 0 0 0  size 6000  count 40000  tilt 15
+shot 0 Home
+  spacecam zoom  0 0 0  from 12000  to 8  bearing 20  elevation 28  fov 40  steady
+
+part "Our neighbours, going home" dissolve 0.6
+set     void
+length  2.50
+space   stars 0  milkyway 0  sun off  bloom 0.1
+galaxy  ours  at 0 0 0  size 100000  tilt -12  turn 30  brightness 2
+galaxy  andromeda  at -900000 -300000 -1700000  size 320000  tilt -40  turn 50  brightness 3  seed 3
+galaxy  triangle   at -300000 -1100000 -1500000  size 200000  tilt -20  turn 10  brightness 3  seed 5
+galaxy  barred     at 500000 200000 -1900000  size 240000  kind barred  tilt -30  turn 70  brightness 3  seed 7
+galaxy  round1     at -1500000 400000 -2300000  size 200000  kind elliptical  tilt 40  brightness 3  seed 2
+galaxy  round2     at 200000 -700000 -2600000  size 160000  kind elliptical  tilt 40  brightness 3  seed 9
+shot 0 Home
+  spacecam zoom  0 0 0  from 1.4e+07  to 700000  bearing 20  elevation 28  fov 40  steady
+
+part "The Milky Way, going home" dissolve 0.6
+set     void
+length  2.50
+space   stars 0  milkyway 0  sun off  bloom 0.1
+galaxy  ours  at 0 0 0  size 100000  tilt -12  turn 30  brightness 2
+shot 0 Home
+  spacecam zoom  0 0 0  from 700000  to 9000  bearing 20  elevation 28  fov 40  steady
+
+part "The nearest stars, going home" dissolve 0.6
+set     void
+length  2.50
+space   stars 0  milkyway 0.5  sun off  bloom 0.12
+event   stars  at 0 0 0  size 600  count 16000
+shot 0 Home
+  spacecam zoom  0 0 0  from 900  to 0.8  bearing 20  elevation 28  fov 40  steady
+
+part "The planets, going home" dissolve 0.6
+set     void
+length  2.50
+space   stars 1  milkyway 0.6  sun off  bloom 0.1
+star    sol  at 0 0 0  radius 696  kind sun  brightness 2
+planet  hub  rocky  at 0 0 0  radius 1
+moon    mercury  rocky   of hub  radius 2.4   orbit 58000    period 90    phase 20
+moon    venus    desert  of hub  radius 6     orbit 108000   period 220   phase 100
+moon    earth    ocean   of hub  radius 6.4   orbit 150000   period 365   phase 210
+moon    mars     desert  of hub  radius 3.4   orbit 230000   period 690   phase 300
+moon    jupiter  gas     of hub  radius 70    orbit 780000   period 4300  phase 70
+moon    saturn   gas     of hub  radius 60    orbit 1400000  period 9000  phase 150
+moon    uranus   gas     of hub  radius 25    orbit 2900000  period 30000 phase 250
+moon    neptune  gas     of hub  radius 25    orbit 4500000  period 60000 phase 330
+orbitline mercury  colour 0.5 0.55 0.7
+orbitline venus    colour 0.5 0.55 0.7
+orbitline earth    colour 0.5 0.8 1
+orbitline mars     colour 0.5 0.55 0.7
+orbitline jupiter  colour 0.5 0.55 0.7
+orbitline saturn   colour 0.5 0.55 0.7
+orbitline uranus   colour 0.5 0.55 0.7
+orbitline neptune  colour 0.5 0.55 0.7
+shot 0 Home
+  spacecam zoom  0 0 0  from 6e+07  to 300000  bearing 20  elevation 28  fov 40  steady
+
+part "The Earth, going home" dissolve 0.6
+set     void
+length  2.50
+space   stars 1  milkyway 0.6  sun 60 12  bloom 0.08
+planet  home  ocean  at 0 0 0  radius 6371  tilt 23  air 1  clouds 0.6
+moon    moon  rocky  of home  radius 1737  orbit 384400  period 2000  phase 40
+orbitline moon  colour 0.55 0.65 0.8  dashed
+shot 0 Home
+  spacecam zoom  0 0 0  from 1.6e+06  to 9000  bearing 20  elevation 28  fov 40  steady
+
+part "Down to the field" dissolve 0.6
+scene   film_assets/wild/set.pbrt
+terrain hills  size 3000  height 8  seed 4
+sky     11:00 11:00  physical  altitude 100
+mute    birds
+forest  mixed 200  in -900 -900 900 900  near 1500
+footing ground
+cast    pip-child  at 0 0 0  facing 0
+gesture pip-child  "cheer" 0 0.6 40 41
+length  6
+planetfall ocean  from 300000  to 2  at 0  over 4  clouds 0.45  straight
+shot 0 Down
+  descend

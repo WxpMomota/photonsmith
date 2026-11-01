@@ -314,7 +314,7 @@ struct Ambience {
 	double gain = 1.0;
 };
 inline const std::vector<std::string> &ambienceKinds() {
-	static const std::vector<std::string> k = {"wind", "birds", "crickets", "water", "night", "sea", "falls", "geese", "reef"};
+	static const std::vector<std::string> k = {"wind", "birds", "crickets", "water", "night", "sea", "falls", "geese", "reef", "breath"};
 	return k;
 }
 namespace sound {
@@ -405,7 +405,12 @@ inline void night(audio::Mix &m, double length, double gain) {
 }  // namespace sound
 inline void play(audio::Mix &m, const std::vector<Ambience> &beds) {
 	for (const Ambience &a : beds) {
-		if (a.kind == "wind") sound::wind(m, m.seconds(), a.gain);
+		if (a.kind == "breath") {   // (inside a helmet, the only sound there is: in, out, the same slow pace, never quite the same)
+			for (double t = 0.4; t < m.seconds(); t += 4.2 + 0.5 * hash01(static_cast<int>(t * 3.0), 11)) {
+				m.put(t, audio::noiseBurst(1.3, 0.5, 0.6, 500.0, 2600.0, static_cast<unsigned>(t * 10.0) + 7), 0.16 * a.gain, 0.0, 0.03);
+				m.put(t + 1.7, audio::noiseBurst(1.7, 0.2, 1.1, 240.0, 1500.0, static_cast<unsigned>(t * 10.0) + 8), 0.24 * a.gain, 0.0, 0.03);
+			}
+		} else if (a.kind == "wind") sound::wind(m, m.seconds(), a.gain);
 		else if (a.kind == "birds") sound::birds(m, m.seconds(), a.gain);
 		else if (a.kind == "crickets") sound::crickets(m, m.seconds(), a.gain);
 		else if (a.kind == "water") sound::water(m, m.seconds(), a.gain);

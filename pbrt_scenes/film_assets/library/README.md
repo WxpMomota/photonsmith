@@ -13,9 +13,9 @@ deep) - but not the film's own lines (film, name, about, tags, still, length, fp
 A problem in a set's lines is reported with the set file's name and line, not the film's; a cast without a `kind` line names the cast file, and a bad word of a
 cast's look is reported at the `cast` line that brought it in.
 
-Here: casts pip, pip-child, kai, ann, sam, shelly and robot; sets dusk-path, meadow, valley and void (an empty stage for a film in space, void.pbrt).
+Here: casts pip, pip-child, kai, ann, sam, shelly, robot and nova (a child astronaut); sets dusk-path, meadow, valley, void (an empty stage for a film in space, void.pbrt) and moonbase (a small moon).
 
 animals/ holds the films' rigged animals (glTF models with their clips: deer, horse, wolf, eagle, goose, bear, elephant, fox, giraffe, lion, penguin, rabbit, snake, zebra;
 made by scripts/make_rigged_animals.py), which `herd` and `flock` lines bring in (src/shared/cartoon/film_animals.h). robot.glb is a rigged character a `rigged` line can
-make a kind of (scripts/make_rigged_robot.py; robot.cast names it), and mira.glb one with a face of morph targets (scripts/make_rigged_face.py). stars/ is the star
+make a kind of (scripts/make_rigged_robot.py; robot.cast names it), nova.glb another (scripts/make_rigged_astronaut.py), and mira.glb one with a face of morph targets (scripts/make_rigged_face.py). stars/ is the star
 catalogue and constellation lines of the real night sky (d3-celestial; its licence is beside them).

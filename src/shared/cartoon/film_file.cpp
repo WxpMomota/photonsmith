@@ -1465,6 +1465,11 @@ void DataFilm::speak(audio::Mix &mix) const {
 				for (float &v : sound) y += k * (v - y), v = static_cast<float>(1.3 * y);
 			}
 		}
+		if (spec.lines[i].radio) {   // (over a radio: in the ear, however far away it is said, and as much later as the distance)
+			speech::overTheRadio(sound, static_cast<unsigned>(i + 1));
+			mix.put(t0 + spec.lines[i].delay, sound, 0.62, 0.0, 0.02);
+			continue;
+		}
 		if (recordingOf(i)) mix.put(t0, sound, 0.8 * gain, panOf(view, at) * 0.6, under ? 0.45 : 0.2);   // (a computer's voice: its recording)
 		else mix.put(t0, sound, 0.55 * gain, panOf(view, at) * 0.6, under ? 0.45 : 0.25);
 	}

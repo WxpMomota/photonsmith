@@ -7,6 +7,34 @@ namespace cartoon {
 namespace film_file {
 
 // One `wind` over the set (film_wind.h): whatever moves with the air and did not say otherwise in its own line takes it.
+// A `say` line: "" or what is wrong with it.
+static std::string sayLine(Spec &s, const std::vector<std::string> &t, int n) {
+	using detail::number;
+	speech::Line l;
+	l.line = n;
+	if (t.size() < 4 || !number(t[2], l.t) || l.t < 0.0) return "`say NAME T \"WHAT IT SAYS\" [rate R] [pitch SEMITONES] [radio] [delay SECONDS] [nocaption]`";
+	l.who = t[1];
+	l.text = t[3];
+	for (std::size_t i = 4; i < t.size();) {
+		if (t[i] == "nocaption") {
+			l.caption = false;
+			++i;
+		} else if (t[i] == "radio") {
+			l.radio = true;
+			++i;
+		} else if (t[i] == "delay" && i + 1 < t.size() && number(t[i + 1], l.delay) && l.delay >= 0.0) {
+			l.radio = true;
+			i += 2;
+		} else if ((t[i] == "rate" || t[i] == "pitch") && i + 1 < t.size() && number(t[i + 1], t[i] == "rate" ? l.rate : l.pitch)) {
+			i += 2;
+		} else {
+			return "\"" + t[i] + "\": a line takes rate R, pitch SEMITONES, radio, delay SECONDS and nocaption";
+		}
+	}
+	if (!(l.rate > 0.0)) return "a line's rate is more than 0";
+	s.lines.push_back(l);
+	return std::string();
+}
 static void applyWind(Spec &s) {
 	if (!s.wind.on) return;
 	const wind::Wind &w = s.wind;
@@ -658,24 +686,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 			l.when.pose = l.target;
 			s.looks.push_back(l);
 		} else if (verb == "say") {
-			const std::vector<std::string> t = detail::tokens(line);
-			speech::Line l;
-			l.line = n;
-			if (t.size() < 4 || !number(t[2], l.t) || l.t < 0.0) return fail("`say NAME T \"WHAT IT SAYS\" [rate R] [pitch SEMITONES] [nocaption]`");
-			l.who = t[1];
-			l.text = t[3];
-			for (std::size_t i = 4; i < t.size();) {
-				if (t[i] == "nocaption") {
-					l.caption = false;
-					++i;
-				} else if ((t[i] == "rate" || t[i] == "pitch") && i + 1 < t.size() && number(t[i + 1], t[i] == "rate" ? l.rate : l.pitch)) {
-					i += 2;
-				} else {
-					return fail("\"" + t[i] + "\": a line takes rate R, pitch SEMITONES and nocaption");
-				}
-			}
-			if (!(l.rate > 0.0)) return fail("a line's rate is more than 0");
-			s.lines.push_back(l);
+			if (const std::string e = sayLine(s, detail::tokens(line), n); !e.empty()) return fail(e);
 		} else if (verb == "dissolve" || verb == "fade" || verb == "wipe") {
 			if (s.shots.empty()) return fail("`" + verb + " SECONDS` belongs to a shot (how it comes in): start one with `shot 0 NAME` first");
 			Transition &tr = s.shots.back().transition;
@@ -1094,6 +1105,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 	}
 	if (s.fall.on && !s.hasTerrain) return fail("`planetfall` comes down to a film's land: it needs a `terrain`");
 	if (s.fall.on && !s.hasSky) return fail("`planetfall` needs a `sky`");
+	if (s.fall.on) s.terrain.ranges = false;   // (the planet goes on past the land: from above a ring of blue-grey hills is a disc on it)
 	if (s.air.on) {   // (one medium round the camera)
 		if (s.hasMist || s.fog.on || s.hasUnderwater) {
 			n = 0;

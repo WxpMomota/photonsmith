@@ -1,5 +1,6 @@
 #pragma once
-// film_planetfall.h -- from orbit to the ground in one shot (film_file.h `planetfall`, and a shot's `descend`): a film on land whose camera starts high above it.
+// film_planetfall.h -- from orbit to the ground in one shot (film_file.h `planetfall`, and a shot's `descend`): a film on land whose camera starts high above it. Or the other way: with `from`
+// below `to` it rises off the ground, and with `straight` it looks straight down all the way (a powers-of-ten shot).
 //
 //   the land   the film's own terrain is the place the camera comes down to, and round it the planet goes on: a cap, a ring of mesh from the terrain's edge out past the horizon of
 //              the highest camera, curving away over a planet of real size. Its rings are spaced by the logarithm of their distance, so it is as fine seen from anywhere over the
@@ -35,28 +36,36 @@ struct Fall {
 	double x = 0.0, z = 0.0, heading = 0.0;   // (where it comes down, pbrt's, and the way it is going, a compass bearing)
 	double clouds = 0.5;
 	int seed = 3;
+	bool straight = false;              // (`straight`: looking straight down over the landing place, all the way)
+	double highest() const { return std::max(from, to); }
+	double lowest() const { return std::min(from, to); }
 };
 
 // How far along the fall it is: slow to start, fast through the middle, easing to the ground.
 inline double progressAt(const Fall &f, double t) {
 	const double u = std::clamp((t - f.t0) / std::max(1e-6, f.t1 - f.t0), 0.0, 1.0);
-	return u * u * (3.0 - 2.0 * u);
+	return f.straight ? u : u * u * (3.0 - 2.0 * u);   // (straight up or down: at one pace, to join the shots either side of it)
 }
 // Its height at t, falling by the same share of itself each moment, as a fall from orbit looks.
 inline double heightAt(const Fall &f, double t) { return f.from * std::pow(f.to / f.from, progressAt(f, t)); }
 // Where the camera is and what it looks at, at t, over a landing place at height `ground`: looking well down from orbit, coming level as it nears the land, and sliding in along its
 // heading from far out, so the land comes up under it at a slant.
 inline void cameraAt(const Fall &f, double t, double ground, Vec3 &eye, Vec3 &target) {
-	const double h = heightAt(f, t), level = std::log(h / f.to) / std::max(1e-6, std::log(f.from / f.to));
+	const double h = heightAt(f, t), level = std::log(h / f.lowest()) / std::max(1e-6, std::log(f.highest() / f.lowest()));
 	const double b = f.heading * kPi / 180.0, down = (7.0 + 30.0 * smoothstep(0.08, 0.55, level) - 10.0 * smoothstep(0.75, 1.0, level)) * kPi / 180.0;
 	const Vec3 ahead{std::sin(b), 0.0, std::cos(b)};
-	eye = Vec3{f.x, ground + h, f.z} - ahead * (0.55 * (h - f.to));
+	if (f.straight) {
+		eye = Vec3{f.x, ground + h, f.z};
+		target = Vec3{f.x, ground, f.z} + ahead * (0.002 * h);   // (a hair off plumb: a camera looking exactly along its up has no way up)
+		return;
+	}
+	eye = Vec3{f.x, ground + h, f.z} - ahead * (0.55 * (h - f.lowest()));
 	target = eye + ahead * (1000.0 * std::cos(down)) + Vec3{0.0, -1000.0 * std::sin(down), 0.0};
 }
 
 namespace detail {
 constexpr int kRings = 80, kSpokes = 240;
-inline double reachOf(const Fall &f) { return std::min(0.8 * f.radius, 1.3 * std::sqrt(2.0 * f.radius * f.from)); }
+inline double reachOf(const Fall &f) { return std::min(0.8 * f.radius, 1.3 * std::sqrt(2.0 * f.radius * f.highest())); }
 // A ring's distance from the landing place: a share of the way out, by the logarithm.
 inline double ringAt(double from, double to, double u) { return from * std::pow(to / from, u); }
 // How far a place `r` out has dropped below the landing place's level, on a planet of radius R.
@@ -91,7 +100,8 @@ constexpr double kSheetFrom = 30.0;
 inline Mesh sheetMesh(const terrain::Field &field, const Fall &f) {
 	Mesh m;
 	const double r0 = kSheetFrom, r1 = reachOf(f), cx = field.sx0 + 0.5 * field.spec.size, cz = field.sz0 + 0.5 * field.spec.size;
-	m.verts.push_back({-cx, 0.0, cz}), m.normals.push_back({0.0, 1.0, 0.0}), m.uvs.push_back({0.5, 0.0});
+	constexpr double kFirstRow = 0.002;   // (its picture repeats: from the very edge of it the middle of the sheet would read the far side of the planet's clouds)
+	m.verts.push_back({-cx, 0.0, cz}), m.normals.push_back({0.0, 1.0, 0.0}), m.uvs.push_back({0.5, kFirstRow});
 	for (int j = 0; j <= kRings; ++j) {
 		const double u = static_cast<double>(j) / kRings, r = ringAt(r0, r1, u);
 		for (int i = 0; i <= kSpokes; ++i) {
@@ -99,7 +109,7 @@ inline Mesh sheetMesh(const terrain::Field &field, const Fall &f) {
 			m.verts.push_back({-(cx + dx), -dropAt(f.radius, r), cz + dz});
 			const Vec3 n = upAt(f.radius, dx, dz);
 			m.normals.push_back({-n.x, n.y, n.z});
-			m.uvs.push_back({static_cast<double>(i) / kSpokes, u});
+			m.uvs.push_back({static_cast<double>(i) / kSpokes, kFirstRow + (1.0 - 2.0 * kFirstRow) * u});
 		}
 	}
 	for (int i = 0; i < kSpokes; ++i) m.tris.push_back({0, 1 + i, 2 + i});
@@ -129,7 +139,12 @@ inline std::string groundPicture(const std::string &film, const terrain::Field &
 	const planets::Planet p = planetOf(f);
 	Vec3 own{0.0, 0.0, 0.0};
 	for (int k = 0; k < 32; ++k) own = own + terrain::colourAt(field, cx + 0.6 * r0 * std::cos(0.196 * k), cz + 0.6 * r0 * std::sin(0.196 * k)) * (1.0 / 32.0);
-	return film_sky::picture(film, "fall3_ground_" + f.kind + "_" + std::to_string(f.seed) + "_" + std::to_string(static_cast<int>(f.from)), W, H, [&](std::vector<float> &rgb) {
+	// (the land just past the terrain is the terrain again, turned over at its edges, so no line shows where one stops)
+	const auto mirrored = [&](double d) {
+		const double v = std::abs(std::fmod(d / field.spec.size + 0.5, 2.0));
+		return (v > 1.0 ? 2.0 - v : v) * (field.spec.size - 2.0) + 1.0;
+	};
+	return film_sky::picture(film, "fall4_ground_" + f.kind + "_" + std::to_string(f.seed) + "_" + std::to_string(static_cast<int>(f.highest())), W, H, [&](std::vector<float> &rgb) {
 		for (int y = 0; y < H; ++y)
 			for (int x = 0; x < W; ++x) {
 				const double a = 2.0 * kPi * (x + 0.5) / W, u = 1.0 - (y + 0.5) / H, r = ringAt(r0, r1, u), dx = r * std::cos(a), dz = r * std::sin(a);
@@ -145,7 +160,7 @@ inline std::string groundPicture(const std::string &film, const terrain::Field &
 				} else {
 					c = c * (0.55 + 0.9 * mid) * (0.7 + 0.6 * small) * (0.8 + 0.4 * fine);
 				}
-				c = lerp(own * (0.75 + 0.5 * fine), c, smoothstep(0.03, 0.16, u));
+				if (const double far_out = smoothstep(0.06, 0.22, u); far_out < 1.0) c = lerp(terrain::colourAt(field, field.sx0 + mirrored(dx), field.sz0 + mirrored(dz)), lerp(own * (0.75 + 0.5 * fine), c, smoothstep(0.1, 0.3, u)), far_out);
 				float *px = &rgb[(static_cast<std::size_t>(y) * W + x) * 3];
 				px[0] = static_cast<float>(c.x), px[1] = static_cast<float>(c.y), px[2] = static_cast<float>(c.z);
 			}
@@ -156,14 +171,14 @@ inline std::string sheetPicture(const std::string &film, const terrain::Field &f
 	constexpr int W = 1536, H = 1024;
 	const double r0 = kSheetFrom, r1 = reachOf(f);
 	(void)field;
-	return film_sky::picture(film, "fall3_sheet" + std::to_string(which) + "_" + std::to_string(f.seed) + "_" + std::to_string(static_cast<int>(f.from)), W, H, [&](std::vector<float> &rgb) {
+	return film_sky::picture(film, "fall4_sheet" + std::to_string(which) + "_" + std::to_string(f.seed) + "_" + std::to_string(static_cast<int>(f.highest())), W, H, [&](std::vector<float> &rgb) {
 		for (int y = 0; y < H; ++y)
 			for (int x = 0; x < W; ++x) {
 				const double a = 2.0 * kPi * (x + 0.5) / W, u = 1.0 - (y + 0.5) / H, r = ringAt(r0, r1, u), dx = r * std::cos(a), dz = r * std::sin(a);
 				const double scale = which == 0 ? 9000.0 : 30000.0;
 				const double big = nature::fbm2(dx / (9.0 * scale) + 7.0, dz / (9.0 * scale), f.seed + 40 + which), body = nature::fbm2(dx / scale, dz / scale, f.seed + 42 + which), fine = nature::fbm2(dx / (0.12 * scale), dz / (0.12 * scale), f.seed + 44 + which);
 				const double n = 0.45 * big + 0.55 * body + 0.1 * (fine - 0.5), line = lerp(0.6, 0.44, std::clamp(f.clouds, 0.0, 1.0));
-				const float keep = static_cast<float>(0.85 * smoothstep(line, line + 0.06, n));
+				const float keep = static_cast<float>(0.85 * smoothstep(line, line + 0.06, n) * smoothstep(1500.0, 4500.0, r));   // (a clear gap over the landing place: the middle of a sheet shows the rings of its picture)
 				float *px = &rgb[(static_cast<std::size_t>(y) * W + x) * 3];
 				px[0] = px[1] = px[2] = keep;
 			}
@@ -174,7 +189,7 @@ inline std::string sheetPicture(const std::string &film, const terrain::Field &f
 // The land past the terrain and what is over it, for a camera `h` above the land. `film`: the film's cache.
 inline std::string text(const std::string &film, const terrain::Field &field, const Fall &f, double h) {
 	const std::string cap = film_cache::ply(film, "fall1_cap", [&] { return detail::capMesh(field, f); });
-	const std::string sheet = film_cache::ply(film, "fall1_sheet", [&] { return detail::sheetMesh(field, f); });
+	const std::string sheet = film_cache::ply(film, "fall2_sheet", [&] { return detail::sheetMesh(field, f); });
 	std::string out = "# the planet round the land (film_planetfall.h)\nAttributeBegin\n  Texture \"fall_ground\" \"spectrum\" \"imagemap\" \"string filename\" [ \"" + detail::groundPicture(film, field, f) +
 					  "\" ]\n  Material \"diffuse\" \"texture reflectance\" \"fall_ground\"\n" + film_cache::plyShape(cap) + "AttributeEnd\n";
 	std::string line = film_cache::plyShape(sheet);

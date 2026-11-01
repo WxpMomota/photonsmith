@@ -299,6 +299,7 @@ inline std::string text(const std::string &film, const terrain::Field &field, co
 	const Vec3 eyeP{-eye.x, eye.y, eye.z};
 	const Vec3 ahead = normalize(Vec3{-(target.x - eye.x), 0.0, target.z - eye.z});
 	const double wide = std::cos(std::min(kPi * 0.5, (fovDeg * 0.5 * 16.0 / 9.0 + 22.0) * kPi / 180.0));
+	const bool overhead = normalize(target - eye).y < -0.87;   // (looking down from above: what is in view is all round under it, on no one side)
 	std::string objects, places;
 	std::set<std::string> made;
 	const double above = s.waterLevel > -1e29 ? s.waterLevel + 0.45 : -1e30;
@@ -316,7 +317,7 @@ inline std::string text(const std::string &film, const terrain::Field &field, co
 				const int salt = (i * 7919) ^ (k * 104729) ^ static_cast<int>(r * 31);
 				if (!ringLays(r, away, hash01(salt, 71))) continue;
 				const Vec3 to = normalize(Vec3{x - eyeP.x, 0.0, z - eyeP.z});
-				if (away > 2.0 * ring.cell && dot(to, ahead) < wide) continue;   // (not in view)
+				if (away > 2.0 * ring.cell && !overhead && dot(to, ahead) < wide) continue;   // (not in view)
 				const Vec3 n = field.normalAt(x, z, 0.5 * ring.cell);
 				if (n.y < 0.84 || y < above) continue;
 				if (s.snowLine() < 1e8 && y - s.y > s.snowLine() * 0.9) continue;

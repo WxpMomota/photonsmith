@@ -9,7 +9,7 @@ namespace film_file {
 
 // Whether `verb` is a space line's.
 inline bool isSpaceVerb(const std::string &verb) {
-	static const std::vector<std::string> k = {"space", "planet", "moon", "nebula", "galaxy", "star", "blackhole", "comet", "asteroids", "remnant", "ship", "astronaut", "descent", "orbit", "burn", "laser", "explode", "shield", "gravity", "footprints", "blob", "drift", "interior", "hologram", "screen", "label", "orbitline", "scalebar", "compare", "planetfall"};
+	static const std::vector<std::string> k = {"space", "planet", "moon", "nebula", "galaxy", "star", "blackhole", "comet", "asteroids", "remnant", "ship", "astronaut", "descent", "orbit", "burn", "laser", "explode", "shield", "gravity", "footprints", "blob", "drift", "interior", "hologram", "screen", "label", "orbitline", "scalebar", "compare", "planetfall", "event", "hud", "flightpath"};
 	return std::find(k.begin(), k.end(), verb) != k.end();
 }
 // Whether an `orbit` line is a ship's (`orbit SHIP ...`: a ship named before it, or before any shot) rather than a shot's camera going round someone (film_parse.cpp).
@@ -333,7 +333,7 @@ inline std::string remnantLine(Spec &s, const std::vector<std::string> &t) {
 
 // A `ship` line (film_cosmos.h). "" or what is wrong with it.
 inline std::string shipLine(Spec &s, const std::vector<std::string> &t) {
-	const std::string usage = "`ship NAME at X Y Z [kind shuttle|fighter|freighter|station|wheel] [size S] [move DX DY DZ] [heading DEGREES] [pitch DEGREES] [spin S] "
+	const std::string usage = "`ship NAME at X Y Z [kind shuttle|fighter|freighter|station|wheel|habitat|ringworld|dyson] [size S] [move DX DY DZ] [heading DEGREES] [pitch DEGREES] [spin S] "
 							  "[engines on|off] [lights on|off] [colour R G B] [seed N]` (size 1 to 20000 m, colour 0 to 1)";
 	cosmos::Ship sh;
 	std::vector<std::string> rest;   // (its three-number words first: what is left is a body's line)
@@ -373,7 +373,7 @@ inline std::string shipLine(Spec &s, const std::vector<std::string> &t) {
 
 // An `astronaut` line (film_cosmos.h). "" or what is wrong with it.
 inline std::string astronautLine(Spec &s, const std::vector<std::string> &t) {
-	const std::string usage = "`astronaut NAME at X Y Z [move DX DY DZ] [tumble DEGREES] [size H] [suit R G B] [tether X Y Z | tether SHIP] [floaters N] [lamps on|off] [seed N]` "
+	const std::string usage = "`astronaut NAME at X Y Z [move DX DY DZ] [tumble DEGREES] [size H] [suit R G B] [tether X Y Z | tether SHIP] [floaters N] [lamps on|off] [does float|wave|point|work|reach] [face on] [facing DEGREES] [seed N]` "
 							  "(size 0.3 to 20 m, floaters 0 to 40, a ship named before it)";
 	cosmos::Astronaut a;
 	std::vector<std::string> rest;   // (its three-number words first, and a tether: what is left is a body's line)
@@ -384,6 +384,15 @@ inline std::string astronautLine(Spec &s, const std::vector<std::string> &t) {
 			if (!three || (t[i] == "suit" && (std::min({x, y, z}) < 0.0 || std::max({x, y, z}) > 1.0))) return "\"" + t[i] + "\": " + usage;
 			(t[i] == "move" ? a.move : a.suit) = {x, y, z};
 			i += 3;
+		} else if (t[i] == "facing" && i + 1 < t.size() && detail::number(t[i + 1], a.facing)) {
+			i += 1;
+		} else if (t[i] == "does" && i + 1 < t.size()) {
+			if (std::find(cosmos::astronautActs().begin(), cosmos::astronautActs().end(), t[i + 1]) == cosmos::astronautActs().end()) return "\"does " + t[i + 1] + "\": " + usage;
+			a.does = t[i + 1];
+			i += 1;
+		} else if (t[i] == "face" && i + 1 < t.size() && t[i + 1] == "on") {
+			a.face = true;
+			i += 1;
 		} else if (t[i] == "tether" && three) {
 			a.tether = {x, y, z}, a.tethered = true;
 			i += 3;
@@ -576,14 +585,18 @@ inline std::string shieldLine(Spec &s, const std::vector<std::string> &t) {
 // `planetfall KIND ...`: from orbit to the film's land (film_planetfall.h).
 inline std::string planetfallLine(Spec &s, const std::vector<std::string> &t) {
 	using detail::number;
-	const std::string usage = "`planetfall KIND [from H] [to H] [at T] [over D] [radius R] [land X Z] [heading B] [clouds C] [seed N]`: rocky, desert, ice, ocean or lava; heights in metres, and a shot with `descend` follows it";
+	const std::string usage = "`planetfall KIND [from H] [to H] [at T] [over D] [radius R] [land X Z] [heading B] [clouds C] [seed N] [straight]`: rocky, desert, ice, ocean or lava; heights in metres (`from` below `to` rises), and a shot with `descend` follows it";
 	planetfall::Fall &f = s.fall;
 	if (t.size() < 2 || std::find(planets::kinds().begin(), planets::kinds().end(), t[1]) == planets::kinds().end() || t[1] == "gas") return usage;
 	f.on = true, f.kind = t[1];
 	for (std::size_t i = 2; i < t.size(); i += 2) {
 		double a = 0.0, b = 0.0;
+		if (t[i] == "straight") {
+			f.straight = true, --i;
+			continue;
+		}
 		if (i + 1 >= t.size() || !number(t[i + 1], a)) return usage;
-		if (t[i] == "from" && a > 100.0) f.from = a;
+		if (t[i] == "from" && a > 0.5) f.from = a;
 		else if (t[i] == "to" && a > 0.5) f.to = a;
 		else if (t[i] == "at" && a >= 0.0) {
 			const double over = f.t1 - f.t0;
@@ -596,6 +609,37 @@ inline std::string planetfallLine(Spec &s, const std::vector<std::string> &t) {
 		else if (t[i] == "land" && i + 2 < t.size() && number(t[i + 2], b)) f.x = a, f.z = b, ++i;
 		else return usage;
 	}
+	if (f.highest() <= 100.0) return usage + " (one of the heights over 100)";
+	return std::string();
+}
+
+// `event KIND at X Y Z size S [from T] [over D] [count N] [tilt DEGREES] [brightness B] [seed N]` (film_cosmic.h).
+inline std::string eventLine(Spec &s, const std::vector<std::string> &t) {
+	using detail::number;
+	const std::string usage = "`event KIND at X Y Z size S [from T] [over D] [count N] [tilt DEGREES] [brightness B] [seed N]`: collision, disc, merger, web or stars; S how wide the whole of it is (count 100 to 40000)";
+	events::Event e;
+	if (t.size() < 2 || std::find(events::kinds().begin(), events::kinds().end(), t[1]) == events::kinds().end()) return usage;
+	e.kind = t[1];
+	for (std::size_t i = 2; i < t.size();) {
+		double a = 0.0, b = 0.0, c = 0.0;
+		if (t[i] == "at" && i + 3 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && number(t[i + 3], c)) {
+			e.at = {a, b, c};
+			i += 4;
+		} else if (i + 1 < t.size() && number(t[i + 1], a)) {
+			if (t[i] == "size" && a > 0.0) e.size = a;
+			else if (t[i] == "from" && a >= 0.0) e.t0 = a;
+			else if (t[i] == "over" && a > 0.0) e.span = a;
+			else if (t[i] == "count" && a >= 100.0 && a <= 40000.0) e.count = static_cast<int>(a);
+			else if (t[i] == "tilt") e.tilt = a;
+			else if (t[i] == "brightness" && a > 0.0) e.brightness = a;
+			else if (t[i] == "seed") e.seed = static_cast<int>(a);
+			else return usage;
+			i += 2;
+		} else {
+			return usage;
+		}
+	}
+	s.events.push_back(e);
 	return std::string();
 }
 
@@ -604,6 +648,39 @@ inline std::string spaceLine(Spec &s, const std::string &verb, const std::string
 	const std::vector<std::string> t = detail::tokens(line);
 	if (verb == "space") return spaceSetLine(s, t);
 	if (verb == "planetfall") return planetfallLine(s, t);
+	if (verb == "event") return eventLine(s, t);
+	if (verb == "hud" || verb == "flightpath") {   // (film_explain.h)
+		using detail::number;
+		const std::string usage = verb == "hud" ? "`hud \"WORDS\" [at X Y] [size S] [from T] [to T]`: words fixed to the frame, X and Y -1 to 1" : "`flightpath FROM TO [\"WORDS\"] [from T] [over D]`: two planets or ships, the way between them drawn on the sky";
+		explain::Hud h;
+		explain::Route r;
+		std::size_t i = 2;
+		if (verb == "hud") {
+			if (t.size() < 2) return usage;
+			h.text = t[1];
+		} else {
+			if (t.size() < 3) return usage;
+			r.a = t[1], r.b = t[2], i = 3;
+			if (i < t.size() && t[i] != "from" && t[i] != "over") r.text = t[i++];
+		}
+		for (; i < t.size();) {
+			double a = 0.0, b = 0.0;
+			if (t[i] == "at" && verb == "hud" && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b)) h.x = a, h.y = b, i += 3;
+			else if (i + 1 < t.size() && number(t[i + 1], a)) {
+				if (t[i] == "from") h.from = r.from = a;
+				else if (t[i] == "to" && verb == "hud") h.to = a;
+				else if (t[i] == "size" && verb == "hud" && a > 0.0) h.size = a;
+				else if (t[i] == "over" && verb == "flightpath" && a > 0.0) r.over = a;
+				else return usage;
+				i += 2;
+			} else {
+				return usage;
+			}
+		}
+		if (verb == "hud") s.explain.huds.push_back(h);
+		else s.explain.routes.push_back(r);
+		return std::string();
+	}
 	if (verb == "planet") return planetLine(s, t);
 	if (verb == "moon") return moonLine(s, t);
 	if (verb == "nebula") return nebulaLine(s, t);

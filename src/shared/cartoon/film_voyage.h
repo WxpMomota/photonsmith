@@ -48,7 +48,7 @@ struct Ship {
 	double goneAt = -1.0;   // (`explode`: blown up at this nature's time, gone after it; film_battle.h)
 };
 inline const std::vector<std::string> &shipKinds() {
-	static const std::vector<std::string> k = {"shuttle", "fighter", "freighter", "station", "wheel"};
+	static const std::vector<std::string> k = {"shuttle", "fighter", "freighter", "station", "wheel", "habitat", "ringworld", "dyson"};
 	return k;
 }
 // One part of a craft, in its own frame (a unit long, nose along +x, up +y; story space): its shape, where, its material and the light it gives (none: 0).
@@ -88,6 +88,52 @@ inline ShipPart pod(double x0, double x1, double r, double y, double z, const st
 	p.place = mul(translate(x0 + r, y, z), rotate({0.0, 0.0, 1.0}, -90.0));
 	p.material = material;
 	return p;
+}
+// What a real hull is covered in: on the surfaces of `parts` (its hull's, by `material`), panels a shade off and raised a hair, and pipes, boxes and vents, placed at random by area, the
+// same each frame. `count` of them, into a mesh to each material.
+inline void addSurfaceDetail(std::vector<ShipPart> &parts, const std::string &material, const std::string &shade, const std::string &darkMaterial, int count, double scaleOf, int seed) {
+	struct Tri {
+		Vec3 a, b, c, n;
+		double area;
+	};
+	std::vector<Tri> tris;
+	double total = 0.0;
+	for (const ShipPart &p : parts) {
+		if (p.material != material) continue;
+		for (const auto &t : p.mesh.tris) {
+			const Vec3 a = transformPoint(p.place, p.mesh.verts[static_cast<std::size_t>(t[0])]), b = transformPoint(p.place, p.mesh.verts[static_cast<std::size_t>(t[1])]), c = transformPoint(p.place, p.mesh.verts[static_cast<std::size_t>(t[2])]);
+			const Vec3 n = cross(b - a, c - a);
+			const double area = 0.5 * length(n);
+			if (area <= 1e-12) continue;
+			tris.push_back({a, b, c, normalize(n), area});
+			total += area;
+		}
+	}
+	if (tris.empty()) return;
+	ShipPart panels, greebles;
+	panels.material = shade, greebles.material = darkMaterial;
+	std::size_t at = 0;
+	double walked = 0.0;
+	for (int k = 0; k < count; ++k) {
+		const int s = seed * 53 + k;
+		const double want = total * (k + hash01(s, 1)) / count;
+		while (at + 1 < tris.size() && walked + tris[at].area < want) walked += tris[at++].area;
+		const Tri &t = tris[at];
+		double u = hash01(s, 2), v = hash01(s, 3);
+		if (u + v > 1.0) u = 1.0 - u, v = 1.0 - v;
+		const Vec3 p = t.a + (t.b - t.a) * u + (t.c - t.a) * v, e1 = normalize(t.b - t.a), e2 = cross(t.n, e1);
+		const bool flat = k % 3 != 0;
+		const double w = scaleOf * (flat ? 0.02 + 0.05 * hash01(s, 4) : 0.006 + 0.016 * hash01(s, 4)), l = scaleOf * (flat ? 0.03 + 0.08 * hash01(s, 5) : 0.008 + 0.03 * hash01(s, 5)), h = scaleOf * (flat ? 0.0014 : 0.004 + 0.012 * hash01(s, 6));
+		Mesh &m = flat ? panels.mesh : greebles.mesh;
+		const int b = static_cast<int>(m.verts.size());
+		for (int i = 0; i < 8; ++i) {
+			const Vec3 q = p + e1 * ((i & 1 ? 0.5 : -0.5) * l) + e2 * ((i & 2 ? 0.5 : -0.5) * w) + t.n * ((i & 4 ? 1.0 : -0.3) * h);
+			m.verts.push_back(q), m.normals.push_back(t.n);
+		}
+		static const int faces[12][3] = {{4, 5, 7}, {4, 7, 6}, {0, 2, 3}, {0, 3, 1}, {0, 1, 5}, {0, 5, 4}, {2, 6, 7}, {2, 7, 3}, {0, 4, 6}, {0, 6, 2}, {1, 3, 7}, {1, 7, 5}};
+		for (const auto &f : faces) m.tris.push_back({b + f[0], b + f[1], b + f[2]});
+	}
+	parts.push_back(panels), parts.push_back(greebles);
 }
 // The parts of a craft (a unit long) at nature's time `nt`: what spins spins.
 inline std::vector<ShipPart> shipParts(const Ship &s, double nt, double burning = 1.0) {
@@ -133,11 +179,17 @@ inline std::vector<ShipPart> shipParts(const Ship &s, double nt, double burning 
 			for (int side = -1; side <= 1; side += 2) {
 				const Vec3 c = lerp(Vec3{0.7, 0.25, 0.15}, Vec3{0.2, 0.4, 0.65}, hash01(s.seed * 41 + i * 2 + side, 1)) * (0.7 + 0.4 * hash01(s.seed * 41 + i, 2));
 				add(box(0.085, 0.07, 0.06), translate(0.32 - 0.1 * i, 0.0, 0.058 * side), diffuseMaterial(c));
+				const std::string ribs = diffuseMaterial(c * 0.72);
+				for (int k = -5; k <= 5; ++k) add(box(0.0035, 0.071, 0.0612), translate(0.32 - 0.1 * i + 0.0072 * k, 0.0, 0.058 * side), ribs);   // (a container's corrugated sides)
+				add(box(0.087, 0.004, 0.0615), translate(0.32 - 0.1 * i, 0.0345, 0.058 * side), dark), add(box(0.087, 0.004, 0.0615), translate(0.32 - 0.1 * i, -0.0345, 0.058 * side), dark);
+				add(box(0.002, 0.012, 0.003), translate(0.32 - 0.1 * i + 0.03, 0.022, 0.0885 * side), metal);   // (its lock bars)
 			}
-		ShipPart bell = pod(-0.56, -0.44, 0.06, 0.0, 0.0, dark);
-		out.push_back(bell);
-		engines.push_back({-0.57, 0.0, 0.0});
-		wing = 0.12;
+		for (int i = 0; i <= 8; ++i) add(box(0.012, 0.09, 0.14), translate(0.37 - 0.1 * i, 0.0, 0.0), metal);   // (the frames that hold them to the spine)
+		add(lathe({{0.022, 0.44}, {0.034, 0.47}, {0.056, 0.53}, {0.066, 0.565}}, 28), rotate({0.0, 0.0, 1.0}, 90.0), dark);   // (the engine's bell: open at the back)
+		add(uvSphere(0.024, 14, 8), translate(-0.43, 0.0, 0.0), metal);
+		for (const double y : {-1.0, 1.0}) add(capsule(0.016, 0.1, 10, 3), mul(translate(-0.385, 0.048 * y, 0.0), rotate({0.0, 0.0, 1.0}, 90.0)), metal);   // (its fuel tanks)
+		engines.push_back({-0.48, 0.0, 0.0});
+		wing = 0.092;
 	} else if (s.kind == "station") {
 		const double turn = std::fmod(nt * 6.0 * s.spin, 360.0);   // (a slow turn about its long axis, the panels following the sun)
 		out.push_back(pod(-0.25, 0.25, 0.06, 0.0, 0.0, hull));
@@ -145,6 +197,47 @@ inline std::vector<ShipPart> shipParts(const Ship &s, double nt, double burning 
 		add(box(0.03, 0.03, 1.0), rotate({1.0, 0.0, 0.0}, turn), metal);
 		for (const double z : {-0.42, -0.27, 0.27, 0.42})
 			for (const double x : {-0.09, 0.09}) add(box(0.16, 0.006, 0.13), mul(rotate({1.0, 0.0, 0.0}, turn), translate(x, 0.0, z)), panels);
+		wing = 0.5;
+	} else if (s.kind == "habitat") {   // a world in a wheel: a wide rim, open to the sky through its glass, land and water curving up on the inside
+		const double turn = std::fmod(nt * 6.0 * s.spin, 360.0);
+		const Mat4 spinning = mul(rotate({1.0, 0.0, 0.0}, turn), rotate({0.0, 0.0, 1.0}, 90.0));
+		const Mesh land = lathe({{0.455, -0.075}, {0.47, -0.08}, {0.47, 0.08}, {0.455, 0.075}}, 96);
+		add(land, spinning, diffuseMaterial({0.09, 0.2, 0.07}));
+		add(lathe({{0.4465, -0.05}, {0.447, 0.05}}, 96), spinning, metalMaterial({0.1, 0.22, 0.42}, 0.08));   // (a band of sea)
+		add(lathe({{0.475, -0.1}, {0.5, -0.1}, {0.5, 0.1}, {0.475, 0.1}}, 96), spinning, hull);
+		ShipPart lamps;
+		lamps.mesh = torus(0.05, 0.0014, 72, 5), lamps.place = spinning, lamps.material = diffuseMaterial({0.0, 0.0, 0.0}), lamps.light = Vec3{1.0, 0.92, 0.78} * 6.0, lamps.lit = true;
+		out.push_back(lamps);
+		for (int k = 0; k < 6; ++k) add(box(0.018, 0.9, 0.018), mul(rotate({1.0, 0.0, 0.0}, turn + 30.0 * k), identity()), metal);
+		out.push_back(pod(-0.13, 0.13, 0.07, 0.0, 0.0, metal));
+		wing = 0.5;
+	} else if (s.kind == "ringworld") {   // a ribbon round a star, its inner face a land of seas and continents in stripes of day and night, its walls standing up on both edges
+		const double turn = std::fmod(nt * 1.2 * s.spin, 360.0);
+		const Mat4 spinning = mul(rotate({1.0, 0.0, 0.0}, turn), rotate({0.0, 0.0, 1.0}, 90.0));
+		for (int k = 0; k < 64; ++k) {
+			const double a0 = 2.0 * kPi * k / 64.0, a1 = 2.0 * kPi * (k + 1) / 64.0, w = 0.04;
+			Mesh m;
+			m.verts = {{0.5 * std::cos(a0), -w, 0.5 * std::sin(a0)}, {0.5 * std::cos(a1), -w, 0.5 * std::sin(a1)}, {0.5 * std::cos(a1), w, 0.5 * std::sin(a1)}, {0.5 * std::cos(a0), w, 0.5 * std::sin(a0)}};
+			const Vec3 n{-std::cos(0.5 * (a0 + a1)), 0.0, -std::sin(0.5 * (a0 + a1))};
+			m.normals.assign(4, n);
+			m.tris = {{0, 2, 1}, {0, 3, 2}};
+			const double sea = hash01(s.seed * 17 + k, 1);
+			add(m, spinning, diffuseMaterial(sea < 0.4 ? Vec3{0.03, 0.09, 0.2} : lerp(Vec3{0.1, 0.22, 0.08}, Vec3{0.32, 0.28, 0.16}, sea)));
+		}
+		add(lathe({{0.5, 0.04}, {0.47, 0.043}, {0.47, 0.046}, {0.505, 0.046}}, 128), spinning, hull);
+		add(lathe({{0.505, -0.046}, {0.47, -0.046}, {0.47, -0.043}, {0.5, -0.04}}, 128), spinning, hull);
+		wing = 0.5;
+	} else if (s.kind == "dyson") {   // ten thousand mirrors on their own orbits, a shell of them round a star that shows through its gaps
+		Mesh shell;
+		for (int k = 0; k < 4200; ++k) {
+			const int c = s.seed * 8191 + k;
+			const double z = 2.0 * hash01(c, 1) - 1.0, a = 2.0 * kPi * hash01(c, 2) + nt * 0.02 * (1.0 + hash01(c, 3)), q = std::sqrt(1.0 - z * z), r = 0.46 + 0.03 * hash01(c, 4), size = 0.008 + 0.012 * hash01(c, 5);
+			const Vec3 n{q * std::cos(a), z, q * std::sin(a)}, e1 = normalize(cross(n, Vec3{0.2, 1.0, 0.3})), e2 = cross(n, e1), at = n * r;
+			const int b = static_cast<int>(shell.verts.size());
+			for (const Vec3 &d : {e1 + e2, e2 - e1, e1 * -1.0 - e2, e1 - e2}) shell.verts.push_back(at + d * size), shell.normals.push_back(n);
+			shell.tris.push_back({b, b + 1, b + 2}), shell.tris.push_back({b, b + 2, b + 3});
+		}
+		add(shell, identity(), metalMaterial({0.72, 0.68, 0.55}, 0.2));
 		wing = 0.5;
 	} else {   // wheel
 		const double turn = std::fmod(nt * 6.0 * s.spin, 360.0);   // (turns a minute)
@@ -158,8 +251,20 @@ inline std::vector<ShipPart> shipParts(const Ship &s, double nt, double burning 
 		out.push_back(pod(-0.12, 0.12, 0.06, 0.0, 0.0, metal));
 		wing = 0.5;
 	}
+	if (s.kind == "shuttle" || s.kind == "fighter" || s.kind == "freighter" || s.kind == "station") addSurfaceDetail(out, hull, diffuseMaterial(s.colour * 0.82), dark, s.kind == "fighter" ? 220 : 420, 1.0, s.seed);
+	else if (s.kind == "habitat" || s.kind == "wheel") addSurfaceDetail(out, hull, diffuseMaterial(s.colour * 0.82), dark, 1600, 0.28, s.seed);   // (so great a thing, its panels far smaller against it)
 	if (burning > 0.02)
-		for (const Vec3 &e : engines) glow(e, s.kind == "freighter" ? 0.032 : 0.028, flame);
+		for (const Vec3 &e : engines) {
+			const double r = s.kind == "freighter" ? 0.032 : 0.028;
+			glow(e, r, flame);
+			for (int k = 1; k <= 5; ++k) {   // (the plume going out behind it, thinning, with its bright knots)
+				ShipPart p;
+				const double u = k / 5.0, knot = k % 2 ? 1.0 : 0.55;
+				p.mesh = uvSphere(r * (0.8 - 0.5 * u), 10, 5), p.place = mul(translate(e.x - r * (0.8 + 2.4 * u), e.y, e.z), scale(1.9, 1.0, 1.0)), p.material = diffuseMaterial({0.0, 0.0, 0.0});
+				p.light = flame * (0.7 * knot * (1.0 - 0.7 * u)), p.lit = true;
+				out.push_back(p);
+			}
+		}
 	if (s.lights) {
 		glow({-0.1, 0.0, -wing}, 0.008, Vec3{1.0, 0.05, 0.03} * 5.0);
 		glow({-0.1, 0.0, wing}, 0.008, Vec3{0.05, 1.0, 0.1} * 5.0);
@@ -244,12 +349,20 @@ struct Astronaut {
 	Vec3 tether{0.0, 0.0, 0.0};
 	bool tethered = false, lamps = true;
 	double size = 1.8, tumble = 4.0;
+	double facing = 0.0;   // (`facing DEGREES`, of one with `tumble 0`: that one is upright, turned so from facing +z)
 	int floaters = 0, seed = 1;
+	std::string does = "float";   // (`does float|wave|point|work|reach`: what its arms are about)
+	bool face = false;            // (`face on`: a clear visor, the face behind it lit from within; gold and shut otherwise)
 };
+inline const std::vector<std::string> &astronautActs() {
+	static const std::vector<std::string> k = {"float", "wave", "point", "work", "reach"};
+	return k;
+}
 // The story-space transform of its parts (a 1.8 m figure, its waist at its own origin, up +y, facing +z) at nature's time `nt`.
 inline Mat4 astronautPlacement(const Astronaut &a, double nt) {
 	const Vec3 at = a.at + a.move * nt;
 	const Vec3 axis = normalize(Vec3{0.3 + hash01(a.seed, 1), 0.4, 0.2 + hash01(a.seed, 2)});
+	if (a.tumble == 0.0) return mul(translate(-at.x, at.y, at.z), rotate({0.0, 1.0, 0.0}, a.facing), scale(a.size / 1.8));
 	return mul(translate(-at.x, at.y, at.z), rotate(axis, std::fmod(360.0 * hash01(a.seed, 3) + a.tumble * nt, 360.0)), scale(a.size / 1.8));
 }
 // Where its waist is (pbrt's) at nature's time `nt`: where a tether is clipped on.
@@ -267,18 +380,53 @@ inline std::string astronautText(const Astronaut &a, double nt, const Vec3 *teth
 	part(roundedBox(0.46, 0.6, 0.3, 0.1), translate(0.0, 0.3, 0.0), suit);   // its torso (the waist at 0)
 	part(roundedBox(0.42, 0.52, 0.18, 0.06), translate(0.0, 0.33, -0.24), pack);
 	part(box(0.18, 0.1, 0.03), translate(0.0, 0.4, 0.16), dark);   // (the panel on its chest)
-	part(uvSphere(0.17, 24, 12), translate(0.0, 0.78, 0.0), suit);
-	part(uvSphere(0.15, 24, 12), mul(translate(0.0, 0.78, 0.06), scale(0.95, 0.82, 0.95)), visor);
-	// its limbs: tubes through shoulder, elbow, hand (hip, knee, foot), drifting
+	if (a.face) {   // a clear visor, and who is in there: a face lit by the lamp in the collar
+		Mesh shell = uvSphere(0.17, 24, 12);   // (the helmet's back half: the front of it is all glass)
+		std::vector<std::array<int, 3>> back;
+		for (const auto &tri : shell.tris)
+			if (shell.verts[static_cast<std::size_t>(tri[0])].z + shell.verts[static_cast<std::size_t>(tri[1])].z + shell.verts[static_cast<std::size_t>(tri[2])].z < -0.03) back.push_back(tri);
+		shell.tris = back;
+		part(shell, translate(0.0, 0.78, 0.0), suit);
+		const Vec3 skin{0.72, 0.52, 0.42};
+		part(uvSphere(0.104, 20, 10), mul(translate(0.0, 0.79, 0.012), scale(0.94, 1.08, 0.95)), diffuseMaterial({0.14, 0.09, 0.06}));   // (hair)
+		part(uvSphere(0.1, 20, 10), mul(translate(0.0, 0.77, 0.03), scale(0.92, 1.1, 0.95)), diffuseMaterial(skin));
+		for (const double s : {-1.0, 1.0}) part(uvSphere(0.0115, 10, 6), translate(0.036 * s, 0.795, 0.122), coated({0.02, 0.015, 0.012}, 0.04));
+		part(uvSphere(0.016, 10, 6), mul(translate(0.0, 0.765, 0.128), scale(0.8, 1.0, 0.9)), diffuseMaterial(skin * 0.92));
+		part(roundedBox(0.05, 0.008, 0.01, 0.003), translate(0.0, 0.725, 0.116), diffuseMaterial({0.42, 0.2, 0.18}));
+		const Vec3 inside = Vec3{1.0, 0.92, 0.8} * 45.0;
+		out += attr(diffuseMaterial({0.0, 0.0, 0.0}), emitMesh(uvSphere(0.012, 8, 4), mul(M, translate(0.0, 0.655, 0.11))), &inside);
+		part(uvSphere(0.166, 24, 12), translate(0.0, 0.78, 0.0), glassMaterial(1.12));
+	} else {
+		part(uvSphere(0.17, 24, 12), translate(0.0, 0.78, 0.0), suit);
+		part(uvSphere(0.15, 24, 12), mul(translate(0.0, 0.78, 0.06), scale(0.95, 0.82, 0.95)), visor);
+	}
+	// its limbs: tubes through shoulder, elbow, hand (hip, knee, foot), drifting; where the arms are is what it is doing
+	const double beat = std::sin(2.2 * nt + a.seed), slow = std::sin(0.9 * nt + a.seed);
 	for (int side = -1; side <= 1; side += 2) {
 		const double sx = side;
-		const Vec3 shoulder{0.28 * sx, 0.5, 0.0}, elbow{(0.42 + sway(side, 0.05)) * sx, 0.28 + sway(side + 3, 0.06), 0.12}, hand{(0.46 + sway(side + 5, 0.06)) * sx, 0.1 + sway(side + 7, 0.1), 0.3};
+		const Vec3 shoulder{0.28 * sx, 0.5, 0.0};
+		Vec3 elbow{(0.42 + sway(side, 0.05)) * sx, 0.28 + sway(side + 3, 0.06), 0.12}, hand{(0.46 + sway(side + 5, 0.06)) * sx, 0.1 + sway(side + 7, 0.1), 0.3};
+		if (a.does == "wave" && side > 0) elbow = {0.5, 0.62, 0.06}, hand = {0.58 + 0.13 * beat, 0.95, 0.1};
+		else if (a.does == "point" && side > 0) elbow = {0.34, 0.5, 0.3}, hand = {0.4, 0.54, 0.66};
+		else if (a.does == "work") elbow = {0.36 * sx, 0.3, 0.26}, hand = {(0.12 + 0.05 * beat * sx) * sx, 0.36 + 0.03 * slow, 0.58 + 0.04 * beat};
+		else if (a.does == "reach" && side > 0) elbow = {0.32, 0.56, 0.28}, hand = {0.26 + 0.05 * slow, 0.78, 0.66 + 0.1 * slow};
 		part(sdf::tubeMesh({shoulder, elbow, hand}, 0.075, 0.9, 10), identity(), suit);
+		const auto bellows = [&](const Vec3 &at, const Vec3 &along, double r) {   // (a pressure suit folds at its joints in rings)
+			for (int k = -2; k <= 2; ++k) part(torus(r, 0.011, 16, 6), mul(translate(at + along * (0.022 * k)), alignY(Vec3{0.0, 0.0, 0.0}, along)), pack);
+		};
+		bellows(elbow, normalize(hand - shoulder), 0.075);
+		bellows(shoulder + (elbow - shoulder) * 0.12, normalize(elbow - shoulder), 0.082);
+		part(torus(0.058, 0.012, 14, 6), mul(translate(hand + normalize(elbow - hand) * 0.05), alignY(Vec3{0.0, 0.0, 0.0}, normalize(elbow - hand))), dark);   // (its glove's cuff)
 		part(uvSphere(0.065, 12, 6), translate(hand.x, hand.y, hand.z), dark);
+		for (int f = 0; f < 4; ++f)   // (four fingers, and that it is holding on or holding up)
+			part(capsule(0.012, 0.05, 6, 2), mul(translate(hand + normalize(hand - elbow) * 0.06 + Vec3{0.022 * (f - 1.5), 0.0, 0.0}), alignY(Vec3{0.0, 0.0, 0.0}, normalize(hand - elbow))), dark);
 		const Vec3 hip{0.12 * sx, -0.02, 0.0}, knee{(0.16 + sway(side + 9, 0.03)) * sx, -0.38, 0.18 + sway(side + 11, 0.06)}, foot{0.15 * sx, -0.78 + sway(side + 13, 0.05), 0.02};
 		part(sdf::tubeMesh({hip, knee, foot}, 0.09, 0.9, 10), identity(), suit);
+		bellows(knee, normalize(foot - hip), 0.09);
 		part(roundedBox(0.13, 0.12, 0.26, 0.04), translate(foot.x, foot.y - 0.04, foot.z + 0.05), dark);
 	}
+	part(torus(0.17, 0.018, 24, 8), mul(translate(0.0, 0.64, 0.0), scale(1.0, 0.8, 1.0)), metalMaterial({0.7, 0.7, 0.72}, 0.3));   // (its neck ring)
+	part(roundedBox(0.5, 0.1, 0.34, 0.03), translate(0.0, 0.0, 0.0), pack);                                                          // (its waist)
 	if (a.lamps) {
 		const Vec3 L{1.0, 0.9, 0.75};
 		for (int side = -1; side <= 1; side += 2) {
@@ -326,6 +474,7 @@ struct SpaceCam {
 	enum Kind { None, Orbit, Flyby, Zoom, Hyperspace } kind = None;
 	Vec3 at, to;
 	double radius = 10000.0, degrees = 90.0, from = 0.0, elevation = 10.0, near0 = 1.0e6, near1 = 100.0, fov = 0.0;
+	bool steady = false;   // (`zoom ... steady`: at the same pace from end to end, without easing in and out, so shots of a long journey join up)
 };
 // The camera of a journey `u` of the way through its shot (0 .. 1).
 inline camera_keyframes::Key spaceCamKey(const SpaceCam &c, double u) {
@@ -344,7 +493,7 @@ inline camera_keyframes::Key spaceCamKey(const SpaceCam &c, double u) {
 			target = eye + normalize(ahead * 1.3 + toIt) * c.radius;   // (looking ahead, the body off to the side as it swings past)
 			break;
 		}
-		case SpaceCam::Zoom: eye = c.at + space::direction(c.from, c.elevation) * (c.near0 * std::pow(c.near1 / c.near0, smoothstep(0.0, 1.0, u))); break;
+		case SpaceCam::Zoom: eye = c.at + space::direction(c.from, c.elevation) * (c.near0 * std::pow(c.near1 / c.near0, c.steady ? u : smoothstep(0.0, 1.0, u))); break;
 		case SpaceCam::Hyperspace: {
 			const Vec3 forward = space::direction(c.from, c.elevation);
 			const double lurch = std::pow(smoothstep(0.25, 0.5, u), 2.0) * 50.0;   // (a lunge forward as it goes)
@@ -394,7 +543,7 @@ inline const std::vector<std::string> &spaceCamKinds() {
 inline std::string spaceCamLine(const std::vector<std::string> &t, SpaceCam &c) {
 	const std::string usage =
 		"`spacecam orbit X Y Z radius R [degrees D] [from BEARING] [elevation E] [fov F]`, `spacecam flyby X Y Z radius R [from BEARING] [elevation E] [fov F]`, "
-		"`spacecam zoom X Y Z from D0 to D1 [bearing B] [elevation E] [fov F]` or `spacecam hyperspace X Y Z to X Y Z [bearing B] [elevation E] [fov F]`";
+		"`spacecam zoom X Y Z from D0 to D1 [bearing B] [elevation E] [fov F] [steady]` or `spacecam hyperspace X Y Z to X Y Z [bearing B] [elevation E] [fov F]`";
 	const auto number = [](const std::string &s, double &v) {
 		char *end = nullptr;
 		v = std::strtod(s.c_str(), &end);
@@ -408,6 +557,10 @@ inline std::string spaceCamLine(const std::vector<std::string> &t, SpaceCam &c) 
 	for (std::size_t i = 5; i < t.size(); i += 2) {
 		double v = 0.0;
 		const std::string &w = t[i];
+		if (out.kind == SpaceCam::Zoom && w == "steady") {
+			out.steady = true, --i;
+			continue;
+		}
 		if (out.kind == SpaceCam::Hyperspace && w == "to" && i + 3 < t.size() && number(t[i + 1], out.to.x) && number(t[i + 2], out.to.y) && number(t[i + 3], out.to.z)) {
 			to = true, i += 2;
 			continue;
@@ -459,7 +612,7 @@ inline std::string planetshineText(const std::vector<planets::Planet> &bodies, d
 }
 // The look line's words for a black hole of `lens 1` seen from `eye` looking at `target` (pbrt's), `fov` degrees (lens_look.h, black_hole_lens.h).
 inline std::string holeLook(const BlackHole &b, const Vec3 &eye, const Vec3 &target, double fov, double t) {
-	const Vec3 ahead = normalize(target - eye), right = normalize(cross(ahead, Vec3{0.0, 1.0, 0.0})), up = cross(right, ahead), to = b.at - eye;
+	const Vec3 ahead = normalize(target - eye), right = normalize(cross(Vec3{0.0, 1.0, 0.0}, ahead)), up = cross(ahead, right), to = b.at - eye;   // (a scene's left-handed: looking down -z, +x is on the left)
 	const double away = dot(to, ahead);
 	if (away <= 0.0) return std::string();   // (behind the camera)
 	Vec3 n, e1, e2;

@@ -224,7 +224,11 @@
 //     asteroids belt at 0 0 -30000  radius 20000  count 4000      # rocks by the thousand: a `ring` going round (`width`, `tilt`) or a drifting `field`
 //     remnant  crab at 0 0 -40000  size 12000  blast 3          # a dying star: a `supernova` (at `blast T`), a `pulsar` (`period`), a `planetary` nebula
 //     ship     ark  at 0 0 -500  kind shuttle  size 60  move 0 0 -40   # a craft: shuttle, fighter, freighter, station, wheel; engines, running lights
-//   (in a shot) spacecam flyby 0 0 -30000 radius 9000 from 20    # the camera's journey: orbit, flyby (a slingshot), zoom (powers of ten), hyperspace
+//   (in a shot) spacecam flyby 0 0 -30000 radius 9000 from 20    # the camera's journey: orbit, flyby (a slingshot), zoom (powers of ten; `steady`: at one pace), hyperspace
+//     event    collision at 0 0 -40000 size 40000 over 24        # worked out and not painted, on the finished picture: collision, disc, merger, web, stars (cosmic_event.h)
+//     planetfall ocean from 300000 to 6 over 16                  # from orbit to a film's `terrain` in one shot, a shot's `descend` (`straight`, and from below to: rising, for powers of ten)
+//     hud      "AIR 96%" at -0.84 0.82 size 0.035 from 2         # words fixed to the frame
+//     flightpath earth mars "THE WAY" from 3 over 4              # the way between two planets or ships, drawn on the sky
 //     space    flare 0.4  bloom 0.15  planetshine 2           # light in space: the lens's flare and glow, the planets' light on what is near them;
 //                                                               # `hum H`: the hum of space under its sounds (engines, breathing, blasts...)
 //     astronaut kim at 0 0 -6  tether ark  floaters 6  tumble 5    # someone floating in a spacesuit, tethered to a point or a ship, loose things round them

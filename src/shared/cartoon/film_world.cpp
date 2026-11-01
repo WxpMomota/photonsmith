@@ -265,6 +265,14 @@ static std::string universeText(const Spec &spec, const std::string &header, dou
 				to = {-p.x, p.y, p.z};
 			}
 		out += cosmos::astronautText(a, nt, a.tethered ? &to : nullptr);
+		const double breath = 0.5 + 0.5 * std::sin(2.0 * kPi * nt / 4.2 + a.seed);
+		if (a.face && breath > 0.3) {   // (its breath on the glass, coming and going)
+			Vec3 eye, target;
+			double fov = 40.0;
+			film_subjects::cameraOf(header, eye, target, fov);
+			const Vec3 p = transformPoint(cosmos::astronautPlacement(a, nt), {0.0, 0.745, 0.145});
+			out += airborne::puffsText(film, {{{-p.x, p.y, p.z}, 0.032 * a.size, 0.06 + 0.22 * breath}}, {0.92, 0.94, 0.97}, {-eye.x, eye.y, eye.z}, "breath_" + a.name);
+		}
 	}
 	for (const cosmos::Ship &sh : spec.ships) out += cosmos::shipText(sh, nt);   // (film_voyage.h)
 	if (!spec.battle.empty()) out += battle::battleText(spec.battle, spec.ships, nt);   // (film_battle.h)
@@ -525,6 +533,44 @@ const std::vector<school::School> &DataFilm::schoolsSwum() const {
 	return swum_.schools;
 }
 // How much more `exposure auto` opens up for a camera under the water, by its depth (film_undersea.h depthExposure); 1 for any other.
+// Where the frame's camera is (pbrt's).
+static Vec3 eyeOf(const std::string &header) {
+	Vec3 eye, target;
+	double fov = 40.0;
+	film_subjects::cameraOf(header, eye, target, fov);
+	return {-eye.x, eye.y, eye.z};
+}
+// From orbit: the sky as it is from up there (`sky` is changed to it), the stars coming out in it, and the planet going on past the land (film_planetfall.h).
+static std::string fromOrbit(const Spec &spec, const std::string &header, dressing::Sky &sky) {
+	const std::shared_ptr<const terrain::Field> land = terrain::fieldOf(spec.terrain);
+	Vec3 eye, target;
+	double fov = 40.0;
+	film_subjects::cameraOf(header, eye, target, fov);
+	const double h = std::max(1.0, eye.y - land->heightAt(spec.fall.x, spec.fall.z));
+	const std::string film = spec.key.empty() ? std::string("film") : spec.key;
+	sky.physical = true, sky.altitude = planetfall::skyHeight(h);
+	std::string out;
+	if (const double shown = planetfall::starsAt(h); shown > 0.0) {
+		space::Space stars;
+		stars.on = true, stars.sun = false, stars.stars = shown, stars.milkyWay = shown;
+		out += space::spaceText(film, stars);
+	}
+	return out + planetfall::text(film, *land, spec.fall, h);
+}
+// What is drawn on the finished picture and not in the scene: where it is in this frame, for the look line. Bent light (black_hole_lens.h) and the great things happening in the sky (film_cosmic.h).
+static std::string withSkyLook(const Spec &spec, std::string out, const std::string &header, double t, double nt) {
+	Vec3 eye, target;
+	double fov = 40.0;
+	if ((spec.blackHoles.empty() && spec.events.empty()) || !film_subjects::cameraOf(header, eye, target, fov)) return out;
+	const Vec3 from{-eye.x, eye.y, eye.z}, to{-target.x, target.y, target.z};
+	for (const cosmos::BlackHole &b : spec.blackHoles)
+		if (b.lens) {
+			out = night::withWords(out, cosmos::holeLook(b, from, to, fov, nt));
+			break;
+		}
+	for (const events::Event &e : spec.events) out = night::withWords(out, events::eventLook(e, from, to, fov, t));
+	return out;
+}
 static double underTheSeaExposure(const Spec &spec, const std::string &header) {
 	if (!spec.hasUnderwater || !spec.exposureAuto || spec.seas.empty()) return 1.0;
 	Vec3 eye, target;
@@ -697,28 +743,10 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 		optics.exposure = exposureAt(t);
 		optics.softSun = !spec.forests.empty();
 		dressing::Sky sky = spec.sky;
-		if (spec.fall.on && spec.hasTerrain) {   // (from orbit: the sky as it is from up there, the stars coming out in it, and the planet going on past the land: film_planetfall.h)
-			const std::shared_ptr<const terrain::Field> land = terrain::fieldOf(spec.terrain);
-			Vec3 eye, target;
-			double fov = 40.0;
-			film_subjects::cameraOf(header, eye, target, fov);
-			const double h = std::max(1.0, eye.y - land->heightAt(spec.fall.x, spec.fall.z));
-			sky.physical = true, sky.altitude = planetfall::skyHeight(h);
-			if (const double shown = planetfall::starsAt(h); shown > 0.0) {
-				space::Space stars;
-				stars.on = true, stars.sun = false, stars.stars = shown, stars.milkyWay = shown;
-				out += space::spaceText(spec.key.empty() ? std::string("film") : spec.key, stars);
-			}
-			out += planetfall::text(spec.key.empty() ? std::string("film") : spec.key, *land, spec.fall, h);
-		}
+		if (spec.fall.on && spec.hasTerrain) out += fromOrbit(spec, header, sky);
 		out += "# the sun and sky at " + std::to_string(dressing::hourAt(spec.sky, t, spec.storyEnd)) + " h (film_dressing.h)\n" + dressing::skyText(spec.key, sky, t, spec.storyEnd, rainbow, storm, optics);
 	}
-	if (spec.moon.on) {   // (round 17: `moonlight` - after the sun, so the sea's caustics and glints take the sun's light while it is up)
-		Vec3 eye, target;
-		double fov = 40.0;
-		film_subjects::cameraOf(header, eye, target, fov);
-		out += sealight::moonText(spec.moon, {-eye.x, eye.y, eye.z});
-	}
+	if (spec.moon.on) out += sealight::moonText(spec.moon, eyeOf(header));   // (round 17: `moonlight` - after the sun, so the sea's caustics and glints take the sun's light while it is up)
 	out += dressingAt(t);
 	out += modelsAt(header, t);   // the film's own models where they are placed (film_model.h)
 	out += swarmsAt(header, t);   // (film_swarm.h)
@@ -861,13 +889,7 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 		out = underTheSeaLight(spec, out, header, t, nt, seabedAt(-eye.x, eye.z));
 		if (spec.toon.on) out = undersea::bubblesGrouped(out);   // (round 17: a toon film draws no ink round its bubbles)
 	}
-	for (const cosmos::BlackHole &b : spec.blackHoles)
-		if (b.lens) {   // (bent light, on the finished picture: where it is in this frame, for the look line)
-			Vec3 eye, target;
-			double fov = 40.0;
-			if (film_subjects::cameraOf(header, eye, target, fov)) out = night::withWords(out, cosmos::holeLook(b, {-eye.x, eye.y, eye.z}, {-target.x, target.y, target.z}, fov, nt));
-			break;
-		}
+	out = withSkyLook(spec, std::move(out), header, t, nt);
 	return spec.space.on ? cosmos::withSpaceLook(space::recentred(out), spec.space.flare, spec.space.bloom) : out;   // (a floating origin for a film in space: film_space.h)
 }
 
@@ -1449,71 +1471,6 @@ std::string DataFilm::aboardAt(const std::string &header, double t, double nt) c
 	for (const screens::Hologram &h : spec.holograms) out += screens::hologramText(h, nt);   // (film_screens.h)
 	for (const screens::Screen &sc : spec.screens) out += screens::screenText(sc, nt, spec.key.empty() ? std::string("film") : spec.key, spec.ships);
 	if (spec.explain.any() || spec.night.trap) out += overlaysAt(header, t, nt);
-	return out;
-}
-
-std::string DataFilm::overlaysAt(const std::string &header, double t, double nt) const {
-	explain::View v;
-	film_subjects::cameraOf(header, v.eye, v.target, v.fov);
-	const std::string film = spec.key.empty() ? std::string("film") : spec.key;
-	std::string out;
-	for (const explain::Label &l : spec.explain.labels) {   // what each names: where its middle is now and how far its top is above that (pbrt's)
-		Vec3 at = l.at;
-		double radius = 0.0;
-		bool found = l.on.empty();
-		for (const cosmos::Ship &s : spec.ships)
-			if (!found && s.name == l.on) {
-				if (s.goneAt >= 0.0 && nt > s.goneAt) break;
-				at = screens::shipWhere(s, nt), radius = 0.35 * s.size, found = true;
-			}
-		for (std::size_t i = 0; i < spec.planets.size() && !found; ++i)
-			if (spec.planets[i].name == l.on) at = planets::centreAt(spec.planets, i, nt), radius = spec.planets[i].radius, found = true;
-		for (const Character &c : spec.characters)
-			if (!found && c.name == l.on) {
-				const Vec3 head = transformPoint(momentOf(c, t).frame, characterKinds().at(c.kind).head * c.scale);
-				at = {-head.x, head.y, head.z}, radius = 0.35 * c.scale, found = true;
-			}
-		if (found) out += explain::labelText(l, t, at, radius, v, film);
-	}
-	for (const explain::OrbitLine &o : spec.explain.orbits) {
-		std::vector<Vec3> path;
-		for (const cosmos::Ship &s : spec.ships)
-			if (s.name == o.of && s.orbit.on) path = explain::orbitPath(s.orbit, nt);
-		for (std::size_t i = 0; i < spec.planets.size(); ++i) {   // a moon: its loop round where what it goes round is now
-			const planets::Planet &p = spec.planets[i];
-			if (p.name != o.of || p.around.empty()) continue;
-			std::size_t parent = i;
-			for (std::size_t k = 0; k < spec.planets.size(); ++k)
-				if (spec.planets[k].name == p.around) parent = k;
-			const Vec3 now = planets::centreAt(spec.planets, parent, nt);
-			for (int k = 0; k <= 160; ++k) {
-				const double at = nt + p.period * k / 160.0;
-				path.push_back(now + planets::centreAt(spec.planets, i, at) - planets::centreAt(spec.planets, parent, at));
-			}
-		}
-		out += explain::orbitLineText(o, t, path, v);
-	}
-	for (const explain::ScaleBar &b : spec.explain.bars) out += explain::scaleBarText(b, t, v, film);
-	out += night::stampText(spec.night, t, v, film);   // (a trail camera's strip: film_night.h)
-	for (const explain::Compare &c : spec.explain.compares) {
-		std::vector<explain::LinedUp> bodies;
-		for (const std::string &name : c.bodies) {
-			explain::LinedUp b;
-			b.name = name;
-			if (const explain::Body *k = explain::knownBody(name)) {
-				b.name = k->name, b.radius = k->radiusKm, b.colour = k->colour, b.shines = b.name == "Sun", b.size = explain::detail::grouped(2.0 * k->radiusKm) + " km";
-			} else {
-				for (const planets::Planet &p : spec.planets)
-					if (p.name == name) {
-						static const std::map<std::string, Vec3> tint = {{"rocky", {0.55, 0.5, 0.45}}, {"desert", {0.8, 0.6, 0.35}}, {"ice", {0.8, 0.88, 0.95}},
-																		{"ocean", {0.25, 0.45, 0.85}}, {"gas", {0.85, 0.72, 0.55}}, {"lava", {0.6, 0.25, 0.1}}};
-						b.radius = p.radius, b.colour = tint.count(p.kind) ? tint.at(p.kind) : Vec3{0.6, 0.6, 0.6}, b.size = explain::detail::grouped(2.0 * p.radius);
-					}
-			}
-			bodies.push_back(b);
-		}
-		out += explain::compareText(c, t, bodies, v, film);
-	}
 	return out;
 }
 

@@ -62,6 +62,7 @@
 #include "film_forest.h"
 #include "film_air.h"
 #include "film_alien.h"
+#include "film_cosmic.h"
 #include "film_planetfall.h"
 #include "film_cover.h"
 #include "film_skyfx.h"
@@ -342,6 +343,7 @@ struct Spec {
 	planetfall::Fall fall;                        // (`planetfall`: the planet round the land, for a camera that comes down from orbit: film_planetfall.h)
 	std::vector<alien::Plumes> plumes;            // (`plumes`, `spires`: what stands on another world: film_alien.h)
 	std::vector<alien::Spires> spires;
+	std::vector<events::Event> events;            // (`event`: a collision of galaxies, a star being born, a merger, the cosmic web: film_cosmic.h)
 	std::vector<Character> characters;
 	// props with physics: the block they move, and the line that says so
 	std::vector<std::pair<std::string, physics::Bounce>> bounces;

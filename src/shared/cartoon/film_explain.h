@@ -34,6 +34,19 @@ struct Label {
 	Vec3 colour{1.0, 0.82, 0.3};
 	double from = 0.0, to = 1e9;
 };
+// A line of a helmet's or a cockpit's display: words fixed to the frame, `x` and `y` -1 .. 1 across it and up it.
+struct Hud {
+	std::string text;
+	double x = -0.8, y = 0.8, size = 0.03;
+	Vec3 colour{0.45, 1.0, 0.75};
+	double from = 0.0, to = 1e9;
+};
+// (`flightpath`) The way from one body to another drawn out on the sky as a dashed arc, with a marker going along it from `from` over `over` seconds and what it says.
+struct Route {
+	std::string a, b, text;
+	Vec3 colour{1.0, 0.82, 0.3};
+	double from = 0.0, over = 6.0;
+};
 struct OrbitLine {
 	std::string of;   // a craft on an orbit, or a moon
 	Vec3 colour{0.45, 0.8, 1.0};
@@ -59,7 +72,9 @@ struct Overlays {
 	std::vector<OrbitLine> orbits;
 	std::vector<ScaleBar> bars;
 	std::vector<Compare> compares;
-	bool any() const { return !labels.empty() || !orbits.empty() || !bars.empty() || !compares.empty(); }
+	std::vector<Hud> huds;
+	std::vector<Route> routes;
+	bool any() const { return !labels.empty() || !orbits.empty() || !bars.empty() || !compares.empty() || !huds.empty() || !routes.empty(); }
 };
 
 // A body of the solar system a `compare` knows: its name as written, its radius (km) and its colour.

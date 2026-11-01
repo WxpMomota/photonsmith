@@ -980,3 +980,195 @@ TEST(FilmBlackHole, LightGoesRoundIt) {
 	EXPECT_GT(std::max(left, right), 1.3 * std::min(left, right)) << "the side coming towards the camera is brighter";
 	EXPECT_GT(over, 0.0) << "the far side of the disc shows up over the top";
 }
+
+// Two galaxies falling through each other: nothing but the two centres' pull throws long tails out of the discs, and it comes out the same however the frames are asked for.
+TEST(FilmCosmicEvents, TailsComeOfThemselves) {
+	namespace ce = cosmic_event;
+	ce::Params e;
+	e.kind = ce::Collision, e.count = 3000;
+	const auto farOut = [&](double u) {   // (the share of the stars outside the two discs they started in)
+		e.u = u;
+		const std::vector<ce::Light> lights = ce::lightsAt(e);
+		std::vector<ce::V> centres;
+		for (const ce::Light &l : lights)
+			if (l.blob) centres.push_back(l.p);
+		EXPECT_EQ(centres.size(), 4u) << "each centre has its bulge and its glow";
+		int out = 0, stars = 0;
+		for (const ce::Light &l : lights) {
+			if (l.blob) continue;
+			++stars;
+			double nearest = 1e30;
+			for (const ce::V &c : centres) nearest = std::min(nearest, std::sqrt(ce::dot(l.p - c, l.p - c)));
+			out += nearest > 0.1;   // (a tenth of the event's size: half as far again as a disc's edge)
+		}
+		return static_cast<double>(out) / stars;
+	};
+	EXPECT_EQ(farOut(0.0), 0.0) << "two whole discs, to begin with";
+	EXPECT_GT(farOut(0.38), 0.15) << "one in six or more flung out";
+	e.u = 0.38;
+	const std::vector<ce::Light> a = ce::lightsAt(e);
+	e.u = 0.1;
+	(void)ce::lightsAt(e);   // (back: it starts again from the beginning)
+	e.u = 0.38;
+	const std::vector<ce::Light> b = ce::lightsAt(e);
+	ASSERT_EQ(a.size(), b.size());
+	EXPECT_EQ(a[17].p.x, b[17].p.x);
+}
+
+// Their light adds up on the picture, the same each time, as bright to the eye from any distance.
+TEST(FilmCosmicEvents, TheirLightAddsUp) {
+	namespace ce = cosmic_event;
+	constexpr int W = 320, H = 180;
+	for (const int kind : {ce::Collision, ce::Disc, ce::Merger, ce::Web, ce::Stars}) {
+		ce::Params e;
+		e.kind = kind, e.count = 1500, e.size = 1000.0, e.u = 0.7, e.z = -2000.0;
+		const auto total = [&](ce::Params p, std::vector<float> &img) {
+			img.assign(static_cast<std::size_t>(W) * H * 3, 0.0f);
+			ce::apply(img.data(), W, H, p);
+			double sum = 0.0;
+			for (const float v : img) {
+				EXPECT_TRUE(std::isfinite(v));
+				sum += v;
+			}
+			return sum;
+		};
+		std::vector<float> one, two;
+		const double near_ = total(e, one);
+		EXPECT_GT(near_, 0.0) << kind;
+		EXPECT_EQ(total(e, two), near_) << "the same picture again, so that it cannot flicker";
+		ce::Params further = e;
+		further.z = -4000.0;
+		const double ratio = total(further, two) / near_;
+		EXPECT_NEAR(ratio, 0.25, 0.1) << kind << ": twice as far, a quarter of the size and so of the light";
+	}
+	ce::Params e;
+	e.kind = ce::Stars, e.size = 100.0, e.z = 2000.0;
+	std::vector<float> behind(static_cast<std::size_t>(W) * H * 3, 0.0f);
+	ce::apply(behind.data(), W, H, e);
+	EXPECT_EQ(*std::max_element(behind.begin(), behind.end()), 0.0f) << "behind the camera";
+}
+
+// A film's `event` line is a frame's look line: where it is and how far through, what the camera sees it from.
+TEST(FilmCosmicEvents, AFrameSaysWhereItIs) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("event", "scene s.pbrt\nlength 12\nevent collision at 0 0 -9000 size 6000 from 2 over 8 tilt 20\nshot 0 It\n key 500 300 0  0 0 -9000  40\n", film), "");
+	EXPECT_EQ(film.sceneAt(1.0).find("event 1"), std::string::npos) << "not yet";
+	const std::string s = film.sceneAt(6.0);
+	const std::size_t at = s.find("# @rt-look");
+	ASSERT_NE(at, std::string::npos);
+	lens_look::Look look;
+	EXPECT_EQ(lens_look::parse(s.substr(at + 10, s.find('\n', at) - at - 10), look), "");
+	ASSERT_EQ(look.events.size(), 1u);
+	EXPECT_TRUE(look.active());
+	EXPECT_NEAR(look.events[0].u, 0.5, 1e-6);
+	EXPECT_NEAR(look.events[0].z, -9000.0, 1e-6);
+	EXPECT_NEAR(look.events[0].eye[0], 500.0, 1e-3) << "in the film's own coordinates, as `at` is";
+	EXPECT_NEAR(look.events[0].fov, 40.0, 1e-3);
+	lens_look::Look none;
+	EXPECT_NE(lens_look::parse(" event-u 0.5", none).find("event 1"), std::string::npos);
+	expectProblems({{"event nova at 0 0 0", "collision"}});
+}
+
+// Powers of ten: a camera rising straight off the ground at one pace, and a zoom that keeps that pace from end to end, so the shots join up.
+TEST(FilmPowersOfTen, OneLookAtOnePace) {
+	namespace pf = cartoon::planetfall;
+	pf::Fall f;
+	f.from = 2.0, f.to = 200000.0, f.t0 = 1.0, f.t1 = 11.0, f.straight = true;
+	EXPECT_NEAR(pf::heightAt(f, 1.0), 2.0, 1e-9);
+	EXPECT_NEAR(pf::heightAt(f, 11.0), 200000.0, 1e-6);
+	EXPECT_NEAR(pf::heightAt(f, 3.0), 20.0, 1e-6) << "ten times as high every two seconds, here";
+	EXPECT_NEAR(pf::heightAt(f, 5.0), 200.0, 1e-6);
+	cartoon::Vec3 eye, target;
+	pf::cameraAt(f, 6.0, 10.0, eye, target);
+	EXPECT_NEAR(eye.x, 0.0, 1e-9) << "straight up, over the same spot";
+	EXPECT_NEAR(eye.z, 0.0, 1e-9);
+	EXPECT_LT(target.y, 11.0);
+	EXPECT_EQ(pf::detail::reachOf(f), pf::detail::reachOf([&] {
+		pf::Fall down = f;
+		std::swap(down.from, down.to);
+		return down;
+	}())) << "the same land going up as coming down";
+	cs::SpaceCam c;
+	ASSERT_EQ(cs::spaceCamLine({"spacecam", "zoom", "0", "0", "0", "from", "10", "to", "1000", "steady", "fov", "40"}, c), "");
+	EXPECT_TRUE(c.steady);
+	EXPECT_NEAR(c.fov, 40.0, 1e-12);
+	const auto apart = [&](double u) {
+		const auto k = cs::spaceCamKey(c, u);
+		return std::sqrt(k.pos[0] * k.pos[0] + k.pos[1] * k.pos[1] + k.pos[2] * k.pos[2]);
+	};
+	EXPECT_NEAR(apart(0.25), 10.0 * std::sqrt(10.0), 1e-6);
+	EXPECT_NEAR(apart(0.5), 100.0, 1e-6);
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("rise", "scene s.pbrt\nlength 12\nterrain hills size 800 height 10 seed 2\nsky 10:00 10:00\nplanetfall ocean from 2 to 200000 over 10 straight\nshot 0 Up\n descend\n", film), "");
+	EXPECT_EQ(film.sceneAt(0.0).find("fall_cloud"), std::string::npos) << "under the clouds";
+	EXPECT_NE(film.sceneAt(9.9).find("fall_cloud"), std::string::npos) << "over them";
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("rise2", "scene s.pbrt\nlength 12\nterrain hills size 800 height 10\nsky 10:00 10:00\nplanetfall ocean from 2 to 50\n", bad).find("over 100"), std::string::npos);
+}
+
+// Ships of many parts, great works, and astronauts doing something with their hands.
+TEST(FilmShipsAndCrews, DetailAndActing) {
+	const auto triangles = [](const cs::Ship &s) {
+		std::size_t n = 0;
+		for (const cs::ShipPart &p : cs::shipParts(s, 2.0)) n += p.mesh.tris.size();
+		return n;
+	};
+	cs::Ship s;
+	for (const std::string &kind : cs::shipKinds()) {
+		s.kind = kind;
+		EXPECT_GT(triangles(s), 500u) << kind;
+		EXPECT_NE(cs::shipText(s, 2.0).find("Shape"), std::string::npos) << kind;
+	}
+	s.kind = "freighter";
+	std::size_t ribs = 0;
+	for (const cs::ShipPart &p : cs::shipParts(s, 2.0)) ribs += p.mesh.verts.size() == 24u;
+	EXPECT_GT(ribs, 100u) << "a container's corrugated sides";
+	cs::Astronaut a;
+	const std::string shut = cs::astronautText(a, 2.0);
+	a.face = true;
+	const std::string open = cs::astronautText(a, 2.0);
+	EXPECT_EQ(shut.find("dielectric"), std::string::npos) << "a gold visor";
+	EXPECT_NE(open.find("dielectric"), std::string::npos) << "and a clear one";
+	a.does = "wave";
+	EXPECT_NE(cs::astronautText(a, 2.0), open) << "its arm is somewhere else";
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("crew", "scene s.pbrt\nlength 4\nastronaut sal at 0 0 -4 does work face on\nship home at 0 0 -30 kind dyson size 20\nshot 0 It\n key 0 0 0  0 0 -4  40\n", film), "");
+	EXPECT_EQ(film.spec.astronauts.at(0).does, "work");
+	EXPECT_TRUE(film.spec.astronauts.at(0).face);
+	expectProblems({{"astronaut sal at 0 0 -4 does dance", "float"}});
+}
+
+// What a mission sounds and looks like: a voice over the radio, late, a helmet's display, and the way home drawn on the sky.
+TEST(FilmMissionTools, RadioDisplayAndRoute) {
+	std::vector<float> tone(4800);
+	for (std::size_t i = 0; i < tone.size(); ++i) tone[i] = static_cast<float>(0.5 * std::sin(2.0 * cartoon::kPi * 120.0 * i / cartoon::audio::kRate));
+	std::vector<float> voice = tone;
+	cartoon::speech::overTheRadio(voice, 1);
+	double before = 0.0, after = 0.0;
+	for (std::size_t i = 1000; i < 4000; ++i) before += tone[i] * tone[i], after += voice[i] * voice[i];
+	EXPECT_LT(after, 0.3 * before) << "a radio has no bass";
+	std::vector<float> same = tone;
+	cartoon::speech::overTheRadio(same, 1);
+	EXPECT_EQ(same, voice);
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("mission", "scene s.pbrt\nlength 8\nambience breath 1\nspace stars 1 sun 60 10\nplanet home ocean at 0 0 -9000 radius 800\nplanet far rocky at 4000 0 -9000 radius 200\nflightpath home far \"THE WAY\" from 1 over 4\nhud \"AIR 96%\" at -0.8 0.8 size 0.04 from 2 to 6\ncharacter sam pip at 0 0 0\nsay sam 1 \"Can you hear me?\" radio delay 1.5\nshot 0 It\n key 2000 1000 2000  2000 0 -9000  50\n", film), "");
+	ASSERT_EQ(film.spec.lines.size(), 1u);
+	EXPECT_TRUE(film.spec.lines[0].radio);
+	EXPECT_DOUBLE_EQ(film.spec.lines[0].delay, 1.5);
+	EXPECT_EQ(film.sceneAt(0.5).find("orbit line"), std::string::npos) << "not yet";
+	EXPECT_NE(film.sceneAt(3.0).find("orbit line"), std::string::npos);
+	EXPECT_EQ(film.sceneAt(1.0).find("AIR 96%"), std::string::npos);
+	EXPECT_NE(film.sceneAt(3.0).find("AIR 96%"), std::string::npos);
+	expectProblems({{"hud", "words fixed to the frame"}, {"flightpath home", "the way between"}, {"say sam 1 \"Hi\" delay -1", "rate"}});
+}
+
+// The library's cartoon in space: its set and its cast load.
+TEST(FilmCartoonSpace, NovaAndRobo) {
+	const std::filesystem::path file = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() / "pbrt_scenes" / "nova-and-robo.film";
+	if (!std::filesystem::exists(file)) GTEST_SKIP() << "no bundled scenes here";
+	for (int part = 0; part < 4; ++part) {
+		ff::DataFilm film;
+		ASSERT_EQ(film.load(file.string(), part), "") << part;
+		EXPECT_FALSE(film.spec.characters.empty());
+	}
+}
