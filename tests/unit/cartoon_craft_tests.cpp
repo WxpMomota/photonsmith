@@ -826,6 +826,29 @@ TEST(MusicCues, SeveralReadTheSameRecordingAtOnce) {
 	removeRecordingsSince(before);
 }
 
+#ifdef __APPLE__
+// A Mac needs no ffmpeg for a compressed recording: afconvert is part of macOS (and a GUI app started from the Finder has no Homebrew on its PATH to find ffmpeg by).
+TEST(MusicCues, ACompressedRecordingIsReadOnAMacWithoutFfmpeg) {
+	namespace mc = cartoon::music_cues;
+	const std::filesystem::path d = std::filesystem::temp_directory_path() / "photonsmith_cue_afconvert_test";
+	std::filesystem::create_directories(d);
+	std::vector<std::int16_t> pcm(2 * cartoon::audio::kRate);   // one second of 330 Hz (writeWav takes interleaved stereo)
+	for (std::size_t i = 0; i < pcm.size(); ++i) pcm[i] = static_cast<std::int16_t>(8000.0 * std::sin(2.0 * 3.14159265358979 * 330.0 * static_cast<double>(i / 2) / cartoon::audio::kRate));
+	const std::string wav = (d / "tone.wav").generic_string(), aac = (d / "tone.m4a").generic_string();
+	ASSERT_TRUE(cartoon::audio::writeWav(wav, pcm));
+	if (std::system(("/usr/bin/afconvert -f m4af -d aac \"" + wav + "\" \"" + aac + "\" 2>/dev/null").c_str()) != 0) GTEST_SKIP() << "no afconvert";
+	const std::set<std::filesystem::path> before = keptRecordings();
+	std::vector<float> sound;
+	std::string why;
+	ASSERT_TRUE(mc::readOther(aac, sound, &why)) << why;
+	EXPECT_NEAR(static_cast<double>(sound.size()), static_cast<double>(cartoon::audio::kRate), 0.1 * cartoon::audio::kRate) << "about a second of it";
+	float loudest = 0.0f;
+	for (float s : sound) loudest = std::max(loudest, std::fabs(s));
+	EXPECT_GT(loudest, 0.1f) << "and it is not silence";
+	removeRecordingsSince(before);
+}
+#endif
+
 // A cues file for a film in parts follows the track of the part playing, at the part's own time.
 TEST(MusicCues, AFilmInPartsFollowsThePartPlaying) {
 	cartoon::Film first{}, second{}, whole{};

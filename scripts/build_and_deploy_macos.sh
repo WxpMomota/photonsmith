@@ -253,6 +253,9 @@ cp "$REPO_ROOT/tools/photo_to_room/room_fit.py" "$APP_BUNDLE/Contents/MacOS/tool
 cp "$REPO_ROOT/tools/photo_to_room/room_objects.py" "$APP_BUNDLE/Contents/MacOS/tools/photo_to_room/room_objects.py"
 cp "$REPO_ROOT/tools/photo_to_room/room_textures.py" "$APP_BUNDLE/Contents/MacOS/tools/photo_to_room/room_textures.py"
 cp "$REPO_ROOT/tools/photo_to_room/room_outline.py" "$APP_BUNDLE/Contents/MacOS/tools/photo_to_room/room_outline.py"
+# File > Import Blender Scene looks for tools/blender_import/blend_to_pbrt.py beside the program (qt_gui/mainwindow_blender_import.cpp); without these the menu item says the tool was not found.
+mkdir -p "$APP_BUNDLE/Contents/MacOS/tools/blender_import"
+for f in blend_to_pbrt.py import_blend.py match_lights.py; do cp "$REPO_ROOT/tools/blender_import/$f" "$APP_BUNDLE/Contents/MacOS/tools/blender_import/$f"; done
 cp "$REPO_ROOT/scripts/setup_photo_to_mesh.sh" "$APP_BUNDLE/Contents/MacOS/scripts/setup_photo_to_mesh.sh"
 chmod +x "$APP_BUNDLE/Contents/MacOS/scripts/setup_photo_to_mesh.sh"
 

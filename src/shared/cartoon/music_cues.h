@@ -20,7 +20,7 @@
 //
 // A recording: `3.0  sample voices/hello.wav  gain 0.8  by kai` plays a WAV file (beside the cues file; any rate, mono or stereo: audio::readWav). `by NAME` makes it that
 // character's voice: voiceAt() is how loud it is at a moment (0..1, the loudest of the line 1), for the film's code to open a mouth by - or, behind a mask, to light up.
-// Any other kind of sound file (MP3, OGG, FLAC ...) is turned into a WAV by ffmpeg, on the PATH as for a video's assembly.
+// Any other kind of sound file (MP3, OGG, FLAC ...) is turned into a WAV by ffmpeg, on the PATH as for a video's assembly. (On a Mac, afconvert does it first: it needs no install, and a GUI app's PATH has no Homebrew.)
 //
 // A recording can be worked on as it plays:
 //     trim 2.0 9.5               only those seconds of it
@@ -299,7 +299,13 @@ inline bool readOther(const std::string &path, std::vector<float> &out, std::str
 	} else {
 		const std::filesystem::path mine = wav.parent_path() / (wav.stem().string() + "_" + std::to_string(std::random_device{}()) + ".wav");
 		const std::string command = "ffmpeg -v error -y -i \"" + path + "\" -ar " + std::to_string(audio::kRate) + " \"" + mine.string() + "\"";
+#ifdef __APPLE__
+		// Every Mac has afconvert (MP3, AAC, AIFF ...), which needs no install. A GUI app started from the Finder has a PATH without Homebrew's folders, where ffmpeg would be: it is the second try, with them added.
+		const std::string afconvert = "/usr/bin/afconvert -f WAVE -d LEI16@" + std::to_string(audio::kRate) + " -c 1 \"" + path + "\" \"" + mine.string() + "\" 2>/dev/null";
+		made = (std::system(afconvert.c_str()) == 0 || std::system(("PATH=\"$PATH:/opt/homebrew/bin:/usr/local/bin\" " + command).c_str()) == 0) && audio::readWav(mine.string(), out, why);
+#else
 		made = std::system(command.c_str()) == 0 && audio::readWav(mine.string(), out, why);
+#endif
 		if (made) std::filesystem::create_hard_link(mine, wav, ec);   // (it fails when another got there first, or on a disk with no links: this one is read all the same)
 		std::filesystem::remove(mine, ec);
 	}

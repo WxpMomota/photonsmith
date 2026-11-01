@@ -399,7 +399,7 @@ CPU renderer; `docs/METAL_PARITY_STATUS.md` lists exactly which scenes and
 features still differ, and `docs/history/METAL_GPU_FEASIBILITY.md` has the full
 incremental history. Live Preview (interactive drag-to-orbit at a small
 fixed size) is described in `docs/MAC_LIVE_PREVIEW.md`. CI builds and runs this on every push (`.github/workflows/
-unit-tests.yml`'s own `metal-poc` job, `macos-14`) - the device-
+unit-tests.yml`'s own `metal-poc` job, `macos-15`) - the device-
 dependent tests gracefully skip there (GitHub's own hosted runners don't
 currently expose hardware-raytracing-capable Metal), so full local
 verification on real Apple Silicon hardware remains the authoritative

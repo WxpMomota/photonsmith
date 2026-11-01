@@ -35,9 +35,18 @@ QString importScript() {
 	return QString();
 }
 
+// On a Mac, picking Blender in a file dialog gives the Blender.app folder; the program is inside it.
+QString blenderProgram(const QString &picked) {
+	if (picked.endsWith(QStringLiteral(".app"), Qt::CaseInsensitive)) {
+		const QString inside = picked + QStringLiteral("/Contents/MacOS/Blender");
+		if (QFileInfo::exists(inside)) return inside;
+	}
+	return picked;
+}
+
 // Blender: where the user last pointed to, the PATH, the installer's and Steam's places.
 QString findBlender() {
-	const QString saved = QSettings(settings_keys::kOrg, settings_keys::kApp).value(kBlenderPathKey).toString();
+	const QString saved = blenderProgram(QSettings(settings_keys::kOrg, settings_keys::kApp).value(kBlenderPathKey).toString());
 	if (!saved.isEmpty() && QFileInfo::exists(saved)) return saved;
 	const QString onPath = QStandardPaths::findExecutable(QStringLiteral("blender"));
 	if (!onPath.isEmpty()) return onPath;
@@ -47,6 +56,10 @@ QString findBlender() {
 	for (const QString &v : versions) candidates << foundation.filePath(v + "/blender.exe");
 	candidates << QStringLiteral("C:/Program Files (x86)/Steam/steamapps/common/Blender/blender.exe") << QStringLiteral("C:/Program Files/Steam/steamapps/common/Blender/blender.exe")
 			   << QStringLiteral("/Applications/Blender.app/Contents/MacOS/Blender") << QDir::homePath() + QStringLiteral("/Applications/Blender.app/Contents/MacOS/Blender");
+	// (a version in the name, "Blender 4.2.app", when several are installed: the newest by name first)
+	for (const QString &root : {QStringLiteral("/Applications"), QDir::homePath() + QStringLiteral("/Applications")})
+		for (const QString &a : QDir(root).entryList({QStringLiteral("Blender*.app")}, QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name | QDir::Reversed))
+			candidates << root + "/" + a + "/Contents/MacOS/Blender";
 	for (const QString &c : candidates)
 		if (QFileInfo::exists(c)) return c;
 	return QString();
@@ -70,7 +83,7 @@ void MainWindow::importBlendFile(const QString &blend, const std::function<void(
 	QString blender = findBlender();
 	if (blender.isEmpty()) {
 		QMessageBox::information(this, tr("Import Blender Scene"), tr("Importing needs Blender, which was not found. Please show where it is (blender.exe, or Blender in Blender.app)."));
-		blender = QFileDialog::getOpenFileName(this, tr("Where is Blender?"));
+		blender = blenderProgram(QFileDialog::getOpenFileName(this, tr("Where is Blender?")));
 		if (blender.isEmpty()) {
 			if (done) done(QString());
 			return;

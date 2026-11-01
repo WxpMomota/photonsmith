@@ -117,15 +117,15 @@ jobs:
   unit-tests-macos:
     # The same portable test target as the Windows job above, on Apple silicon: it builds and passes there (about 4,260 tests; ~20 s without the
     # films, but the whole-film sweeps take ~390 s of a ~410 s run on Windows, and much longer here at -O0) and so catches a macOS-only break - a header that only compiles with MSVC, a path assumption, an Apple clang diagnostic - that the
-    # Windows job cannot. Same two executables, same cwd rule (the repo root, so pbrt_scenes/ resolves). Pinned to macos-14 like metal-poc.
-    runs-on: macos-14
+    # Windows job cannot. Same two executables, same cwd rule (the repo root, so pbrt_scenes/ resolves). Pinned to macos-15 like metal-poc (macos-14 is retired on 2026-11-02, actions/runner-images#13518).
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
-          key: unit-tests-macos-14
+          key: unit-tests-macos-15
           max-size: 500M
 
       - name: Ensure Ninja
@@ -174,9 +174,9 @@ jobs:
     # sibling above already learned this lesson the hard way once
     # (windows-latest silently moving to a VS version whose CMake
     # generator string changed, see its own "Configure (CMake)" step
-    # comment); macos-14 is Apple silicon (M1-class), matching
+    # comment); macos-15 is Apple silicon (M1-class), matching
     # docs/history/METAL_GPU_FEASIBILITY.md's own target platform.
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
@@ -186,7 +186,7 @@ jobs:
       - name: Set up ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
-          key: metal-poc-macos-14
+          key: metal-poc-macos-15
           max-size: 500M
 
       - name: Ensure Ninja
@@ -269,7 +269,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             qt_version: '6.11.1'
             qt_arch: ""
           # Qt 6.11.1 on Windows lives in a repository layout (qt6_6111/qt6_6111_msvc2022_64) that the current aqtinstall cannot resolve yet
