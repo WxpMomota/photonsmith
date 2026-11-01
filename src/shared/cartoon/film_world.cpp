@@ -1638,8 +1638,9 @@ std::string DataFilm::plantsAt(const std::string &header, double t, double nt) c
 	film_subjects::cameraOf(header, eye, target, fov);
 	const std::string film = spec.key.empty() ? std::string("film") : spec.key;
 	std::string out;
-	for (std::size_t i = 0; i < spec.forests.size() && i < spec.planted.size(); ++i) out += forest::text(film, spec.planted[i], spec.forests[i], nt, t, eye, spec.gusts);
-	if (grows) out += cover::text(film, *terrain::fieldOf(spec.terrain), spec.undergrowth, eye, target, fov, nt, weatherAt(t).snow, spec.gusts, spec.planted);
+	forest::Written trees;
+	for (std::size_t i = 0; i < spec.forests.size() && i < spec.planted.size(); ++i) out += forest::text(film, spec.planted[i], spec.forests[i], nt, t, eye, spec.gusts, weatherAt(t).wet, trees);
+	if (grows) out += cover::text(film, *terrain::fieldOf(spec.terrain), spec.undergrowth, eye, target, fov, nt, weatherAt(t).snow, spec.gusts, spec.planted, weatherAt(t).wet);
 	return out;
 }
 // The film's swarms at t (film_swarm.h), their discs turned to the camera of `header`.

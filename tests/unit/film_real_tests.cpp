@@ -391,3 +391,101 @@ TEST(FilmReal, TheAnimalsClipsMoveTheWholeBody) {
 	EXPECT_GE(trackOf("idle", "chest"), 1) << "it breathes";
 	EXPECT_GE(trackOf("idle", "pelvis"), 1) << "and eases its weight";
 }
+
+// A leaf is waxy, so it shines, and what it gives back does not go up with the wax: the green underneath loses a share as the wax gains one. Rain makes more of it, smoother.
+TEST(FilmReal, LeavesAreWaxyAndRainMakesThemShine) {
+	namespace d = forest::detail;
+	const std::string dry = d::leafMaterial("photonsmith-test-wax", "wax_test", "broadleaf", 0, "summer", std::string(), 0.0, 0.0);
+	const std::string wet = d::leafMaterial("photonsmith-test-wax", "wax_test", "broadleaf", 0, "summer", std::string(), 0.0, 1.0);
+	EXPECT_NE(dry.find("\"coateddiffuse\""), std::string::npos);
+	EXPECT_NE(dry.find("Material \"mix\""), std::string::npos);
+	EXPECT_NE(dry.find("\"float amount\" [ 0.400 ]"), std::string::npos);
+	EXPECT_NE(wet.find("\"float amount\" [ 0.650 ]"), std::string::npos);
+	EXPECT_NE(dry.find("\"float roughness\" [ 0.320 ]"), std::string::npos);
+	EXPECT_NE(wet.find("\"float roughness\" [ 0.100 ]"), std::string::npos);
+}
+
+// A leaf is not flat: it folds along its midrib, each its own way, and keeps its size and its place in the mesh (a far tree's and a season's leaves are found by their six points).
+TEST(FilmReal, LeavesFoldAlongTheirMidribs) {
+	Mesh m;
+	for (int k = 0; k < 40; ++k) cartoon::nature::addLeaf(m, V3{static_cast<double>(k), 0.0, 0.0}, V3{0.0, 0.0, 1.0}, V3{0.0, 1.0, 0.0}, 0.2, 0.1);
+	const Mesh flat = m;
+	forest::detail::shapeLeaves(m, 0, 11);
+	ASSERT_EQ(m.verts.size(), flat.verts.size());
+	std::set<int> folds;
+	for (int k = 0; k < 40; ++k) {
+		const std::size_t f = static_cast<std::size_t>(k) * 6;
+		EXPECT_EQ(m.verts[f].x, flat.verts[f].x) << "the stalk stays where it grew";
+		const double lift = m.verts[f + 1].y - flat.verts[f + 1].y, other = m.verts[f + 5].y - flat.verts[f + 5].y;
+		EXPECT_GT(lift + other, 0.0) << "both sides rise from the midrib";
+		EXPECT_LT(m.verts[f + 3].y, flat.verts[f + 3].y + 1e-9) << "the tip hangs";
+		EXPECT_NEAR(length(m.normals[f + 1]), 1.0, 1e-9);
+		EXPECT_GT(std::abs(m.normals[f + 1].x - m.normals[f + 5].x), 0.01) << "the two halves face apart";
+		folds.insert(static_cast<int>(lift * 1e4));
+	}
+	EXPECT_GT(folds.size(), 20u) << "each its own";
+}
+
+// Up close a tree's leaves are tufts of smaller leaves, as much leaf as there was, every one in some tuft and near it, and a conifer's dark core stays out of them.
+TEST(FilmReal, ACloseTreesLeavesAreTufts) {
+	namespace d = forest::detail;
+	Mesh m;
+	m.verts = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
+	m.normals = {{0, 0, 1}, {0, 0, 1}, {0, 0, 1}};
+	m.uvs = {{0, 0}, {0, 0}, {0, 0}};
+	m.tris = {{0, 1, 2}};
+	for (int k = 0; k < 60; ++k) cartoon::nature::addLeaf(m, V3{k < 30 ? -5.0 : 5.0, 0.1 * k, 0.0}, V3{0.0, 0.0, 1.0}, V3{0.0, 1.0, 0.0}, 0.2, 0.1);
+	m.uvs.resize(m.verts.size());
+	const std::vector<V3> at = {{-5.0, 1.0, 0.0}, {5.0, 4.0, 0.0}};
+	const std::vector<Mesh> cut = d::cutIntoTufts(m, 3, 1, at);
+	ASSERT_EQ(cut.size(), 3u);
+	EXPECT_EQ(cut[2].tris.size(), 1u) << "the core, as it was";
+	EXPECT_EQ(cut[0].tris.size(), 30u * 3u * 4u);
+	EXPECT_EQ(cut[1].tris.size(), 30u * 3u * 4u);
+	for (const V3 &p : cut[0].verts) EXPECT_LT(p.x, -4.0);
+	for (const V3 &p : cut[1].verts) EXPECT_GT(p.x, 4.0);
+	const std::vector<V3> &oak = d::tuftsOf("broadleaf", 0);
+	EXPECT_GE(oak.size(), 6u);
+	EXPECT_LE(static_cast<int>(oak.size()), d::kMostTufts);
+	EXPECT_TRUE(d::tuftsOf("cactus", 0).empty());
+}
+
+// A tree close to the camera moves in parts, and further off it is one object; its tufts turn each their own way and quicker than the trunk leans.
+TEST(FilmReal, ACloseTreeMovesInParts) {
+	forest::Forest f;
+	forest::Tree tree;
+	tree.species = "broadleaf", tree.at = {0.0, 0.0, -10.0}, tree.scale = 1.0, tree.turn = 30.0;
+	const std::vector<forest::Tree> trees = {tree};
+	const auto frame = [&](double t, const V3 &eye) { return forest::text("photonsmith-test-tufts", trees, f, t, t, eye); };
+	const std::string close = frame(1.0, {0.0, 2.0, 0.0}), later = frame(1.04, {0.0, 2.0, 0.0}), far = frame(1.0, {0.0, 2.0, 60.0});
+	EXPECT_NE(close.find("ObjectInstance \"forest_broadleaf_0_summer_near_close_t0\""), std::string::npos);
+	EXPECT_NE(close.find("_cut\""), std::string::npos) << "the leaves have their own outline";
+	EXPECT_EQ(far.find("_close"), std::string::npos) << "and not out here";
+	EXPECT_NE(far.find("ObjectInstance \"forest_broadleaf_0_summer_near\""), std::string::npos);
+	const auto placing = [](const std::string &text, const std::string &object) {
+		const std::size_t at = text.find("ObjectInstance \"" + object + "\"");
+		const std::size_t from = at == std::string::npos ? at : text.rfind("ConcatTransform", at);
+		return from == std::string::npos ? std::string() : text.substr(from, at - from);
+	};
+	const std::string tuft = "forest_broadleaf_0_summer_near_close_t3";
+	ASSERT_FALSE(placing(close, tuft).empty());
+	EXPECT_NE(placing(close, tuft), placing(later, tuft)) << "a twenty-fifth of a second on, a tuft has moved";
+	EXPECT_NE(placing(close, tuft), placing(close, "forest_broadleaf_0_summer_near_close_t4")) << "and not as its neighbour has";
+	std::size_t tufts = 0;
+	for (std::size_t p = close.find("ObjectInstance \"forest_broadleaf_0_summer_near_close_t"); p != std::string::npos; p = close.find("ObjectInstance \"forest_broadleaf_0_summer_near_close_t", p + 1)) ++tufts;
+	EXPECT_GE(tufts, 6u);
+}
+
+// A forest's objects are said once a frame however many forests share them.
+TEST(FilmReal, ForestsShareTheirObjects) {
+	forest::Forest f;
+	forest::Tree tree;
+	tree.species = "birch", tree.at = {0.0, 0.0, -10.0};
+	const std::vector<forest::Tree> trees = {tree};
+	forest::Written written;
+	const std::string one = forest::text("photonsmith-test-shared", trees, f, 1.0, 1.0, {0.0, 2.0, 0.0}, {}, 0.0, written);
+	const std::string two = forest::text("photonsmith-test-shared", trees, f, 1.0, 1.0, {0.0, 2.0, 0.0}, {}, 0.0, written);
+	EXPECT_NE(one.find("ObjectBegin"), std::string::npos);
+	EXPECT_EQ(two.find("ObjectBegin"), std::string::npos);
+	EXPECT_NE(two.find("_close_t0\""), std::string::npos) << "the second still places its tufts";
+}

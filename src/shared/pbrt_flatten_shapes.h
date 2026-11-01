@@ -402,6 +402,11 @@ inline void attachShapeAlphaMask(const pbrt_scene::Scene &scene, FlatScene &out,
 						 "processed will actually be used");
 				}
 				mat.alphaTextureFilename = filename;
+				// A hit on a Mix is one of its two materials, chosen before the mask is read (optix_anyhit_shadow.h): the mask is theirs too.
+
+				if (mat.kind == MaterialKind::Mix)
+					for (const int sub : {mat.mixMaterialA, mat.mixMaterialB})
+						out.materials[static_cast<std::size_t>(sub)].alphaTextureFilename = filename;
 				warnIfImagemapOptionsIgnored(*tex, "alpha", warn);
 			}
 		}

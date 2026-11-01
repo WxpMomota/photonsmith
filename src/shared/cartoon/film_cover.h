@@ -122,7 +122,7 @@ inline Vec3 colourFor(const Growth &g, int dry, int bright) {
 }
 // A picture of blades in `colour`: a column each, dark at the root, where they shade each other, and paler at the tip. Light through a blade is yellower, and with what it reflects
 // never more than came in.
-inline std::string bladeMaterial(const std::string &film, const std::string &name, Vec3 colour, bool leaves) {
+inline std::string bladeMaterial(const std::string &film, const std::string &name, Vec3 colour, bool leaves, double wet) {
 	constexpr int W = 128, H = 32;
 	const auto paint = [&](std::vector<float> &rgb, bool through) {
 		for (int y = 0; y < H; ++y)
@@ -132,25 +132,26 @@ inline std::string bladeMaterial(const std::string &film, const std::string &nam
 				const Vec3 own = lerp(colour, Vec3{colour.y * 1.05, colour.y, colour.z * 0.7}, 0.5 * hash01(col, 61)) * (0.7 + 0.6 * hash01(col, 62));
 				Vec3 c = leaves ? lerp(own, Vec3{0.3, 0.17, 0.07} * (0.5 + 0.9 * hash01(col, 63)), 0.7) : own * (0.45 + 0.75 * smoothstep(0.0, 0.8, v));
 				const Vec3 reflected = c;
-				if (through) c = Vec3{c.x * 1.1 + 0.03, c.y * 1.2 + 0.03, c.z * 0.8};
+				if (through) c = Vec3{c.x * 1.1 + 0.03, c.y * 1.2 + 0.03, c.z * 0.8} * (leaves ? 1.0 : 1.0 / (1.0 - forest::detail::kWax));
 				const double most = through ? 0.9 - std::max({reflected.x, reflected.y, reflected.z}) : 0.9;
 				float *px = &rgb[(static_cast<std::size_t>(y) * W + x) * 3];
 				px[0] = static_cast<float>(std::min(c.x, most)), px[1] = static_cast<float>(std::min(c.y, most)), px[2] = static_cast<float>(std::min(c.z, most));
 			}
 	};
-	const std::string r = name + "_r", t = name + "_t";
+	const std::string r = name + "_r2", t = name + "_t2";
 	const std::string reflects = film_sky::picture(film, r, W, H, [&](std::vector<float> &rgb) { paint(rgb, false); });
 	const std::string passes = film_sky::picture(film, t, W, H, [&](std::vector<float> &rgb) { paint(rgb, true); });
+	const std::string matte = "\"texture reflectance\" \"" + r + "\" \"texture transmittance\" \"" + t + "\"";
 	return "Texture \"" + r + "\" \"spectrum\" \"imagemap\" \"string wrap\" \"clamp\" \"string filename\" [ \"" + reflects + "\" ]\n  Texture \"" + t +
-		   "\" \"spectrum\" \"imagemap\" \"string wrap\" \"clamp\" \"string filename\" [ \"" + passes + "\" ]\n  Material \"diffusetransmission\" \"texture reflectance\" \"" + r +
-		   "\" \"texture transmittance\" \"" + t + "\"";
+		   "\" \"spectrum\" \"imagemap\" \"string wrap\" \"clamp\" \"string filename\" [ \"" + passes + "\" ]\n  " +
+		   (leaves ? "Material \"diffusetransmission\" " + matte : forest::detail::waxyMaterial(name, matte, "\"texture reflectance\" \"" + r + "\"", wet));   // (a dead leaf has lost its wax)
 }
 }  // namespace detail
 
 // The film's cover seen from `eye` looking at `target` (story space) with `fovDeg`, at t: the objects it uses and a placement for each square in view. `trees`: the film's forests,
-// under which it is litter and ferns. `snow` how much lies on the land (0 .. 1): it goes under.
+// under which it is litter and ferns. `snow` how much lies on the land (0 .. 1): it goes under. `wet`, 0 .. 1: rain on the blades.
 inline std::string text(const std::string &film, const terrain::Field &field, const Cover &c, Vec3 eye, Vec3 target, double fovDeg, double t, double snow, const dressing::Gusts &gusts,
-						const std::vector<std::vector<forest::Tree>> &trees) {
+						const std::vector<std::vector<forest::Tree>> &trees, double wet = 0.0) {
 	const terrain::Spec &s = field.spec;
 	const Growth g = growthOf(s);
 	if (!c.on || g.density <= 0.0 || snow > 0.5) return std::string();
@@ -207,7 +208,7 @@ inline std::string text(const std::string &film, const terrain::Field &field, co
 						return under ? detail::litterMesh(ring.cell, static_cast<int>(ring.blades * 0.35 * keep), std::max(0.09, 0.03 * ring.cell), 1 + shape)
 									 : detail::patchMesh(ring.cell, static_cast<int>(ring.blades * keep * g.density), ring.joints, ring.width, g.tall, 5 + shape + 11 * static_cast<int>(r));
 					});
-					objects += nature::objectBegin(name) + "  AttributeBegin\n  " + detail::bladeMaterial(film, name, detail::colourFor(g, dry, bright), under) + "\n" + film_cache::plyShape(file) + "  AttributeEnd\n" + nature::objectEnd();
+					objects += nature::objectBegin(name) + "  AttributeBegin\n  " + detail::bladeMaterial(film, name, detail::colourFor(g, dry, bright), under, wet) + "\n" + film_cache::plyShape(file) + "  AttributeEnd\n" + nature::objectEnd();
 				}
 				// tilted to lie on the ground, and leaning with the wind
 				const Mat4 tilt = {1, 0, 0, 0, n.x / n.y, 1, -n.z / n.y, 0, 0, 0, 1, 0, 0, 0, 0, 1};

@@ -134,6 +134,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 			continue;
 		}
 		n = detail::lineId(s, here = sources.back().where, where, ++sources.back().n);   // (a library file's lines numbered with their file: detail::lineWhere)
+		if (sources.back().n == 1 && line.rfind("\xEF\xBB\xBF", 0) == 0) line.erase(0, 3);   // (the mark Notepad and PowerShell put at the start of a UTF-8 file)
 		line = detail::trim(detail::withoutComment(line));
 		if (line.empty()) continue;
 		const std::vector<std::string> w = detail::words(line);

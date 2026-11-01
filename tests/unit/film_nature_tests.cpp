@@ -1350,3 +1350,9 @@ TEST(FilmPlants, SeasonsChainSummerToAutumnThenWinter) {
 	ff::DataFilm bad;
 	EXPECT_NE(loadNature("seasons_chain_bad", "scene s.pbrt\nlength 30\nforest birch 10 season summer to autumn from 2 to 10 then winter from 8 to 20\n", bad).find("`... then C"), std::string::npos);
 }
+
+// A film saved by Notepad or PowerShell starts with the mark of UTF-8: not a word of the film.
+TEST(FilmFile, AFilmMayStartWithTheMarkOfUtf8) {
+	ff::DataFilm film;
+	EXPECT_EQ(loadNature("utf8mark", "\xEF\xBB\xBFscene s.pbrt\nlength 4\n", film), "");
+}

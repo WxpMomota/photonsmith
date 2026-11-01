@@ -262,3 +262,26 @@ TEST_F(AlphaCutoutTempTree, AHalfAlphaMaskKeepsAboutHalfTheRaysInsteadOfAllOrNon
 	EXPECT_LT(hits, n * 0.60);
 }
 
+// A hit on a Mix is one of its two materials, picked before the mask is read: a mask on the shape has to be on both, or nothing is cut.
+TEST_F(AlphaCutoutTempTree, AMaskOnAMixIsOnBothItsMaterials) {
+	write("scene.pbrt",
+		  "Texture \"mask\" \"float\" \"imagemap\" \"string filename\" [ \"mask.bmp\" ]\n"
+		  "MakeNamedMaterial \"a\" \"string type\" \"diffuse\"\n"
+		  "MakeNamedMaterial \"b\" \"string type\" \"coateddiffuse\"\n"
+		  "Material \"mix\" \"string materials\" [ \"a\" \"b\" ] \"float amount\" [ 0.5 ]\n"
+		  "Shape \"trianglemesh\" \"texture alpha\" [ \"mask\" ]\n"
+		  "  \"integer indices\" [ 0 1 2  0 2 3 ]\n"
+		  "  \"point3 P\" [ 0 0 0  1 0 0  1 1 0  0 1 0 ]\n");
+	write("mask.bmp", solidBmp1x1(255, 255, 255));
+	const pbrt_load::LoadResult loaded = pbrt_load::loadFile(path("scene.pbrt"));
+	ASSERT_TRUE(loaded.ok) << loaded.error;
+	SceneData scene;
+	pbrt_gpu::build(loaded.scene, scene);
+	int masked = 0, mixes = 0;
+	for (const auto &m : scene.materials) {
+		if (m.type == MaterialType::Mix) ++mixes;
+		else if (m.alphaMaskTexIdx >= 0) ++masked;
+	}
+	EXPECT_EQ(mixes, 1);
+	EXPECT_EQ(masked, 2);
+}
