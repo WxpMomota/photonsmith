@@ -595,6 +595,12 @@ struct Curve {
 	// "width1" each independently override it.
 	double width0 = 1.0, width1 = 1.0;
 	std::string curveType = "flat";   // "flat" | "cylinder" | "ribbon"
+	// The tube the GPU backends dice each segment into: rings along it and sides round it (our extension: "integer dicelength", "integer diceradial"). 10 x 8 suits a hair seen close;
+	// a strand thinner than a pixel looks the same at a tenth of that, and fur by the hundred thousand is mostly these patches: their memory and the time to build their BVH each frame.
+	int diceLength = 10, diceRadial = 8;
+	// ("bool dicetriangles", also ours) Diced into triangles, which the card's ray tracing hardware tests, not bilinear patches, which a program of ours tests: much faster for a coat of
+	// fine strands. Flat-shaded, and no fibre direction reaches a hair material, so for strands in a plain material.
+	bool diceTriangles = false;
 	// Ribbon only - one shading normal per segment ENDPOINT (nSegments+1
 	// total, world space, unit length, transformed via transformNormal not
 	// transformPoint) - see flatten()'s own ribbon-normal validation, which

@@ -930,6 +930,9 @@ inline bool flattenCurveShape(const pbrt_scene::Scene &scene, FlatScene &out, co
 
 	Curve c;
 	c.nSegments = nSegments;
+	c.diceLength = std::clamp(shape.params.getInt("dicelength", c.diceLength), 1, 32);
+	c.diceRadial = std::clamp(shape.params.getInt("diceradial", c.diceRadial), 3, 16);   // (three sides are the fewest that close a tube)
+	c.diceTriangles = shape.params.getBool("dicetriangles", false);
 	c.cp.resize(objCp.size());
 	for (std::size_t i = 0; i < objCp.size() / 3; ++i) {
 		double world[3];

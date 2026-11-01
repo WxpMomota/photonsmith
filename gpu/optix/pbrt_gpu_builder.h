@@ -1054,14 +1054,15 @@ inline void addCurves(BuildCtx &c) {
 	// same curve_tessellate::tessellate() call build_curve_fibers_scene_gpu()
 	// (scene_builder.cpp) already uses for its native (non-pbrt) curve demo,
 	// with that function's own density constants (n_length=10, n_radial=8) as
-	// a reasonable default. Curve `type` (flat/cylinder/ribbon) is NOT
+	// a reasonable default ("integer dicelength"/"diceradial" on the curve change them:
+	// pbrt_flatten::Curve). Curve `type` (flat/cylinder/ribbon) is NOT
 	// distinguished here - the tessellator only emits a round tube regardless
 	// - a real, documented CPU/GPU visual divergence (see docs/
 	// PBRT_SUPPORT.md), not an oversight; pbrt-v4's own GPU dicing has the
 	// identical divergence for the identical reason.
 	for (const pbrt_flatten::Curve &cv : scene.curves) {
 		const int matIdx = materialIndex(cv.material, cv.areaLight);
-		const int n_length = 10, n_radial = 8;
+		const int n_length = cv.diceLength, n_radial = cv.diceRadial;
 		std::vector<curve_tessellate::Quad> quads;
 		for (int seg = 0; seg < cv.nSegments; ++seg) {
 			const std::size_t base = static_cast<std::size_t>(seg) * 4;

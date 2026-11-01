@@ -69,7 +69,8 @@ inline std::shared_ptr<const StrandSet> strandsOf(const std::string &path) {
 }
 
 // The strands as pbrt curves, in the mirrored space a placed PLY is in (x negated: film_cache::placement). With `poses`, each follows the bones its root is weighted to. `lod` as a
-// model's: at 2, one strand in four, twice as wide. Strands are drawn in a material of their group's colour, matte.
+// model's: at 2, one strand in four, twice as wide. Strands are drawn in a material of their group's colour, matte, each a tube of nine patches on the GPU, not the eighty a hair close to
+// the camera takes: a groomed coat is hundreds of thousands of strands thinner than a pixel, and at eighty a strand they filled the graphics card.
 inline std::string strandsText(const StrandSet &set, int lod, const Weights *weights = nullptr, const std::vector<Mat4> *poses = nullptr) {
 	const std::size_t step = static_cast<std::size_t>(std::max(1, lod * lod));
 	const double wide = std::max(1, lod);
@@ -95,7 +96,7 @@ inline std::string strandsText(const StrandSet &set, int lod, const Weights *wei
 		for (std::size_t s = 0; s < n; s += step) {
 			const float *f = g.points.data() + s * 12;
 			const Vec3 a = bent(root + s, {f[0], f[1], f[2]}), b = bent(root + s, {f[3], f[4], f[5]}), c = bent(root + s, {f[6], f[7], f[8]}), d = bent(root + s, {f[9], f[10], f[11]});
-			std::snprintf(buf, sizeof buf, "  Shape \"curve\" \"string type\" \"cylinder\" \"float width0\" %.5f \"float width1\" %.5f \"point3 P\" [ %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f ]\n",
+			std::snprintf(buf, sizeof buf, "  Shape \"curve\" \"string type\" \"cylinder\" \"integer dicelength\" 3 \"integer diceradial\" 3 \"bool dicetriangles\" true \"float width0\" %.5f \"float width1\" %.5f \"point3 P\" [ %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f ]\n",
 						  g.width0 * wide, g.width1 * wide, -a.x, a.y, a.z, -b.x, b.y, b.z, -c.x, c.y, c.z, -d.x, d.y, d.z);
 			out += buf;
 		}

@@ -167,10 +167,10 @@ inline size_t tessellateForBackend(pbrt_flatten::FlatScene& scene, const Tessell
         }
     }
 
-    // Curve: every Bezier segment becomes a tapered 8-sided tube (the same dicing density OptiX
+    // Curve: every Bezier segment becomes a tapered tube, 8-sided unless the curve says otherwise (the same dicing density OptiX
     // uses); width interpolates across the WHOLE curve, as in pbrt-v4. Flat-shaded.
     for (const pbrt_flatten::Curve& cv : scene.curves) {
-        if (!caps.curves) break;
+        if (!caps.curves && !cv.diceTriangles) continue;
         if (isInterface(cv.material)) continue;
         std::vector<curve_tessellate::Quad> quads;
         for (int seg = 0; seg < cv.nSegments; ++seg) {
@@ -180,7 +180,7 @@ inline size_t tessellateForBackend(pbrt_flatten::FlatScene& scene, const Tessell
             const double t0 = (double)seg / cv.nSegments, t1 = (double)(seg + 1) / cv.nSegments;
             quads.clear();
             curve_tessellate::tessellate(cp, 0.0f, 1.0f, (float)(cv.width0 + (cv.width1 - cv.width0) * t0),
-                                         (float)(cv.width0 + (cv.width1 - cv.width0) * t1), 10, 8, quads);
+                                         (float)(cv.width0 + (cv.width1 - cv.width0) * t1), cv.diceLength, cv.diceRadial, quads);
             for (const curve_tessellate::Quad& q : quads) {
                 const float* c4[4] = {q.p00, q.p10, q.p01, q.p11};
                 const int tris[2][3] = {{0, 1, 3}, {0, 3, 2}};
@@ -210,6 +210,7 @@ inline size_t tessellateForBackend(pbrt_flatten::FlatScene& scene, const Tessell
     if (caps.cones) scene.cones.clear();
     if (caps.paraboloids) scene.paraboloids.clear();
     if (caps.curves) scene.curves.clear();
+    else scene.curves.erase(std::remove_if(scene.curves.begin(), scene.curves.end(), [](const pbrt_flatten::Curve& c) { return c.diceTriangles; }), scene.curves.end());
     if (caps.texturedQuadrics) { scene.disks = std::move(keptDisks); scene.cylinders = std::move(keptCylinders); scene.spheres = std::move(keptSpheres); }
     return out.size();
 }

@@ -713,6 +713,23 @@ TEST(FlattenTest, CurveParamsAreReadWithPbrtDefaults) {
 	EXPECT_DOUBLE_EQ(s.curves[0].cp[9], 3.0);
 }
 
+TEST(FlattenTest, CurveDicingIsItsOwnChoiceWithinLimits) {
+	const FlatScene plain = flattenSource(kSingleSegmentCurve);
+	ASSERT_EQ(plain.curves.size(), 1u);
+	EXPECT_EQ(plain.curves[0].diceLength, 10);
+	EXPECT_EQ(plain.curves[0].diceRadial, 8);
+	EXPECT_FALSE(plain.curves[0].diceTriangles);
+	const FlatScene fine = flattenSource("Shape \"curve\" \"integer dicelength\" 2 \"integer diceradial\" 3 \"bool dicetriangles\" true\n  \"point3 P\" [ 0 0 0  1 1 0  2 1 0  3 0 0 ]\n");
+	ASSERT_EQ(fine.curves.size(), 1u);
+	EXPECT_EQ(fine.curves[0].diceLength, 2);
+	EXPECT_EQ(fine.curves[0].diceRadial, 3);
+	EXPECT_TRUE(fine.curves[0].diceTriangles);
+	const FlatScene wild = flattenSource("Shape \"curve\" \"integer dicelength\" 0 \"integer diceradial\" 1\n  \"point3 P\" [ 0 0 0  1 1 0  2 1 0  3 0 0 ]\n");
+	ASSERT_EQ(wild.curves.size(), 1u);
+	EXPECT_EQ(wild.curves[0].diceLength, 1) << "at least one ring";
+	EXPECT_EQ(wild.curves[0].diceRadial, 3) << "three sides close a tube";
+}
+
 TEST(FlattenTest, CurveWidthParamsAreReadWhenGiven) {
 	const FlatScene s = flattenSource(
 		"Shape \"curve\" \"string type\" [ \"cylinder\" ] "
