@@ -53,7 +53,7 @@ inline std::string fireLine(Spec &s, const std::string &verb, const std::string 
 	fire::Wildfire wf;
 	std::size_t i = 1;
 	double a = 0.0, b = 0.0, c = 0.0, d = 0.0;
-	const std::string usage = verb == "fire" ? "`fire at X Y Z [size S] [during T0 T1] [smoke off] [seed N]`"
+	const std::string usage = verb == "fire" ? "`fire at X Y Z [size S] [during T0 T1] [smoke off] [light off] [sparks off] [sound off] [seed N] [detail N] [bright B] [sizes T S T S ...] [leans T L T L ...]`"
 							  : verb == "lava" ? "`lava from X Z [width W] [speed S] [start T]` (down the land from a vent: it needs a `terrain`)"
 							  : verb == "volcano" ? "`volcano at X Z [height H] [radius R] [erupting T0 T1] [column H] [wind DEGREES] [lightning N] [ashfall A] [flow T [toward DEGREES]]` (raised in the land: it needs a `terrain`)"
 												  : "`wildfire in X0 Z0 X1 Z1 [during T0 T1] [wind DEGREES]`";
@@ -79,9 +79,29 @@ inline std::string fireLine(Spec &s, const std::string &verb, const std::string 
 		} else if (verb == "fire" && t[i] == "smoke" && i + 1 < t.size() && t[i + 1] == "off") {
 			fi.smoke = false;
 			i += 2;
+		} else if (verb == "fire" && t[i] == "light" && i + 1 < t.size() && t[i + 1] == "off") {
+			fi.lit = false;
+			i += 2;
+		} else if (verb == "fire" && t[i] == "sparks" && i + 1 < t.size() && t[i + 1] == "off") {
+			fi.sparks = false;
+			i += 2;
+		} else if (verb == "fire" && t[i] == "sound" && i + 1 < t.size() && t[i + 1] == "off") {
+			fi.sound = false;
+			i += 2;
+		} else if (verb == "fire" && (t[i] == "sizes" || t[i] == "leans")) {
+			const bool tall = t[i] == "sizes";
+			std::vector<std::pair<double, double>> &keys = tall ? fi.sizes : fi.leans;
+			for (i += 1; i + 1 < t.size() && number(t[i], a) && number(t[i + 1], b); i += 2) {
+				if (!keys.empty() && a <= keys.back().first) return fail("a fire's keys go forward in time");
+				if (tall && (b < 0.05 || b > 100.0)) return fail("a fire is 0.05 to 100 m tall");
+				keys.emplace_back(a, b);
+			}
+			if (keys.empty()) return fail(usage);
 		} else if (i + 1 < t.size() && number(t[i + 1], a)) {
 			if (verb == "fire" && t[i] == "size" && a > 0.05 && a <= 100.0) fi.size = a;
 			else if (verb == "fire" && t[i] == "seed") fi.seed = detail::seedOf(a);
+			else if (verb == "fire" && t[i] == "detail" && a >= 8.0 && a <= 64.0) fi.detail = static_cast<int>(a);
+			else if (verb == "fire" && t[i] == "bright" && a > 0.0 && a <= 100.0) fi.bright = a;
 			else if (verb == "lava" && t[i] == "width" && a > 0.0) la.width = a;
 			else if (verb == "lava" && t[i] == "speed" && a > 0.0) la.speed = a;
 			else if (verb == "lava" && t[i] == "start") la.t0 = a;

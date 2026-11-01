@@ -560,9 +560,10 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 		for (std::size_t i = 0; i < spec.fires.size(); ++i) {
 			const fire::Fire &f = spec.fires[i];
 			if (t < f.t0 || t > f.t1) continue;
-			out += fire::flameText("flame_" + std::to_string(i), f.at, f.size, nt, f.seed);
-			const Vec3 drift = spec.wind.on ? spec.wind.dir() * (4.0 * f.size * std::min(1.5, spec.wind.speed / 6.0)) : Vec3{0.0, 0.0, 0.0};   // (bent away by the wind)
-			if (f.smoke) out += fire::smokeText("smoke_" + std::to_string(i), f.at + Vec3{0.0, 1.25 * f.size, 0.0}, 2.5 * f.size, 8.0 * f.size, nt, f.seed, 0.6, drift);
+			const double size = f.sizeAt(t);
+			out += fire::flameText("flame_" + std::to_string(i), f.at, size, nt, f.seed, f.detail, f.leanAt(t), f.bright, f.lit);
+			const Vec3 drift = spec.wind.on ? spec.wind.dir() * (4.0 * size * std::min(1.5, spec.wind.speed / 6.0)) : Vec3{0.0, 0.0, 0.0};   // (bent away by the wind)
+			if (f.smoke) out += fire::smokeText("smoke_" + std::to_string(i), f.at + Vec3{0.0, 1.25 * size, 0.0}, 2.5 * size, 8.0 * size, nt, f.seed, 0.6, drift);
 		}
 		const double lavaGlow = 3.0 / std::pow(std::max(1.0, exposureAt(t)), 0.85);   // (exposed for the lava as the night camera opens up: orange, not white)
 		for (const fire::Lava &l : spec.lavas) out += fire::lavaText(film, l, nt, lavaGlow);
@@ -1157,6 +1158,7 @@ void DataFilm::soundscape(audio::Mix &m) const {
 	// fires: a low roar and the crackle; a wildfire's roar over its land; lava's hiss and its bubbles; a volcano's rumble
 	for (std::size_t i = 0; i < spec.fires.size(); ++i) {
 		const fire::Fire &f = spec.fires[i];
+		if (!f.sound) continue;
 		const double g = 0.12 * f.size;
 		ss::lay(m, ears, f.t0, f.t1, 0.25, [&f](double) { return f.at + Vec3{0.0, 0.3 * f.size, 0.0}; }, [g](double) { return g; }, ss::roar(120.0, 700.0, 0.6, 201u + static_cast<unsigned>(i)), 4.0);
 		double t = std::max(0.0, f.t0);

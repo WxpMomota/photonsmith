@@ -216,6 +216,32 @@ TEST(FilmReal, TheRingsOfGrassLeaveNoHolesWhereTheyMeet) {
 		}
 }
 
+// A fire that lives through a story: it shrinks to nothing and roars back, leans in the wind, and can leave its light, sparks and sound to the film.
+TEST(FilmReal, AFireCanChangeOverTheFilm) {
+	namespace ff = cartoon::film_file;
+	namespace firefx = cartoon::fire;
+	ff::Spec s;
+	EXPECT_EQ(ff::fireLine(s, "fire", "fire at 1 0 -19  size 3  light off  sparks off  sound off  smoke off  detail 30  bright 2  sizes 0 6  10 0.5  20 8  leans 0 0  10 0.3"), "");
+	ASSERT_EQ(s.fires.size(), 1u);
+	const firefx::Fire &f = s.fires[0];
+	EXPECT_FALSE(f.lit);
+	EXPECT_FALSE(f.sparks);
+	EXPECT_FALSE(f.sound);
+	EXPECT_EQ(f.detail, 30);
+	EXPECT_DOUBLE_EQ(f.sizeAt(-1.0), 6.0);
+	EXPECT_DOUBLE_EQ(f.sizeAt(5.0), 3.25);
+	EXPECT_DOUBLE_EQ(f.sizeAt(99.0), 8.0);
+	EXPECT_DOUBLE_EQ(f.leanAt(5.0), 0.15);
+	const firefx::Fire plain;
+	EXPECT_DOUBLE_EQ(plain.sizeAt(3.0), plain.size) << "with no keys, its size";
+	EXPECT_NE(ff::fireLine(s, "fire", "fire at 0 0 0 sizes 5 1  2 3"), "") << "keys go forward";
+	EXPECT_NE(ff::fireLine(s, "fire", "fire at 0 0 0 sizes 1 500"), "") << "and stay a fire's size";
+	EXPECT_NE(firefx::flameText("f", {0, 0, 0}, 2.0, 1.0, 1, 10).find("LightSource"), std::string::npos);
+	const std::string dark = firefx::flameText("f", {0, 0, 0}, 2.0, 1.0, 1, 10, 0.0, 1.0, false);
+	EXPECT_EQ(dark.find("LightSource"), std::string::npos) << "its light left to the scene";
+	EXPECT_NE(dark, firefx::flameText("f", {0, 0, 0}, 2.0, 1.0, 1, 10, 0.3, 1.0, false)) << "leaning moves the flames";
+}
+
 // A coat with no pattern is not one flat colour: darker along the back, paler under the belly, the legs dark at the foot, and a herd is not all alike.
 TEST(FilmReal, ANaturalCoatIsNotOneFlatColour) {
 	namespace coats = cartoon::coats;

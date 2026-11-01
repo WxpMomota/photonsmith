@@ -991,6 +991,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 		}
 	}
 	for (const fire::Fire &f : s.fires) {   // sparks fly up from a fire
+		if (!f.sparks) continue;
 		particles::Emitter e;
 		e.kind = "sparks", e.at = f.at + Vec3{0.0, 0.3 * f.size, 0.0}, e.t0 = std::max(0.0, f.t0), e.t1 = std::min(s.length, f.t1), e.rate = 12.0 * f.size, e.speed = 1.5 * std::sqrt(f.size);
 		s.emitters.push_back(e);

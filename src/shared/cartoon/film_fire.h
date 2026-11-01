@@ -36,6 +36,20 @@ struct Fire {
 	double t0 = 0.0, t1 = 1e30;
 	bool smoke = true;
 	int seed = 1;
+	std::vector<std::pair<double, double>> sizes, leans;   // over time (seconds, value), in order: how tall it is, and how far its tips are pushed over (a share of its height, along +x)
+	int detail = 20;      // voxels across
+	double bright = 1.0;
+	bool lit = true;      // false: no light of its own (the scene has one of its own that follows it)
+	bool sparks = true, sound = true;
+	double sizeAt(double t) const { return keyed(sizes, t, size); }
+	double leanAt(double t) const { return keyed(leans, t, 0.0); }
+	static double keyed(const std::vector<std::pair<double, double>> &keys, double t, double none) {
+		if (keys.empty()) return none;
+		if (t <= keys.front().first) return keys.front().second;
+		for (std::size_t k = 1; k < keys.size(); ++k)
+			if (t <= keys[k].first) return keys[k - 1].second + (keys[k].second - keys[k - 1].second) * (t - keys[k - 1].first) / std::max(1e-9, keys[k].first - keys[k - 1].first);
+		return keys.back().second;
+	}
 };
 struct Lava {
 	double x = 0.0, z = 0.0, width = 6.0, speed = 0.4, t0 = 0.0;
@@ -82,8 +96,9 @@ inline void put(std::string &out, double v) {
 }
 }  // namespace detail
 
-// A flame at t, as scene text: its medium (named `name`) in a box `size` tall at `foot` (pbrt's), the pass-through sphere it fills, and its flickering light.
-inline std::string flameText(const std::string &name, Vec3 foot, double size, double t, int seed, int res = 20) {
+// A flame at t, as scene text: its medium (named `name`) in a box `size` tall at `foot` (pbrt's), the pass-through sphere it fills, and its flickering light (unless `lit` is false).
+// `lean`: how far its tips are pushed along +x, as a share of its height; `bright` scales the light it gives out.
+inline std::string flameText(const std::string &name, Vec3 foot, double size, double t, int seed, int res = 20, double lean = 0.0, double bright = 1.0, bool lit = true) {
 	const int nx = res, ny = res * 2, nz = res;
 	const double w = 0.7 * size;
 	std::string sa, ss, le;
@@ -95,7 +110,7 @@ inline std::string flameText(const std::string &name, Vec3 foot, double size, do
 				const double x = (i + 0.5) / nx, y = (j + 0.5) / ny, z = (k + 0.5) / nz;
 				// tongues: the gas pushed sideways by noise that climbs through it, more the higher it is
 				const double climb = t * 2.4;
-				const double dx = 0.45 * y * (detail::fbm3(x * 3.0, y * 3.5 - climb, z * 3.0, seed) - 0.5), dz = 0.45 * y * (detail::fbm3(x * 3.0 + 7.0, y * 3.5 - climb, z * 3.0, seed + 3) - 0.5);
+				const double dx = 0.45 * y * (detail::fbm3(x * 3.0, y * 3.5 - climb, z * 3.0, seed) - 0.5) - lean * y * y / 0.7, dz = 0.45 * y * (detail::fbm3(x * 3.0 + 7.0, y * 3.5 - climb, z * 3.0, seed + 3) - 0.5);   // (the box is 0.7 of its height across)
 				const double r = std::hypot(x + dx - 0.5, z + dz - 0.5);
 				const double R = 0.42 * std::pow(std::max(0.0, 1.0 - y), 0.75) * (0.55 + 0.45 * std::min(1.0, y * 5.0));   // (widest low down, a point at the top)
 				const double flicker = detail::fbm3(x * 5.0, y * 5.0 - climb * 1.7, z * 5.0, seed + 7);
@@ -112,13 +127,14 @@ inline std::string flameText(const std::string &name, Vec3 foot, double size, do
 	std::snprintf(buf, sizeof buf, "  Translate %.4f %.4f %.4f\n  Scale %.4f %.4f %.4f\n", foot.x - 0.5 * w, foot.y, foot.z - 0.5 * w, w, size, w);
 	out += buf;
 	std::snprintf(buf, sizeof buf, "  MakeNamedMedium \"%s\" \"string type\" [ \"rgbgrid\" ] \"integer nx\" [ %d ] \"integer ny\" [ %d ] \"integer nz\" [ %d ] \"float g\" [ 0 ] \"float Lescale\" [ %.5f ]\n", name.c_str(),
-				  nx, ny, nz, 0.02 / std::max(0.2, size));
+				  nx, ny, nz, bright * 0.02 / std::max(0.2, size));
 	out += buf;
 	out += "    \"rgb sigma_a\" [ " + sa + "]\n    \"rgb sigma_s\" [ " + ss + "]\n    \"rgb Le\" [ " + le + "]\nAttributeEnd\n";
 	const double radius = 0.5 * std::sqrt(2.0 * w * w + size * size) * 1.02;
 	std::snprintf(buf, sizeof buf, "AttributeBegin\n  Translate %.4f %.4f %.4f\n  Material \"interface\"\n  MediumInterface \"%s\" \"\"\n  Shape \"sphere\" \"float radius\" [ %.4f ]\nAttributeEnd\n", foot.x,
 				  foot.y + 0.5 * size, foot.z, name.c_str(), radius);
 	out += buf;
+	if (!lit) return out;
 	// its light: among the flames, flickering with them (how much is burning this frame), warm
 	const double glow = (0.6 + 0.4 * (total / (nx * ny * nz * 0.08))) * size * size * 2.5;
 	std::snprintf(buf, sizeof buf, "LightSource \"point\" \"point3 from\" [ %.4f %.4f %.4f ] \"rgb I\" [ %.4f %.4f %.4f ]\n", foot.x, foot.y + 0.3 * size, foot.z, glow, 0.45 * glow, 0.12 * glow);
