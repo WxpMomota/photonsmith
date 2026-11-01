@@ -99,7 +99,12 @@ inline std::shared_ptr<const Model> modelOf(const std::string &kind, std::string
 }
 
 // How many poses a clip is cut into, and over how long it runs (its loop).
-inline int posesOf(const std::string &clip) { return clip == "idle" ? 20 : clip == "glide" ? 8 : clip == "perch" ? 10 : 16; }
+inline int posesOf(const std::string &clip) { return clip == "idle" || clip == "shake" || clip == "stamp" || clip == "nuzzle" ? 20 : clip == "lie" ? 24 : clip == "glide" ? 8 : clip == "perch" ? 10 : 16; }
+// What a quadruped does in a pause, by a chance of its own: mostly what its kind does, now and then shaking itself, stamping at a fly or turning round to its flank. `choice` 0 .. 1.
+inline std::string pauseClip(const Model &m, bool grazes, double choice) {
+	const char *clip = choice < 0.08 ? "shake" : choice < 0.17 ? "stamp" : choice < 0.25 ? "nuzzle" : choice < 0.42 ? "idle" : grazes ? "graze" : "idle";
+	return m.clip(clip) >= 0 ? clip : grazes ? "graze" : "idle";
+}
 
 // A posed rig's pieces as meshes (story space) and their colours.
 inline void piecesOf(const gltf_skin::Rig &rig, const gltf_skin::Pose &pose, std::vector<Mesh> &meshes, std::vector<gltf_import::Material> &materials) {
@@ -140,7 +145,7 @@ inline std::string eyeShineMaterial(const std::string &kind, double amount) {
 // An animal near the camera is posed for itself: the clip at exactly `phase` (0 .. 1), not the nearest of its few poses, a foot stepping along the ground a little at a time, and each
 // foot that is down set on the land where `place` (the animal's placement, story space) puts it, its leg bending to reach or straightening: the placement tilts a body to the slope
 // under it, and the ground under one hoof is its own. `groundAt`: the land's height at a place in story space.
-inline gltf_skin::Pose exactPose(const Model &m, const std::string &clip, double phase, const Mat4 &place, const std::function<double(double, double)> &groundAt) {
+inline gltf_skin::Pose exactPose(const Model &m, const std::string &clip, double phase, const Mat4 &place, const std::function<double(double, double)> &groundAt, const Vec3 *watch = nullptr) {
 	const gltf_skin::Rig &rig = m.rig;
 	gltf_skin::Pose pose = gltf_skin::restPose(rig);
 	const auto rest = gltf_skin::worldOf(rig, pose);
@@ -164,6 +169,19 @@ inline gltf_skin::Pose exactPose(const Model &m, const std::string &clip, double
 	};
 	const double size = length(transformPoint(place, {1.0, 0.0, 0.0}) - transformPoint(place, {0.0, 0.0, 0.0}));
 	const auto theta = [](const Vec3 &v) { return std::atan2(-v.z, -v.y); };
+	if (watch) {   // (head up and round to what it is watching: `watch`, story space; the neck takes some of the turn, the head the rest)
+		const Vec3 ahead = transformPoint(place, {0.0, 0.0, 1.0}) - transformPoint(place, {0.0, 0.0, 0.0}), to = *watch - transformPoint(place, {0.0, 0.0, 0.0});
+		const double yaw = std::clamp(std::atan2(ahead.z * to.x - ahead.x * to.z, ahead.x * to.x + ahead.z * to.z), -1.1, 1.1);
+		for (const auto &[name, share] : {std::pair<const char *, double>{"neck", 0.55}, {"head", 0.45}}) {
+			const int n = nodeOf(name);
+			if (n < 0) continue;
+			const double dq[4] = {0.0, std::sin(0.5 * yaw * share), 0.0, std::cos(0.5 * yaw * share)};
+			double out[4];
+			gltf_skin::detail::quatMul(dq, pose[static_cast<std::size_t>(n)].q, out);
+			for (int i = 0; i < 4; ++i) pose[static_cast<std::size_t>(n)].q[i] = out[i];
+			gltf_skin::detail::normalise(pose[static_cast<std::size_t>(n)].q);
+		}
+	}
 	for (const std::string leg : {"hl", "fl", "hr", "fr"}) {
 		const int upper = nodeOf(leg + ".upper"), lower = nodeOf(leg + ".lower"), foot = nodeOf(leg + ".foot");
 		if (upper < 0 || lower < 0 || foot < 0) continue;
@@ -265,9 +283,11 @@ inline std::string poseObject(const Model &m, const std::string &name, const std
 // spot on the skin), leaves the skin and lies back along the body and a little down, as long as the kind's coat (film_fur.h) - half that on the face, more on the tail and
 // under the belly, shorter on the legs - and coloured from the coat's pattern there (film_coats.h). Written in the world through `place` (the herd's placement, mirrored
 // on the outside: what the posed object's mirrored meshes end up under). `amount` 1 is some 9000 strands a square metre of skin; strands thinned for distance are as much wider. `exact`:
-// the pose, when it has one of its own (exactPose). Each is a dozen patches on the card, not the eighty of a hair in a close-up.
+// the pose, when it has one of its own (exactPose). Each is a dozen patches on the card, not the eighty of a hair in a close-up. A coat has two layers: seven strands in ten are the soft
+// short underfur, paler; the rest are guard hairs, half as long again, darkening to their tips, which is what gives a pelt its depth. On the flank and the chest the coat turns about
+// a whorl, as a real one does. `wet`: the hairs stick together in points and lie closer.
 inline std::string heroFur(const std::string &kind, const std::string &clip, int k, const std::string &pattern, int variant, double amount, const Mat4 &place, int seed, const gltf_skin::Pose *exact = nullptr,
-						   bool mud = false, double wider = 1.0) {
+						   bool mud = false, double wider = 1.0, bool wet = false) {
 	const std::shared_ptr<const Model> m = modelOf(kind);
 	if (!m || amount <= 0.0) return std::string();
 	const gltf_skin::Rig &rig = m->rig;
@@ -288,6 +308,12 @@ inline std::string heroFur(const std::string &kind, const std::string &clip, int
 	const double density = 9000.0 * amount;
 	const Vec3 back = normalize(transformPoint(place, {0.0, 0.0, -1.0}) - transformPoint(place, {0.0, 0.0, 0.0})), down{0.0, -1.0, 0.0};
 	const double scaleOf = length(transformPoint(place, {1.0, 0.0, 0.0}) - transformPoint(place, {0.0, 0.0, 0.0}));
+	// where the coat turns: on each flank behind the shoulder, and on the chest, by the rest pose's size
+	Vec3 lo{1e30, 1e30, 1e30}, hi{-1e30, -1e30, -1e30};
+	for (const Mesh &r : rest)
+		for (const Vec3 &p : r.verts) lo = {std::min(lo.x, p.x), std::min(lo.y, p.y), std::min(lo.z, p.z)}, hi = {std::max(hi.x, p.x), std::max(hi.y, p.y), std::max(hi.z, p.z)};
+	const double reachOf = 0.09 * (hi.y - lo.y);
+	const Vec3 whorls[3] = {{0.48 * hi.x, lo.y + 0.66 * (hi.y - lo.y), lo.z + 0.6 * (hi.z - lo.z)}, {0.48 * lo.x, lo.y + 0.66 * (hi.y - lo.y), lo.z + 0.6 * (hi.z - lo.z)}, {0.0, lo.y + 0.6 * (hi.y - lo.y), lo.z + 0.72 * (hi.z - lo.z)}};
 	std::map<int, std::string> byColour;   // (strands in a few dozen colours: one material each)
 	std::map<int, Vec3> colourOf;
 	char buf[300];
@@ -324,24 +350,41 @@ inline std::string heroFur(const std::string &kind, const std::string &clip, int
 				const Vec3 colour = pattern.empty() ? flat : coats::colourAt(pattern, variant, coatColour, legColour, ax, ay, mud);
 				const Vec3 root = transformPoint(place, rootM);
 				const Vec3 nrm = normalize(transformPoint(place, rootM + nM) - root);
-				const Vec3 way = ay >= 0.5 ? down * 0.9 + back * 0.3 : back;   // (a coat lies back along the body and down the legs)
+				const Vec3 restAt = R.verts[t[0]] * (1.0 - u - v) + R.verts[t[1]] * u + R.verts[t[2]] * v;
+				Vec3 way = ay >= 0.5 ? down * 0.9 + back * 0.3 : back;   // (a coat lies back along the body and down the legs)
+				for (const Vec3 &w : whorls) {   // (and turns about its whorls)
+					const Vec3 from = restAt - w;
+					const double near1 = std::exp(-dot(from, from) / (reachOf * reachOf));
+					if (near1 > 0.02) way = lerp(way, normalize(cross(nrm, transformPoint(place, rootM + from) - root) + Vec3{1e-9, 0.0, 0.0}), near1);
+				}
 				Vec3 lie = way - nrm * dot(way, nrm);
 				lie = length(lie) > 1e-6 ? normalize(lie) : down;
-				const double L = coat.length * part * scaleOf * (0.7 + 0.6 * hash01(own, 4));
-				const Vec3 restAt = R.verts[t[0]] * (1.0 - u - v) + R.verts[t[1]] * u + R.verts[t[2]] * v;
-				const Vec3 pull = transformPoint(place, rootM + fur::clumpPull(restAt, L / scaleOf)) - root;   // (the tips of a tuft gather)
-				const Vec3 d1 = normalize(nrm * 0.55 + lie * 0.45), d2 = normalize(nrm * 0.15 + lie * 0.75 + down * 0.25);
+				const bool guard = hash01(own, 7) < 0.3;
+				const double L = coat.length * part * scaleOf * (0.7 + 0.6 * hash01(own, 4)) * (guard ? 1.35 : 0.62) * (wet ? 0.75 : 1.0);
+				const Vec3 pull = (transformPoint(place, rootM + fur::clumpPull(restAt, L / scaleOf)) - root) * (wet ? 1.6 : 1.0);   // (the tips of a tuft gather; the more when they are wet)
+				const double rise = wet ? 0.3 : 0.55;
+				const Vec3 d1 = normalize(nrm * rise + lie * (1.0 - rise)), d2 = normalize(nrm * 0.15 + lie * 0.75 + down * 0.25);
 				const Vec3 p0 = root - nrm * (0.05 * L), p1 = root + d1 * (0.35 * L), p2 = p1 + d2 * (0.35 * L) + pull * 0.35, p3 = p2 + normalize(d2 + down * 0.3) * (0.35 * L) + pull * 0.65;
-				const int key = static_cast<int>(std::lround(colour.x * 12)) * 400 + static_cast<int>(std::lround(colour.y * 12)) * 20 + static_cast<int>(std::lround(colour.z * 12));
-				colourOf[key] = colour;
-				std::snprintf(buf, sizeof buf, "Shape \"curve\" \"string type\" \"cylinder\" \"integer dicelength\" 3 \"integer diceradial\" 4 \"float width0\" [ %.5f ] \"float width1\" [ %.5f ] \"point3 P\" [", 0.0012 * scaleOf * wider, 0.0003 * scaleOf * wider);
-				std::string &out = byColour[key];
-				out += buf;
-				for (const Vec3 &q : {p0, p1, p2, p3}) {
-					std::snprintf(buf, sizeof buf, " %.5f %.5f %.5f", q.x, q.y, q.z);
+				const double width = 0.0012 * scaleOf * wider * (guard ? 1.0 : 0.8);
+				const auto strand = [&](const Vec3 &a, const Vec3 &b, const Vec3 &c, const Vec3 &d, const Vec3 &tone, double w0, double w1) {
+					const int key = static_cast<int>(std::lround(tone.x * 12)) * 400 + static_cast<int>(std::lround(tone.y * 12)) * 20 + static_cast<int>(std::lround(tone.z * 12));
+					colourOf[key] = tone;
+					std::snprintf(buf, sizeof buf, "Shape \"curve\" \"string type\" \"cylinder\" \"integer dicelength\" 3 \"integer diceradial\" 4 \"float width0\" [ %.5f ] \"float width1\" [ %.5f ] \"point3 P\" [", w0, w1);
+					std::string &out = byColour[key];
 					out += buf;
+					for (const Vec3 &q : {a, b, c, d}) {
+						std::snprintf(buf, sizeof buf, " %.5f %.5f %.5f", q.x, q.y, q.z);
+						out += buf;
+					}
+					out += " ]\n";
+				};
+				if (!guard) strand(p0, p1, p2, p3, colour * 1.18 + Vec3{0.03, 0.03, 0.025}, width, 0.3 * width);
+				else {   // (a guard hair in two lengths, split where its colour turns: de Casteljau at 0.55)
+					const double s1 = 0.55;
+					const Vec3 a = lerp(p0, p1, s1), b = lerp(p1, p2, s1), c = lerp(p2, p3, s1), ab = lerp(a, b, s1), bc = lerp(b, c, s1), mid = lerp(ab, bc, s1);
+					strand(p0, a, ab, mid, colour, width, 0.6 * width);
+					strand(mid, bc, c, p3, colour * 0.5, 0.6 * width, 0.2 * width);
 				}
-				out += " ]\n";
 			}
 		}
 	}

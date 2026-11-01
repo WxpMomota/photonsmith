@@ -679,3 +679,57 @@ TEST(FilmReal, GrassMakesWayForWhatWalksThroughIt) {
 	EXPECT_NE(frame({{0.0, 2.0, 0.6, 0.0}}), frame({{0.0, 2.0, 0.6, 3.0}})) << "it comes back";
 	EXPECT_EQ(frame({{0.0, 400.0, 0.6, 0.0}}), alone) << "nothing near it";
 }
+
+// A wolf's head is not a horse's, a jaw opens, and an eye blinks.
+TEST(FilmReal, HeadsAreTheirOwn) {
+	namespace animals = cartoon::animals;
+	const auto wolf = animals::modelOf("wolves"), horse = animals::modelOf("horses");
+	ASSERT_TRUE(wolf && horse);
+	const V3 shut = jointAt(*wolf, "walk", 0.2, "tongue"), open = jointAt(*wolf, "run", 0.2, "tongue");
+	EXPECT_NE(shut.y - jointAt(*wolf, "walk", 0.2, "head").y, open.y - jointAt(*wolf, "run", 0.2, "head").y) << "a running wolf's mouth is open";
+	const auto angleOf = [](const cartoon::animals::Model &m, const std::string &clip, double t, const std::string &joint) {
+		gltf_skin::Pose pose = gltf_skin::restPose(m.rig);
+		gltf_skin::apply(m.rig, m.rig.clips[static_cast<std::size_t>(m.clip(clip))], t, pose);
+		for (std::size_t i = 0; i < m.rig.nodes.size(); ++i)
+			if (m.rig.nodes[i].name == joint) return std::abs(pose[i].q[2]);
+		return 0.0;
+	};
+	EXPECT_GT(angleOf(*horse, "idle", 0.7, "blink.l"), 0.4) << "the lid is down";
+	EXPECT_LT(angleOf(*horse, "idle", 1.5, "blink.l"), 0.02) << "and up again";
+	const std::string object = animals::poseObject(*wolf, "test_wolf", "run", 0, "wolves", 0.0, "natural", 0);
+	EXPECT_NE(object.find("0.62000 0.27000 0.28000"), std::string::npos) << "a tongue";
+}
+
+// A close coat has two layers, the long guard hairs darkening to their tips, and wet it lies closer.
+TEST(FilmReal, ACoatHasLayers) {
+	namespace animals = cartoon::animals;
+	const std::string dry = animals::heroFur("wolves", "idle", 0, "natural", 0, 0.05, cartoon::identity(), 3);
+	const std::string wet = animals::heroFur("wolves", "idle", 0, "natural", 0, 0.05, cartoon::identity(), 3, nullptr, false, 1.0, true);
+	ASSERT_FALSE(dry.empty());
+	EXPECT_NE(dry, wet);
+	std::set<std::string> widths;
+	for (std::size_t p = dry.find("\"float width0\" [ "); p != std::string::npos; p = dry.find("\"float width0\" [ ", p + 1)) widths.insert(dry.substr(p + 17, 7));
+	EXPECT_GE(widths.size(), 3u) << "underfur, a guard hair's root and its tip";
+}
+
+// An animal with a moment to itself does what animals do; a herd that has arrived lies down in its own time, and a young one goes to its mother.
+TEST(FilmReal, AnimalsDoThingsWhenTheyStop) {
+	namespace animals = cartoon::animals;
+	namespace wildlife = cartoon::wildlife;
+	const auto deer = animals::modelOf("deer");
+	ASSERT_TRUE(deer);
+	std::set<std::string> done;
+	for (int k = 0; k < 100; ++k) done.insert(animals::pauseClip(*deer, true, k / 100.0));
+	for (const char *clip : {"graze", "idle", "shake", "stamp", "nuzzle"}) EXPECT_TRUE(done.count(clip)) << clip;
+	wildlife::Herd h;
+	h.kind = "deer", h.count = 8, h.young = 3, h.fx = 0.0, h.fz = 0.0, h.tx = 4.0, h.tz = 0.0, h.speed = 1.0, h.seed = 4;
+	const auto frame = [&](double t) {
+		animals::Poses poses;
+		return wildlife::herdText(h, t, nullptr, poses);
+	};
+	EXPECT_EQ(frame(1.0).find("anim_deer_lie_"), std::string::npos) << "on its way";
+	EXPECT_NE(frame(60.0).find("anim_deer_lie_"), std::string::npos) << "there";
+	bool suckles = false;
+	for (double t = 20.0; t < 90.0 && !suckles; t += 7.0) suckles = frame(t).find("anim_deer_suckle_") != std::string::npos;
+	EXPECT_TRUE(suckles);
+}

@@ -448,6 +448,22 @@ EYES = {"deer": ("bar", (0.16, 0.09, 0.04)), "horse": ("bar", (0.14, 0.07, 0.03)
         "elephant": ("round", (0.25, 0.15, 0.07)), "wolf": ("round", (0.75, 0.6, 0.2)), "lion": ("round", (0.72, 0.48, 0.12)), "fox": ("slit", (0.8, 0.45, 0.1)),
         "bear": ("round", (0.3, 0.16, 0.06)), "rabbit": ("round", (0.22, 0.11, 0.05))}
 
+# A head's shape, from the poll to the nose: (along it, how wide, how deep, how far the jaw hangs below the nose's line), by family. A grazer's is long and deep at the jaw; a dog's has a
+# broad skull, a sharp stop at the brow and a narrow muzzle; a cat's is short and blunt with heavy jowls; a bear's is broad and flat; a rabbit's round.
+SKULLS = {
+    "grazer": [(0.0, 0.55, 0.6, 0.0), (0.08, 0.9, 1.0, 0.1), (0.2, 1.08, 1.32, 0.3), (0.34, 0.95, 1.28, 0.34), (0.5, 0.72, 0.96, 0.24), (0.66, 0.58, 0.72, 0.14), (0.82, 0.6, 0.66, 0.1),
+               (0.93, 0.64, 0.66, 0.08), (0.985, 0.46, 0.46, 0.06), (1.0, 0.12, 0.12, 0.06)],
+    "dog": [(0.0, 0.6, 0.62, 0.0), (0.08, 0.95, 1.0, 0.06), (0.2, 1.15, 1.15, 0.12), (0.34, 1.05, 1.0, 0.16), (0.46, 0.72, 0.62, 0.14), (0.62, 0.52, 0.46, 0.12), (0.8, 0.46, 0.4, 0.1),
+            (0.93, 0.46, 0.38, 0.08), (0.985, 0.34, 0.28, 0.06), (1.0, 0.1, 0.1, 0.06)],
+    "cat": [(0.0, 0.7, 0.7, 0.0), (0.1, 1.0, 1.0, 0.05), (0.25, 1.2, 1.12, 0.12), (0.42, 1.15, 1.0, 0.18), (0.58, 0.9, 0.82, 0.2), (0.74, 0.82, 0.74, 0.18), (0.88, 0.78, 0.66, 0.14),
+            (0.96, 0.62, 0.5, 0.1), (0.99, 0.42, 0.34, 0.1), (1.0, 0.16, 0.14, 0.1)],
+    "bear": [(0.0, 0.75, 0.7, 0.0), (0.1, 1.05, 1.0, 0.05), (0.28, 1.2, 1.1, 0.12), (0.45, 1.05, 0.92, 0.18), (0.62, 0.72, 0.66, 0.18), (0.8, 0.62, 0.56, 0.14), (0.93, 0.58, 0.5, 0.1),
+             (0.985, 0.44, 0.38, 0.08), (1.0, 0.12, 0.12, 0.08)],
+    "rabbit": [(0.0, 0.7, 0.7, 0.0), (0.15, 1.0, 1.0, 0.05), (0.35, 1.1, 1.05, 0.1), (0.55, 0.95, 0.9, 0.14), (0.75, 0.75, 0.72, 0.14), (0.9, 0.55, 0.5, 0.1), (0.98, 0.34, 0.3, 0.08), (1.0, 0.14, 0.12, 0.08)],
+}
+FAMILY = {"wolf": "dog", "fox": "dog", "lion": "cat", "bear": "bear", "rabbit": "rabbit"}
+PANTS = ("wolf", "fox", "lion")   # (a dog or a cat cools itself through its open mouth)
+
 # What a muzzle ends in: the colour of its bare wet skin.
 NOSES = {"deer": (0.03, 0.025, 0.025), "horse": (0.1, 0.085, 0.08), "wolf": (0.015, 0.014, 0.014), "lion": (0.32, 0.17, 0.13), "zebra": (0.02, 0.02, 0.02), "giraffe": (0.07, 0.055, 0.05),
          "bear": (0.02, 0.018, 0.018), "fox": (0.02, 0.016, 0.016), "rabbit": (0.45, 0.26, 0.25)}
@@ -509,13 +525,19 @@ def quadruped(name, s):
     rx0, ry0 = s["barrel"]
     midY = 0.5 * (hipY + shoulderY) - 0.03 * H
     earAt = {side: add(headPos, [side * s["headR"] * 0.6, s["headR"] * 0.9, -0.05 * s["head"]]) for side in (1, -1)}
+    hd = [0, -math.sin(math.radians(35)), math.cos(math.radians(35))]
+    below = norm(cross(hd, [1, 0, 0]))
+    if below[1] > 0: below = mul(below, -1.0)
+    hinge = add(add(headPos, mul(hd, 0.2 * s["head"])), mul(below, 0.62 * s["headR"]))
+    eyeR = max(0.016 * H, 0.14 * s["headR"])
+    eyeAt = {side: add(add(headPos, add(mul(hd, 0.12 * s["head"]), [side * s["headR"] * 0.85, s["headR"] * 0.35, 0])), [-side * 0.4 * eyeR, 0, 0]) for side in (1, -1)}
     joints += [("blade.l", 1, [rx0 * 0.8, shoulderY - 0.16 * H, Lb / 2 - 0.02 * H]), ("blade.r", 1, [-rx0 * 0.8, shoulderY - 0.16 * H, Lb / 2 - 0.02 * H]),
                ("haunch.l", 0, [rx0 * 0.85, hipY - 0.16 * H, -Lb / 2]), ("haunch.r", 0, [-rx0 * 0.85, hipY - 0.16 * H, -Lb / 2]),
                ("belly", 0, [0, midY - ry0 * 0.8, 0.1 * Lb]), ("flank.l", 0, [rx0 * 0.95, midY, 0.05 * Lb]), ("flank.r", 0, [-rx0 * 0.95, midY, 0.05 * Lb]),
-               ("ear.l", 3, earAt[1]), ("ear.r", 3, earAt[-1])]
+               ("ear.l", 3, earAt[1]), ("ear.r", 3, earAt[-1]), ("jaw", 3, hinge), ("tongue", len(joints) + 9, add(hinge, mul(hd, 0.3 * s["head"]))), ("blink.l", 3, eyeAt[1]), ("blink.r", 3, eyeAt[-1])]
     J = {n: i for i, (n, _, _) in enumerate(joints)}
     P = {n: p for n, _, p in joints}
-    body, belly, feet, extra, eyes, pupil, nose, ear, lid = Mesh(), Mesh(), Mesh(), Mesh(), Mesh(), Mesh(), Mesh(), Mesh(), Mesh()
+    body, belly, feet, extra, eyes, pupil, nose, ear, lid, tongue = Mesh(), Mesh(), Mesh(), Mesh(), Mesh(), Mesh(), Mesh(), Mesh(), Mesh(), Mesh()
     # how much of the barrel's skin each of them carries: a soft patch, so the skin rolls and does not fold
     soft = [(J["blade.l"], P["blade.l"], (0.8 * rx0, 0.2 * H, 0.2 * H), 1), (J["blade.r"], P["blade.r"], (0.8 * rx0, 0.2 * H, 0.2 * H), -1),
             (J["haunch.l"], P["haunch.l"], (0.8 * rx0, 0.22 * H, 0.22 * H), 1), (J["haunch.r"], P["haunch.r"], (0.8 * rx0, 0.22 * H, 0.22 * H), -1),
@@ -574,15 +596,35 @@ def quadruped(name, s):
     hd = [0, -math.sin(math.radians(35)), math.cos(math.radians(35))]
     below = norm(cross(hd, [1, 0, 0]))
     if below[1] > 0: below = mul(below, -1.0)
-    profile = [(0.0, 0.55, 0.6, 0.0), (0.08, 0.9, 1.0, 0.1), (0.2, 1.08, 1.32, 0.3), (0.34, 0.95, 1.28, 0.34), (0.5, 0.72, 0.96, 0.24), (0.66, 0.58, 0.72, 0.14), (0.82, 0.6, 0.66, 0.1),
-               (0.93, 0.64, 0.66, 0.08), (0.985, 0.46, 0.46, 0.06), (1.0, 0.12, 0.12, 0.06)]   # (along it, how wide, how deep, how far the jaw hangs below the nose's line)
+    profile = SKULLS[FAMILY.get(name, "grazer")]
     centres, radii = [], []
+    open_ = not s.get("trunk")   # (the upper head ends where the mouth is, and the lower jaw is its own: an elephant's stays shut behind its trunk)
     for u, wide, deep, jaw in profile:
-        centres.append(add(add(headPos, mul(hd, (u - 0.15) * s["head"])), mul(below, jaw * s["headR"])))
-        radii.append((s["headR"] * wide, s["headR"] * deep))
-    tube(body, centres, radii, [[(J["head"], 1.0)]] * len(profile), sides=16, rect=(0.75, 0.0, 1.0, 0.25))
+        upper = 0.8 if open_ and u >= 0.4 else 1.0
+        centres.append(add(add(add(headPos, mul(hd, (u - 0.15) * s["head"])), mul(below, jaw * s["headR"])), mul(below, -(1.0 - upper) * 0.6 * deep * s["headR"])))
+        radii.append((s["headR"] * wide, s["headR"] * deep * upper))
+    hr = s["headR"]
+    # the bones of a face under its skin: the ridge over each eye, the muscle of the cheek
+    skull = [Source(centres, radii, [[(J["head"], 1.0)]] * len(profile), rect=(0.75, 0.0, 1.0, 0.25), mesh=body)]
+    for side in (1, -1):
+        brow = add(headPos, add(mul(hd, 0.1 * s["head"]), [side * 0.74 * hr, 0.6 * hr, 0]))
+        skull.append(Source([add(brow, mul(hd, 0.13 * s["head"] * u)) for u in (-1.0, -0.4, 0.4, 1.0)], [(0.03 * hr, 0.03 * hr), (0.2 * hr, 0.16 * hr), (0.2 * hr, 0.16 * hr), (0.03 * hr, 0.03 * hr)], [[(J["head"], 1.0)]] * 4, up=(1, 0, 0)))
+        cheek = add(add(headPos, add(mul(hd, 0.3 * s["head"]), [side * 0.66 * hr, 0, 0])), mul(below, 0.5 * hr))
+        skull.append(Source([add(cheek, mul(hd, 0.2 * s["head"] * u)) for u in (-1.0, -0.4, 0.4, 1.0)], [(0.03 * hr, 0.03 * hr), (0.26 * hr, 0.46 * hr), (0.26 * hr, 0.46 * hr), (0.03 * hr, 0.03 * hr)], [[(J["head"], 1.0)]] * 4, up=(1, 0, 0)))
+    fuse(skull, 0.13 * hr, 0.22 * hr, lambda p, skin: skin)
+    if open_:   # the lower jaw, hinged behind the cheek; the mouth's dark roof and floor, and the tongue, which only an open mouth shows
+        rows = [p for p in profile if 0.36 <= p[0] <= 0.97]
+        jawLine = [add(add(add(headPos, mul(hd, (u - 0.15) * s["head"])), mul(below, jaw * hr)), mul(below, 0.74 * deep * hr)) for u, wide, deep, jaw in rows]
+        jawR = [(0.68 * wide * hr, 0.26 * deep * hr) for u, wide, deep, jaw in rows]
+        jawR[-1] = (jawR[-1][0] * 0.4, jawR[-1][1] * 0.4)
+        n = len(rows)
+        tube(body, jawLine, jawR, [[(J["jaw"], 1.0)]] * n, sides=12, up=below, rect=(0.75 + 0.25 * rows[0][0], 0.0, 0.75 + 0.25 * rows[-1][0], 0.25))
+        roof = [add(c, mul(below, -0.5 * r[1])) for c, r in zip(jawLine, jawR)]
+        tube(lid, jawLine, [(r[0] * 0.9, r[1] * 1.15) for r in jawR], [[(J["jaw"], 1.0)]] * n, sides=8, up=below)
+        tube(lid, roof, [(r[0] * 0.9, r[1] * 0.8) for r in jawR], [[(J["head"], 1.0)]] * n, sides=8, up=below)
+        tongueWay = [add(c, mul(below, -1.05 * r[1])) for c, r in zip(jawLine, jawR)]
+        tube(tongue, tongueWay, [(r[0] * 0.55, r[1] * 0.42) for r in jawR], [[(J["tongue"], 1.0)]] * n, sides=8, up=below)
     if name in NOSES:   # the end of the muzzle, bare and wet, its nostrils dark; and the line of the mouth back along the jaw
-        hr = s["headR"]
         tip = centres[-1]
         back = mul(hd, -1.0)
         tube(nose, [add(tip, mul(back, 0.1 * s["head"])), add(tip, mul(back, 0.05 * s["head"])), add(tip, mul(back, 0.012 * s["head"])), add(tip, mul(hd, 0.008 * s["head"]))],
@@ -592,8 +634,8 @@ def quadruped(name, s):
             tube(lid, [add(n0, mul(hd, -0.012 * s["head"])), add(n0, mul(hd, 0.012 * s["head"]))], [(0.12 * hr, 0.07 * hr)] * 2, [[(J["head"], 1.0)]] * 2, sides=8, up=below)
             line = []
             for u, wide, deep, jaw in profile[3:-1]:
-                at = add(add(headPos, mul(hd, (u - 0.15) * s["head"])), mul(below, (jaw + 0.62 * deep) * hr))
-                line.append(add(at, [side * 0.72 * wide * hr, 0, 0]))
+                at = add(add(headPos, mul(hd, (u - 0.15) * s["head"])), mul(below, (jaw + 0.58 * deep) * hr))
+                line.append(add(at, [side * 0.7 * wide * hr, 0, 0]))
             tube(lid, line, [(0.035 * hr, 0.035 * hr)] * len(line), [[(J["head"], 1.0)]] * len(line), sides=5)
     if s.get("trunk"):   # an elephant's trunk: on from the muzzle, hanging, curling a little forward at its tip
         m0 = centres[-1]
@@ -628,8 +670,12 @@ def quadruped(name, s):
     for side in (1, -1):   # eyes and ears
         e = add(headPos, add(mul(hd, 0.12 * s["head"]), [side * s["headR"] * 0.85, s["headR"] * 0.35, 0]))
         # the eye: a ball set in its socket, wet, so it holds the sky; the pupil curved on it, (across, up) in the shape of its kind's; dark lids round it
-        r = max(0.016 * H, 0.14 * s["headR"])
-        c = add(e, [-side * 0.4 * r, 0, 0])
+        r = eyeR
+        c = eyeAt[side]
+        # the upper lid, up in its socket until it blinks
+        arc = [0.02, 0.5, 0.9, 1.15]
+        tube(lid, [add(c, [0, 1.07 * r * math.cos(a), 0]) for a in arc], [(1.07 * r * math.sin(a), 1.07 * r * math.sin(a)) for a in arc], [[(J["blink.l" if side > 0 else "blink.r"], 1.0)]] * 4, sides=12, up=(0, 0, 1), caps=False)
+        c = eyeAt[side]
         ball = [(-1.0, 0.02), (-0.7, 0.71), (-0.3, 0.95), (0.2, 0.98), (0.6, 0.8), (0.87, 0.5), (1.0, 0.03)]
         tube(eyes, [add(c, [side * a * r, 0, 0]) for a, _ in ball], [(b * r, b * r) for _, b in ball], [[(J["head"], 1.0)]] * len(ball), sides=14, up=(0, 0, 1))
         shape = EYES.get(name, ("round", None))[0]
@@ -738,8 +784,8 @@ def quadruped(name, s):
     print("  %s: one skin of %d points, %d triangles" % (name, points, triangles))
     materials = [material("coat", s["body"]), material("legs", s["legs"]), material("hooves", s["feet"], 0.5), material("extra", s["extra"], 0.6),
                  material("eyes", EYES.get(name, (None, (0.02, 0.015, 0.01)))[1], 0.03), material("pupil", (0.004, 0.004, 0.004), 0.03),
-                 material("nose", NOSES.get(name, (0.05, 0.04, 0.04)), 0.16), material("ear", s["body"], 0.9), material("lid", (0.012, 0.01, 0.01), 0.45)]
-    meshes = [body, belly, feet, extra, eyes, pupil, nose, ear, lid]
+                 material("nose", NOSES.get(name, (0.05, 0.04, 0.04)), 0.16), material("ear", s["body"], 0.9), material("lid", (0.012, 0.01, 0.01), 0.45), material("tongue", (0.62, 0.27, 0.28), 0.25)]
+    meshes = [body, belly, feet, extra, eyes, pupil, nose, ear, lid, tongue]
 
     # ---- the clips ----
     clips = []
@@ -856,6 +902,11 @@ def quadruped(name, s):
                 lo.append(quat(X, flex if fore > 0 else -1.4 * flex))
                 ft.append(quat(X, (0.6 * flex if fore > 0 else 0.7 * flex) - (20.0 if gait == "run" else 11.0) * load))
             tracks += [(leg + ".upper", "rotation", times, up), (leg + ".lower", "rotation", times, lo), (leg + ".foot", "rotation", times, ft)]
+        if name in PANTS and gait != "walk":   # (hot work: the mouth open, the tongue out a little, breathing with the stride)
+            gape = 14.0 if gait == "run" else 9.0
+            tracks.append(("jaw", "rotation", times, [quat(X, gape + 3.0 * math.sin(2 * math.pi * t)) for t in times]))
+            tongueRest = sub(P["tongue"], P["jaw"])
+            tracks.append(("tongue", "translation", times, [add(tongueRest, mul(hd, 0.1 * s["head"])) for t in times]))
         tracks.append(("pelvis", "translation", times, bob))
         tracks.append(("pelvis", "rotation", times, pelvisQ))
         tracks.append(("chest", "rotation", times, chestQ))
@@ -883,7 +934,11 @@ def quadruped(name, s):
             u = ((t + shift) % length) / length
             return 34.0 * math.exp(-((u - 0.3) / 0.05) ** 2) * (1.0 if 0 <= u else 0.0)
         return (joint, "rotation", et_, [quat(Y, turn(t) * (1 if joint == "ear.l" else -1)) for t in et_])
+    def blink(joint, side, moments):   # (the upper lid down over the eye and up, a sixth of a second)
+        return (joint, "rotation", ft, [quat(Z, side * 74.0 * max(math.exp(-((t - at) / 0.07) ** 2) for at in moments)) for t in ft])
+    chew = ("jaw", "rotation", ft, [qmul(quat(X, 2.2 + 2.2 * math.sin(2 * math.pi * 1.9 * t)), quat(Y, 2.0 * math.sin(2 * math.pi * 0.95 * t))) for t in ft])
     clips.append(("graze", [
+        chew, blink("blink.l", -1, (1.1, 3.3)), blink("blink.r", 1, (1.1, 3.3)),
         twitch(1.4, 1, "flank.l"), twitch(3.1, -1, "flank.r"), earTrack("ear.l", 0.0, 4.0), earTrack("ear.r", 1.7, 4.0),
         ("neck", "rotation", gt, [quat(X, -down - 6 * max(0.0, math.sin(2 * math.pi * t / 4.0)) ** 4) for t in gt]),
         ("head", "rotation", gt, [quat(X, 25 + 6 * math.sin(2 * math.pi * t * 1.5)) for t in gt]),
@@ -893,7 +948,9 @@ def quadruped(name, s):
     ]))
     # idle: standing, looking round (the head turning), the tail flicking
     it = [i * 0.25 for i in range(21)]
-    clips.append(("idle", [
+    panting = [("jaw", "rotation", ft, [quat(X, 7.0 + 2.5 * math.sin(2 * math.pi * 2.6 * t)) for t in ft])] if name in PANTS else []
+    clips.append(("idle", panting + [
+        blink("blink.l", -1, (0.7, 2.6, 4.4)), blink("blink.r", 1, (0.7, 2.6, 4.4)),
         twitch(0.9, -1, "flank.r"), twitch(3.6, 1, "flank.l"), earTrack("ear.l", 0.8, 5.0), earTrack("ear.r", 3.0, 5.0),
         ("neck", "rotation", it, [qmul(quat(Y, 20 * math.sin(2 * math.pi * t / 5.0)), quat(X, -3 * math.sin(2 * math.pi * t / 2.5))) for t in it]),
         ("head", "rotation", it, [quat(Y, 15 * math.sin(2 * math.pi * t / 5.0 + 0.8)) for t in it]),
@@ -901,6 +958,57 @@ def quadruped(name, s):
         ("chest", "rotation", it, [quat(X, 1.0 * math.sin(2 * math.pi * t / 2.5)) for t in it]),       # (breathing)
         ("pelvis", "rotation", it, [quat(Z, 1.6 * math.sin(2 * math.pi * t / 5.0)) for t in it]),      # (easing its weight from one hind leg to the other)
     ]))
+    # what an animal does with a moment to itself (each five seconds, what it does at the start and then standing, so a pause of any length can take one)
+    breathing = ("chest", "rotation", it, [quat(X, 1.0 * math.sin(2 * math.pi * t / 2.5)) for t in it])
+    fast = [i * 0.04 for i in range(126)]
+    def burst(t, length): return math.sin(math.pi * min(1.0, t / length)) ** 2
+    # a shake, from the shoulders back, the skin going with it
+    clips.append(("shake", [
+        ("chest", "rotation", fast, [quat(Z, 9.0 * burst(t, 1.3) * math.sin(2 * math.pi * 6.0 * t)) for t in fast]),
+        ("pelvis", "rotation", fast, [quat(Z, -5.0 * burst(t - 0.15, 1.3) * math.sin(2 * math.pi * 6.0 * t) if t > 0.15 else 0.0) for t in fast]),
+        ("neck", "rotation", fast, [quat(Y, 14.0 * burst(t, 1.3) * math.sin(2 * math.pi * 3.0 * t)) for t in fast]),
+        ("tail", "rotation", fast, [quat(Y, 26.0 * burst(t, 1.5) * math.sin(2 * math.pi * 6.0 * t + 1.0)) for t in fast]),
+        blink("blink.l", -1, (0.5,)), blink("blink.r", 1, (0.5,)), earTrack("ear.l", 2.3, 5.0), earTrack("ear.r", 2.3, 5.0),
+    ]))
+    # a fore foot stamped at a fly, twice
+    def stamp(t):
+        return max(math.exp(-((t - 0.8) / 0.16) ** 2), 0.8 * math.exp(-((t - 1.6) / 0.15) ** 2))
+    clips.append(("stamp", [
+        ("fr.upper", "rotation", fast, [quat(X, -22.0 * stamp(t)) for t in fast]), ("fr.lower", "rotation", fast, [quat(X, 62.0 * stamp(t)) for t in fast]),
+        ("fr.foot", "rotation", fast, [quat(X, -30.0 * stamp(t)) for t in fast]), twitch(0.7, -1, "flank.r"), twitch(1.5, 1, "flank.l"),
+        ("tail", "rotation", it, [quat(Y, 26 * math.sin(2 * math.pi * t / 1.25) ** 7) for t in it]), breathing,
+    ]))
+    # round to its own flank at a fly, and back
+    def round_(t): return math.exp(-((t - 1.6) / 0.9) ** 4)
+    clips.append(("nuzzle", [
+        ("neck", "rotation", it, [qmul(quat(Y, 62.0 * round_(t)), quat(X, 16.0 * round_(t))) for t in it]), ("head", "rotation", it, [quat(Y, 42.0 * round_(t)) for t in it]),
+        ("chest", "rotation", it, [quat(Y, 10.0 * round_(t)) for t in it]), twitch(1.5, 1, "flank.l"), earTrack("ear.l", 1.0, 5.0), earTrack("ear.r", 1.0, 5.0),
+    ]))
+    # a drink, the muzzle low and level, the throat working
+    clips.append(("drink", [
+        ("neck", "rotation", gt, [quat(X, s["neckUp"] + 52 - 2.0 * max(0.0, math.sin(2 * math.pi * t / 3.0)) ** 4) for t in gt]), ("head", "rotation", gt, [quat(X, -8) for t in gt]),
+        ("chest", "rotation", gt, [quat(X, 6 + 0.6 * math.sin(2 * math.pi * t / 2.0)) for t in gt]), ("fl.upper", "rotation", gt, [quat(X, -11) for t in gt]),
+        ("fr.upper", "rotation", gt, [quat(X, -11) for t in gt]), ("jaw", "rotation", ft, [quat(X, 2.0 + 2.0 * math.sin(2 * math.pi * 2.6 * t)) for t in ft]),
+    ]))
+    # a young one, its head up under its mother, its tail going
+    clips.append(("suckle", [
+        ("neck", "rotation", gt, [quat(X, s["neckUp"] * 0.75 + 0.6 * math.sin(2 * math.pi * t / 0.9)) for t in gt]), ("head", "rotation", gt, [quat(X, -28.0) for t in gt]),
+        ("tail", "rotation", fast, [quat(Y, 18.0 * math.sin(2 * math.pi * 3.0 * t)) for t in fast]), ("jaw", "rotation", ft, [quat(X, 3.0 + 2.5 * math.sin(2 * math.pi * 2.2 * t)) for t in ft]),
+    ]))
+    # down to rest, over six seconds, and stays: the forelegs folding, the hind end after it, the head up (a clip not to be looped)
+    lt = [i * 0.1 for i in range(61)]
+    def ease(a, b, t): return (lambda u: u * u * (3.0 - 2.0 * u))(max(0.0, min(1.0, (t - a) / (b - a))))
+    drop = hipY - 1.02 * ry0 - 0.03 * H
+    def fold(leg, fore, a, b):
+        k = 1.0 if fore else -1.0
+        return [(leg + ".upper", "rotation", lt, [quat(X, -k * 62.0 * ease(a, b, t)) for t in lt]), (leg + ".lower", "rotation", lt, [quat(X, k * 128.0 * ease(a, b, t)) for t in lt]),
+                (leg + ".foot", "rotation", lt, [quat(X, -k * 52.0 * ease(a, b, t)) for t in lt])]
+    if not s.get("pillar"):
+        clips.append(("lie", fold("fl", True, 0.3, 2.0) + fold("fr", True, 0.5, 2.2) + fold("hl", False, 1.6, 3.4) + fold("hr", False, 1.7, 3.5) + [
+            ("pelvis", "translation", lt, [add(pelvis, [0, -drop * ease(1.5, 3.6, t), 0]) for t in lt]),
+            ("pelvis", "rotation", lt, [quat(X, -13.0 * (ease(0.4, 2.0, t) - ease(1.8, 3.5, t))) for t in lt]),
+            ("neck", "rotation", lt, [quat(X, 14.0 * ease(0.4, 2.0, t) - 18.0 * ease(3.0, 4.2, t)) for t in lt]),
+        ]))
     strides = {g: 2 * legLen["fl"] * math.sin(math.radians(swings[g])) / gaits[g][1] for g in gaits}
     return joints, meshes, materials, clips, strides
 
