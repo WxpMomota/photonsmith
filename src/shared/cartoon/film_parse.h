@@ -208,7 +208,16 @@
 //     sandcastle 3 2                                             # what the tide takes (film_tideline.h); `rockpool X Z`
 //     pier     0 -6 toward 0 length 20                           # places (film_waterside.h): harbour, lighthouse, bridge, watermill, steppingstones, stilthouses, dam
 //     toonwater deep 0 0.3 0.5                                   # a toon film's water is drawn (film_toonwater.h): `lines N`, `sparkle N`; `toonwater off`
-//     model    robot                                            # a model of the film's own (film_model.h), read up to `end`: pieces of shapes (add, blend K, cut,
+//     character mira mermaid at 0 -12 -4                         # round 18 (film_sea_cast.h): mermaid, merman, seaturtle, shark, jellyfish, seahorse, puffer ("puff")
+//     wear     mira cape colour red                              # what flows (film_flow.h): scarf, cape, veil, ribbon, sash
+//     sub      round nemo at 0 3 -8 to 20 3 -8  speed 1.5        # film_subs.h: round, bubble, robot; `dive T`, `rise T`, `lights off`; `aboard WHO NAME`
+//     divingbell -4 4 -9                                         # air (film_airpocket.h): `aircave X Y Z`, `helmet WHO`, `bigbubble X Y Z [radius R]`, `blowring WHO at T`
+//     seatown  0 -24  radius 14                                  # a town (film_seatown.h); `fastlane NAME at X Y Z to ...`, `ride WHO LANE from T`, `chase WHO after OTHER`
+//     schoolshow 1 heart at 4                                    # film_shows.h: ring, ball, spiral, arrow, wall, `word TEXT`, burst; `choir N at T`, `whalesong at T`
+//     kraken   0 2 -30  size 6  glow 5                           # giants (film_abyss.h): giantsquid, `seaserpent NAME at ...`, hugeeye, `reveal X Y Z at T`, whalefall
+//     hook     0 -6  at 2  yank 12                               # film_fromabove.h: `net X Z at T [school N] [lift T]`, anchor, brinepool, pillowlava, brinicle, turbidity
+//     bubblewipe at 10                                           # drawn looks (film_seatoon.h): waterwobble, drawnrays, `speedlines WHO`, `gulp WHO at T`, seasparkle
+//     model    robot                                           # a model of the film's own (film_model.h), read up to `end`: pieces of shapes (add, blend K, cut,
 //       piece  body colour 0.8 0.3 0.2                          #   intersect; `hard` for crisp edges), subdivision cages (`cage box W H D crease S`), modifiers
 //       box    0 0.8 0 size 0.6 0.7 0.4 round 0.03              #   (bend, twist, taper, mirror, array, radial, lattice, solidify, smooth), `sweep`, `loft`,
 //       mirror x                                                #   `paint`, `displace`, `kit`, and whole models by `make building|chair|table|car|rocket|boat`

@@ -1,0 +1,79 @@
+# The Lantern Below: a showcase of round 18's cartoon features under the sea (docs/VIDEO_GENERATION.md, "Under the sea, round 18"). Marina the mermaid, Pip in his glass bubble sub,
+# a pufferfish who will not leave a hook alone, a ride on a fast lane to a town under the sea as night falls, and something very big in the dark beyond it.
+# Heights on the sea's lines are above the seabed (15 m down: no terrain); a character's y and the camera's keys are the world's (the surface at 0).
+film    the-lantern-below
+name    The Lantern Below
+about   Marina the mermaid and Pip in his bubble sub race a fast lane to the town under the sea for the lantern night - and meet what lives in the dark beyond it.
+scene   film_assets/wild/set.pbrt
+length  70
+tags    cartoon, underwater, showcase
+
+toon       bands 3  lines 2
+water      sea  level 0  waves 0.35
+sky        16:30 23:00 south 0 physical
+underwater clarity 2  colour teal
+exposure   auto 0.6
+current    0.06 toward 70
+
+# the reef where it starts, and the boat over it
+reef       24 in -8 -16 8 -9
+shells     50 in -6 -10 6 -3
+boat       rowboat dinghy at 1 -7 facing 80
+hook       0.6 -6.6 at -20 depth 2.2 yank 13.5
+drawnrays  count 8 bright 1.2
+
+character  marina mermaid at -5 -13.5 -6  facing 90  hair red tail teal
+character  puff   puffer  at 0.9 -13.3 -5.2  facing 15
+character  hip    seahorse at -1.8 -13.4 -4.4  facing 140  scale 1.5
+character  pip    pip     at 14 -12.4 -9  facing 270
+walk       marina 0.5 0.9  -1.2 -6.2
+gesture    marina "wave" 2.6 3 4.4 4.8
+say        marina 2.8 "Afternoon, Hip!"
+gesture    hip    "nod" 3.6 3.8 4.6 4.8
+gesture    puff   "puff" 9.2 9.5 12.5 13
+gulp       puff   at 8.6
+say        marina 10 "Puff! Leave that hook alone!"
+feel       puff   scared 8.5 8.8 13 13.5
+
+# Pip arrives in his bubble sub, and they race along the fast lane to town
+sub        bubble orb at 14 3 -9 to 3 3 -7.5 speed 1.2 from 13 rise 30
+aboard     pip orb
+say        pip 22 "Race you to the lantern night!"
+gesture    marina "cheer" 23 23.4 24.6 25
+fastlane   eac at 0 3 -6 to 30 3.5 -10 to 60 3 -14 width 4 speed 3.2 turtles 4
+ride       marina eac from 25 to 34
+speedlines marina during 25 35
+sub        round nemo at 18 3.5 -16 to 34 4 -6 to 58 3.5 -10 speed 2.6 from 25 dive 26
+# the town under the sea, as night falls
+seatown    80 -14 radius 14 houses 11 lamps 10 traffic 50
+school     sardines 260 at 80 7 -6 radius 3
+schoolshow 1 heart at 42 for 8 size 4 toward 0 centre 80 9 -22
+choir      1 at 41 for 9
+schoolshow 1 word NIGHT! at 62 for 7 size 2.2 toward 0 centre 80 8 -22
+seasparkle amount 1.2
+# what is out in the dark beyond it
+hugeeye    96 3 -26 toward 300 size 2.4 open 51
+kraken     104 2 -38 size 6 toward 300 rise 46 reach 86 4 -20 from 56 glow 54
+reveal     104 9 -44 at 53 bright 1.5 colour 0.5 0.7 1.0 over 3
+bubblewipe at 60.5
+blowring   marina at 66
+whalesong  at 48 for 20
+
+shot 0 The reef
+  key   -1.4 -12.9 -1.6   -0.9 -13.1 -6.0   46
+  key   -1.0 -13.0 -2.2   -0.6 -13.1 -6.0   42
+shot 7.5 The hook
+  key   1.6 -13.0 -3.4   0.7 -13.1 -6.2   38
+shot 14 Pip
+  key   2.0 -12.4 -1.0   6.0 -12.6 -8.0   50
+shot 24 The fast lane
+  follow marina  behind 4.5  up 1.2  side 1.5  fov 52
+shot 36 Town
+  key   80 -6 6   80 -12.5 -14   60
+  key   81 -6.5 5  80 -11.5 -16   56
+shot 47 The dark
+  key   76 -11.5 -9  96 -11 -26   50
+shot 55 Grandpa Kraken
+  key   78 -10 -8   102 -9.5 -36   58
+shot 60.5 Lantern night
+  key   80 -9 4   80 -7.5 -20   56

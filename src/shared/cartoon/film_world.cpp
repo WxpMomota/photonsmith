@@ -529,6 +529,7 @@ const std::vector<school::School> &DataFilm::schoolsSwum() const {
 		film_cache::writeOnce(file, bytes);
 		school::swumFrom(sc, bytes);   // (as the processes that read the file will have it, to the float: every frame's scene the same whichever process makes it)
 	}
+	seaShows(done);   // (round 18: their shows and the nets that haul them: film_seaworld.cpp)
 	swum_.schools = std::move(done);
 	return swum_.schools;
 }
@@ -617,6 +618,7 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 			}
 		out = underTheSea(spec, out, header, t, nt, schoolsSwum(), landings(), cast);
 	}   // under the sea: the water round the camera, the light coming down through it, what lives in it
+	out += deepAt(header, t, nt);   // (round 18: film_seaworld.cpp)
 	if (!spec.fires.empty() || !spec.lavas.empty() || !spec.volcanoes.empty() || !spec.wildfires.empty()) {   // fire, lava and smoke (film_fire.h)
 		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
 		const auto groundAt = [&](double x, double z) { return ground && ground->inside(x, z) ? ground->heightAt(x, z) : (ground ? spec.terrain.y : 0.0); };
@@ -877,6 +879,7 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 	} else if (spec.toon.on && !spec.paint.off && (!spec.seas.empty() || !spec.rivers.empty())) {
 		out = undersea::bubblesGrouped(out);   // (no ink round the wave lines either: film_toonwater.h)
 	}
+	if (!spec.seatoon.wobbles.empty()) out = night::withWords(out, seatoon::wobbleLook(spec.seatoon.wobbles, t));   // (round 18: `waterwobble`)
 	out = withSkyLook(spec, std::move(out), header, t, nt);
 	return spec.space.on ? cosmos::withSpaceLook(space::recentred(out), spec.space.flare, spec.space.bloom) : out;   // (a floating origin for a film in space: film_space.h)
 }
@@ -932,6 +935,7 @@ std::string DataFilm::castAt(double t) const {
 		const auto drawnAt = [&](double tc) {   // the character as its kind draws it at a time
 			CharacterMoment m = standingMoment(c, tc);   // (its feet locked and, with `footing ground`, on the floor)
 			if (kind.trails) m.trail = trailOf(c, tc, m);
+			if (kind.flows || wears(c)) flowInto(c, tc, m);   // (round 18: where it has been, for what flows from it)
 			m.voice = music_cues::voiceAt(spec.key, c.name, tc, shotStarts(), shotNameList(), &m.mouth);   // (a recording's loudness and mouth shapes)
 			speakingAt(c, tc, m);
 			m.face = faces::faceAt(c.feelings, tc);
@@ -965,6 +969,7 @@ std::string DataFilm::castAt(double t) const {
 				drawn += hair::text(*groom, scalp, kind.headFrame(was), gust, colour, c.scale, m.seed, m.swim);   // (under the water it floats: round 16)
 			}
 			if (m.swim > 0.0) drawn = motion::wrapped(drawn, swimTurn(c, kind, m));
+			if (wears(c)) drawn += wornAt(c, kind, tc, m, m.swim > 0.0 ? swimTurn(c, kind, m) : identity());   // (round 18: garments, a helmet, speed lines)
 			return drawn;
 		};
 		const double tc = motion::heldTime(spec.stepping, c.name, t, spec.fps);   // (on twos: the moment of the frame it holds; film_motion.h)
@@ -1155,6 +1160,7 @@ static void seaSounds(const Spec &spec, audio::Mix &m, const soundscape::Ears &e
 
 void DataFilm::soundscape(audio::Mix &m) const {
 	waterSounds(m);
+	deepSounds(m);
 	const bool eagles = std::any_of(spec.flocks.begin(), spec.flocks.end(), [](const wildlife::Flock &f) { return f.kind == "eagles"; });
 	if (spec.falls.empty() && spec.fires.empty() && spec.lavas.empty() && spec.volcanoes.empty() && spec.wildfires.empty() && !spec.swell.on && spec.herds.empty() && !eagles &&
 		spec.forests.empty() && spec.geysers.empty() && spec.rockfalls.empty() && spec.avalanches.empty() && spec.quakes.empty() && spec.whales.empty() && spec.pods.empty() && spec.glaciers.empty() && spec.tornadoes.empty() &&

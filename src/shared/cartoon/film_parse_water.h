@@ -401,11 +401,12 @@ inline std::string waterProblems(const Spec &s) {
 		if (s.seas.empty()) return "`fallin` and `climbout` need a `water` line (" + f.who + ")";
 	if ((s.bank.on || s.waterMist.on || !s.lifes.empty()) && !anyWater) return "`bankside`, `watermist` and `pondlife` are by the water: the film needs a `water` or a `river` line";
 	if (s.bank.on && s.bank.patches.empty() && s.rivers.empty() && !s.hasTerrain) return "`bankside`: a lake with no land has no shore: give it a `terrain`, a `river` or `patch X Z R`";
-	if (!s.crafts.empty() && s.hasUnderwater) return "`boat KIND NAME` is for a film above the water: under it, `boat X Z`";
 	if ((!s.castles.empty() || !s.pools.empty()) && s.seas.empty()) return "`sandcastle` and `rockpool` are on a shore: the film needs a `water` line";
 	if (!s.places.empty() && !anyWater) return "a `" + s.places[0].kind + "` is on the water: the film needs a `water` or a `river` line";
-	for (const Spec::Aboard &a : s.aboards)
-		if (std::none_of(s.crafts.begin(), s.crafts.end(), [&a](const craft::Craft &c) { return c.name == a.boat; })) return "`aboard`: there is no boat called \"" + a.boat + "\"";
+	for (const Spec::Aboard &a : s.aboards)   // (a boat on the water, or a sub under it: round 18, film_subs.h)
+		if (std::none_of(s.crafts.begin(), s.crafts.end(), [&a](const craft::Craft &c) { return c.name == a.boat; }) &&
+			std::none_of(s.subs.begin(), s.subs.end(), [&a](const subs::Sub &b) { return b.name == a.boat; }))
+			return "`aboard`: there is no boat or sub called \"" + a.boat + "\"";
 	return std::string();
 }
 

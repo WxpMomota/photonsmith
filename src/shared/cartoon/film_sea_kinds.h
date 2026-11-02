@@ -36,6 +36,7 @@ struct SeaPose {
 	double snap = 0.0;                   // a crab's claws open, 0..1
 	double nod = 0.0, tilt = 0.0;        // the head (or whole body) nodding down, tilted (degrees)
 	double mouthOpen = 0.0, smile = 0.0, browTilt = 0.0, browRaise = 0.0, eyeWide = 0.0, lids = 0.0, blink = 0.0;
+	double puff = 0.0;                   // (round 18) a pufferfish blown up, 0..1 (film_sea_cast.h; the others ignore it)
 	Vec3 look;
 	double lookWeight = 0.0;
 };
@@ -48,6 +49,7 @@ inline const rig::PoseLibrary<SeaPose> &poses() {
 		{"shrug", [](SeaPose &p, double w, double) { p.spread += w, p.tilt += 12.0 * w, p.browRaise += 0.6 * w, p.smile -= 0.15 * w; }},
 		{"nod", [](SeaPose &p, double w, double since) { p.nod += 14.0 * w * std::max(0.0, std::sin(2.0 * kPi * 1.8 * since)); }},
 		{"snap", [](SeaPose &p, double w, double since) { p.snap = std::max(p.snap, w * (0.5 + 0.5 * std::sin(2.0 * kPi * 3.0 * since))), p.raiseL += 0.5 * w, p.raiseR += 0.5 * w; }},
+		{"puff", [](SeaPose &p, double w, double since) { p.puff = std::max(p.puff, w * smoothstep(0.0, 0.35, since)), p.eyeWide += 0.5 * w, p.mouthOpen += 0.3 * w; }},
 	};
 	return library;
 }

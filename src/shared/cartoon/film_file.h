@@ -291,6 +291,21 @@ class DataFilm {
 	craft::Afloat afloat() const { return {spec.seas.empty() ? nullptr : &spec.seas[0], &spec.rivers}; }
 	void paintSea(water::Sea &sea) const;   // (a toon film's: film_toonwater.h)
 	void waterHands(const Character &c, double t, CharacterMoment &m) const;
+	// (round 18 under the sea: film_seaworld.cpp) the round's things at t as scene text (subs, air, towns, lanes, giants, things from above, the deep's places, drawn looks);
+	// a character carried by a lane, chasing another or sitting in a sub; where it has been (for what flows from it); what it wears (garments, a helmet, speed lines, with
+	// `turn` the swimmer's laying level); the round's sounds; the schools' shows and hauls; a sub or a serpent as a shot's subject
+	std::string deepAt(const std::string &header, double t, double nt) const;
+	void deepMoment(const Character &c, double t, Vec3 &where, double &heading, double &going, double &swim, bool &airborne) const;
+	void flowInto(const Character &c, double t, CharacterMoment &m) const;
+	std::string wornAt(const Character &c, const CharacterKind &kind, double t, const CharacterMoment &m, const Mat4 &turn) const;
+	void deepSounds(audio::Mix &m) const;
+	void seaShows(std::vector<school::School> &schools) const;
+	bool deepSubject(const std::string &who, double t, Vec3 &feet, Vec3 &front, Vec3 &chest) const;
+	bool wears(const Character &c) const {
+		return std::any_of(spec.garments.begin(), spec.garments.end(), [&c](const flow::Garment &g) { return g.who == c.name; }) ||
+			   std::any_of(spec.air18.helmets.begin(), spec.air18.helmets.end(), [&c](const airpocket::Helmet &h) { return h.who == c.name; }) ||
+			   std::any_of(spec.seatoon.lines.begin(), spec.seatoon.lines.end(), [&c](const seatoon::Lines &l) { return l.who == c.name; });
+	}
 	std::string marksAt(const std::string &header, double t) const;
 	// Where a character looks of itself while someone speaks (CharacterMoment::look): at the speaker, turning to them just after they begin and back a little after they end
 	// (the look moves smoothly from one speaker to the next); and while it speaks, at the nearest of those who listen. A `look` line is on top of this.
@@ -435,10 +450,10 @@ class DataFilm {
 	// worked out (film_school.h prepare: once, the first time they are asked for, keeping clear of the camera and the divers).
 	double seabedAt(double x, double z) const;
 	// (round 16) whether a character is under the water - brought in 0.3 m or more below its surface - and so swims, talks in bubbles and is heard muffled.
-	bool underwater(const Character &c) const { return spec.hasUnderwater && !spec.seas.empty() && c.start[1] < spec.seas[0].level - 0.3; }
+	bool underwater(const Character &c) const { return spec.hasUnderwater && !spec.seas.empty() && c.start[1] < spec.seas[0].level - 0.3 && !spec.dry.count(c.name); }   // (round 18: not in a sub or a helmet)
 	// (and swims there - not a kind that walks on the seabed, a crab: CharacterKind::crawls)
 	bool swimming(const Character &c) const {
-		if (!underwater(c)) return false;
+		if (!spec.hasUnderwater || spec.seas.empty() || c.start[1] >= spec.seas[0].level - 0.3 || spec.riders.count(c.name)) return false;   // (round 18: one in a sub sits)
 		const auto kind = characterKinds().find(c.kind);
 		return kind == characterKinds().end() || !kind->second.crawls;
 	}

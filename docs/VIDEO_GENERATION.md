@@ -2753,6 +2753,71 @@ dark a lighthouse's lamp brightens and two spots turn; the beams show only in `f
 terrain, with no reflections. White wave lines drift on it, star sparkles twinkle along the way to the sun, a touch is a drawn ring, and a splash is a white crown with fat drops. `toonwater off`
 keeps real water in a toon film. A river is flat `mid` colour with its foam.
 
+### Under the sea, round 18: cartoons (2026-11-02)
+
+Ten more features for cartoons under the sea. Heights on these lines are above the seabed, as on rounds 14 to 17, and x z are pbrt's. `pbrt_scenes/the-lantern-below.film` uses them
+together.
+
+**More sea characters: `character NAME mermaid|merman|seaturtle|shark|jellyfish|seahorse|puffer at X Y Z`.** (film_sea_cast.h.) A mermaid treads water upright with her tail slowly waving,
+and when she swims she lies level and drives with her tail up and down, arms along her sides. Her hair streams behind her and lifts in the water; `hair` lines give her strands instead. A
+merman has short hair and no shell top. The sea turtle's front flippers stroke and wave, the shark grins with two rows of teeth, the jellyfish pulses bell first and trails its tentacles, the
+seahorse stands upright with its back fin a blur, and the pufferfish blows up into a spiky ball on `gesture NAME "puff" T0 T1 T2 T3`. They take the sea's poses (wave, point, cheer, shrug,
+nod, snap, puff), say lines with a mouth that moves, and feel. Part colours: mermaid skin, hair, tail, fins, top, eyes, lips; turtle shell, skin, eyes; shark body, belly, eyes, teeth;
+jellyfish bell, glow, eyes; seahorse body, fins, eyes; puffer body, belly, spines, eyes.
+
+**Hair, cloth and fins that flow: `wear WHO scarf|cape|veil|ribbon|sash [colour C] [length L] [width W]`.** (film_flow.h.) What trails from a character is worked out from where it has been
+over the last second. Each point of a lock of hair, a tentacle or a cape lies where its root was a moment ago, as far back as it is long, so it streams along the way the character came. When
+the character is still it falls back to its rest shape: down in the air, up and back in the water, carried by the `current`, with a slow wave running down it. A garment flutters in `gusts` in
+the air and floats under the water. This works on every kind of character.
+
+**Submarines: `sub round|bubble|robot NAME at X Y Z [to X Y Z]... [speed S] [from T] [toward A] [dive T]... [rise T]... [lights off] [colour R G B]`.** (film_subs.h.) `round` is a little yellow
+submarine with a glass dome over a cabin you can see into (a seat, a lit panel, a warm lamp), a conning tower and a turning propeller. `bubble` is a glass sphere on a frame of thrusters.
+`robot` is a remote robot with a float, a glowing camera eye, a claw and its tether up to the surface. Two searchlights shine ahead, and the water itself shows their beams. It leaves a wash of
+bubbles, and blows its ballast at each `dive` and `rise`. `aboard WHO NAME [seat N]` seats a character in the cabin, where it talks without bubbles. A shot can `follow` the sub by name. You
+hear its motor and a sonar ping. A camera inside a sub is still in the water: the cabin's air is not drawn as air.
+
+**Air under the water: `divingbell X Y Z [size S] [lamp L]`, `aircave X Y Z [radius R] [lamp L]`, `helmet WHO [size S]`, `bigbubble X Y Z [radius R] [at T] [rise S] [wobble W]`, `blowring WHO at
+T`.** (film_airpocket.h.) The bell and the cave hold a pocket of air. Its floor is the water's own surface, which from below at a slant is a silver mirror, because light inside the water is
+turned back there. A helmet is a glass bubble over a character's head; it still swims, but its lines have no bubbles. A big bubble wobbles in its low modes, grows as it rises because the
+pressure falls, bends what is seen through it, and is gone at the surface. `blowring` blows round 14's bubble ring from a character's mouth.
+
+**Towns under the sea: `seatown X Z [radius R] [houses N] [lamps N] [traffic N] [nomarket]`.** (film_seatown.h.) Houses stand round a plaza with their doors to it: spiral shell towers, sponge
+domes and coral towers, their round windows lit warm. A ring street of flat stones has jellyfish street lamps on posts, pulsing. There is a market of striped awnings over counters of shells
+and pearls. Fish traffic goes round the ring street both ways in two lanes, and along the streets into the plaza and out. In the middle of the plaza a signal turns red and green every six
+seconds, and on red every street fish stops where it is until green. You hear the market's chatter and the signal's ding.
+
+**The ocean's fast lanes: `fastlane NAME at X Y Z to X Y Z ... [width W] [speed S] [streaks N] [debris N] [turtles N]`, `ride WHO LANE from T [to T] [across X Y]`, `chase WHO after OTHER [lag S]
+[from T] [to T]`.** (film_fastlane.h.) A fast lane is a smooth tube of fast water. Streaks of light rush along it, fastest in its middle, weed and leaves tumble in it, turtles ride it with
+their flippers out, and you hear it roar. A rider is carried in from where it was over a second, swims as it goes, and coasts to a stop after it lets go. A chaser is where the other one was
+`lag` seconds before. A chase cannot follow someone who is chasing too.
+
+**Schools that perform: `schoolshow N heart|ring|ball|spiral|arrow|wall at T [for D] [size S] [toward A] [beat BPM] [centre X Y Z]`, `schoolshow N word TEXT at T ...`, `schoolshow N burst at T`,
+`choir N at T [for D] [key K]`, `whalesong at T [for D] [from X Y Z]`.** (film_shows.h.) School N (its `school` line, from 1) leaves its swim, makes the shape S metres high facing A, holds it,
+and goes back. Each fish keeps circling its place so it never stops. A word is up to 12 letters, numbers, ! or ? in a 5 by 7 letter. `beat` pulses the shape in time. `burst` throws the school
+outwards in a flash of silver and it comes back together. A choir sings a slow chord, phrase by phrase, from among the fish while the school breathes in and out. Whale song is long swoops
+heard from far off, from the film's humpbacks if it has any. The show changes the school's worked-out swim, so a shot that follows the school sees the show too.
+
+**Giants in the dark: `kraken X Y Z [size S] [toward A] [rise T] [reach X Y Z] [from T] [glow T]`, `giantsquid X Y Z [length L] [toward A] [from T] [glow T]`, `seaserpent NAME at X Y Z to X Y Z ...
+[length L] [speed S] [from T] [glow T]`, `hugeeye X Y Z [toward A] [size S] [open T] [close T]`, `reveal X Y Z at T [bright B] [colour R G B] [over D]`, `whalefall X Z [length L] [toward A]`.**
+(film_abyss.h.) A kraken's eight arms curl, and the front two stretch for `reach` from T. With `rise T` it comes up out of the deep over eight seconds. A giant squid jets ahead in pulses, its
+feeding tentacles trailing. A sea serpent swims along its points in waves with a crest down its back, and a shot can follow it. A huge eye opens in the dark: a gold iris, a slit pupil.
+`glow T` lights a giant's rows of lights. `reveal` is a light that comes up behind a giant (a silhouette) or in front of it. A whale fall is a skeleton furred with bacteria, with crabs and
+hagfish at work on it.
+
+**Things from above, and the deep's places: `hook X Z at T [depth D] [yank T]`, `net X Z at T [size S] [school N] [lift T]`, `anchor X Z at T`, `brinepool X Z [radius R]`, `pillowlava X Z
+[radius R]`, `brinicle X Z at T [length L]`, `turbidity X Z toward A at T [size S] [speed V]`.** (film_fromabove.h.) A worm wriggles on a hook that jigs above the bottom and is snatched up.
+A net sinks, closes at `lift` and is hauled up with the fish of school N that are inside it. An anchor falls on its chain and lands in a cloud of silt. The water rounds' `boat KIND NAME`
+now floats over an underwater film too, seen from below with its oars dipping, and ducks paddle their feet under the surface. A brine pool is a lake on the seabed with a shining surface and
+mussels round its shore. Pillow lava has black crusts with glowing orange cracks, and bubbles and a hiss. A brinicle (it needs an `icecap`) grows down from the ice over twenty seconds and
+spreads a web of ice where it touches the bottom. `turbidity` is an underwater avalanche of sediment pouring down the slope.
+
+**Drawn looks and glow: `bubblewipe at T`, `waterwobble during T0 T1 [amount A]`, `drawnrays [count N] [bright B]`, `speedlines WHO [during T0 T1]`, `gulp WHO at T`, `seasparkle [amount A] [colour R G
+B]`.** (film_seatoon.h.) A bubble wipe is a wall of round bubbles rushing up across the whole picture to hide a cut. A wobble shimmers the whole picture, for a dream or a daze. Drawn rays are beams
+shining down from just under the surface round the camera: a light throws a picture of soft spots down, and the water shows each spot's beam, so nothing behind them is hidden. Speed lines
+stream behind a character when it swims fast, and a gulp is a big wobbling bubble out of a character's mouth and a boing. Sea sparkle lights the water in sparks round anything moving in it
+(characters, subs, serpents) once it is dark: under a `sky` it fades in as the sun goes down. Speed lines and sparks are grouped with the bubbles, so a toon film draws no ink round them.
+Every one of these features has its own sounds.
+
 ### Cartoons of space and the universe (2026-11-01)
 
 Ten things for films about space. **`pbrt_scenes/powers-of-ten.film`** and **`pbrt_scenes/nova-and-robo.film`** use most of them.

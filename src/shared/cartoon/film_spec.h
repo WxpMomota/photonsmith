@@ -24,6 +24,7 @@
 #include "../toon_look.h"
 #include "film_dressing.h"
 #include "film_faces.h"
+#include "film_flow.h"
 #include "film_marks.h"
 #include "film_cloth.h"
 #include "film_motion.h"
@@ -90,6 +91,14 @@
 #include "film_vents.h"
 #include "film_undersea.h"
 #include "film_vignettes.h"
+#include "film_abyss.h"
+#include "film_airpocket.h"
+#include "film_fastlane.h"
+#include "film_fromabove.h"
+#include "film_seatoon.h"
+#include "film_seatown.h"
+#include "film_shows.h"
+#include "film_subs.h"
 #include "film_model.h"
 #include "film_macro.h"
 #include "film_night.h"
@@ -249,6 +258,7 @@ struct CharacterMoment {
 	Vec3 footNormal[4] = {{0.0, 1.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 1.0, 0.0}};   // (`footing ground`) the slope under each foot (story space)
 	face_track::Shapes faceShapes;   // (`act`) ARKit's face shapes from a video now: a rigged model's morphs by those names (its feelings and mouth are on m.face and m.mouth)
 	double dark = 0.3;       // how dark it is round it, 0 a sunny day .. 1 night (real eyes' pupils open in the dark)
+	flow::Wake wake;         // (round 18) where it has been, for what trails from it and flows (film_flow.h): filled as it is drawn, for a kind that `flows` or one that wears something
 };
 // A kind of character: its scene text (story space, as the toolkit writes it) and its feet at a moment, the point a camera and the film doctor look at (body space), and its walk's
 // step (rig::PathWalk's stride and first step).
@@ -269,6 +279,10 @@ struct CharacterKind {
 	// (round 17, film_sea_kinds.h) a sea creature: `aquatic` swims level as it is (castAt does not lay it flat as it lays a person); `crawls` walks on the seabed
 	// under the water instead of swimming
 	bool aquatic = false, crawls = false;
+	// (round 18, film_flow.h) something of it trails and flows - hair, a tail fin, arms - drawn from where it has been (CharacterMoment::wake); and its own lean of its body
+	// at a moment (a mermaid laid level as she swims), for what it wears
+	bool flows = false;
+	std::function<Mat4(const CharacterMoment &)> lean;
 	// (for props) where a hand of it is at a moment, in the world (its arm's reach decides: a prop held follows it), where it carries a prop (body space, scale 1, the left
 	// hand's: the right's is mirrored) and which hand it uses (0 the left, 1 the right); (for `look`) its head, body space at scale 1
 	std::function<Vec3(const CharacterMoment &, int)> handAt;
@@ -555,6 +569,23 @@ struct Spec {
 	undersea::IceCap iceCap;
 	treasure::World treasure;
 	sealight::Moon moon;
+	// round 18: garments that flow (`wear`: film_flow.h), submarines (`sub`: film_subs.h), air under the water (`divingbell`, `aircave`, `helmet`, `bigbubble`, `blowring`:
+	// film_airpocket.h), towns (`seatown`: film_seatown.h), fast lanes and chases (`fastlane`, `ride`, `chase`: film_fastlane.h), schools that perform and the sea's songs
+	// (`schoolshow`, `choir`, `whalesong`: film_shows.h), giants in the dark (film_abyss.h), things from above and the deep's places (film_fromabove.h), drawn looks
+	// (film_seatoon.h). Heights above the seabed are made pbrt's when the film is loaded (settleDeep); `dry` are those whose speech has no bubbles (in a sub, a helmet).
+	std::vector<flow::Garment> garments;
+	std::vector<subs::Sub> subs;
+	airpocket::World air18;
+	std::vector<seatown::Town> towns;
+	std::vector<fastlane::Lane> lanes;
+	std::vector<fastlane::Ride> rides;
+	std::vector<fastlane::Chase> chases;
+	std::vector<shows::Show> shows;
+	std::vector<shows::Song> songs;
+	abyss::World abyss;
+	fromabove::World above;
+	seatoon::World seatoon;
+	std::set<std::string> dry, riders;   // (riders: those in a sub)
 	// models written in the film (`model NAME ... end`, placed with `place NAME at ...` and `scatter NAME N in ...`: film_model.h, the modeling round)
 	std::vector<model::Model> models;
 	std::vector<model::Placed> modelPlaces;

@@ -1041,7 +1041,9 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 	}
 	if (const std::string why = underseaProblems(s); !why.empty()) return n = 0, fail(why);   // (film_parse_sea.h)
 	if (const std::string why = waterProblems(s); !why.empty()) return n = 0, fail(why);      // (film_parse_water.h)
+	if (const std::string why = deepProblems(s); !why.empty()) return n = 0, fail(why);       // (film_parse_deep.h)
 	settleOnWater(s);
+	settleDeep(s);
 	if (s.hasUnderwater) s.seas[0].fromBelow = true, s.seas[0].foam = false;   // (under the film's water: its surface seen from below)
 	if ((!s.whales.empty() || !s.pods.empty()) && (s.seas.empty() || s.seas[0].kind == "lake")) {
 		n = 0;

@@ -6,6 +6,7 @@
 #include "film_parse_space.h"   // (and film_spec.h)
 #include "film_parse_sea.h"
 #include "film_parse_water.h"
+#include "film_parse_deep.h"
 #include "film_parse_model.h"
 
 namespace cartoon {
@@ -1176,6 +1177,8 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		s.fog.on = true;
 	} else if (waterVerb(verb, line)) {   // on the water, and by it (film_parse_water.h)
 		return waterLine(s, verb, line);
+	} else if (deepVerb(verb)) {   // under the sea, round 18 (film_parse_deep.h)
+		return deepAnyLine(s, verb, line);
 	} else if (underseaVerb(verb) || underseaVerb17(verb) || barracudaTornado(verb, line)) {   // under the sea: the water, its flow, bubbles, the deep, the seabed and its places (film_parse_sea.h)
 		return underseaLine(s, verb, line);
 	} else if (verb == "kelp" || verb == "coral") {

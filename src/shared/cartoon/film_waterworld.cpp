@@ -6,6 +6,7 @@ namespace cartoon {
 namespace film_file {
 
 bool DataFilm::wildSubject(const std::string &who, double t, Vec3 &feet, Vec3 &front, Vec3 &chest) const {
+	if (deepSubject(who, t, feet, front, chest)) return true;   // (round 18: a sub, a serpent)
 	for (const craft::Craft &c : spec.crafts)   // a boat by name
 		if (c.name == who) {
 			const craft::Shape h = craft::shapeOf(c.kind, c.length, c.colour);
@@ -294,7 +295,7 @@ bool DataFilm::boatSeat(const Character &c, double t, Mat4 &frame, craft::Seat &
 }
 
 void DataFilm::waterMoment(const Character &c, double t, Vec3 &where, double &heading, double going, double &swim, bool &airborne, double &wet) const {
-	if (spec.hasUnderwater || (spec.aboards.empty() && spec.tumbles.empty() && spec.seas.empty())) return;
+	if ((spec.hasUnderwater && spec.crafts.empty()) || (spec.aboards.empty() && spec.tumbles.empty() && spec.seas.empty())) return;
 	const auto kind = characterKinds().find(c.kind);
 	if (kind == characterKinds().end() || kind->second.aquatic) return;
 	const double H = kind->second.height * c.scale, level = spec.seas.empty() ? 0.0 : spec.seas[0].level + spec.seas[0].riseAt(natureAt(t));
@@ -314,6 +315,12 @@ void DataFilm::waterMoment(const Character &c, double t, Vec3 &where, double &he
 		turned = rig::headingOf(transformPoint(frame, place + Vec3{0.0, 0.0, seat.faces}) - at);
 		return true;
 	};
+	if (spec.hasUnderwater) {   // (round 18: a boat over an underwater film - who is in it sits in it; the rest is for a film above the water)
+		Vec3 place;
+		double turned = heading;
+		if (seatPlace(t, place, turned)) where = place, heading = turned;
+		return;
+	}
 	if (fell) {   // over the side: in an arc, under, up again, treading water
 		Vec3 from = where;
 		double turned = heading;

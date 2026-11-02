@@ -208,7 +208,7 @@ struct Mesh {
 			out += buf;
 		}
 		out += "]\n";
-		if (!uvs.empty()) {
+		if (!uvs.empty() && uvs.size() == verts.size()) {   // (a mesh built from pieces with and without them has none: the loader would ignore them and warn)
 			out += "  \"point2 uv\" [ ";
 			for (const auto &uv : uvs) {
 				std::snprintf(buf, sizeof(buf), "%.5f %.5f  ", uv.first, uv.second);

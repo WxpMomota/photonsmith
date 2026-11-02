@@ -524,7 +524,12 @@ const film_paths::Terrain * DataFilm::terrainFor(const Character &c) const {
 std::string DataFilm::crowding() const {
 	const double step = 0.05;
 	// (only those who can: every program start reads every film, and where someone in a boat is means reading the sea, 9 ms a time: 13 s for one film with a rower and a bystander)
-	const auto aboard = [this](const Character &c) { return std::any_of(spec.aboards.begin(), spec.aboards.end(), [&c](const Spec::Aboard &x) { return x.who == c.name; }); };
+	// (nor one carried by a boat, a sub, a fast lane, or following another in a chase - close behind it on purpose: round 18)
+	const auto aboard = [this](const Character &c) {
+		return std::any_of(spec.aboards.begin(), spec.aboards.end(), [&c](const Spec::Aboard &x) { return x.who == c.name; }) ||
+			   std::any_of(spec.chases.begin(), spec.chases.end(), [&c](const fastlane::Chase &x) { return x.who == c.name; }) ||
+			   std::any_of(spec.rides.begin(), spec.rides.end(), [&c](const fastlane::Ride &x) { return x.who == c.name; });
+	};
 	std::vector<std::pair<const Character *, const Character *>> pairs;
 	for (std::size_t a = 0; a < spec.characters.size(); ++a)
 		for (std::size_t b = a + 1; b < spec.characters.size(); ++b) {
@@ -1026,6 +1031,7 @@ CharacterMoment DataFilm::momentOf(const Character &c, double t, Vec3 *at) const
 	}
 	double wet = 0.0;
 	waterMoment(c, t, where, heading, going, swim, airborne, wet);
+	deepMoment(c, t, where, heading, going, swim, airborne);   // (round 18: a lane, a chase, a sub)
 	CharacterMoment m;
 	m.swim = swim, m.wet = wet;
 	m.running = running;

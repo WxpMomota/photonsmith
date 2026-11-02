@@ -371,6 +371,7 @@ Registry &registry() {
 		film_kinds::install();   // (before any film file is read: its characters are of these kinds)
 		film_kinds::aliens::install();   // (and the aliens and the robot: film_aliens.h)
 		film_kinds::sea::install();      // (and the sea's characters: film_sea_kinds.h)
+		film_kinds::seacast::install();  // (and round 18's: film_sea_cast.h)
 		for (const Film &f : kFilms) {
 			reg->made.push_back(withFilmFiles(f));
 			reg->all.push_back(&reg->made.back());

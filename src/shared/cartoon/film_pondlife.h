@@ -95,6 +95,12 @@ inline void duck(Parts &p, const Mat4 &at, int sort, double t, int seed) {   // 
 	p.ball(bill, {0.0, 0.192, 0.215}, {0.022, 0.009, 0.035}, m, 8, 5);
 	p.ball({0.02, 0.02, 0.02}, {0.033, 0.208, 0.18}, {0.006, 0.006, 0.006}, m, 6, 4);
 	p.ball({0.02, 0.02, 0.02}, {-0.033, 0.208, 0.18}, {0.006, 0.006, 0.006}, m, 6, 4);
+	for (const double side : {-1.0, 1.0}) {   // (round 18) its feet paddling under the water, in turn: what a camera under it sees
+		const double kick = std::sin(2.0 * kPi * 2.2 * t + (side > 0.0 ? kPi : 0.0) + seed);
+		const Vec3 hip{side * 0.04, 0.0, -0.03}, ankle{side * 0.05, -0.075, -0.05 - 0.045 * kick};
+		p.tube({0.85, 0.48, 0.1}, {hip, ankle}, 0.007, m, 0.8, 5);
+		p.ball({0.9, 0.5, 0.1}, ankle + Vec3{0.0, -0.004, -0.018}, {0.026, 0.004 + 0.003 * std::max(0.0, kick), 0.032}, m, 8, 4);
+	}
 }
 inline void swan(Parts &p, const Mat4 &m, double t, int seed) {
 	const Vec3 white{0.92, 0.92, 0.88};
