@@ -113,11 +113,13 @@ inline void heron(Parts &p, const Mat4 &m, double strike, bool fish, double step
 	const double H = 0.72;
 	for (const double side : {-1.0, 1.0}) {
 		const double swing = side * 0.1 * step;
-		p.tube(legs, {{side * 0.05, -0.3, swing}, {side * 0.05, 0.3, swing + 0.02}, {side * 0.05, H, 0.0}}, 0.011, m, 1.0, 5);
+		p.tube(legs, {{side * 0.05, -0.3, swing}, {side * 0.05, 0.3, swing + 0.02}, {side * 0.05, H + 0.04, 0.0}}, 0.015, m, 1.0, 6);
 	}
-	p.ball(grey, {0.0, H + 0.1, -0.04}, {0.1, 0.12, 0.26}, mul(m, rotate({1.0, 0.0, 0.0}, -30.0)));
-	p.ball(grey, {0.0, H + 0.04, -0.3}, {0.06, 0.04, 0.2}, mul(m, rotate({1.0, 0.0, 0.0}, 15.0)));
-	const Vec3 base{0.0, H + 0.2, 0.12};
+	const Mat4 body = mul(m, translate(0.0, H + 0.14, -0.04), rotate({1.0, 0.0, 0.0}, -34.0));   // (held upright, its tail down)
+	p.ball(grey, {0.0, 0.0, 0.0}, {0.085, 0.1, 0.25}, body);
+	p.ball({0.3, 0.33, 0.37}, {0.0, 0.02, -0.26}, {0.055, 0.03, 0.2}, body);
+	for (const double side : {-1.0, 1.0}) p.ball({0.36, 0.38, 0.42}, {side * 0.075, 0.015, -0.05}, {0.025, 0.07, 0.22}, body);
+	const Vec3 base{0.0, H + 0.24, 0.13};
 	const Vec3 rest{0.0, H + 0.62, 0.2}, reach{0.0, 0.08, 0.72};
 	const Vec3 head = lerp(rest, reach, strike), bend = lerp(Vec3{0.0, H + 0.42, 0.02}, Vec3{0.0, H - 0.1, 0.5}, strike);
 	p.tube(pale, {base, bend, lerp(bend, head, 0.5), head}, 0.024, m, 0.65, 7);

@@ -93,7 +93,7 @@ inline void addRain(double amount, double x, double z, double t, double &h, doub
 				if (t - t0 > 0.9) break;
 				const int k = key + static_cast<int>(n - back) * 7;
 				Ring q;
-				q.x = (a + hash01(k, 2)) * kRainCell, q.z = (b + hash01(k, 3)) * kRainCell, q.t0 = t0, q.size = 0.018 + 0.012 * hash01(k, 4), q.height = 0.0022, q.life = 0.33;
+				q.x = (a + hash01(k, 2)) * kRainCell, q.z = (b + hash01(k, 3)) * kRainCell, q.t0 = t0, q.size = 0.018 + 0.012 * hash01(k, 4), q.height = 0.009, q.life = 0.42;
 				addRing(q, x, z, t, h, sx, sz);
 			}
 		}

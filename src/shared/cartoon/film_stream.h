@@ -113,7 +113,7 @@ inline double shapeAt(const water::River &r, const std::vector<const water::Rock
 		const double ds = s - q->s, dc = c - q->c, R = q->r, a = 0.3 * R * std::min(1.0, U / 2.0);
 		const double near_ = ds * ds + dc * dc;
 		h += a * std::exp(-((ds + 1.1 * R) * (ds + 1.1 * R) + dc * dc) / (1.1 * R * R));   // (the pillow it pushes up)
-		if (near_ < R * R * 5.0) white = std::max(white, 0.9 * std::exp(-((ds + R) * (ds + R) + dc * dc * 0.5) / (0.9 * R * R)));
+		if (near_ < R * R * 5.0) white = std::max(white, 0.8 * std::exp(-((ds + 1.05 * R) * (ds + 1.05 * R) * 4.0 + dc * dc * 0.7) / (0.9 * R * R)));   // (a thin collar of white, not a sheet)
 		if (ds <= 0.0) continue;
 		h -= 0.5 * a * std::exp(-((ds - 2.0 * R) * (ds - 2.0 * R) + dc * dc) / (1.5 * R * R));   // (the dimple behind it)
 		const double spread = R + 0.36 * ds, off = std::abs(dc) - spread, thick = 0.25 * R + 0.1 * ds, seam = std::exp(-off * off / (thick * thick)), fall = std::exp(-ds / (9.0 * R));
@@ -262,7 +262,7 @@ inline Mesh stonesMesh(const water::River &r) {
 		const water::Rock &q = r.stones[n];
 		const Place p = placeAt(r, q.s);
 		const double w = widthAt(r, q.s);
-		put(boulder(q.r, r.seed + static_cast<int>(n)), p.at + p.side * q.c + Vec3{0.0, 0.32 * q.r - 0.45 * bedDrop(r, q.s, 2.0 * q.c / w) * 0.3, 0.0});
+		put(boulder(q.r, r.seed + static_cast<int>(n), 44, 26), p.at + p.side * q.c + Vec3{0.0, 0.32 * q.r - 0.45 * bedDrop(r, q.s, 2.0 * q.c / w) * 0.3, 0.0});
 	}
 	const double L = r.along.back();
 	const int stones = std::min(1600, static_cast<int>(2.2 * L));
@@ -398,7 +398,7 @@ inline std::string text(const std::string &film, const water::River &r, double t
 		sdf::computeNormals(b);
 		return b;
 	});
-	const std::string stones = film_cache::ply(film, "river2_stones_" + key, [&] { return detail::stonesMesh(r); });
+	const std::string stones = film_cache::ply(film, "river3_stones_" + key, [&] { return detail::stonesMesh(r); });
 	std::string out = "# a river (film_stream.h)\n";
 	if (!bed.empty()) {
 		const std::string tex = "river_bed_" + std::to_string(r.seed);

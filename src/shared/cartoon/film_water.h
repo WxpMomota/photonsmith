@@ -282,7 +282,7 @@ inline std::string seaText(const Sea &given, double t, const Vec3 &eyeStory, con
 	water.verts.reserve(static_cast<std::size_t>(around + 1) * (out + 1));
 	for (int j = 0; j <= out; ++j) {
 		const double r = r0 * std::pow(r1 / r0, j / double(out));
-		const double ripple = std::exp(-r / (25.0 + 6.0 * height)) * (stirred ? 1.0 + 1.5 * stirred->rain : 1.0);   // (rain roughens what is too far off for its rings)
+		const double ripple = std::exp(-r / (25.0 + 6.0 * height)) * (stirred ? 1.0 + 0.5 * stirred->rain : 1.0);   // (rain roughens what is too far off for its rings)
 		const double spacing = r * std::max(std::log(r1 / r0) / out, 2.0 * half / around);   // (between this ring's points, along and across)
 		for (int i = 0; i <= around; ++i) {
 			const double a = heading - half + 2.0 * half * i / around;
