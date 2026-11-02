@@ -166,13 +166,15 @@ inline std::string parse(const std::string &text, Look &out) {
 		if (!(in >> v) || !std::isfinite(v)) return "\"" + word + "\" needs a number after it";
 		if (word == "bloom") out.bloom = std::clamp(v, 0.0, 1.0);
 		else if (word == "bloom-radius") out.bloomRadius = std::clamp(v, 0.001, 0.5);
-		else if (word == "event") out.events.emplace_back();
-		else if (word.rfind("event-", 0) == 0) {
+		else if (word == "event") {
+			if (v > 0.0) out.events.emplace_back();   // (`event 0` is none)
+		} else if (word.rfind("event-", 0) == 0) {
 			if (out.events.empty()) return "\"" + word + "\" comes after `event 1`";
 			cosmic_event::Params &e = out.events.back();
-			if (word == "event-kind") e.kind = static_cast<int>(v);
-			else if (word == "event-count") e.count = std::clamp(static_cast<int>(v), 1, 40000);
-			else if (word == "event-seed") e.seed = static_cast<int>(v);
+			// (clamped before the cast: a number past an int's range cast to one is undefined)
+			if (word == "event-kind") e.kind = static_cast<int>(std::clamp(v, -1.0, 1000.0));
+			else if (word == "event-count") e.count = static_cast<int>(std::clamp(v, 1.0, 40000.0));
+			else if (word == "event-seed") e.seed = static_cast<int>(std::fmod(std::trunc(v), 1e9));
 			else if (word == "event-x") e.x = v;
 			else if (word == "event-y") e.y = v;
 			else if (word == "event-z") e.z = v;
@@ -192,13 +194,13 @@ inline std::string parse(const std::string &text, Look &out) {
 		else if (word == "hole") out.hole = v > 0.0;
 		else if (word == "hole-x") out.holeLens.x = v;
 		else if (word == "hole-y") out.holeLens.y = v;
-		else if (word == "hole-size") out.holeLens.size = v;
+		else if (word == "hole-size") out.holeLens.size = std::max(1e-6, v);
 		else if (word == "hole-nx") out.holeLens.nx = v;
 		else if (word == "hole-ny") out.holeLens.ny = v;
 		else if (word == "hole-nz") out.holeLens.nz = v;
 		else if (word == "hole-disc") out.holeLens.disc = v;
 		else if (word == "hole-bright") out.holeLens.brightness = v;
-		else if (word == "hole-fov") out.holeLens.fov = v;
+		else if (word == "hole-fov") out.holeLens.fov = std::clamp(v, 0.01, 179.0);   // (as an event's: at 0 the bend was infinite, and the sky was read out of bounds)
 		else if (word == "hole-time") out.holeLens.time = v;
 		else if (word == "hole-spin") out.holeLens.spin = v;
 		else if (word == "flare") out.flare = std::clamp(v, 0.0, 1.0);

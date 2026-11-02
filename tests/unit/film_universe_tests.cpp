@@ -1203,6 +1203,20 @@ TEST(FilmMissionTools, RadioDisplayAndRoute) {
 	EXPECT_EQ(film.sceneAt(1.0).find("AIR 96%"), std::string::npos);
 	EXPECT_NE(film.sceneAt(3.0).find("AIR 96%"), std::string::npos);
 	expectProblems({{"hud", "words fixed to the frame"}, {"flightpath home", "the way between"}, {"say sam 1 \"Hi\" delay -1", "rate"}});
+	// heard late, its caption late with it (it showed when it was said)
+	const auto caps = film.lineCaptions();
+	ASSERT_EQ(caps.size(), 1u);
+	EXPECT_NEAR(caps[0].t0, 2.5, 1e-9);
+	expectProblems({{"say sam 1 \"Hi\" delay 1e300", "rate"}});
+}
+
+// What could not be done is said, not dropped: a second black hole bending the light, and a shot with two ways for its camera to go.
+TEST(FilmUniverseChecks, OneLensAndOneWayToGo) {
+	expectProblems({{"blackhole a at 0 0 -30000 radius 2000 lens 1\nblackhole b at 9000 0 -30000 radius 2000 lens 1", "only one black hole"}});
+	ff::DataFilm one;
+	EXPECT_EQ(loadFilm("onelens", "scene s.pbrt\nlength 4\nspace sun off\nblackhole a at 0 0 -30000 radius 2000 lens 1\nblackhole b at 9000 0 -30000 radius 2000\nshot 0 A\n key 0 0 0  0 0 -100  50\n", one), "");
+	ff::DataFilm two;
+	EXPECT_NE(loadFilm("twoways", "scene s.pbrt\nlength 12\nterrain hills size 800 height 10 seed 2\nsky 10:00 10:00\nplanetfall ocean from 200000 to 6 over 10\ncharacter ann pip at 0 0 0\nshot 0 Down\n descend\n orbit ann radius 3 degrees 120 height 1.6\n", two).find("one way for its camera"), std::string::npos);
 }
 
 // The library's cartoon in space: its set and its cast load.

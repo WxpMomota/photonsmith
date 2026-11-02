@@ -25,7 +25,7 @@ import os
 import struct
 import sys
 
-OUT = sys.argv[1] if len(sys.argv) > 1 else "pbrt_scenes/film_assets/library/animals"
+OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pbrt_scenes", "film_assets", "library", "animals")
 
 
 # ---- vectors and quaternions --------------------------------------------------------------------------------------------------------------------------------------------
@@ -690,7 +690,7 @@ def quadruped(name, s):
         cap = [1.0, 0.8, 0.5, 0.02]   # (how wide of the pupil, from its edge to the front of the ball)
         tube(pupil, [add(c, [side * r * 1.012 * math.sqrt(1.0 - (a * max(pr)) ** 2), 0, 0]) for a in cap], [(a * pr[1] * r, a * pr[0] * r) for a in cap], [[(J["head"], 1.0)]] * 4, sides=12, up=(0, 0, 1))
         rim = [add(e, [side * 0.1 * r, 1.0 * r * math.sin(2 * math.pi * k / 16), 1.0 * r * math.cos(2 * math.pi * k / 16)]) for k in range(17)]
-        tube(lid, rim, [(0.14 * r, 0.14 * r)] * 17, [[(J["head"], 1.0)]] * 17, sides=6, caps=False)
+        tube(lid, rim, [(0.14 * r, 0.14 * r)] * 17, [[(J["head"], 1.0)]] * 17, sides=6, caps=False, up=(1, 0, 0))   # (up across its plane, y z: with y up the ring's frame turned over under the eye)
         eb = earAt[side]
         et = add(eb, [side * 0.35 * s["ears"], 0.9 * s["ears"], -0.15 * s["ears"]])
         earJoint = J["ear.l" if side > 0 else "ear.r"]
@@ -839,13 +839,21 @@ def quadruped(name, s):
                     z = contact[2] + S * (0.5 - u / duty)
                     load = math.sin(math.pi * u / duty) ** 2
                     return [contact[0], 0.0, z], [ankle[0], ankle[1] * (1.0 - 0.16 * load), z - restFoot[2]], load
-                def solve(i, toe, wanted, down):
+                def solve(i, toe, wanted, down, forced=None):
+                    # (`forced`: the shoulder's or hip's give, eased through the swing from what it was at lift-off to what it will be at touch-down: worked out only
+                    # while the foot was down, it went from some centimetres to none in one step, and the hip snapped back twice a cycle)
                     at, turn = parentAt(i)
                     U = add(at, qrot(turn, upperRel))
                     to = sub(wanted, U)
                     d = math.sqrt(dot(to, to))
                     slide = [0.0, 0.0, 0.0]
-                    if d > reach:
+                    give = 0.0
+                    if forced is not None:
+                        give = forced
+                        if give > 0.0:
+                            slide = mul(norm(to), give)
+                            U = add(U, slide)
+                    elif d > reach:
                         ankleAt = add(U, mul(to, reach / d))
                         short = math.sqrt(dot(sub(ankleAt, toe), sub(ankleAt, toe))) - F if down else 0.0
                         give = min(max(0.0, short), 0.1 * H)   # (the shoulder's or the hip's share)
@@ -859,13 +867,29 @@ def quadruped(name, s):
                     open2 = math.acos(max(-1.0, min(1.0, (L2 * L2 + d * d - L1 * L1) / (2 * L2 * d))))
                     upper, lower = aim - bend * open1, aim + bend * open2
                     pitch = 2.0 * math.atan2(turn[0], turn[3])   # (how far the parent is turned about x)
-                    return upper - theta(a), lower - theta(b) - (upper - theta(a)), pitch, wanted, qrot(qconj(turn), slide)
+                    return upper - theta(a), lower - theta(b) - (upper - theta(a)), pitch, wanted, qrot(qconj(turn), slide), give
+                # the give at each sample while the foot is down (the cycle's n samples; the last time is the first again)
+                downGive = {}
+                for i in range(n):
+                    u = (times[i] - start) % 1.0
+                    if u < duty:
+                        toe, wanted, load = stance(u)
+                        downGive[i] = solve(i, toe, wanted, True)[5]
+                def swingGive(i, v):
+                    back, ahead = i, i
+                    while (back % n) not in downGive and back > i - n:
+                        back -= 1
+                    while (ahead % n) not in downGive and ahead < i + n:
+                        ahead += 1
+                    g0, g1 = downGive.get(back % n, 0.0), downGive.get(ahead % n, 0.0)
+                    fade = lambda x: 0.5 - 0.5 * math.cos(math.pi * max(0.0, min(1.0, x)))
+                    return g0 * (1.0 - fade(v / 0.35)) + g1 * fade((v - 0.65) / 0.35)
                 ups, los, fts, shifts = [], [], [], []
                 for i, t in enumerate(times):
                     u = (t - start) % 1.0
                     if u < duty:
                         toe, wanted, load = stance(u)
-                        phiU, phiL, pitch, ankleAt, slide = solve(i, toe, wanted, True)
+                        phiU, phiL, pitch, ankleAt, slide, _ = solve(i, toe, wanted, True)
                         v0 = sub(toe, ankleAt)
                         world = theta(v0) - theta(restFoot) - math.radians(16.0 if gait == "run" else 9.0) * load
                     else:
@@ -873,7 +897,7 @@ def quadruped(name, s):
                         ease = 0.5 - 0.5 * math.cos(math.pi * v)
                         z = contact[2] + S * (ease - 0.5)
                         wanted = [ankle[0], ankle[1] + lift * math.sin(math.pi * v) ** 1.3, z - restFoot[2]]
-                        phiU, phiL, pitch, ankleAt, slide = solve(i, wanted, wanted, False)
+                        phiU, phiL, pitch, ankleAt, slide, _ = solve(i, wanted, wanted, False, swingGive(i, v))
                         world = math.radians(0.9 * (45.0 if gait == "run" else 35.0)) * math.sin(math.pi * v)   # (folded under as it comes through)
                     ups.append(quat(X, math.degrees(phiU)))
                     los.append(quat(X, math.degrees(phiL)))
@@ -932,21 +956,26 @@ def quadruped(name, s):
     gt = [i * 0.25 for i in range(17)]
     down = -(s["neckUp"] + 40)
     ft = [i * 0.05 for i in range(101)]   # (a skin's twitch is quicker than the rest of the body: a shiver over the flank, a fly shaken off)
-    def twitch(at, side, joint):
+    # (the 4 s clips' fine tracks are 4 s too, each going round a whole number of times: with 5 s ones mixed in, graze, drink and suckle were 5 s long, their necks still for
+    # the last of it, and the jaw jumped where they went round again)
+    ft4 = [i * 0.05 for i in range(81)]
+    def twitch(at, side, joint, times=None):
+        times = ft if times is None else times
         rest = sub(P[joint], pelvis)
-        return (joint, "translation", ft, [add(rest, [side * 0.009 * H * math.exp(-((t - at) / 0.09) ** 2) * math.sin(2 * math.pi * 7.0 * (t - at)), 0.0, 0.0]) for t in ft])
+        return (joint, "translation", times, [add(rest, [side * 0.009 * H * math.exp(-((t - at) / 0.09) ** 2) * math.sin(2 * math.pi * 7.0 * (t - at)), 0.0, 0.0]) for t in times])
     def earTrack(joint, shift, length):   # (an ear turned to a sound and back, now and then)
         et_ = [i * 0.1 for i in range(int(length * 10) + 1)]
         def turn(t):
             u = ((t + shift) % length) / length
             return 34.0 * math.exp(-((u - 0.3) / 0.05) ** 2) * (1.0 if 0 <= u else 0.0)
         return (joint, "rotation", et_, [quat(Y, turn(t) * (1 if joint == "ear.l" else -1)) for t in et_])
-    def blink(joint, side, moments):   # (the upper lid down over the eye and up, a sixth of a second)
-        return (joint, "rotation", ft, [quat(Z, side * 74.0 * max(math.exp(-((t - at) / 0.07) ** 2) for at in moments)) for t in ft])
-    chew = ("jaw", "rotation", ft, [qmul(quat(X, 2.2 + 2.2 * math.sin(2 * math.pi * 1.9 * t)), quat(Y, 2.0 * math.sin(2 * math.pi * 0.95 * t))) for t in ft])
+    def blink(joint, side, moments, times=None):   # (the upper lid down over the eye and up, a sixth of a second)
+        times = ft if times is None else times
+        return (joint, "rotation", times, [quat(Z, side * 74.0 * max(math.exp(-((t - at) / 0.07) ** 2) for at in moments)) for t in times])
+    chew = ("jaw", "rotation", ft4, [qmul(quat(X, 2.2 + 2.2 * math.sin(2 * math.pi * 2.0 * t)), quat(Y, 2.0 * math.sin(2 * math.pi * 1.0 * t))) for t in ft4])
     clips.append(("graze", [
-        chew, blink("blink.l", -1, (1.1, 3.3)), blink("blink.r", 1, (1.1, 3.3)),
-        twitch(1.4, 1, "flank.l"), twitch(3.1, -1, "flank.r"), earTrack("ear.l", 0.0, 4.0), earTrack("ear.r", 1.7, 4.0),
+        chew, blink("blink.l", -1, (1.1, 3.3), ft4), blink("blink.r", 1, (1.1, 3.3), ft4),
+        twitch(1.4, 1, "flank.l", ft4), twitch(3.1, -1, "flank.r", ft4), earTrack("ear.l", 0.0, 4.0), earTrack("ear.r", 1.7, 4.0),
         ("neck", "rotation", gt, [quat(X, -down - 6 * max(0.0, math.sin(2 * math.pi * t / 4.0)) ** 4) for t in gt]),
         ("head", "rotation", gt, [quat(X, 25 + 6 * math.sin(2 * math.pi * t * 1.5)) for t in gt]),
         ("tail", "rotation", gt, [quat(Y, 12 * math.sin(2 * math.pi * t / 2.0) ** 9) for t in gt]),
@@ -993,14 +1022,15 @@ def quadruped(name, s):
     ]))
     # a drink, the muzzle low and level, the throat working
     clips.append(("drink", [
-        ("neck", "rotation", gt, [quat(X, s["neckUp"] + 52 - 2.0 * max(0.0, math.sin(2 * math.pi * t / 3.0)) ** 4) for t in gt]), ("head", "rotation", gt, [quat(X, -8) for t in gt]),
+        ("neck", "rotation", gt, [quat(X, s["neckUp"] + 52 - 2.0 * max(0.0, math.sin(2 * math.pi * t / 4.0)) ** 4) for t in gt]), ("head", "rotation", gt, [quat(X, -8) for t in gt]),
         ("chest", "rotation", gt, [quat(X, 6 + 0.6 * math.sin(2 * math.pi * t / 2.0)) for t in gt]), ("fl.upper", "rotation", gt, [quat(X, -11) for t in gt]),
-        ("fr.upper", "rotation", gt, [quat(X, -11) for t in gt]), ("jaw", "rotation", ft, [quat(X, 2.0 + 2.0 * math.sin(2 * math.pi * 2.6 * t)) for t in ft]),
+        ("fr.upper", "rotation", gt, [quat(X, -11) for t in gt]), ("jaw", "rotation", ft4, [quat(X, 2.0 + 2.0 * math.sin(2 * math.pi * 2.5 * t)) for t in ft4]),
     ]))
     # a young one, its head up under its mother, its tail going
+    fast4 = [i * 0.04 for i in range(101)]
     clips.append(("suckle", [
-        ("neck", "rotation", gt, [quat(X, s["neckUp"] * 0.75 + 0.6 * math.sin(2 * math.pi * t / 0.9)) for t in gt]), ("head", "rotation", gt, [quat(X, -28.0) for t in gt]),
-        ("tail", "rotation", fast, [quat(Y, 18.0 * math.sin(2 * math.pi * 3.0 * t)) for t in fast]), ("jaw", "rotation", ft, [quat(X, 3.0 + 2.5 * math.sin(2 * math.pi * 2.2 * t)) for t in ft]),
+        ("neck", "rotation", gt, [quat(X, s["neckUp"] * 0.75 + 0.6 * math.sin(2 * math.pi * t / 1.0)) for t in gt]), ("head", "rotation", gt, [quat(X, -28.0) for t in gt]),
+        ("tail", "rotation", fast4, [quat(Y, 18.0 * math.sin(2 * math.pi * 3.0 * t)) for t in fast4]), ("jaw", "rotation", ft4, [quat(X, 3.0 + 2.5 * math.sin(2 * math.pi * 2.25 * t)) for t in ft4]),
     ]))
     # down to rest, over six seconds, and stays: the forelegs folding, the hind end after it, the head up (a clip not to be looped)
     lt = [i * 0.1 for i in range(61)]

@@ -65,7 +65,7 @@ inline double noise3(double x, double y, double z, int salt) {   // value noise 
 	const int ix = static_cast<int>(fx), iy = static_cast<int>(fy), iz = static_cast<int>(fz);
 	const double u = x - fx, v = y - fy, w = z - fz;
 	const double su = u * u * (3 - 2 * u), sv = v * v * (3 - 2 * v), sw = w * w * (3 - 2 * w);
-	const auto at = [salt](int a, int b, int c) { return hash01(a * 73856093 ^ b * 19349663 ^ c * 83492791, salt); };
+	const auto at = [salt](int a, int b, int c) { return hash01(cellOf(a, b, c), salt); };
 	const double x00 = lerp(at(ix, iy, iz), at(ix + 1, iy, iz), su), x10 = lerp(at(ix, iy + 1, iz), at(ix + 1, iy + 1, iz), su);
 	const double x01 = lerp(at(ix, iy, iz + 1), at(ix + 1, iy, iz + 1), su), x11 = lerp(at(ix, iy + 1, iz + 1), at(ix + 1, iy + 1, iz + 1), su);
 	return lerp(lerp(x00, x10, sv), lerp(x01, x11, sv), sw);

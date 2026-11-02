@@ -340,7 +340,9 @@ struct Going {
 	double covered = 0.0, speed = 0.0;
 	bool paused = false;
 	double still = 0.0;   // how settled into its pause, 0 .. 1, easing in and out over most of a second (what turns smoothly as it stops and sets off)
+	int pause = 0;        // which of its pauses (its cycle's count; kArrived once it has come to the end of its way): what it does in one is chosen for the whole of it
 };
+constexpr int kArrived = -1000;
 inline Going goingAt(double rel, double pace, double cycle, double pause, double offset, double flee, double fleeSpeed) {
 	const auto W = [&](double x) { return pace * (std::floor(x / cycle) * (cycle - pause) + std::min(std::fmod(x, cycle), cycle - pause)); };
 	Going g;
@@ -350,6 +352,7 @@ inline Going goingAt(double rel, double pace, double cycle, double pause, double
 		g.paused = phase > cycle - pause;
 		g.still = smoothstep(cycle - pause, cycle - pause + ease, phase) * (1.0 - smoothstep(cycle - ease, cycle, phase));
 		g.speed = g.paused ? 0.0 : pace;
+		g.pause = static_cast<int>(std::floor((rel + offset) / cycle));
 		return g;
 	}
 	const double ramp = 1.5, x = rel - flee, u = std::min(1.0, x / ramp);
@@ -382,7 +385,7 @@ inline Animal animalAt(const Herd &h, const animals::Species &sp, int i, double 
 	const double flee = h.flee >= 0.0 ? std::max(0.0, h.flee - h.t0) + 0.15 * std::sqrt(static_cast<double>(i)) + 0.3 * hash01(s, 9) : -1.0;   // (one after another)
 	const double fleeSpeed = sp.fleeSpeed * (0.92 + 0.16 * hash01(s, 10));
 	a.going = goingAt(rel, pace, cycle, pause, offset, flee, fleeSpeed);
-	if (flee < 0.0 && a.going.covered >= total) a.going.covered = total, a.going.paused = true, a.going.speed = 0.0, a.going.still = 1.0;   // (there: it stops)
+	if (flee < 0.0 && a.going.covered >= total) a.going.covered = total, a.going.paused = true, a.going.speed = 0.0, a.going.still = 1.0, a.going.pause = kArrived;   // (there: it stops)
 	a.at = from + a.dir * a.going.covered - a.dir * behind + side * across;
 	a.at.y = ground ? ground->heightAt(a.at.x, a.at.z) : 0.0;
 	if (!a.going.paused) {
@@ -615,8 +618,9 @@ inline std::string kickedUp(Vec3 at, Vec3 dir, double speed, double size, double
 	for (int k = 0; k < static_cast<int>(kRate * kLife); ++k) {
 		const double born = std::floor(t * kRate) / kRate - k / kRate, age = t - born;
 		const int sk = static_cast<int>(std::lround(born * kRate)) * 977 + seed;
+		const Vec3 was = at - dir * (speed * age);   // (where the hooves were when it was thrown: it is left behind, not carried along)
 		for (int j = 0; j < per; ++j) {
-			const Vec3 origin = at + dir * ((hash01(sk + j, 1) < 0.5 ? 0.45 : -0.45) * size) + side * ((hash01(sk + j, 2) < 0.5 ? 0.18 : -0.18) * size);
+			const Vec3 origin = was + dir * ((hash01(sk + j, 1) < 0.5 ? 0.45 : -0.45) * size) + side * ((hash01(sk + j, 2) < 0.5 ? 0.18 : -0.18) * size);
 			const Vec3 v = Vec3{0.0, 0.8 + 0.22 * speed * hash01(sk + j, 3), 0.0} + side * (0.8 * (hash01(sk + j, 4) - 0.5)) - dir * (0.12 * speed * hash01(sk + j, 5));
 			const Vec3 p = origin + v * age + Vec3{0.0, -4.9 * age * age, 0.0};
 			if (p.y >= at.y) out += detail::drop(p, 0.003 + 0.006 * hash01(sk + j, 6));
@@ -629,7 +633,7 @@ inline std::string kickedUp(Vec3 at, Vec3 dir, double speed, double size, double
 inline double arrival(const Herd &h, const animals::Species &sp, int i, double t, const terrain::Field *ground) {
 	double lo = h.t0, hi = t;
 	const double total = length(Vec3{h.tx - h.fx, 0.0, h.tz - h.fz});
-	for (int k = 0; k < 12; ++k) {
+	for (int k = 0; k < 44; ++k) {   // (to a hair: 12 halvings of a long film were a tenth of a second off, a different tenth each frame, and the lying down shuddered)
 		const double mid = 0.5 * (lo + hi);
 		(animalAt(h, sp, i, mid, ground).going.covered >= total ? hi : lo) = mid;
 	}
@@ -688,9 +692,6 @@ inline std::string herdText(const Herd &h, double t, const terrain::Field *groun
 		Vec3 p = a.at;
 		const Vec3 dir = a.dir;
 		const auto groundAt = [&](const Vec3 &q) { return ground ? ground->heightAt(q.x, q.z) : 0.0; };
-		const double pitch = std::atan2(groundAt(p + dir * (0.5 * sp->length)) - groundAt(p - dir * (0.5 * sp->length)), sp->length) * 180.0 / kPi;   // (to the slope)
-		const Vec3 across{-dir.z, 0.0, dir.x};   // (and across it, its feet at the heights of the ground under them)
-		const double roll = std::atan2(groundAt(p + across * (0.2 * sp->length)) - groundAt(p - across * (0.2 * sp->length)), 0.4 * sp->length) * 180.0 / kPi;
 		std::string pose, clip;
 		int k = 0;
 		const double turn = (6.0 + 44.0 * a.going.still) * (hash01(s, 7) - 0.5);   // (turned further aside as it settles to graze: it snapped 22 degrees in a frame)
@@ -704,17 +705,21 @@ inline std::string herdText(const Herd &h, double t, const terrain::Field *groun
 			clip = "lie", clipPhase = std::min(0.999, lyingDown), pausedPhase = true;
 			k = static_cast<int>(clipPhase * animals::posesOf(clip));
 		} else if (a.going.paused) {
-			const int which = static_cast<int>(std::floor(t / 13.0 + hash01(s, 25)));   // (a pause lasts some seconds: a choice for each stretch of 13)
+			// (what it does is chosen for the whole of a pause - its mother's, for a young one - not for each 13 s of the clock, which changed it half way through)
+			const int which = a.going.pause == kArrived ? 7919 : a.going.pause;
 			const double nearWater = waterLevel > -1e29 && ground ? waterLevel - ground->heightAt(p.x + dir.x * sp->length, p.z + dir.z * sp->length) : -1.0;
 			if (child && shape && shape->clip("suckle") >= 0 && hash01(s + which, 26) < 0.6) {
 				const Vec3 side{-dir.z, 0.0, dir.x};
-				a.at = motherAt.at - motherAt.dir * (0.18 * sp->length) + side * ((hash01(s, 21) < 0.5 ? -1.0 : 1.0) * 0.32 * sp->length);
+				Vec3 under = motherAt.at - motherAt.dir * (0.18 * sp->length) + side * ((hash01(s, 21) < 0.5 ? -1.0 : 1.0) * 0.32 * sp->length);
+				under.y = a.at.y;
+				a.at = lerp(a.at, under, motherAt.going.still);   // (it goes to her as she settles, and back as she sets off: it jumped a body length)
 				a.at.y = ground ? ground->heightAt(a.at.x, a.at.z) : 0.0;
 				p = a.at;
 				clip = "suckle";
 			} else if (shape && !child && nearWater > -0.05 && nearWater < 0.6 && shape->clip("drink") >= 0) clip = "drink";
 			else clip = shape ? animals::pauseClip(*shape, sp->grazes, hash01(s + which * 131, 27)) : sp->grazes ? "graze" : "idle";
-			const double len = clip == "graze" || clip == "drink" || clip == "suckle" ? 4.0 : 5.0;
+			const int c = shape ? shape->clip(clip) : -1;   // (the clip's own length: graze, drink and suckle are 5 s, not the 4 they were taken for)
+			const double len = c >= 0 ? std::max(0.5, shape->rig.clips[static_cast<std::size_t>(c)].length) : 5.0;
 			clipPhase = t / len + hash01(s + which, 11);
 			clipPhase -= std::floor(clipPhase);
 			pausedPhase = true;
@@ -763,6 +768,10 @@ inline std::string herdText(const Herd &h, double t, const terrain::Field *groun
 				}
 			}
 		}
+		// to the slope where it stands (after a young one has gone to its mother), and across it, its feet at the heights of the ground under them
+		const double pitch = std::atan2(groundAt(p + dir * (0.5 * sp->length)) - groundAt(p - dir * (0.5 * sp->length)), sp->length) * 180.0 / kPi;
+		const Vec3 across{-dir.z, 0.0, dir.x};
+		const double roll = std::atan2(groundAt(p + across * (0.2 * sp->length)) - groundAt(p - across * (0.2 * sp->length)), 0.4 * sp->length) * 180.0 / kPi;
 		const Vec3 storyAt{-p.x, p.y, p.z}, storyFwd{-dir.x, 0.0, dir.z};
 		// leaning into a turn, as a running animal does (its weight against the turn: tan(lean) = v w / g, its speed times how fast it turns)
 		double lean = 0.0;
@@ -781,11 +790,15 @@ inline std::string herdText(const Herd &h, double t, const terrain::Field *groun
 				const double cycles = pausedPhase ? clipPhase : a.cycles;
 				// (one standing near the camera has noticed it, and watches)
 				const Vec3 lens{-eye->x, eye->y, eye->z};
-				const bool notices = clip == "idle" && away < 16.0 && hash01(s, 28) < 0.7;
-				own = std::make_unique<gltf_skin::Pose>(animals::exactPose(*model, clip, cycles - std::floor(cycles), placing, [&](double x, double z) { return ground ? ground->heightAt(-x, z) : 0.0; }, notices ? &lens : nullptr));
-				pose = poses.exactName(h.kind, clip, *own, std::to_string(h.seed) + "_" + std::to_string(static_cast<int>(std::lround(h.fx * 7.0 + h.fz * 13.0))) + "_" + std::to_string(i), out, coatOn, pattern, variant, glossy, mud);
+				const double notices = clip == "idle" && hash01(s, 28) < 0.7 ? 1.0 - smoothstep(12.0, 16.0, away) : 0.0;   // (turning to it as it comes near, not all at once at 16 m)
+				// (a lying one's folded legs are the clip's: set on the ground, they were pushed up into its belly)
+				own = std::make_unique<gltf_skin::Pose>(animals::exactPose(*model, clip, cycles - std::floor(cycles), placing, [&](double x, double z) { return ground ? ground->heightAt(-x, z) : 0.0; }, notices > 0.0 ? &lens : nullptr,
+																		   notices, clip != "lie"));
+				char whose[200];   // (its herd's own numbers: two herds of a seed from one place took each other's poses)
+				std::snprintf(whose, sizeof whose, "%s|%d|%.3f|%.3f|%.3f|%.3f|%.3f", h.kind.c_str(), h.seed, h.fx, h.fz, h.tx, h.tz, h.t0);
+				pose = poses.exactName(h.kind, clip, *own, film_cache::nameOf(whose) + "_" + std::to_string(i), out, coatOn, pattern, variant, glossy, mud);
 			}
-		if (!own) pose = poses.poseName(h.kind, clip, k, out, coatOn, pattern, variant, glossy);
+		if (!own) pose = poses.poseName(h.kind, clip, k, out, coatOn, pattern, variant, glossy, mud);   // (muddy too: only those posed for themselves were, and an animal's mud came and went at 34 m)
 		out += nature::placeObject(pose, placing);
 		if (eye && rain < 0.1 && a.going.speed > 3.0 && !a.going.paused && length(p - *eye) < kDustWithin) {   // (dry ground thrown up from the hooves: its own colour, a little paler)
 			const Vec3 ground0 = ground ? terrain::colourAt(*ground, p.x, p.z) : Vec3{0.4, 0.34, 0.26};

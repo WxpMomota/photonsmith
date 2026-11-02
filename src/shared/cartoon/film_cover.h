@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <functional>
 #include <map>
 #include <memory>
@@ -101,7 +102,7 @@ inline Mesh patchMesh(double size, int blades, int joints, double width, double 
 		const double a = 2.0 * kPi * hash01(s, 4), lean = h * (lying ? 1.5 : 0.15 + 0.6 * hash01(s, 5));
 		const Vec3 facing{std::cos(a), 0.0, std::sin(a)}, side{-facing.z, 0.0, facing.x};
 		const double col = dead ? (kBladeCols - 1.5 + std::floor(hash01(s, 6) * 2.0)) / kBladeCols : (std::floor(hash01(s, 6) * (kBladeCols - 2)) + 0.5) / kBladeCols;
-		if (seeded)   // a head of grain up the last of the stem, a dozen husks hanging to one side
+		if (seeded)   // a head of grain up the last of the stem, seven husks hanging to one side
 			for (int k = 0; k < 7; ++k) {
 				const double u = 0.8 + 0.2 * k / 6.0;
 				const Vec3 at = root + Vec3{0.0, h * u, 0.0} + facing * (lean * u * u), dir = normalize(facing + Vec3{0.3 * std::cos(2.4 * k), -0.5, 0.3 * std::sin(2.4 * k)});
@@ -183,10 +184,16 @@ inline Mesh earthSkin(double size) {
 	m.tris = {{0, 2, 1}, {0, 3, 2}};
 	return m;
 }
+// The ground's colour to a twentieth (each part: blue too), and its name: what the near earth and stones are made in, so a square's are its own colour and not the first square's.
+inline Vec3 soilOf(Vec3 ground) { return {std::floor(ground.x * 20.0) / 20.0, std::floor(ground.y * 20.0) / 20.0, std::floor(ground.z * 20.0) / 20.0}; }
+inline std::string soilKey(Vec3 ground) {
+	const Vec3 s = soilOf(ground);
+	return std::to_string(static_cast<int>(s.x * 20.0 + 0.5)) + "_" + std::to_string(static_cast<int>(s.y * 20.0 + 0.5)) + "_" + std::to_string(static_cast<int>(s.z * 20.0 + 0.5));
+}
 inline std::string earthMaterial(const std::string &film, const std::string &name, Vec3 ground, const std::string &mesh, bool bare) {
 	constexpr int W = 256;
-	const std::string colours = film_sky::picture(film, "earth1_" + std::to_string(static_cast<int>(ground.x * 20)) + "_" + std::to_string(static_cast<int>(ground.y * 20)), W, W, [&](std::vector<float> &rgb) {
-		const Vec3 soil = lerp(Vec3{0.16, 0.115, 0.075}, ground, 0.2);
+	const std::string colours = film_sky::picture(film, "earth2_" + soilKey(ground), W, W, [&](std::vector<float> &rgb) {
+		const Vec3 soil = lerp(Vec3{0.16, 0.115, 0.075}, soilOf(ground), 0.2);
 		for (int y = 0; y < W; ++y)
 			for (int x = 0; x < W; ++x) {
 				const double a = 2.0 * kPi * x / W, b = 2.0 * kPi * y / W;
@@ -281,6 +288,17 @@ inline std::string text(const std::string &film, const terrain::Field &field, co
 	const terrain::Spec &s = field.spec;
 	const Growth g = growthOf(s);
 	if (!c.on || g.density <= 0.0 || snow > 0.5) return std::string();
+	std::string growth;
+	{
+		char words[400];
+		int n = std::snprintf(words, sizeof words, "%.3f|%.3f", g.density, g.tall);
+		for (int d = 0; d < kDry; ++d)
+			for (int b = 0; b < 2; ++b) {
+				const Vec3 col = detail::colourFor(g, d, b);
+				n += std::snprintf(words + n, sizeof words - static_cast<std::size_t>(n), "|%.3f,%.3f,%.3f", col.x, col.y, col.z);
+			}
+		growth = film_cache::nameOf(words).substr(0, 8);
+	}
 	// (the trees, by the 8 metre squares they stand in; a place is under one within a few metres of its trunk, an edge that wanders with the place)
 	std::map<long long, std::vector<Vec3>> shaded;
 	const auto squareOf = [](int i, int k) { return (static_cast<long long>(i) << 24) ^ static_cast<long long>(k); };
@@ -314,7 +332,7 @@ inline std::string text(const std::string &film, const terrain::Field &field, co
 				if (!field.inside(x, z)) continue;
 				const double y = field.heightAt(x, z);
 				const double away = std::sqrt((x - eyeP.x) * (x - eyeP.x) + (y - eyeP.y) * (y - eyeP.y) + (z - eyeP.z) * (z - eyeP.z));
-				const int salt = (i * 7919) ^ (k * 104729) ^ static_cast<int>(r * 31);
+				const int salt = static_cast<int>((static_cast<unsigned>(i) * 7919u) ^ (static_cast<unsigned>(k) * 104729u) ^ static_cast<unsigned>(r * 31));   // (unsigned: far out, an int overflowed)
 				if (!ringLays(r, away, hash01(salt, 71))) continue;
 				const Vec3 to = normalize(Vec3{x - eyeP.x, 0.0, z - eyeP.z});
 				if (away > 2.0 * ring.cell && !overhead && dot(to, ahead) < wide) continue;   // (not in view)
@@ -338,8 +356,8 @@ inline std::string text(const std::string &film, const terrain::Field &field, co
 				const double height = year > 1.2 ? lerp(1.0, 0.55, smoothstep(1.2, 1.6, year)) : 1.0;
 				const int shape = static_cast<int>(hash01(salt, 73) * kShapes) % kShapes;
 				const auto laid = [&](const char *what, bool leaves, double share) {   // (one of the square's objects, written once)
-					char id[80];
-					std::snprintf(id, sizeof id, "cover_%s_%d_%d_%d_%d", what, static_cast<int>(r), shape, dry, bright);
+					char id[96];   // (its name, and its files': the land's kind of growth too - its blades' height, how many, their green - or an edited biome kept the old grass)
+					std::snprintf(id, sizeof id, "cover_%s_%d_%d_%d_%d_%s", what, static_cast<int>(r), shape, dry, bright, growth.c_str());
 					if (made.insert(id).second) {
 						const std::string name = id;
 						const double keep = std::clamp(c.amount, 0.05, 3.0);
@@ -358,13 +376,15 @@ inline std::string text(const std::string &film, const terrain::Field &field, co
 				const Mat4 turnIt = rotate({0, 1, 0}, 90.0 * static_cast<int>(hash01(salt, 74) * 4.0));
 				const Vec3 w = under ? Vec3{0.0, 0.0, 0.0} : nature::windLean(foot.x, foot.z, t, 0.18) + dressing::gustAt(gusts, foot.x, foot.z, t) * 0.35;
 				if (under || wooded) places += nature::placeObject(laid("litter", true, 1.0), mul(translate(foot), tilt, turnIt));
+				const Vec3 onGround{-x, y, z};   // (the earth and what lies on it are on the ground: at the blades' roots, 2 cm under it, they were buried)
+				const std::string soil = detail::soilKey(ground);
 				if (r <= 1 && !under) {   // near the camera: the earth between the blades, what lies on it
-					const std::string earth = std::string("cover_earth") + (worn ? "b" : "") + "_" + std::to_string(r) + "_" + std::to_string(shape);
+					const std::string earth = std::string("cover_earth") + (worn ? "b" : "") + "_" + std::to_string(r) + "_" + std::to_string(shape) + "_" + soil;   // (its soil's colour: the first square's was all of them)
 					if (made.insert(earth).second) {
 						const std::string file = film_cache::ply(film, "cover_earth_" + std::to_string(r), [&] { return detail::earthSkin(ring.cell); });
 						objects += nature::objectBegin(earth) + "  AttributeBegin\n  " + detail::earthMaterial(film, earth, ground, file, worn) + "  AttributeEnd\n" + nature::objectEnd();
 					}
-					places += nature::placeObject(earth, mul(translate(foot), tilt, turnIt));
+					places += nature::placeObject(earth, mul(translate(onGround), tilt, turnIt));
 				}
 				if (r == 0) {
 					const std::string bits = "cover_bits" + std::to_string(shape);
@@ -375,7 +395,7 @@ inline std::string text(const std::string &film, const terrain::Field &field, co
 						objects += nature::objectBegin(bits) + "  AttributeBegin\n  " + diffuseMaterial({0.3, 0.28, 0.25}) + "\n" + film_cache::plyShape(a) + "  AttributeEnd\n  AttributeBegin\n  " + diffuseMaterial({0.32, 0.26, 0.17}) + "\n" +
 								   film_cache::plyShape(b) + "  AttributeEnd\n" + nature::objectEnd();
 					}
-					places += nature::placeObject(bits, mul(translate(foot), tilt, turnIt));
+					places += nature::placeObject(bits, mul(translate(onGround), tilt, turnIt));
 				}
 				// what has walked here: shoved out from under it as it comes, lying down behind it, and getting up again
 				Vec3 shoved{0.0, 0.0, 0.0};
@@ -393,10 +413,10 @@ inline std::string text(const std::string &film, const terrain::Field &field, co
 				// here and there, close enough to see: a stone half sunk in the ground, and under the trees a fern
 				if (ring.cell == 3.0) {
 					const auto dressed = [&](const char *what, int kinds, const std::function<std::string(int)> &make, double chance, double sinks, double size) {
-						const int own = salt * 31 + what[0] * 131 + what[1];
+						const int own = static_cast<int>(static_cast<unsigned>(salt) * 31u + static_cast<unsigned>(what[0] * 131 + what[1]));
 						if (hash01(own, 76) > chance) return;
 						const int which = static_cast<int>(hash01(own, 77) * kinds) % kinds;
-						const std::string name = std::string("cover_") + what + std::to_string(which);
+						const std::string name = std::string("cover_") + what + std::to_string(which) + (std::strcmp(what, "stone") == 0 ? "_" + soil : std::string());   // (a stone takes the ground's colour)
 						if (made.insert(name).second) objects += make(which);
 						const Vec3 at{-(x + ring.cell * (hash01(own, 78) - 0.5)), y - sinks, z + ring.cell * (hash01(own, 79) - 0.5)};
 						places += nature::placeObject(name, mul(translate(at), rotate({0, 1, 0}, 360.0 * hash01(own, 80)), scale(size * (0.6 + 0.9 * hash01(own, 81)))));
@@ -410,6 +430,7 @@ inline std::string text(const std::string &film, const terrain::Field &field, co
 						const std::string file = film_cache::ply(film, name, [&] {
 							Mesh low = nature::rock(1.0, 740 + k);
 							for (Vec3 &p : low.verts) p.y *= 0.3;
+							for (Vec3 &q : low.normals) q = normalize(Vec3{q.x, q.y / 0.3, q.z});   // (its normals squashed with it: the steep rock's lit it)
 							return moss::topSkin(low, 0.8, 0.0);
 						});
 						return nature::objectBegin(name) + moss::shape(film, name, file, moss::kTop) + nature::objectEnd();
@@ -424,10 +445,10 @@ inline std::string text(const std::string &film, const terrain::Field &field, co
 					}, 0.6, 0.0, 1.0);
 					const bool damp = s.biome.empty() || s.biome == "jungle" || s.biome == "tundra";
 					dressed("stone", 3, [&](int k) {
-						const std::string name = "cover_stone" + std::to_string(k);
-						const std::string file = film_cache::ply(film, name, [&] { return nature::rock(0.5, 720 + k); });
-						const std::string top = damp ? film_cache::ply(film, name + "_moss", [&] { return moss::topSkin(nature::rock(0.5, 720 + k), 0.8, 0.004); }) : std::string();
-						const Vec3 rock = lerp(ground, Vec3{0.3, 0.29, 0.27}, 0.7);
+						const std::string name = "cover_stone" + std::to_string(k) + "_" + soil;
+						const std::string file = film_cache::ply(film, "cover_stone" + std::to_string(k), [&] { return nature::rock(0.5, 720 + k); });
+						const std::string top = damp ? film_cache::ply(film, "cover_stone" + std::to_string(k) + "_moss", [&] { return moss::topSkin(nature::rock(0.5, 720 + k), 0.8, 0.004); }) : std::string();
+						const Vec3 rock = lerp(detail::soilOf(ground), Vec3{0.3, 0.29, 0.27}, 0.7);
 						return nature::objectBegin(name) + "  AttributeBegin\n  " + diffuseMaterial(rock) + "\n" + film_cache::plyShape(file) + "  AttributeEnd\n" + moss::shape(film, name, top, moss::kTop) + nature::objectEnd();
 					}, 0.12, 0.08, 1.0);
 				}

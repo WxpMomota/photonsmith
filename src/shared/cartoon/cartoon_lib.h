@@ -383,6 +383,9 @@ inline int seedFrom(double v) {
 	if (!(std::abs(v) < 1e300)) return 1;   // (NaN, infinite)
 	return static_cast<int>(std::fmod(std::trunc(v), 100000.0));
 }
+// A grid cell's number for hash01 (the usual spatial hash), in unsigned arithmetic: as ints the products overflow a few tens of cells out, which is undefined (MSVC wraps them, as
+// this does, so the numbers are the ones it always gave).
+inline int cellOf(int a, int b, int c = 0) { return static_cast<int>(static_cast<unsigned>(a) * 73856093u ^ static_cast<unsigned>(b) * 19349663u ^ static_cast<unsigned>(c) * 83492791u); }
 inline double hash01(int i, int salt) {
 	unsigned x = static_cast<unsigned>(i) * 747796405u + static_cast<unsigned>(salt) * 2891336453u + 12345u;
 	x = ((x >> ((x >> 28u) + 4u)) ^ x) * 277803737u;

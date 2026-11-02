@@ -27,7 +27,7 @@ namespace cartoon {
 namespace model {
 
 // ---- noise ----
-inline double hash3(int x, int y, int z, int seed) { return hash01(x * 73856093 ^ y * 19349663 ^ z * 83492791, seed); }
+inline double hash3(int x, int y, int z, int seed) { return hash01(cellOf(x, y, z), seed); }
 // Smooth value noise in [0, 1).
 inline double noise3(Vec3 p, int seed) {
 	const int ix = static_cast<int>(std::floor(p.x)), iy = static_cast<int>(std::floor(p.y)), iz = static_cast<int>(std::floor(p.z));

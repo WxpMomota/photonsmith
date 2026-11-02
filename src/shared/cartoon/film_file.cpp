@@ -1344,12 +1344,13 @@ void DataFilm::speakingAt(const Character &c, double t, CharacterMoment &m) cons
 double DataFilm::speechAt(double t) const {
 	double v = 0.0;
 	for (std::size_t i = 0; i < spec.lines.size(); ++i) {
-		if (t < spec.lines[i].t - 0.1 || t > lineEnd(i) + 0.1) continue;
+		const double late = heardLate(i), u = t - late;   // (a radio's line is heard `delay` late: the music dips then, not when it is said)
+		if (u < spec.lines[i].t - 0.1 || u > lineEnd(i) + 0.1) continue;
 		if (const music_cues::Recording *r = recordingOf(i)) {
-			const std::size_t k = static_cast<std::size_t>(std::max(0.0, t - spec.lines[i].t) * 100.0);
+			const std::size_t k = static_cast<std::size_t>(std::max(0.0, u - spec.lines[i].t) * 100.0);
 			if (k < r->loudness.size()) v = std::max(v, static_cast<double>(r->loudness[k]));
 		} else {
-			v = std::max(v, speech::loudnessAt(spoken[i], t));
+			v = std::max(v, speech::loudnessAt(spoken[i], u));
 		}
 	}
 	bool voiced = false;   // (the shots worked out once, not once for each character)
@@ -1399,7 +1400,7 @@ void DataFilm::speak(audio::Mix &mix) const {
 		std::vector<float> sound = recordingOf(i) ? recordingOf(i)->sound : speech::speak(spoken[i], t0, voiceOf(c), static_cast<unsigned>(i + 1));
 		// (round 16) under the water a voice is muffled - its highs gone, a little louder below, bubbling (the speaker's bubbles are drawn: castAt) - when the one speaking
 		// or the ears are under it
-		const bool under = underwater(c) || (spec.hasUnderwater && !spec.seas.empty() && eye.y < spec.seas[0].level);
+		const bool under = !spec.lines[i].radio && (underwater(c) || (spec.hasUnderwater && !spec.seas.empty() && eye.y < spec.seas[0].level));   // (a radio's voice is in the ear: not muffled)
 		if (under) {
 			const double k = 1.0 - std::exp(-2.0 * kPi * 650.0 / audio::kRate);   // (two passes of a one-pole low-pass at 650 Hz)
 			for (int pass = 0; pass < 2; ++pass) {
@@ -1409,7 +1410,7 @@ void DataFilm::speak(audio::Mix &mix) const {
 		}
 		if (spec.lines[i].radio) {   // (over a radio: in the ear, however far away it is said, and as much later as the distance)
 			speech::overTheRadio(sound, static_cast<unsigned>(i + 1));
-			mix.put(t0 + spec.lines[i].delay, sound, 0.62, 0.0, 0.02);
+			mix.put(t0 + heardLate(i), sound, 0.62, 0.0, 0.02);
 			continue;
 		}
 		if (recordingOf(i)) mix.put(t0, sound, 0.8 * gain, panOf(view, at) * 0.6, under ? 0.45 : 0.2);   // (a computer's voice: its recording)
@@ -1422,13 +1423,14 @@ std::vector<Caption> DataFilm::lineCaptions() const {
 	std::vector<std::size_t> order;
 	for (std::size_t i = 0; i < spec.lines.size(); ++i)
 		if (spec.lines[i].caption) order.push_back(i);
-	std::stable_sort(order.begin(), order.end(), [this](std::size_t a, std::size_t b) { return spec.lines[a].t < spec.lines[b].t; });
+	// (when each is heard: a radio's `delay` late - its caption with its voice)
+	std::stable_sort(order.begin(), order.end(), [this](std::size_t a, std::size_t b) { return spec.lines[a].t + heardLate(a) < spec.lines[b].t + heardLate(b); });
 	for (std::size_t k = 0; k < order.size(); ++k) {
 		const speech::Line &l = spec.lines[order[k]];
 		Caption cap;
-		cap.t0 = l.t;
-		cap.t1 = lineEnd(order[k]) + 0.6;
-		if (k + 1 < order.size()) cap.t1 = std::min(cap.t1, spec.lines[order[k + 1]].t - 0.05);
+		cap.t0 = l.t + heardLate(order[k]);
+		cap.t1 = lineEnd(order[k]) + heardLate(order[k]) + 0.6;
+		if (k + 1 < order.size()) cap.t1 = std::min(cap.t1, spec.lines[order[k + 1]].t + heardLate(order[k + 1]) - 0.05);
 		cap.t1 = std::max(cap.t1, cap.t0 + 0.5);
 		cap.fade = 0.15;
 		cap.centreY = 0.88;

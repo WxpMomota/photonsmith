@@ -69,7 +69,7 @@ struct Spec {
 	// every number it is made from: names its files
 	std::string key() const {
 		char b[320];
-		std::snprintf(b, sizeof b, "v1|%s|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.3f|%d|%d|%.3f", kind.c_str(), size, height, x, z, y, fx(), fz(), snowLine(), erosionAmount(), seed, ranges ? 1 : 0,
+		std::snprintf(b, sizeof b, "v2|%s|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.3f|%d|%d|%.3f", kind.c_str(), size, height, x, z, y, fx(), fz(), snowLine(), erosionAmount(), seed, ranges ? 1 : 0,
 					  waterLevel > -1e29 ? waterLevel : -1.0);
 		std::string all = b;
 		if (!biome.empty()) all += "|b" + biome;
@@ -122,7 +122,7 @@ inline double perlin(double x, double z, int salt) {
 	const int ix = static_cast<int>(fx), iz = static_cast<int>(fz);
 	const double u = x - fx, v = z - fz;
 	const auto grad = [salt](int a, int b, double dx, double dz) {
-		const double ang = 2.0 * kPi * hash01(a * 73856093 ^ b * 19349663, salt);
+		const double ang = 2.0 * kPi * hash01(cellOf(a, b), salt);
 		return std::cos(ang) * dx + std::sin(ang) * dz;
 	};
 	const auto fade = [](double t) { return t * t * t * (t * (t * 6.0 - 15.0) + 10.0); };

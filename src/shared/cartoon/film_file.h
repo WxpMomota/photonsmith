@@ -369,6 +369,8 @@ class DataFilm {
 	double lightLevel(const std::string &name, double t) const;
 	// When line i ends: the last sound of its recording, or its last syllable. (Kept once known: it is asked for every 1/100 s of the film by the music's ducking.)
 	double lineEnd(std::size_t i) const;
+	// How much later line i is heard than said: a radio's `delay` (the distance), else none. Its voice, its caption and the music's dip all go then.
+	double heardLate(std::size_t i) const { return spec.lines[i].radio ? spec.lines[i].delay : 0.0; }
 	// A character's mouth and voice at t from its lines (a line in a computer's voice: its recording's mouth shapes and loudness).
 	void speakingAt(const Character &c, double t, CharacterMoment &m) const;
 	// How loud the characters are speaking at t, 0..1: their lines and their recorded voices (the music is ducked under it).

@@ -249,13 +249,16 @@ inline std::string blackHoleLine(Spec &s, const std::vector<std::string> &t) {
 									   if (w == "turn") return b.turn = a, true;
 									   if (w == "spin" && a >= -5.0 && a <= 5.0) return b.spin = a, true;
 									   if (w == "jets" && (a == 0.0 || (a >= 2.0 && a <= 60.0))) return b.jets = a, true;
-								   if (w == "lens") return b.lens = a > 0.0, true;
+									   if (w == "lens") return b.lens = a > 0.0, true;
 									   if (w == "brightness" && a > 0.0 && a <= 20.0) return b.brightness = a, true;
 									   if (w == "seed") return b.seed = detail::seedOf(a), true;
 									   return false;
 								   });
 	if (!e.empty()) return e;
 	if (!sized) return "`blackhole NAME at X Y Z radius R ...`: how big it is";
+	if (b.lens)   // (the look's lens bends the picture round one hole: a second one was drawn nowhere)
+		for (const cosmos::BlackHole &o : s.blackHoles)
+			if (o.lens) return "`blackhole " + b.name + " ... lens 1`: only one black hole can bend the picture's light (" + o.name + " already does); leave out `lens 1` and it is drawn with its disc";
 	s.blackHoles.push_back(b);
 	return std::string();
 }

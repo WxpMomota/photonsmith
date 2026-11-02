@@ -274,7 +274,8 @@ inline std::string seaText(const Sea &given, double t, const Vec3 &eyeStory, con
 	const double height = std::max(0.5, std::abs(eye.y - s.level));
 	const double r0 = std::max(0.05, 0.08 * height), r1 = 8000.0;
 	const int around = 150, out = 110;
-	const std::shared_ptr<const surf::Grid> grid = swell && swell->on && ground && !s.fromBelow ? surf::gridOf(*ground, given.level, *swell) : nullptr;
+	// (the surf where the water is now - a tide moves it up and down the beach - to a quarter metre, so a tide makes a few of its grids and not one a frame)
+	const std::shared_ptr<const surf::Grid> grid = swell && swell->on && ground && !s.fromBelow ? surf::gridOf(*ground, std::round(s.level * 4.0) / 4.0, *swell) : nullptr;
 	Mesh water, foam;
 	std::vector<double> folds;
 	std::vector<char> shallow;
@@ -298,8 +299,9 @@ inline std::string seaText(const Sea &given, double t, const Vec3 &eyeStory, con
 			else p = {x, s.level, z}, n = {0.0, 1.0, 0.0};   // (beyond what the waves can show: flat, so the horizon is a clean line)
 			bool clear = false;
 			if (!s.painted.empty()) {   // (painted water is flat, or the ink finds every crest; what moves on it is drawn: film_toonwater.h)
+				p = {x, s.level, z};   // (flat, and then a whirlpool's or a great wave's shape alone: the waves kept with them gave the ink every crest)
+				for (const Sea::Bend &b : s.bends) bendAt(b, x, z, t, p, n, fold);
 				n = {0.0, 1.0, 0.0}, fold = 0.0;
-				if (s.bends.empty()) p = {x, s.level, z};
 			}
 			if (stirred && !stirred->froth.empty()) fold = std::max(fold, stirred->foldAt(x, z, t));
 			if (grid) {   // the surf: the open sea's waves giving way to it as the water shoals

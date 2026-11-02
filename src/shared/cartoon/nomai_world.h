@@ -63,7 +63,7 @@ inline std::string sunText(double dawn, double strength = 1.0) {
 inline double noise3(Vec3 p, int salt) {
 	const double fx = std::floor(p.x), fy = std::floor(p.y), fz = std::floor(p.z);
 	const int ix = static_cast<int>(fx), iy = static_cast<int>(fy), iz = static_cast<int>(fz);
-	const auto at = [salt](int a, int b, int c) { return hash01(a * 73856093 ^ b * 19349663 ^ c * 83492791, salt); };
+	const auto at = [salt](int a, int b, int c) { return hash01(cellOf(a, b, c), salt); };
 	const auto s = [](double u) { return u * u * (3.0 - 2.0 * u); };
 	const double u = s(p.x - fx), v = s(p.y - fy), w = s(p.z - fz);
 	const double a = lerp(lerp(at(ix, iy, iz), at(ix + 1, iy, iz), u), lerp(at(ix, iy + 1, iz), at(ix + 1, iy + 1, iz), u), v);

@@ -48,7 +48,7 @@ inline Vec3 clumpPull(const Vec3 &rest, double length) {
 	for (int k = -1; k <= 1; ++k)
 		for (int j = -1; j <= 1; ++j)
 			for (int i = -1; i <= 1; ++i) {
-				const int cell = (cx + i) * 73856093 ^ (cy + j) * 19349663 ^ (cz + k) * 83492791;
+				const int cell = static_cast<int>(static_cast<unsigned>(cx + i) * 73856093u ^ static_cast<unsigned>(cy + j) * 19349663u ^ static_cast<unsigned>(cz + k) * 83492791u);   // (unsigned: an int overflowed past 0.9 m, undefined)
 				const Vec3 middle{(cx + i + hash01(cell, 21)) * kCell, (cy + j + hash01(cell, 22)) * kCell, (cz + k + hash01(cell, 23)) * kCell};
 				const Vec3 d = middle - rest;
 				if (const double e = dot(d, d); e < nearest) nearest = e, to = d;
@@ -77,7 +77,7 @@ inline std::string strandsText(const std::vector<Mesh> &posed, const std::vector
 			const double want = area * perArea;
 			const int n = static_cast<int>(want) + (hash01(salt, 1) < want - std::floor(want) ? 1 : 0);
 			for (int k = 0; k < n; ++k) {
-				const int own = salt * 8191 + k * 131071;
+				const int own = static_cast<int>(static_cast<unsigned>(salt) * 8191u + static_cast<unsigned>(k) * 131071u);
 				double u = hash01(own, 2), v = hash01(own, 3);
 				if (u + v > 1.0) u = 1.0 - u, v = 1.0 - v;
 				const auto &pt = m.tris[ti];

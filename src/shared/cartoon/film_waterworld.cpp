@@ -168,7 +168,7 @@ std::string DataFilm::waterAt(const std::string &header, double t, double nt) co
 		if (spec.hasUnderwater && undersea::waterlineOf(sea, nt, {-eye.x, eye.y, eye.z}).where == undersea::Waterline::At) sea.holeX = -eye.x, sea.holeZ = eye.z, sea.holeR = 1.5;   // (clear of a lens at the waterline)
 		out += water::seaText(sea, nt, eye, target, hfov, ground.get(), spec.swell.on ? &spec.swell : nullptr, spec.hasUnderwater || painted ? nullptr : &stirred);
 	}
-	if (spec.swell.on && ground) out += surf::shallowsCausticText(spec.key.empty() ? std::string("film") : spec.key, nt, -eye.x, eye.z, *ground, spec.seas[0].level, spec.tracedCaustics);
+	if (spec.swell.on && ground) out += surf::shallowsCausticText(spec.key.empty() ? std::string("film") : spec.key, nt, -eye.x, eye.z, *ground, spec.seas[0].level + spec.seas[0].riseAt(nt), spec.tracedCaustics);   // (where the water is now)
 	for (const water::River &r : spec.rivers) out += stream::text(spec.key.empty() ? std::string("film") : spec.key, r, nt, ground.get(), eye, target, hfov, spec.hasUnderwater ? nullptr : &stirred, painted ? &spec.paint.mid : nullptr);
 	for (const water::Fall &f : spec.falls) out += f.frozen ? (ground ? std::string() : water::cliffText(f)) + ice::frozenFallText(f) : water::fallText(f, nt, ground.get());
 	out += onTheWater(stirred, t, nt, eye, target, hfov);

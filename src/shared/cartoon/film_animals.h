@@ -147,7 +147,9 @@ inline std::string eyeShineMaterial(const std::string &kind, double amount) {
 // An animal near the camera is posed for itself: the clip at exactly `phase` (0 .. 1), not the nearest of its few poses, a foot stepping along the ground a little at a time, and each
 // foot that is down set on the land where `place` (the animal's placement, story space) puts it, its leg bending to reach or straightening: the placement tilts a body to the slope
 // under it, and the ground under one hoof is its own. `groundAt`: the land's height at a place in story space.
-inline gltf_skin::Pose exactPose(const Model &m, const std::string &clip, double phase, const Mat4 &place, const std::function<double(double, double)> &groundAt, const Vec3 *watch = nullptr) {
+// `watching`: how far it turns to `watch` (0 .. 1, easing it in); `feet`: its feet set on the ground (not a lying one's, folded under it).
+inline gltf_skin::Pose exactPose(const Model &m, const std::string &clip, double phase, const Mat4 &place, const std::function<double(double, double)> &groundAt, const Vec3 *watch = nullptr,
+								 double watching = 1.0, bool feet = true) {
 	const gltf_skin::Rig &rig = m.rig;
 	gltf_skin::Pose pose = gltf_skin::restPose(rig);
 	const auto rest = gltf_skin::worldOf(rig, pose);
@@ -173,7 +175,7 @@ inline gltf_skin::Pose exactPose(const Model &m, const std::string &clip, double
 	const auto theta = [](const Vec3 &v) { return std::atan2(-v.z, -v.y); };
 	if (watch) {   // (head up and round to what it is watching: `watch`, story space; the neck takes some of the turn, the head the rest)
 		const Vec3 ahead = transformPoint(place, {0.0, 0.0, 1.0}) - transformPoint(place, {0.0, 0.0, 0.0}), to = *watch - transformPoint(place, {0.0, 0.0, 0.0});
-		const double yaw = std::clamp(std::atan2(ahead.z * to.x - ahead.x * to.z, ahead.x * to.x + ahead.z * to.z), -1.1, 1.1);
+		const double yaw = std::clamp(watching, 0.0, 1.0) * std::clamp(std::atan2(ahead.z * to.x - ahead.x * to.z, ahead.x * to.x + ahead.z * to.z), -1.1, 1.1);
 		for (const auto &[name, share] : {std::pair<const char *, double>{"neck", 0.55}, {"head", 0.45}}) {
 			const int n = nodeOf(name);
 			if (n < 0) continue;
@@ -185,6 +187,7 @@ inline gltf_skin::Pose exactPose(const Model &m, const std::string &clip, double
 		}
 	}
 	for (const std::string leg : {"hl", "fl", "hr", "fr"}) {
+		if (!feet) break;
 		const int upper = nodeOf(leg + ".upper"), lower = nodeOf(leg + ".lower"), foot = nodeOf(leg + ".foot");
 		if (upper < 0 || lower < 0 || foot < 0) continue;
 		const Vec3 U = at(world, upper), K = at(world, lower), A = at(world, foot);
@@ -332,7 +335,7 @@ inline std::string heroFur(const std::string &kind, const std::string &clip, int
 			const double want = area * density;
 			const int n = static_cast<int>(want) + (hash01(salt, 1) < want - std::floor(want) ? 1 : 0);
 			for (int j = 0; j < n; ++j) {
-				const int own = salt * 8191 + j * 131071;   // (each strand's chances its own: counted up, they fell in lines along the body)
+				const int own = static_cast<int>(static_cast<unsigned>(salt) * 8191u + static_cast<unsigned>(j) * 131071u);   // (unsigned, as it overflowed; each strand's chances its own: counted up, they fell in lines along the body)
 				double u = hash01(own, 2), v = hash01(own, 3);
 				if (u + v > 1.0) u = 1.0 - u, v = 1.0 - v;
 				const auto &pt = P.tris[ti];
@@ -405,14 +408,14 @@ struct Poses {
 	std::set<std::string> written;
 	double eyeshine = 0.0;   // (the film's `night eyeshine E`: the pupils glow - eyeShineOf)
 	std::string poseName(const std::string &kind, const std::string &clip, int k, std::string &text, double coat = 0.0, const std::string &pattern = std::string(), int variant = 0,
-						 bool wet = false) {
+						 bool wet = false, bool mud = false) {
 		k = ((k % posesOf(clip)) + posesOf(clip)) % posesOf(clip);
 		const std::string name = "anim_" + kind + "_" + clip + "_" + std::to_string(k) + (coat > 0.0 ? "_coat" + std::to_string(static_cast<int>(std::lround(coat * 100.0))) : std::string()) +
-								 (pattern.empty() ? std::string() : "_" + pattern + std::to_string(variant)) + (wet ? "_wet" : "") +
+								 (pattern.empty() ? std::string() : "_" + pattern + std::to_string(variant)) + (wet ? "_wet" : "") + (mud ? "_mud" : "") +
 								 (eyeshine > 0.0 ? "_shine" + std::to_string(static_cast<int>(std::lround(eyeshine * 100.0))) : std::string());
 		if (written.insert(name).second) {
 			const std::shared_ptr<const Model> m = modelOf(kind);
-			if (m) text += poseObject(*m, name, clip, k, kind, coat, pattern, variant, wet, eyeshine);
+			if (m) text += poseObject(*m, name, clip, k, kind, coat, pattern, variant, wet, eyeshine, nullptr, mud);
 		}
 		return name;
 	}

@@ -20,7 +20,7 @@ namespace nature {
 inline double noise2(double x, double z, int salt) {
 	const double fx = std::floor(x), fz = std::floor(z);
 	const int ix = static_cast<int>(fx), iz = static_cast<int>(fz);
-	const auto at = [salt](int a, int b) { return hash01(a * 73856093 ^ b * 19349663, salt); };
+	const auto at = [salt](int a, int b) { return hash01(cellOf(a, b), salt); };
 	const double u = x - fx, v = z - fz;
 	const double su = u * u * (3.0 - 2.0 * u), sv = v * v * (3.0 - 2.0 * v);
 	return lerp(lerp(at(ix, iz), at(ix + 1, iz), su), lerp(at(ix, iz + 1), at(ix + 1, iz + 1), su), sv);

@@ -218,7 +218,7 @@ inline std::string foamText(double storm, double t, const Vec3 &eye, double leve
 	const double u0 = dot(eye - drift, along), v0 = dot(eye - drift, across);
 	for (int j = static_cast<int>(std::floor((v0 - R) / cell)); j <= static_cast<int>(std::floor((v0 + R) / cell)); ++j)
 		for (int i = static_cast<int>(std::floor((u0 - R) / cell)); i <= static_cast<int>(std::floor((u0 + R) / cell)); ++i) {
-			const int key = i * 73856093 ^ j * 19349663;
+			const int key = cellOf(i, j);
 			if (hash01(key, 1) > 0.65 * storm) continue;
 			const double u = (i + hash01(key, 2)) * cell, v = (j + hash01(key, 3)) * cell, len = 0.4 + 1.8 * hash01(key, 4), wide = 0.05 + 0.25 * hash01(key, 5);
 			const Vec3 c = drift + along * u + across * v;

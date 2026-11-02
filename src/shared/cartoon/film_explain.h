@@ -106,9 +106,9 @@ struct View {
 	double fov = 40.0;
 	double frameHeightAt(Vec3 p) const { return 2.0 * std::max(1e-6, length(p - eye)) * std::tan(0.5 * fov * kPi / 180.0); }
 	Vec3 forward() const { return normalize(target - eye + Vec3{0.0, 0.0, 1e-12}); }
-	Vec3 right() const {   // (across the frame to the right: pbrt's +x looking along +z)
-		const Vec3 r = cross(Vec3{0.0, 1.0, 0.0}, forward());
-		return length(r) > 1e-9 ? normalize(r) : Vec3{1.0, 0.0, 0.0};
+	Vec3 right() const {   // (across the frame to the right: pbrt's +x looking along +z; with the film's LookAt's up - 0 0 -1 looking nearly straight up or down, film_file.cpp)
+		const Vec3 f = forward(), upward = std::hypot(f.x, f.z) < 1e-4 * std::abs(f.y) ? Vec3{0.0, 0.0, -1.0} : Vec3{0.0, 1.0, 0.0};
+		return normalize(cross(upward, f));
 	}
 	Vec3 up() const { return cross(forward(), right()); }
 };
@@ -130,8 +130,8 @@ inline std::string line(Vec3 a, Vec3 b, double width, Vec3 colour) {
 inline std::string card(const std::string &picture, double aspect, Vec3 c, double h, const View &v, double bright) {
 	const Vec3 r = v.right() * (0.5 * h * aspect), u = v.up() * (0.5 * h);
 	const Vec3 p[4] = {c - r - u, c + r - u, c + r + u, c - r + u};
-	char buf[512];
-	std::snprintf(buf, sizeof buf, "  Shape \"trianglemesh\" \"integer indices\" [ 0 1 2 0 2 3 ] \"point3 P\" [ %.6g %.6g %.6g %.6g %.6g %.6g %.6g %.6g %.6g %.6g %.6g %.6g ] \"point2 uv\" [ 0 0 1 0 1 1 0 1 ]\n",
+	char buf[640];   // (to a tenth of a millimetre however far out: at six figures a display card a few millimetres high, 30 km out, was one point)
+	std::snprintf(buf, sizeof buf, "  Shape \"trianglemesh\" \"integer indices\" [ 0 1 2 0 2 3 ] \"point3 P\" [ %.11g %.11g %.11g %.11g %.11g %.11g %.11g %.11g %.11g %.11g %.11g %.11g ] \"point2 uv\" [ 0 0 1 0 1 1 0 1 ]\n",
 				  p[0].x, p[0].y, p[0].z, p[1].x, p[1].y, p[1].z, p[2].x, p[2].y, p[2].z, p[3].x, p[3].y, p[3].z);
 	char scale[48];
 	std::snprintf(scale, sizeof scale, "%.4f", bright);

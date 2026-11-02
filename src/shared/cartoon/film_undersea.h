@@ -102,7 +102,8 @@ inline double surfaceAt(const water::Sea &s, double x, double z, double t) {
 // The mirror beyond Snell's window, seen from pbrt's `eye` under the surface: rings round the point over the eye out to far away, each point of the waves (its own slope)
 // a mirror where the line from the eye meets it past the critical angle; a centimetre under the water's own surface.
 inline std::string windowText(const water::Sea &s, double t, const Vec3 &eye) {
-	const double depth = std::max(0.05, s.level - eye.y);
+	const double level = s.level + s.riseAt(t);   // (where the water is now, as seaAt's surface is: a tide or a flood's)
+	const double depth = std::max(0.05, level - eye.y);
 	const double edge = depth * kCritical / std::sqrt(1.0 - kCritical * kCritical);   // (where the window's edge is on calm water)
 	const double r0 = 0.55 * edge, r1 = std::max(500.0, 60.0 * depth);
 	const int around = 120, rings = 50;
@@ -119,7 +120,7 @@ inline std::string windowText(const water::Sea &s, double t, const Vec3 &eye) {
 			Vec3 p, n;
 			double fold = 0.0;
 			if (r < 2500.0) water::seaAt(s, x, z, t, std::exp(-r / (20.0 + 4.0 * depth)), p, n, fold, spacing);
-			else p = {x, s.level, z}, n = {0.0, 1.0, 0.0};
+			else p = {x, level, z}, n = {0.0, 1.0, 0.0};
 			p.y -= 0.012;
 			const Vec3 d = normalize(p - eye);
 			const double c = std::clamp(dot(d, n), -1.0, 1.0);
@@ -177,11 +178,12 @@ inline std::string floated(const std::string &header, const water::Sea &s, doubl
 	if (!std::regex_search(header, m, look)) return header;
 	double v[6];
 	for (int k = 0; k < 6; ++k) v[k] = std::atof(m[k + 1].str().c_str());
-	if (!atSurface && std::abs(v[1] - s.level) > 0.6) return header;
+	const double level = s.level + s.riseAt(t);   // (the water where it is now: a tide's, as surfaceAt's)
+	if (!atSurface && std::abs(v[1] - level) > 0.6) return header;
 	// (round 16: with the wave, a little under it - lower at a crest, closer in a trough - so the line still rocks; at nine tenths of the wave, as before, the lens
 	// was above the water in a trough, and under the line the picture showed the surface's top)
-	const double w = surfaceAt(s, v[0], v[2], t) - s.level;
-	const double dy = w - (0.004 + 0.05 * std::max(0.0, w + 0.5 * s.waves)) + (atSurface ? s.level - v[1] : 0.0);
+	const double w = surfaceAt(s, v[0], v[2], t) - level;
+	const double dy = w - (0.004 + 0.05 * std::max(0.0, w + 0.5 * s.waves)) + (atSurface ? level - v[1] : 0.0);
 	char buf[200];
 	std::snprintf(buf, sizeof buf, "LookAt %.6f %.6f %.6f %.6f %.6f %.6f", v[0], v[1] + dy, v[2], v[3], v[4] + dy, v[5]);
 	return header.substr(0, static_cast<std::size_t>(m.position(0))) + buf + header.substr(static_cast<std::size_t>(m.position(0) + m.length(0)));
@@ -235,7 +237,7 @@ inline std::string backscatterText(double t, const Vec3 &eyeStory, const Vec3 &d
 		for (int b = -1; b <= 1; ++b)
 			for (int c = -1; c <= 1; ++c)
 				for (int k = 0; k < 60; ++k) {
-					const int cell = ((tx + a) * 73856093) ^ ((ty + b) * 19349663) ^ ((tz + c) * 83492791);
+					const int cell = cellOf(tx + a, ty + b, tz + c);
 					Vec3 p{(tx + a + hash01(k, cell + 1)) * tile, (ty + b + hash01(k, cell + 2)) * tile, (tz + c + hash01(k, cell + 3)) * tile};
 					p = p + Vec3{-drift.x, drift.y, drift.z} + Vec3{0.05 * std::sin(0.7 * t + k), 0.04 * std::sin(0.5 * t + 2 * k), 0.05 * std::cos(0.6 * t + k)};
 					const double d = length(p - eyeStory);
@@ -470,7 +472,7 @@ struct IceCap {
 };
 // The hole of the 30 m cell (i, j), if it has one: its middle and radius (pbrt's x z).
 inline bool iceHoleOf(const IceCap &ice, int i, int j, double &cx, double &cz, double &r) {
-	const int key = i * 73856093 ^ j * 19349663 ^ ice.seed;
+	const int key = cellOf(i, j) ^ ice.seed;
 	if (hash01(key, 1) * 4.0 >= ice.holes) return false;
 	cx = (i + 0.2 + 0.6 * hash01(key, 2)) * 30.0, cz = (j + 0.2 + 0.6 * hash01(key, 3)) * 30.0, r = 1.5 + 2.0 * hash01(key, 4);
 	return true;
@@ -592,7 +594,7 @@ inline std::string grainsText(const Vec3 &eye, const Vec3 &look, const std::func
 	const int cx = static_cast<int>(std::floor(look.x / cell)), cz = static_cast<int>(std::floor(look.z / cell)), n = static_cast<int>(R / cell);
 	for (int j = -n; j <= n; ++j)
 		for (int i = -n; i <= n; ++i) {
-			const int key = (cx + i) * 73856093 ^ (cz + j) * 19349663;
+			const int key = cellOf(cx + i, cz + j);
 			for (int k = 0; k < 5; ++k) {
 				const double x = (cx + i + hash01(key + k, 1)) * cell, z = (cz + j + hash01(key + k, 2)) * cell;
 				if (std::hypot(x - look.x, z - look.z) > R) continue;

@@ -142,7 +142,7 @@ inline std::string text(const Groom &g, const Scalp &s, const Mat4 &before, Vec3
 		strands.push_back(p);
 		// its clump: a cell of the scalp
 		const int cx = static_cast<int>(std::floor(d.x * 7.0)), cy = static_cast<int>(std::floor(d.y * 7.0)), cz = static_cast<int>(std::floor(d.z * 7.0));
-		clumps.push_back(((cx * 73856093) ^ (cy * 19349663) ^ (cz * 83492791)) & 0x7fffffff);
+		clumps.push_back(cellOf(cx, cy, cz) & 0x7fffffff);
 	}
 	// clumps: each strand drawn towards its clump's mean, more towards the tip
 	if (g.clump > 0.0) {

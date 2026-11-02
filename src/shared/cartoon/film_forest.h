@@ -460,7 +460,7 @@ inline Grown grow(const std::string &sp, int v, bool winter, bool spring) {
 			addLimb(g.wood, {along, 0.2, 0.05}, {along + 0.2, 0.2 + 0.5 * std::abs(std::sin(a)), 0.05 + 0.5 * std::cos(a)}, 0.04, 0.012);
 		}
 		addRoots(g, 6, 0.55, 0.1, salt);
-	} else if (sp == "glowcap") {   // from another world: a pale stem the height of a tree under a great dark cap, its gills and the spots on it shining
+	} else if (sp == "glowcap") {   // from another world: a pale stem the height of a tree under a great dark cap, the spots on it shining
 		const double H = 5.0 + 5.0 * hash01(salt, 1), r = 1.8 + 1.8 * hash01(salt, 2), bend = 0.5 * (hash01(salt, 3) - 0.5) * H;
 		const auto spine = [&](double u) { return Vec3{bend * u * u, H * u, 0.0}; };
 		for (int k = 0; k < 8; ++k) addLimb(g.wood, spine(k / 8.0), spine((k + 1) / 8.0), 0.28 - 0.14 * k / 8.0, 0.28 - 0.14 * (k + 1) / 8.0);
@@ -468,7 +468,8 @@ inline Grown grow(const std::string &sp, int v, bool winter, bool spring) {
 		addInto(g.foliage, cap, translate(spine(1.0)));
 		for (int k = 0; k < 26; ++k) {   // (its spots)
 			const double a = 2.0 * kPi * hash01(salt + k, 4), u = 0.2 + 0.72 * std::sqrt(hash01(salt + k, 5)), size = 0.04 + 0.1 * r * hash01(salt + k, 6);
-			addInto(g.blossom, uvSphere(1.0, 8, 5), mul(translate(spine(1.0) + Vec3{u * r * std::cos(a), 0.62 * r * (1.0 - u * u) + 0.02, u * r * std::sin(a)}), scale(size, 0.35 * size, size)));
+			const double top = u < 0.55 ? lerp(0.62, 0.5, u / 0.55) : u < 0.9 ? lerp(0.5, 0.2, (u - 0.55) / 0.35) : lerp(0.2, 0.0, (u - 0.9) / 0.1);   // (on the cap's own profile: under it, most were inside)
+			addInto(g.blossom, uvSphere(1.0, 8, 5), mul(translate(spine(1.0) + Vec3{u * r * std::cos(a), top * r + 0.1 * size, u * r * std::sin(a)}), scale(size, 0.35 * size, size)));
 		}
 	} else if (sp == "frond") {   // from another world: great arching plumes from the ground, as tall as a house
 		for (int f = 0; f < 11; ++f) {
@@ -989,7 +990,7 @@ inline std::string stageName(const std::string &sp, int v, const std::string &a,
 }
 inline std::string stageText(const std::string &film, const std::string &sp, int v, const std::string &a, const std::string &b, int k, bool full, double wet, std::vector<int> *tufts = nullptr) {
 	const double u = static_cast<double>(k) / detail::kStages;
-	const double leaves = lerp(detail::leavesIn(sp, a), detail::leavesIn(sp, b), u), blossom = lerp(a == "spring" ? 1.0 : 0.0, b == "spring" ? 1.0 : 0.0, u),
+	const double leaves = lerp(detail::leavesIn(sp, a), detail::leavesIn(sp, b), u), blossom = sp == "glowcap" ? 1.0 : lerp(a == "spring" ? 1.0 : 0.0, b == "spring" ? 1.0 : 0.0, u),   // (a glowcap's spots shine in every season)
 				 snow = lerp(a == "winter" ? 1.0 : 0.0, b == "winter" ? 1.0 : 0.0, u);
 	const bool bare = a == "winter" || b == "winter";
 	const std::string plain = stageName(sp, v, a, b, k, full), base = plain + (tufts ? "_close" : "");
@@ -1173,7 +1174,7 @@ inline std::string text(const std::string &film, const std::vector<Tree> &trees,
 		if (wet > 0.15)   // (what has come through the crown falls on from leaf to leaf: a drop from somewhere every moment)
 			for (int d = 0; d < 7; ++d) {
 				const int salt = own * 37 + d;
-				const double rate = 0.9 + 0.8 * hash01(salt, 64), cycle = t * rate + hash01(salt, 65), from = 2.5 + 3.5 * hash01(salt, 66), age = (cycle - std::floor(cycle)) * std::min(1.0 / rate, std::sqrt(from / 4.9));
+				const double rate = 0.9 + 0.8 * hash01(salt, 64), cycle = t * rate + hash01(salt, 65), from = 2.5 + 3.5 * hash01(salt, 66), age = (cycle - std::floor(cycle)) * std::min(1.0 / rate, std::sqrt(from * size / 4.9));   // (from as high as it starts: a sapling's went under the ground)
 				const Vec3 at = foot + Vec3{3.0 * (hash01(salt + static_cast<int>(std::floor(cycle)), 67) - 0.5), from * size - 4.9 * age * age, 3.0 * (hash01(salt + static_cast<int>(std::floor(cycle)), 68) - 0.5)};
 				char b[140];
 				std::snprintf(b, sizeof b, "AttributeBegin\n  Material \"dielectric\" \"float eta\" [ 1.33 ]\n  Translate %.4f %.4f %.4f\n  Shape \"sphere\" \"float radius\" [ 0.0028 ]\nAttributeEnd\n", -at.x, at.y, at.z);

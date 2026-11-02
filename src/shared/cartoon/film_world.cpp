@@ -996,6 +996,12 @@ std::string DataFilm::castAt(double t) const {
 // and a puff of silt at each step it takes on the seabed.
 std::string DataFilm::waterPlay(const Character &c, const CharacterKind &kind, double t) const {
 	const double level = spec.seas[0].level, dt = 1.0 / 12.0, back = 3.0;
+	// (no one near the water, now or three seconds ago - who walks on the shore, who sits in a boat - has nothing here: two moments, not 37 of them a frame, each of a rower's
+	// some milliseconds)
+	if (!underwater(c) && std::none_of(spec.tumbles.begin(), spec.tumbles.end(), [&c](const Spec::Tumble &f) { return f.who == c.name; })) {
+		const auto clearOf = [&](double u) { return transformPoint(momentOf(c, std::max(0.0, u)).frame, kind.chest * c.scale).y > level + 0.05; };
+		if (clearOf(t) && clearOf(t - back) && clearOf(t - 0.5 * back)) return std::string();
+	}
 	struct Sample {
 		double u, steps, going;
 		Vec3 chest;   // (pbrt's)

@@ -253,6 +253,7 @@ inline std::string textOf(const Kept &k, const std::string &kind, const RigOptio
 		const Vec3 colour{mat.baseColor[0], mat.baseColor[1], mat.baseColor[2]};
 		std::string material;
 		if (const auto tex = textures.find(mat.baseColorImage); tex != textures.end()) material = "Material \"diffuse\" \"texture reflectance\" \"" + tex->second + "\"";
+		else if (mat.transmission > 0.5) material = "Material \"thindielectric\" \"float eta\" [ 1.5 ]";   // (glass - a helmet's bubble - as a thin shell: it was a glossy white, and hid the face)
 		else if (mat.metallic > 0.5) material = metalMaterial(colour, std::max(0.02, mat.roughness * 0.5));
 		else if (mat.roughness < 0.5) material = coated(colour, mat.roughness);
 		else material = diffuseMaterial(colour);

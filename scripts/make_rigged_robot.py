@@ -13,10 +13,13 @@ Run it from the repository: python scripts/make_rigged_robot.py [OUT.glb]. Stand
 """
 import json
 import math
+import os
 import struct
 import sys
 
-OUT = sys.argv[1] if len(sys.argv) > 1 else "pbrt_scenes/film_assets/library/robot.glb"
+OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pbrt_scenes", "film_assets", "library", "robot.glb")
+# how far the wave and the cheer lift the arms (1: the robot's own, nearly straight up; a model with a big head lifts them less, or they go into it)
+ARM_UP = 1.0
 
 # joints: name, parent, rest position in the model's world (y up, facing +z; +x is the robot's left)
 JOINTS = [
@@ -179,9 +182,9 @@ def main():
         ("head", "rotation", idle_t, [quat(X, 3.0 * math.sin(2 * math.pi * t / 3.0 + 1.0)) for t in idle_t]),
     ])
     clip("wave", [("arm.R", "rotation", [0.0, 0.4, 0.7, 1.0, 1.3, 1.6, 2.0],
-                   [quat(Z, 0), quat(Z, -150), quat(Z, -125), quat(Z, -165), quat(Z, -125), quat(Z, -150), quat(Z, 0)])])
-    clip("cheer", [("arm.L", "rotation", [0.0, 0.35, 0.6, 0.85, 1.1, 1.6], [quat(Z, 0), quat(Z, 160), quat(Z, 140), quat(Z, 165), quat(Z, 140), quat(Z, 0)]),
-                   ("arm.R", "rotation", [0.0, 0.35, 0.6, 0.85, 1.1, 1.6], [quat(Z, 0), quat(Z, -160), quat(Z, -140), quat(Z, -165), quat(Z, -140), quat(Z, 0)])])
+                   [quat(Z, a * ARM_UP) for a in (0, -150, -125, -165, -125, -150, 0)])])
+    clip("cheer", [("arm.L", "rotation", [0.0, 0.35, 0.6, 0.85, 1.1, 1.6], [quat(Z, a * ARM_UP) for a in (0, 160, 140, 165, 140, 0)]),
+                   ("arm.R", "rotation", [0.0, 0.35, 0.6, 0.85, 1.1, 1.6], [quat(Z, a * ARM_UP) for a in (0, -160, -140, -165, -140, 0)])])
     clip("nod", [("head", "rotation", [0.0, 0.25, 0.5, 0.75, 1.0], [quat(X, 0), quat(X, 18), quat(X, 0), quat(X, 18), quat(X, 0)])])
 
     doc = {

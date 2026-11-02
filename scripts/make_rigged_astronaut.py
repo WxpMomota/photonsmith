@@ -10,11 +10,12 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-out = sys.argv[1] if len(sys.argv) > 1 else "pbrt_scenes/film_assets/library/nova.glb"
+out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pbrt_scenes", "film_assets", "library", "nova.glb")
 sys.argv = sys.argv[:1]
 import make_rigged_robot as robot  # noqa: E402
 
 robot.OUT = out
+robot.ARM_UP = 120.0 / 165.0   # (its arms up as a V: lifted the robot's 165 degrees, nearly straight up, they went into its bubble)
 robot.JOINTS = [
     ("hips", -1, (0.0, 0.40, 0.0)),
     ("chest", 0, (0.0, 0.54, 0.0)),

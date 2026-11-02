@@ -22,7 +22,7 @@ static std::string sayLine(Spec &s, const std::vector<std::string> &t, int n) {
 		} else if (t[i] == "radio") {
 			l.radio = true;
 			++i;
-		} else if (t[i] == "delay" && i + 1 < t.size() && number(t[i + 1], l.delay) && l.delay >= 0.0) {
+		} else if (t[i] == "delay" && i + 1 < t.size() && number(t[i + 1], l.delay) && l.delay >= 0.0 && l.delay <= 600.0) {   // (a minute or ten: a distance's, not a number the mix cannot place)
 			l.radio = true;
 			i += 2;
 		} else if ((t[i] == "rate" || t[i] == "pitch") && i + 1 < t.size() && number(t[i + 1], t[i] == "rate" ? l.rate : l.pitch)) {
@@ -94,6 +94,45 @@ static void eruptionsOnLand(Spec &s, const terrain::Field &groundField) {
 	}
 }
 
+namespace detail {
+// The shot being read, at its end (`shotText` its key lines, `shotEase` its `ease camera`): its camera path made from its keys, or what is wrong with it.
+static std::string closeShot(Spec &s, std::string &shotText, std::string &shotEase) {
+	if (s.shots.empty()) return std::string();
+	const std::string ease = shotEase;
+	shotEase.clear();
+	Shot &sh = s.shots.back();
+	const std::string named = "the shot \"" + sh.name + "\"";
+	if (!ease.empty() && (sh.move.kind != Shot::Move::None || !sh.fly.empty() || sh.following || sh.coverage || sh.descending || sh.spaceCam.kind != cosmos::SpaceCam::None))
+		return named + " has `ease camera`, which is for a shot of `key` lines";
+	// (one way for its camera to go: with two, one was dropped without a word - a `descend` won over an `orbit`)
+	const int ways = (sh.move.kind != Shot::Move::None ? 1 : 0) + (!sh.fly.empty() ? 1 : 0) + (sh.descending ? 1 : 0) + (sh.spaceCam.kind != cosmos::SpaceCam::None ? 1 : 0);
+	if (ways > 1) return named + " has more than one of a move (`orbit`, `dolly`...), `fly`, `descend` and `spacecam`: one way for its camera to go";
+	const bool others = !shotText.empty() || sh.following || sh.coverage;
+	if (sh.move.kind != Shot::Move::None) return others ? named + " has a move and `key`, `follow` or `auto` lines too" : std::string();
+	if (!sh.fly.empty()) return others ? named + " has a `fly` line and `key`, `follow` or `auto` lines too" : std::string();
+	if (sh.descending) return others ? named + " has a `descend` line and `key`, `follow` or `auto` lines too" : std::string();   // (from orbit to the ground: film_planetfall.h)
+	if (sh.spaceCam.kind != cosmos::SpaceCam::None) return others ? named + " has a `spacecam` line and `key`, `follow` or `auto` lines too" : std::string();   // (a journey in space: film_voyage.h)
+	if (sh.following || sh.coverage) {
+		if (!shotText.empty()) return named + " has both `key` lines and `" + (sh.following ? "follow" : "auto") + "`";
+		if (sh.following && sh.coverage) return named + " has both `follow` and `auto`";
+		return std::string();
+	}
+	if (shotText.empty()) return named + " has no `key` lines (or a `follow` line)";
+	// one `key` is a camera that stays where it is (a camera path wants two)
+	std::size_t keyLines = 0;
+	for (std::size_t at = shotText.find("key "); at != std::string::npos; at = shotText.find("key ", at + 1)) ++keyLines;
+	if (keyLines == 1) {
+		const std::size_t at = shotText.find("key ");
+		shotText += shotText.substr(at, shotText.find('\n', at) - at + 1);
+	}
+	const camera_keyframes::ParseResult p = camera_keyframes::parse(ease + shotText);
+	if (!p.ok) return named + "'s `key` lines: " + p.error;
+	sh.path = p.path;
+	shotText.clear();
+	return std::string();
+}
+}  // namespace detail
+
 Parsed parse(const std::string &text, const std::string &where, const std::vector<Spec::CreditName> *castBefore) {
 	using detail::number;
 	Parsed r;
@@ -116,47 +155,7 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 	};
 	std::string shotText;   // the key lines of the shot being read
 	std::string shotEase;   // its `ease camera` (as the camera path's `ease` line)
-	auto closeShot = [&]() -> std::string {
-		if (s.shots.empty()) return std::string();
-		const std::string ease = shotEase;
-		shotEase.clear();
-		if (!ease.empty() && (s.shots.back().move.kind != Shot::Move::None || !s.shots.back().fly.empty() || s.shots.back().following || s.shots.back().coverage))
-			return "the shot \"" + s.shots.back().name + "\" has `ease camera`, which is for a shot of `key` lines";
-		if (s.shots.back().move.kind != Shot::Move::None) {
-			if (!shotText.empty() || s.shots.back().following || s.shots.back().coverage) return "the shot \"" + s.shots.back().name + "\" has a move and `key`, `follow` or `auto` lines too";
-			return std::string();
-		}
-		if (!s.shots.back().fly.empty()) {
-			if (!shotText.empty() || s.shots.back().following || s.shots.back().coverage) return "the shot \"" + s.shots.back().name + "\" has a `fly` line and `key`, `follow` or `auto` lines too";
-			return std::string();
-		}
-		if (s.shots.back().descending) {   // (from orbit to the ground: film_planetfall.h)
-			if (!shotText.empty() || s.shots.back().following || s.shots.back().coverage) return "the shot \"" + s.shots.back().name + "\" has a `descend` line and `key`, `follow` or `auto` lines too";
-			return std::string();
-		}
-		if (s.shots.back().spaceCam.kind != cosmos::SpaceCam::None) {   // (a journey in space: film_voyage.h)
-			if (!shotText.empty() || s.shots.back().following || s.shots.back().coverage) return "the shot \"" + s.shots.back().name + "\" has a `spacecam` line and `key`, `follow` or `auto` lines too";
-			return std::string();
-		}
-		if (s.shots.back().following || s.shots.back().coverage) {
-			if (!shotText.empty()) return "the shot \"" + s.shots.back().name + "\" has both `key` lines and `" + (s.shots.back().following ? "follow" : "auto") + "`";
-			if (s.shots.back().following && s.shots.back().coverage) return "the shot \"" + s.shots.back().name + "\" has both `follow` and `auto`";
-			return std::string();
-		}
-		if (shotText.empty()) return "the shot \"" + s.shots.back().name + "\" has no `key` lines (or a `follow` line)";
-		// one `key` is a camera that stays where it is (a camera path wants two)
-		std::size_t keyLines = 0;
-		for (std::size_t at = shotText.find("key "); at != std::string::npos; at = shotText.find("key ", at + 1)) ++keyLines;
-		if (keyLines == 1) {
-			const std::size_t at = shotText.find("key ");
-			shotText += shotText.substr(at, shotText.find('\n', at) - at + 1);
-		}
-		const camera_keyframes::ParseResult p = camera_keyframes::parse(ease + shotText);
-		if (!p.ok) return "the shot \"" + s.shots.back().name + "\"'s `key` lines: " + p.error;
-		s.shots.back().path = p.path;
-		shotText.clear();
-		return std::string();
-	};
+	const auto closeShot = [&]() { return detail::closeShot(s, shotText, shotEase); };
 	int shotLine = 0;
 	for (;;) {
 		if (!std::getline(*sources.back().in, line)) {   // (the end of a library file: back to the file that brought it in)
@@ -908,6 +907,10 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 		}
 		s.terrain.biome = s.biome;
 		const bool bare = s.biome == "arctic" || s.biome == "rust" || s.biome == "frost" || s.biome == "glass" || s.biome == "moonrock";
+		if (bare && s.biomeTrees > 0) {   // (it was taken and nothing grew)
+			n = 0;
+			return fail("`biome " + s.biome + "` is bare: it has no plants for `plants N`");
+		}
 		if (s.forests.empty() && !bare) {
 			forest::Forest f;
 			f.kind = s.biome;
@@ -922,6 +925,8 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 			else if (s.biome != "moonrock") s.ambience = {{"wind", s.biome == "desert" ? 0.6 : 0.8}};   // (no air, no sound)
 		}
 	}
+	// (the planet goes on past the land: from above a ring of blue-grey hills is a disc on it. Set before the land is first made, or a second one was made with ranges at load)
+	if (s.fall.on) s.terrain.ranges = false;
 	if (s.hasTerrain) {   // on a terrain, heights are above the ground: what is placed and who is brought in stand on it
 		if (!s.seas.empty()) s.terrain.waterLevel = s.seas[0].level;   // (its shore is drawn for the water)
 		if (s.terrain.kind == "coast" && !s.terrain.ySet) s.terrain.y = (s.seas.empty() ? 0.0 : s.seas[0].level) - 0.25 * s.terrain.height;   // (its beach at the water)
@@ -1107,11 +1112,11 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 		}
 		if (std::none_of(s.ambience.begin(), s.ambience.end(), [](const dressing::Ambience &am) { return am.kind == "wind"; })) s.ambience.push_back({"wind", 0.5 + 0.5 * st.strength});
 	}
+	n = 0;   // (these are about the whole film: not the last line read)
 	for (const Shot &shot : s.shots)
 		if (shot.descending && !s.fall.on) return fail("the shot \"" + shot.name + "\" has a `descend` line: the film needs a `planetfall` line for it to come down");
 	if (s.fall.on && !s.hasTerrain) return fail("`planetfall` comes down to a film's land: it needs a `terrain`");
 	if (s.fall.on && !s.hasSky) return fail("`planetfall` needs a `sky`");
-	if (s.fall.on) s.terrain.ranges = false;   // (the planet goes on past the land: from above a ring of blue-grey hills is a disc on it)
 	if (s.air.on) {   // (one medium round the camera)
 		if (s.hasMist || s.fog.on || s.hasUnderwater) {
 			n = 0;

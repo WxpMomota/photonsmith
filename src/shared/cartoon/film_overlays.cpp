@@ -1,6 +1,8 @@
 // film_overlays.cpp -- what an explainer draws over a frame of a film made from a file (film_explain.h): labels, orbit lines, scale bars, a comparison, a mission's route and its display.
 // DataFilm's member. Compiled once, in cpu_renderer.
 
+#include <cstdlib>
+
 #include "film_file.h"
 
 namespace cartoon {
@@ -71,13 +73,22 @@ std::string DataFilm::overlaysAt(const std::string &header, double t, double nt)
 		mark.text = r.text.empty() ? std::string(">") : r.text, mark.colour = r.colour, mark.from = r.from;
 		out += explain::labelText(mark, t, pointAt(std::min(1.0, (t - r.from) / std::max(1e-6, r.over))), 0.0, v, film);
 	}
-	for (const explain::Hud &h : spec.explain.huds) {   // (held at a fixed place in the frame, just in front of the camera, its left edge at x)
+	// the frame's width over its height, from its Film line (a 2.39 or 4:3 film's display was placed as if 16:9)
+	const auto resolution = [&header](const char *what) {
+		const std::size_t at = header.find(what), open = at == std::string::npos ? at : header.find('[', at);
+		return open == std::string::npos ? 0 : std::atoi(header.c_str() + open + 1);
+	};
+	const int frameW = resolution("integer xresolution"), frameH = resolution("integer yresolution");
+	const double frame = frameW > 0 && frameH > 0 ? static_cast<double>(frameW) / frameH : 16.0 / 9.0;
+	// (held at a fixed place in the frame, just in front of the camera, its left edge at x; far from the world's middle, further in front: a renderer's floats are a few millimetres
+	// apart 30 km out, and a card millimetres high collapsed)
+	for (const explain::Hud &h : spec.explain.huds) {
 		const double a = explain::detail::shown(t, h.from, h.to);
 		if (a <= 0.0) continue;
 		double aspect = 1.0;
 		const std::string pic = explain::cardPicture(film, h.text, h.colour, aspect);
-		const double half = std::tan(0.5 * v.fov * kPi / 180.0), d = std::max(0.2, 0.002 * length(v.target - v.eye) + 0.2), high = h.size * 2.0 * d * half;
-		const Vec3 at = v.eye + v.forward() * d + v.right() * (h.x * d * half * 16.0 / 9.0 + 0.5 * high * aspect) + v.up() * (h.y * d * half);
+		const double half = std::tan(0.5 * v.fov * kPi / 180.0) * (frame < 1.0 ? 1.0 / frame : 1.0), d = std::max({0.2, 0.002 * length(v.target - v.eye) + 0.2, 2e-4 * length(v.eye)}), high = h.size * 2.0 * d * half;   // (pbrt's fov is the shorter side's)
+		const Vec3 at = v.eye + v.forward() * d + v.right() * (h.x * d * half * frame + 0.5 * high * aspect) + v.up() * (h.y * d * half);
 		if (!pic.empty()) out += "# a line of the display (film_explain.h): " + h.text + "\n" + explain::detail::card(pic, aspect, at, high, v, a);
 	}
 	for (const explain::Compare &c : spec.explain.compares) {
