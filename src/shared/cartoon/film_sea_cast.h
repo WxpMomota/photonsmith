@@ -48,6 +48,12 @@ inline Vec3 handFor(Vec3 shoulder, double side, const SeaPose &p, double reach, 
 	dir = lerp(normalize(dir), normalize(Vec3{side * 0.15, -1.0, -0.12}), streamline * (1.0 - std::min(1.0, raise + p.forwardR)));
 	return shoulder + normalize(dir) * reach + Vec3{0.0, 0.015 * std::sin(1.3 * t + side), 0.0};
 }
+// A mermaid's hand (her own frame): as handFor, with a slow treading stroke while she neither swims nor gestures. What she draws and where what she holds goes (handAt).
+inline Vec3 mermaidHand(double side, const SeaPose &p, double swimming, double t) {
+	const Vec3 hand = handFor({side * 0.165, 1.37, 0.0}, side, p, 0.48, swimming, t);
+	if (swimming < 0.5 && p.raiseL + p.raiseR + p.forwardR + p.spread < 0.1) return hand + Vec3{side * 0.1 * (1.0 + std::sin(2.0 * kPi * t / 2.4)), 0.12, 0.08 * std::cos(2.0 * kPi * t / 2.4)};
+	return hand;
+}
 inline void arm(Mesh &skin, Mesh &hands, Vec3 shoulder, Vec3 hand, double side, double r) {
 	const Vec3 mid = (shoulder + hand) * 0.5 + Vec3{side * 0.05, -0.02, -0.05};   // (the elbow out and back a little)
 	add(skin, sdf::tubeMesh({shoulder, mid, hand}, r, 0.75, 8));
@@ -112,9 +118,7 @@ inline CharacterKind merKind(bool merman) {
 		// her arms: hanging, raised, waving; along her sides as she swims, a slow stroke as she treads water
 		for (const double side : {1.0, -1.0}) {
 			const Vec3 shoulder{side * 0.165, 1.37, 0.0};
-			Vec3 hand = handFor(shoulder, side, p, 0.48, swimming, m.t);
-			if (swimming < 0.5 && p.raiseL + p.raiseR + p.forwardR + p.spread < 0.1) hand = hand + Vec3{side * 0.1 * (1.0 + std::sin(2.0 * kPi * m.t / 2.4)), 0.12, 0.08 * std::cos(2.0 * kPi * m.t / 2.4)};
-			arm(skin, hands, shoulder, hand, side, merman ? 0.045 : 0.038);
+			arm(skin, hands, shoulder, mermaidHand(side, p, swimming, m.t), side, merman ? 0.045 : 0.038);
 		}
 		// the tail: from her hips down to the fluke, waving - a slow sway while she treads water, a strong kick as she swims (up and down, once she lies level)
 		const double beat = 2.0 * kPi * m.t * (0.45 + 1.3 * swimming), amp = 0.35 + 0.9 * swimming;
@@ -163,7 +167,7 @@ inline CharacterKind merKind(bool merman) {
 	k.handAt = [](const CharacterMoment &m, int s) {
 		const SeaPose p = posed(m, {0.0, 1.55, 0.02});
 		const double side = s == 0 ? 1.0 : -1.0;
-		return transformPoint(mul(m.frame, scale(m.scale), mermaidLean(m)), detail::handFor({side * 0.165, 1.37, 0.0}, side, p, 0.48, m.swim > 0.0 ? smoothstep(0.0, 0.7, m.going) : 0.0, m.t));
+		return transformPoint(mul(m.frame, scale(m.scale), mermaidLean(m)), detail::mermaidHand(side, p, m.swim > 0.0 ? smoothstep(0.0, 0.7, m.going) : 0.0, m.t));
 	};
 	k.headFrame = [](const CharacterMoment &m) {   // (+x forward, +y up, +z its right: for `hair` strands)
 		const Mat4 body = mul(m.frame, scale(m.scale), mermaidLean(m));
@@ -202,9 +206,17 @@ inline CharacterKind seaTurtleKind() {
 		for (auto &tr : shell.tris) std::swap(tr[1], tr[2]);
 		shell.uvs.clear();
 		Mesh plates, skin, white, pupil, lid, brows, mouth;
-		for (int q = 0; q < 9; ++q) {   // (the plates on its shell, a shade lighter)
+		const auto shellTop = [L](double x, double z) {   // (the shell's top over (x, z): its profile's radius there, squashed as `shell` is)
+			const double hs[6] = {-0.5, -0.42, -0.15, 0.1, 0.35, 0.48}, rs[6] = {0.0, 0.3, 0.45, 0.48, 0.38, 0.0}, h = std::clamp(z / L, -0.5, 0.48);
+			int k = 0;
+			while (k < 4 && h > hs[k + 1]) ++k;
+			const double rp = L * lerp(rs[k], rs[k + 1], (h - hs[k]) / (hs[k + 1] - hs[k]));
+			return 0.15 + 0.32 * std::sqrt(std::max(0.0, rp * rp - x * x));
+		};
+		for (int q = 0; q < 9; ++q) {   // (the plates on its shell, a shade lighter: standing a little out of it, not under it)
 			const double a = 2.0 * kPi * q / 6.0, r = q < 6 ? 0.2 : 0.0, z = q < 6 ? 0.0 : 0.22 * (q - 7);
-			add(plates, ellipsoid({r * std::sin(a) * L * 0.6, 0.15 + 0.135 * L * (q < 6 ? 0.85 : 1.0), r * std::cos(a) * L * 0.6 + z * L}, {0.09, 0.012, 0.09}, 12, 6));
+			const double px = r * std::sin(a) * L * 0.6, pz = r * std::cos(a) * L * 0.6 + z * L;
+			add(plates, ellipsoid({px, shellTop(px, pz) - 0.004, pz}, {0.09, 0.012, 0.09}, 12, 6));
 		}
 		const double look = 0.06 * p.nod;
 		add(skin, ellipsoid({0.0, 0.17 - look, 0.53}, {0.095, 0.085, 0.12}, 18, 12));   // (its head, on a neck)
@@ -352,12 +364,12 @@ inline CharacterKind jellyfishKind() {
 			add(arms, flow::tube(line, r, 7, 1.8));
 		}
 		for (const double side : {1.0, -1.0}) {   // a face on the front of its bell
-			const Vec3 c{side * 0.06, 0.6 + 0.4 * R * tall, 0.7 * R * wide + 0.02};
+			const Vec3 c{side * 0.06, 0.55 + 0.4 * R * tall, 0.7 * R * wide + 0.02};   // (on the bell: it is 0.55 up, as `bell` is)
 			eye(white, pupil, lid, m, p, c, 0.03, normalize(Vec3{side * 0.2, 0.1, 1.0}));
 			brow(brows, c, 0.03, side, p);
 		}
 		const double open = std::clamp(p.mouthOpen, 0.0, 1.0), smile = std::clamp(p.smile, -1.0, 1.0);
-		add(mouth, ellipsoid({0.0, 0.6 + 0.1 * R + 0.004 * smile, 0.9 * R * wide + 0.015}, {0.025 + 0.006 * smile, 0.003 + 0.016 * open, 0.01}, 12, 8));
+		add(mouth, ellipsoid({0.0, 0.55 + 0.1 * R + 0.004 * smile, 0.9 * R * wide + 0.015}, {0.025 + 0.006 * smile, 0.003 + 0.016 * open, 0.01}, 12, 8));
 		const Vec3 L = glowC * 0.9;
 		char glow[200];
 		std::snprintf(glow, sizeof glow, "AreaLightSource \"diffuse\" \"rgb L\" [ %.4f %.4f %.4f ] \"bool twosided\" true \"bool sampled\" false\n  Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]", L.x, L.y, L.z);

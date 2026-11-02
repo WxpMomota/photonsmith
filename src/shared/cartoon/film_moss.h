@@ -30,9 +30,9 @@ constexpr int kSides = 4;      // (the pictures of a trunk)
 constexpr int kTop = kSides;   // (and the one of what faces up)
 constexpr double kReach = 4.5;   // (how far up a trunk, metres)
 
-// How a mesh's triangle goes into a skin: raised off the surface by `lift`, with uv from `at` (each corner's own copy, as a skin has seams).
+// How a mesh's triangle goes into a skin: raised off the surface by `lift`, with uv from `at` (each corner's own copy, as a skin has seams). `around`: u is an angle round, and wraps.
 template <class Uv>
-inline Mesh skinOf(const Mesh &m, double lift, const std::function<bool(const Vec3 &, const Vec3 &, const Vec3 &, const Vec3 &)> &wanted, const Uv &at) {
+inline Mesh skinOf(const Mesh &m, double lift, const std::function<bool(const Vec3 &, const Vec3 &, const Vec3 &, const Vec3 &)> &wanted, const Uv &at, bool around) {
 	Mesh out;
 	if (m.normals.size() != m.verts.size()) return out;
 	for (const auto &t : m.tris) {
@@ -40,10 +40,10 @@ inline Mesh skinOf(const Mesh &m, double lift, const std::function<bool(const Ve
 		const Vec3 face = cross(b - a, c - a);
 		if (length(face) < 1e-12 || !wanted(a, b, c, normalize(face))) continue;
 		std::array<std::pair<double, double>, 3> uv = {at(a), at(b), at(c)};
-		// (a triangle across the seam of the angle round the trunk: its corners on the same side of it)
+		// (a triangle across the seam of the angle round the trunk: its corners on the same side of it. Not on a flat skin: a long log's triangle spans more than half a repeat)
 		const double top = std::max({uv[0].first, uv[1].first, uv[2].first});
 		for (auto &q : uv)
-			if (top - q.first > 0.5) q.first += 1.0;
+			if (around && top - q.first > 0.5) q.first += 1.0;
 		const int base = static_cast<int>(out.verts.size());
 		for (int k = 0; k < 3; ++k) {
 			const std::size_t i = static_cast<std::size_t>(t[k]);
@@ -58,11 +58,11 @@ inline Mesh skinOf(const Mesh &m, double lift, const std::function<bool(const Ve
 // The skin of the bottom of a trunk (and its roots): u the angle round it, v the height.
 inline Mesh trunkSkin(const Mesh &wood) {
 	return skinOf(wood, 0.007, [](const Vec3 &a, const Vec3 &b, const Vec3 &c, const Vec3 &) { return std::max({a.y, b.y, c.y}) < kReach; },
-				  [](const Vec3 &p) { return std::make_pair(std::atan2(p.z, p.x) / (2.0 * kPi) + 0.5, std::clamp(p.y / kReach, 0.0, 1.0)); });
+				  [](const Vec3 &p) { return std::make_pair(std::atan2(p.z, p.x) / (2.0 * kPi) + 0.5, std::clamp(p.y / kReach, 0.0, 1.0)); }, true);
 }
 // The skin of what faces up: uv across the ground, one repeat of the picture to `size` metres.
 inline Mesh topSkin(const Mesh &m, double size, double lift) {
-	return skinOf(m, lift, [](const Vec3 &, const Vec3 &, const Vec3 &, const Vec3 &n) { return n.y > 0.25; }, [size](const Vec3 &p) { return std::make_pair(p.x / size, p.z / size); });
+	return skinOf(m, lift, [](const Vec3 &, const Vec3 &, const Vec3 &, const Vec3 &n) { return n.y > 0.25; }, [size](const Vec3 &p) { return std::make_pair(p.x / size, p.z / size); }, false);
 }
 
 namespace detail {
@@ -70,14 +70,14 @@ namespace detail {
 // a whole number of times, so the picture has no seam.
 inline std::string coverPicture(const std::string &film, int side) {
 	constexpr int W = 384, H = 384;
-	return film_sky::picture(film, "moss2_cover" + std::to_string(side), W, H, [&](std::vector<float> &rgb) {
+	return film_sky::picture(film, "moss3_cover" + std::to_string(side), W, H, [&](std::vector<float> &rgb) {
 		for (int y = 0; y < H; ++y)
 			for (int x = 0; x < W; ++x) {
 				const double u = (x + 0.5) / W, v = 1.0 - (y + 0.5) / H, a = 2.0 * kPi * u;
 				const double n = nature::fbm2(2.6 * std::cos(a) + 2.1 * v * (side == kTop ? 0.0 : 1.0) + 5.0, 2.6 * std::sin(a) + 11.0 * v, 47);
 				double want = 0.75;
 				if (side != kTop) {
-					const double facing = std::cos(a - 2.0 * kPi * side / kSides);
+					const double facing = std::cos(a - kPi - 2.0 * kPi * side / kSides);   // (u is the angle round the trunk plus half a turn: trunkSkin)
 					want = 0.3 + 0.42 * facing + 0.5 * (1.0 - v) * (1.0 - v) - 0.8 * smoothstep(0.6, 1.0, v);
 				}
 				const double line = lerp(0.72, 0.36, std::clamp(want, 0.0, 1.0));

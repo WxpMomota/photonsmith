@@ -34,9 +34,9 @@ struct Paint {
 // The colour of the water by its depth, in steps: the bands' picture over the terrain's square (u, v along x, z).
 inline std::string bandsPicture(const std::string &film, const terrain::Field &g, double level, const Paint &p) {
 	const int W = 768;
-	char key[80];
-	std::snprintf(key, sizeof key, "toonsea1_%d_%d_%d", g.n, static_cast<int>(level * 100.0), static_cast<int>(1000.0 * (p.deep.x + 2.0 * p.mid.y + 3.0 * p.shallow.z)));
-	return film_sky::picture(film, key, W, W, [&](std::vector<float> &rgb) {
+	char words[240];   // (its name: every number it is made from, the land's shape and all nine of the colours)
+	std::snprintf(words, sizeof words, "|%d|%.4f|%.4f|%.4f|%.4f|%.4f|%.4f|%.4f|%.4f|%.4f|%.4f", g.n, level, p.deep.x, p.deep.y, p.deep.z, p.mid.x, p.mid.y, p.mid.z, p.shallow.x, p.shallow.y, p.shallow.z);
+	return film_sky::picture(film, "toonsea2_" + film_cache::nameOf(g.spec.key() + words), W, W, [&](std::vector<float> &rgb) {
 		for (int y = 0; y < W; ++y)
 			for (int x = 0; x < W; ++x) {
 				const double px = g.x0 + (x + 0.5) / W * (g.n - 1) * g.cell, pz = g.z0 + (W - 1 - y + 0.5) / W * (g.n - 1) * g.cell;
@@ -77,7 +77,10 @@ inline void circle(Mesh &m, double x, double y, double z, double r, double width
 }  // namespace detail
 
 // The drawn things on the water at t: its wave lines and sparkles round the camera, its rings and its splashes. `sunFacing`: where the sun is (a facing, degrees), `sunUp` how high.
-inline std::string text(const Paint &paint, const stir::Field &f, double t, const Vec3 &eye, const Vec3 &ahead, double hfov, double level, const water::Sea *sea, double sunFacing, double sunUp) {
+// `waterY`: the water's height at pbrt's (x, z) (a sea's is flat; a river's falls); the wave lines and sparkles are for open water (`sea`) alone: they are laid out everywhere round
+// the camera, and over a valley with only a river they floated in the air.
+template <class WaterY>
+inline std::string text(const Paint &paint, const stir::Field &f, double t, const Vec3 &eye, const Vec3 &ahead, double hfov, double level, const water::Sea *sea, double sunFacing, double sunUp, WaterY waterY) {
 	if (paint.off) return std::string();
 	const double wide = std::cos(std::min(kPi, (0.5 * hfov + 12.0) * kPi / 180.0));
 	const auto seen = [&](double x, double z) {
@@ -85,10 +88,10 @@ inline std::string text(const Paint &paint, const stir::Field &f, double t, cons
 		const double d = length(to);
 		return d > 0.5 && dot(to * (1.0 / d), ahead) > wide;
 	};
-	const auto waterY = [&](double, double) { return level; };   // (painted water is flat)
 	Mesh lines;
 	const double height = std::max(0.5, std::abs(eye.y - level));
 	for (const double cell : {3.0 + 0.8 * height, 14.0 + 3.0 * height}) {
+		if (!sea) break;
 		const bool nearOnes = cell < 10.0 + 2.0 * height;
 		const int reach = nearOnes ? 8 : 12, ix = static_cast<int>(std::floor(eye.x / cell)), iz = static_cast<int>(std::floor(eye.z / cell));
 		for (int a = ix - reach; a <= ix + reach; ++a)
@@ -112,19 +115,17 @@ inline std::string text(const Paint &paint, const stir::Field &f, double t, cons
 			}
 	}
 	Mesh stars;
-	if (paint.sparkle > 0.0 && sunUp > -2.0) {
+	if (sea && paint.sparkle > 0.0 && sunUp > -2.0) {
 		const double a = sunFacing * kPi / 180.0;
 		const Vec3 toSun{std::sin(a), 0.0, std::cos(a)}, across{toSun.z, 0.0, -toSun.x};
 		const int count = static_cast<int>(70.0 * paint.sparkle);
-		const Vec3 toEye = normalize(Vec3{-ahead.x, 0.0, -ahead.z});
-		(void)toEye;
 		for (int n = 0; n < count; ++n) {
 			const double u = 0.02 + 0.98 * hash01(n, 1) * hash01(n, 2), period = 0.7 + 1.1 * hash01(n, 3), phase = t / period + hash01(n, 4), w = phase - std::floor(phase);
 			const double d = height * (2.0 + 60.0 * u), off = d * 0.12 * (hash01(n * 3 + static_cast<int>(std::floor(phase)), 5) - 0.5) * 2.0;
 			const Vec3 at = Vec3{eye.x, 0.0, eye.z} + toSun * d + across * off;
 			if (!seen(at.x, at.z)) continue;
 			const double s = (0.012 + 0.006 * d) * std::sin(kPi * w) * (0.5 + hash01(n, 6)), y = (d < 70.0 ? waterY(at.x, at.z) : level) + 0.05 + 0.0015 * d;
-			const Vec3 c{-at.x, y, at.z}, up{0.0, s * 1.0, 0.0}, r = normalize(Vec3{-across.x * -1.0, 0.0, across.z}) * s;
+			const Vec3 c{-at.x, y, at.z}, up{0.0, s * 1.0, 0.0}, r = normalize(Vec3{-across.x, 0.0, across.z}) * s;   // (across the sun's way in story space, as `c` is: unmirrored, a star lay edge-on to the eye at any but a square facing)
 			const int base = static_cast<int>(stars.verts.size());
 			const double q = 0.14;
 			for (const Vec3 &v : {c + up, c + (up + r) * q, c + r, c + (r - up) * q, c - up, c - (up + r) * q, c - r, c + (up - r) * q, c}) stars.verts.push_back(v), stars.normals.push_back(normalize(Vec3{-eye.x + at.x, eye.y - y, eye.z - at.z}));

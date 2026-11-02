@@ -5,7 +5,7 @@
 //                                                    at `yank` it is snatched back up
 //   net X Z at T [size S] [school N] [lift T]        a net sinking from the surface, S metres across (8), its weights round its rim; at `lift` it closes and is hauled up,
 //                                                    and the fish of school N inside it go up with it
-//   anchor X Z at T [chain]                          an anchor dropped from above on its chain, landing in a cloud of silt, its chain up to the surface
+//   anchor X Z at T                                  an anchor dropped from above on its chain, landing in a cloud of silt, its chain up to the surface
 //   (and round 18 lets the water rounds' boats float over an underwater film: `boat rowboat NAME ...` seen from below, oars dipping; ducks paddle their feet)
 //
 //   brinepool X Z [radius R] [seed K]                a lake on the seabed: brine heavier than the sea, its surface a shining line with slow waves, mussels round its shore
@@ -217,13 +217,14 @@ inline std::string anchorText(const Anchor &a, double t, double level, double be
 	add(iron, torus(0.08, 0.02, 14, 6), mul(translate(0.0, 1.18, 0.0), rotate({1, 0, 0}, 90.0)));
 	const Vec3 ring = transformPoint(place, {0.0, 1.18, 0.0});
 	const double slack = t >= landed ? 1.5 : 0.2;
-	for (int q = 0; q < 80; ++q) {   // its chain, link by link, up to the surface
-		const double u = q / 80.0, yy = lerp(ring.y, level + 0.2, u);
-		if (yy - ring.y > 18.0) break;
+	const double rise = level + 0.2 - ring.y, linkStep = 0.13;   // (a link is 0.17 tall: a step under that keeps them through each other, at any depth)
+	const int links = rise > 0.0 ? std::min(139, static_cast<int>(rise / linkStep) + 1) : 0;   // (the lower 18 m of it)
+	for (int q = 0; q < links; ++q) {   // its chain, link by link, up to the surface
+		const double u = std::min(1.0, q * linkStep / rise), yy = ring.y + q * linkStep;
 		const Vec3 at{ring.x + slack * std::sin(kPi * u) * 0.8, yy, ring.z + slack * std::sin(kPi * u) * 0.5};
 		add(chain, torus(0.07, 0.016, 12, 5), mul(translate(at), rotate({0, 1, 0}, q % 2 == 0 ? 0.0 : 90.0), rotate({1, 0, 0}, 90.0)));
 	}
-	return "# an anchor (film_fromabove.h)\n" + attr(metalMaterial({0.25, 0.23, 0.22}, 0.5), emitMesh(iron, place) + emitMesh(chain, identity()));
+	return "# an anchor (film_fromabove.h)\n" + attr(metalMaterial({0.25, 0.23, 0.22}, 0.5), emitMesh(iron, place) + (chain.tris.empty() ? std::string() : emitMesh(chain, identity())));
 }
 
 // ---- a brine pool ----
@@ -263,10 +264,12 @@ inline std::string brineText(const Brine &b, double t, const std::function<doubl
 inline std::string lavaText(const Lava &l, double t, const std::function<double(double, double)> &bedAt, double level, const underwater::Current &c, std::vector<undersea::Bubble> &bubbles) {
 	using namespace detail;
 	Mesh crust, cracks;
+	double lightY = bedAt(l.x, l.z) + 1.0;   // (its light: over every pillow round its middle, or one closed over it put it out)
 	for (int q = 0; q < 46; ++q) {
 		const int s = l.seed * 53 + q;
 		const double a = 2.0 * kPi * hash01(s, 1), r = l.radius * std::sqrt(hash01(s, 2)), size = 0.4 + 0.5 * hash01(s, 3);
 		const double px = l.x + r * std::cos(a), pz = l.z + r * std::sin(a), py = bedAt(px, pz) + 0.45 * size * (1.0 + 0.8 * (1.0 - r / l.radius));
+		if (r < 1.35 * size) lightY = std::max(lightY, py + 0.8 * size + 0.15);
 		Mesh pillow = uvSphere(1.0, 16, 10);
 		pillow.uvs.clear();
 		for (Vec3 &v : pillow.verts) v = v + v * (0.08 * (nature::noise2(v.x * 3.0 + s, v.z * 3.0 + v.y * 2.0, s) - 0.5));
@@ -292,7 +295,7 @@ inline std::string lavaText(const Lava &l, double t, const std::function<double(
 	out += attr(coated({0.04, 0.035, 0.035}, 0.3), emitMesh(crust, identity()));
 	if (!cracks.tris.empty()) out += flow::glowAttr(emitMesh(cracks, identity()), L);
 	char buf[200];
-	std::snprintf(buf, sizeof buf, "AttributeBegin\n  LightSource \"point\" \"point3 from\" [ %.4f %.4f %.4f ] \"rgb I\" [ %.3f %.3f %.3f ]\nAttributeEnd\n", l.x, bedAt(l.x, l.z) + 1.0, l.z, 9.0 * flicker, 3.0 * flicker, 0.6 * flicker);
+	std::snprintf(buf, sizeof buf, "AttributeBegin\n  LightSource \"point\" \"point3 from\" [ %.4f %.4f %.4f ] \"rgb I\" [ %.3f %.3f %.3f ]\nAttributeEnd\n", l.x, lightY, l.z, 9.0 * flicker, 3.0 * flicker, 0.6 * flicker);
 	return out + buf;
 }
 

@@ -1029,7 +1029,7 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		alien::Plumes g;
 		alien::Spires f;
 		double n = 0.0;
-		if (t.size() < 2 || !number(t[1], n) || n < 1.0 || n > 20000.0) return fail(usage);
+		if (t.size() < 2 || !number(t[1], n) || n < 1.0 || n > (verb == "plumes" ? 400.0 : 20000.0)) return fail(usage + (verb == "plumes" ? " (N up to 400: each is a column of puffs every frame)" : ""));
 		g.count = f.count = static_cast<int>(n);
 		for (std::size_t i = 2; i < t.size();) {
 			double a = 0.0, b = 0.0, c = 0.0, d = 0.0;

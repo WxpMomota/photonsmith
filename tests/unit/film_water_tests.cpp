@@ -343,6 +343,25 @@ TEST(FilmWaterPlaces, TheyAllDrawAndAMillTurns) {
 	EXPECT_NE(cartoon::waterside::detail::millWheel(film.spec.places[4], 0.0, 1.0, 1.2), cartoon::waterside::detail::millWheel(film.spec.places[4], 0.0, 2.0, 1.2));
 }
 
+// `stilthouses X Z` is a place, its count only before `at`; a sandcastle the tide has had stays gone when the water goes down again.
+TEST(FilmWaterPlaces, StiltsCountAndACastleStaysGone) {
+	{
+		ff::DataFilm film;
+		ASSERT_EQ(film.load(filmOf("stilts", "water lake level 0\nstilthouses 4 -6\nshot 0 a\n  key 0 3 12  0 0 -10  40\n").string()), "");
+		ASSERT_EQ(film.spec.places.size(), 1u);
+		EXPECT_EQ(film.spec.places[0].x, 4.0);
+		EXPECT_EQ(film.spec.places[0].z, -6.0);
+	}
+	{
+		ff::DataFilm film;
+		EXPECT_NE(film.load(filmOf("stilts2", "water lake level 0\nstilthouses 100000 at 0 0\nshot 0 a\n  key 0 3 12  0 0 -10  40\n").string()), "") << "a count that would build every frame for ever";
+	}
+	ff::DataFilm film;   // (water over it a third of each 12 s: in any 30 s, under 14 s of it; all the film, more)
+	ASSERT_EQ(film.load(filmOf("castle", "length 90\nwater lake level 0\ntide low -3 high 1 period 12\nsandcastle 2 -3\nshot 0 a\n  key 0 3 12  0 0 -10  40\n").string()), "");
+	EXPECT_NE(film.worldAt(film.headerAt(1.0), 1.0).find("# a sandcastle"), std::string::npos) << "dry at first";
+	for (const double t : {62.0, 72.0, 84.0}) EXPECT_EQ(film.worldAt(film.headerAt(t), t).find("# a sandcastle"), std::string::npos) << t;
+}
+
 TEST(FilmWaterToon, WaterIsDrawn) {
 	ff::DataFilm film;
 	ASSERT_EQ(film.load(filmOf("toon", "toon bands 3 lines 2\nwater sea level 0 waves 0.3\nripple 0 -6 at 1 size 0.2\nshot 0 a\n  key 0 3 4  0 0 -8  40\n").string()), "");

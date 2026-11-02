@@ -126,6 +126,12 @@ inline Vec3 planetDir(double a, double r, double R) {
 	const double arc = std::asin(std::min(1.0, r / R));
 	return normalize(under * std::cos(arc) + (e1 * std::cos(a) + e2 * std::sin(a)) * std::sin(arc));
 }
+// The name of what is made for a fall over a land: every number its meshes and pictures are made from.
+inline std::string keyOf(const terrain::Field &field, const Fall &f) {
+	char b[200];
+	std::snprintf(b, sizeof b, "|%s|%d|%.6g|%.6g|%.6g|", f.kind.c_str(), f.seed, f.radius, f.highest(), f.clouds);
+	return film_cache::nameOf(field.spec.key() + b);
+}
 inline planets::Planet planetOf(const Fall &f) {
 	planets::Planet p;
 	p.kind = f.kind, p.seed = f.seed, p.radius = f.radius;
@@ -144,7 +150,7 @@ inline std::string groundPicture(const std::string &film, const terrain::Field &
 		const double v = std::abs(std::fmod(d / field.spec.size + 0.5, 2.0));
 		return (v > 1.0 ? 2.0 - v : v) * (field.spec.size - 2.0) + 1.0;
 	};
-	return film_sky::picture(film, "fall4_ground_" + f.kind + "_" + std::to_string(f.seed) + "_" + std::to_string(static_cast<int>(f.highest())), W, H, [&](std::vector<float> &rgb) {
+	return film_sky::picture(film, "fall5_ground_" + keyOf(field, f), W, H, [&](std::vector<float> &rgb) {
 		for (int y = 0; y < H; ++y)
 			for (int x = 0; x < W; ++x) {
 				const double a = 2.0 * kPi * (x + 0.5) / W, u = 1.0 - (y + 0.5) / H, r = ringAt(r0, r1, u), dx = r * std::cos(a), dz = r * std::sin(a);
@@ -170,8 +176,7 @@ inline std::string groundPicture(const std::string &film, const terrain::Field &
 inline std::string sheetPicture(const std::string &film, const terrain::Field &field, const Fall &f, int which) {
 	constexpr int W = 1536, H = 1024;
 	const double r0 = kSheetFrom, r1 = reachOf(f);
-	(void)field;
-	return film_sky::picture(film, "fall4_sheet" + std::to_string(which) + "_" + std::to_string(f.seed) + "_" + std::to_string(static_cast<int>(f.highest())), W, H, [&](std::vector<float> &rgb) {
+	return film_sky::picture(film, "fall5_sheet" + std::to_string(which) + "_" + keyOf(field, f), W, H, [&](std::vector<float> &rgb) {
 		for (int y = 0; y < H; ++y)
 			for (int x = 0; x < W; ++x) {
 				const double a = 2.0 * kPi * (x + 0.5) / W, u = 1.0 - (y + 0.5) / H, r = ringAt(r0, r1, u), dx = r * std::cos(a), dz = r * std::sin(a);
@@ -188,8 +193,9 @@ inline std::string sheetPicture(const std::string &film, const terrain::Field &f
 
 // The land past the terrain and what is over it, for a camera `h` above the land. `film`: the film's cache.
 inline std::string text(const std::string &film, const terrain::Field &field, const Fall &f, double h) {
-	const std::string cap = film_cache::ply(film, "fall1_cap", [&] { return detail::capMesh(field, f); });
-	const std::string sheet = film_cache::ply(film, "fall2_sheet", [&] { return detail::sheetMesh(field, f); });
+	const std::string key = detail::keyOf(field, f);
+	const std::string cap = film_cache::ply(film, "fall1_cap_" + key, [&] { return detail::capMesh(field, f); });
+	const std::string sheet = film_cache::ply(film, "fall2_sheet_" + key, [&] { return detail::sheetMesh(field, f); });
 	std::string out = "# the planet round the land (film_planetfall.h)\nAttributeBegin\n  Texture \"fall_ground\" \"spectrum\" \"imagemap\" \"string filename\" [ \"" + detail::groundPicture(film, field, f) +
 					  "\" ]\n  Material \"diffuse\" \"texture reflectance\" \"fall_ground\"\n" + film_cache::plyShape(cap) + "AttributeEnd\n";
 	std::string line = film_cache::plyShape(sheet);

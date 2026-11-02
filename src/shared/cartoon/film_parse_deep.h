@@ -353,7 +353,7 @@ inline std::string deepLine(Spec &s, const std::string &verb, const std::string 
 			if (!within("size", 0.3, 30.0)) return usage;
 			s.abyss.eyes.push_back({p, get("toward", 0.0), get("size", 2.0), get("open", 0.0), get("close", 1e30)});
 		} else {
-			if (!opt.count("at") || !within("bright", 0.01, 100.0) || !within("over", 0.0, 60.0)) return usage;
+			if (!opt.count("at") || !within("bright", 0.01, 100.0) || !within("over", 0.05, 60.0)) return usage;   // (not 0: its light came up over no time at all, 0/0, a NaN light)
 			abyss::Reveal r;
 			r.at = p, r.t = opt["at"], r.bright = get("bright", 1.0), r.over = get("over", 3.0);
 			if (colour.x >= 0.0) r.colour = colour;
@@ -418,7 +418,7 @@ inline std::string deepLookLine(Spec &s, const std::string &verb, const std::str
 			if (t[i] == "colour" && verb == "seasparkle") {
 				if (i + 3 >= t.size() || !number(t[i + 1], a) || !number(t[i + 2], b)) return usage;
 				double c = 0.0;
-				if (!number(t[i + 3], c)) return usage;
+				if (!number(t[i + 3], c) || std::min({a, b, c}) < 0.0 || std::max({a, b, c}) > 1.0) return usage + ": a colour's parts are 0 to 1";   // (a negative light stops pbrt)
 				s.seatoon.sparkle.colour = {a, b, c};
 				i += 2;
 				continue;

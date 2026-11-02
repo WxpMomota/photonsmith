@@ -109,18 +109,18 @@ inline std::string bellText(const Bell &b, double t, double level, const underwa
 	}
 	add(lampM, ellipsoid({0.0, 0.8 * H, 0.0}, {0.07, 0.09, 0.07}, 10, 8));
 	const Vec3 top = transformPoint(place, {0.0, H, 0.0});
-	for (int q = 0; q < 40; ++q) {   // its chain, up to the surface: links in turn across each other
-		const double u = q / 40.0, y = lerp(top.y, level + 0.3, u);
-		if (y > level + 0.3) break;
+	const double rise = level + 0.3 - top.y, linkStep = 0.09;   // (a link is 0.124 tall: a step under that keeps them through each other, at any depth)
+	const int links = rise > 0.0 ? std::min(134, static_cast<int>(rise / linkStep) + 1) : 0;   // (a long way up: the camera sees only the lower 12 m of it)
+	for (int q = 0; q < links; ++q) {   // its chain, up to the surface: links in turn across each other
+		const double u = std::min(1.0, q * linkStep / rise), y = top.y + q * linkStep;
 		const Vec3 at{top.x + 0.3 * std::sin(kPi * u) * sway, y, top.z};
 		Mesh link = torus(0.05, 0.012, 12, 6);
 		add(chain, link, mul(translate(at), rotate({0, 1, 0}, q % 2 == 0 ? 0.0 : 90.0), rotate({1, 0, 0}, 90.0)));
-		if (u * (level - top.y) > 12.0) break;   // (a long way up: the camera sees only the lower links)
 	}
 	std::string out = "# a diving bell (film_airpocket.h)\n";
 	out += attr(metalMaterial({0.32, 0.3, 0.28}, 0.45), emitMesh(iron, place) + emitMesh(rivets, place));
 	out += attr("Material \"thindielectric\" \"float eta\" [ 1.5 ]", emitMesh(glass, place));
-	out += attr(metalMaterial({0.35, 0.33, 0.3}, 0.4), emitMesh(chain, identity()));
+	if (!chain.tris.empty()) out += attr(metalMaterial({0.35, 0.33, 0.3}, 0.4), emitMesh(chain, identity()));
 	// the air inside: its floor the water's surface, half way up the bell
 	out += attr(kAirSurface, emitMesh(surfaceDisc({0.0, 0.42 * H, 0.0}, 0.94 * R, t, b.seed), place));
 	if (b.lamp > 0.0) {
@@ -132,7 +132,8 @@ inline std::string bellText(const Bell &b, double t, double level, const underwa
 		out += buf;
 	}
 	for (int burst = 0; burst < 4; ++burst) {   // a few big bubbles spilling from its rim as it rocks, every six seconds
-		const double when = std::floor(t / 6.0) * 6.0 - 6.0 * burst + 2.0 * hash01(burst + static_cast<int>(t / 6.0), b.seed);
+		const int window = static_cast<int>(std::floor(t / 6.0)) - burst;   // (its own six seconds: the same burst from one frame to the next, not one that moved on every six)
+		const double when = 6.0 * window + 2.0 * hash01(window, b.seed);
 		for (int q = 0; q < 6; ++q) {
 			const int key = static_cast<int>(when * 10.0) * 13 + q + b.seed;
 			const double a = 2.0 * kPi * hash01(key, 3);

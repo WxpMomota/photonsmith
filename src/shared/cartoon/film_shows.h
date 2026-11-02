@@ -133,7 +133,7 @@ inline void perform(school::School &sc, const std::vector<Show> &shows, const st
 			const double t = k * sc.dt, since = t - s.at;
 			if (s.shape == "burst") {
 				if (since > 9.0) break;
-				const double out = 7.0 * (1.0 - std::exp(-since / 0.3)) * std::exp(-since / 2.2);
+				const double out = 7.0 * (1.0 - std::exp(-since / 0.3)) * std::exp(-since / 2.2) * (1.0 - smoothstep(7.0, 9.0, since));   // (to nothing by its end: it stopped 12 cm out, and the school jumped)
 				for (std::size_t i = 0; i < n; ++i) {
 					const Vec3 d = swum[k0][i] - c;
 					sc.pos[k][i] = sc.pos[k][i] + (length(d) > 1e-6 ? normalize(d) : Vec3{0.0, 1.0, 0.0}) * out;
@@ -158,7 +158,9 @@ inline void perform(school::School &sc, const std::vector<Show> &shows, const st
 			const double since = k * sc.dt - ch.at;
 			if (since > ch.length) break;
 			const double b = smoothstep(0.0, 1.5, since) * (1.0 - smoothstep(ch.length - 1.5, ch.length, since));
-			const Vec3 m = middleAt(k);
+			Vec3 m{0, 0, 0};   // (the middle of where they are now, a show's shape and all: the swim's own middle swung a heart about a place metres off)
+			for (const Vec3 &p : sc.pos[k]) m = m + p;
+			m = m * (1.0 / static_cast<double>(n));
 			const double breathe = 1.0 + 0.18 * b * std::sin(2.0 * kPi * since / 2.5);
 			for (std::size_t i = 0; i < n; ++i) sc.pos[k][i] = m + (sc.pos[k][i] - m) * breathe;
 		}

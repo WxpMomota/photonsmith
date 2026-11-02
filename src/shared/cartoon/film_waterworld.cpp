@@ -194,22 +194,25 @@ std::string DataFilm::onTheWater(const stir::Field &stirred, double t, double nt
 	std::string out;
 	const std::string film = spec.key.empty() ? std::string("film") : spec.key;
 	const double level = spec.seas.empty() ? (spec.rivers.empty() || spec.rivers[0].path.empty() ? 0.0 : spec.rivers[0].path[0].y) : spec.seas[0].level + spec.seas[0].riseAt(nt);
-	const bool painted = spec.toon.on && !spec.paint.off;
+	const bool painted = spec.toon.on && !spec.paint.off && !spec.hasUnderwater;   // (as waterAt draws it)
+	const auto surfaceAt = [&](double x, double z) { return spec.seas.empty() && !spec.rivers.empty() ? stream::heightAt(spec.rivers[0], x, z, nt) : level; };
 	if (painted) {
 		double elevation = 40.0, facing = 0.0;
 		if (spec.hasSky) dressing::sunAt(spec.sky, dressing::hourAt(spec.sky, t, spec.storyEnd), elevation, facing);
 		const Vec3 ahead = normalize(Vec3{-(target.x - eye.x), 0.0, target.z - eye.z} + Vec3{1e-9, 0.0, 0.0});
-		out += toonwater::text(spec.paint, stirred, nt, {-eye.x, eye.y, eye.z}, ahead, hfov, level, spec.seas.empty() ? nullptr : &spec.seas[0], facing, elevation);
+		out += toonwater::text(spec.paint, stirred, nt, {-eye.x, eye.y, eye.z}, ahead, hfov, level, spec.seas.empty() ? nullptr : &spec.seas[0], facing, elevation, surfaceAt);
 	} else {
-		out += stir::splashText(stirred, nt, [&](double x, double z) { return spec.seas.empty() && !spec.rivers.empty() ? stream::heightAt(spec.rivers[0], x, z, nt) : level; });
+		out += stir::splashText(stirred, nt, surfaceAt);
 	}
 	if (spec.hasTerrain && !spec.seas.empty() && spec.seas[0].tidePeriod > 0.0) out += tideline::wetBandText(film, *terrain::fieldOf(spec.terrain), spec.seas[0].tideLow, spec.seas[0].tideHigh);
 	const std::shared_ptr<const terrain::Field> land = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
-	const auto groundOf = [&](double x, double z) { return land && land->inside(x, z) ? land->heightAt(x, z) : level - 0.5; };
+	// (with no land under it: a bar of sand just over the still water, not half a metre under it, where a sandcastle was gone in its first 14 seconds)
+	const double still = spec.seas.empty() ? level : spec.seas[0].level;
+	const auto groundOf = [&](double x, double z) { return land && land->inside(x, z) ? land->heightAt(x, z) : still + 0.05; };
 	for (const tideline::Castle &c : spec.castles) {
 		const double y = groundOf(c.x, c.z);
-		double since = 0.0;   // (how long the water has been up to it)
-		for (double u = std::max(0.0, nt - 30.0); u < nt && !spec.seas.empty(); u += 0.5)
+		double since = 0.0;   // (how long the water has been up to it, all the film: a castle the tide has had does not stand again when it goes out)
+		for (double u = 0.0; u < nt && !spec.seas.empty() && since < 14.0; u += 0.5)
 			if (spec.seas[0].level + spec.seas[0].riseAt(u) > y - 0.02) since += 0.5;
 		if (since < 14.0) out += tideline::castleText(c, y, tideline::slumped(since), nt);
 	}
@@ -260,9 +263,12 @@ std::string DataFilm::onTheWater(const stir::Field &stirred, double t, double nt
 			}
 		const Vec3 eyeP{-eye.x, eye.y, eye.z}, ahead = normalize(Vec3{-(target.x - eye.x), 0.0, target.z - eye.z} + Vec3{1e-9, 0.0, 0.0});
 		const double wind = spec.seas.empty() ? 0.0 : spec.seas[0].wind * kPi / 180.0;
-		const auto windAt = [&](double x, double z) { return dressing::gustAt(spec.gusts, x, z, nt) + Vec3{0.5 * std::sin(wind), 0.0, 0.5 * std::cos(wind)}; };
-		out += bankside::text(film, spec.bank, nt, eyeP, ahead, hfov, &stirred, movers, windAt, levelAt, level);
-		if (spec.hasTerrain) out += bankside::mudText(film, spec.bank, *terrain::fieldOf(spec.terrain), level);
+		const auto windAt = [&](double x, double z) {   // (pbrt's, as bankside wants it: the gusts are story space's, asked and answered mirrored)
+			const Vec3 g = dressing::gustAt(spec.gusts, -x, z, nt);
+			return Vec3{-g.x, 0.0, g.z} + Vec3{0.5 * std::sin(wind), 0.0, 0.5 * std::cos(wind)};
+		};
+		out += bankside::text(film, spec.bank, nt, eyeP, ahead, hfov, &stirred, movers, windAt, levelAt);
+		if (spec.hasTerrain && !spec.seas.empty()) out += bankside::mudText(film, spec.bank, *terrain::fieldOf(spec.terrain), spec.seas[0].level);   // (along a sea's still line: a river's height is not one contour)
 	}
 	if (spec.waterMist.on) {
 		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;

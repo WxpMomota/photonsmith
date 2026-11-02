@@ -612,7 +612,9 @@ inline std::string planetshineText(const std::vector<planets::Planet> &bodies, d
 }
 // The look line's words for a black hole of `lens 1` seen from `eye` looking at `target` (pbrt's), `fov` degrees (lens_look.h, black_hole_lens.h).
 inline std::string holeLook(const BlackHole &b, const Vec3 &eye, const Vec3 &target, double fov, double t) {
-	const Vec3 ahead = normalize(target - eye), right = normalize(cross(Vec3{0.0, 1.0, 0.0}, ahead)), up = cross(ahead, right), to = b.at - eye;   // (a scene's left-handed: looking down -z, +x is on the left)
+	const Vec3 ahead = normalize(target - eye);
+	const Vec3 upward = std::hypot(ahead.x, ahead.z) < 1e-4 * std::abs(ahead.y) ? Vec3{0.0, 0.0, -1.0} : Vec3{0.0, 1.0, 0.0};   // (the film's LookAt's up, film_file.cpp)
+	const Vec3 right = normalize(cross(upward, ahead)), up = cross(ahead, right), to = b.at - eye;   // (a scene's left-handed: looking down -z, +x is on the left)
 	const double away = dot(to, ahead);
 	if (away <= 0.0) return std::string();   // (behind the camera)
 	Vec3 n, e1, e2;

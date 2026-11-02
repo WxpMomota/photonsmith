@@ -1668,7 +1668,7 @@ std::string DataFilm::plantsAt(const std::string &header, double t, double nt) c
 	forest::Written trees;
 	if (!spec.plumes.empty() || !spec.spires.empty()) {   // (film_alien.h)
 		const terrain::Field *land = spec.hasTerrain ? terrain::fieldOf(spec.terrain).get() : nullptr;
-		for (std::size_t i = 0; i < spec.spires.size(); ++i) out += alien::spiresText(film, spec.spires[i], land);
+		for (std::size_t i = 0; i < spec.spires.size(); ++i) out += alien::spiresText(film, spec.spires[i], land, i);
 		for (std::size_t i = 0; i < spec.plumes.size(); ++i) out += alien::plumesText(film, spec.plumes[i], land, nt, {-eye.x, eye.y, eye.z}, "plumes" + std::to_string(i));
 	}
 	for (std::size_t i = 0; i < spec.forests.size() && i < spec.planted.size(); ++i) out += forest::text(film, spec.planted[i], spec.forests[i], nt, t, eye, spec.gusts, weatherAt(t).wet, trees);

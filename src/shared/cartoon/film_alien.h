@@ -67,10 +67,11 @@ inline Mesh shard(int salt) {
 	return m;
 }
 }  // namespace detail
-inline std::string spiresText(const std::string &film, const Spires &f, const terrain::Field *land) {
+// `index`: which of the film's `spires` lines (its objects' names are its own: two lines of one seed defined the same objects, and the last one's glass or stone was both).
+inline std::string spiresText(const std::string &film, const Spires &f, const terrain::Field *land, std::size_t index = 0) {
 	std::string objects, places;
 	std::set<int> made;
-	const std::string base = "spire_" + std::to_string(f.seed);
+	const std::string base = "spire_" + std::to_string(index) + "_" + std::to_string(f.seed) + "_";
 	const bool clear = f.colour.x + f.colour.y + f.colour.z <= 0.0;
 	for (int k = 0; k < f.count; ++k) {
 		const int s = f.seed * 211 + k, which = static_cast<int>(hash01(s, 1) * 3.0) % 3;

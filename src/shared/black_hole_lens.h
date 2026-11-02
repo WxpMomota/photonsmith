@@ -65,8 +65,15 @@ inline const Table &table() {
 	}();
 	return t;
 }
-// Where an impact parameter falls in the table.
-inline int rowOf(double b) { return std::clamp(static_cast<int>(std::lround(std::log(b / kFirst) / std::log(kLast / kFirst) * (kImpacts - 1))), 0, kImpacts - 1); }
+// Where an impact parameter falls in the table: its row, and how far on to the next (the rows are 0.75% apart in b, and near the shadow's edge the bend changes fast with b: the
+// nearest row alone drew the bent sky in steps, rings round the shadow).
+inline double placeOf(double b) { return std::clamp(std::log(b / kFirst) / std::log(kLast / kFirst) * (kImpacts - 1), 0.0, kImpacts - 1.0); }
+inline int rowOf(double b) { return static_cast<int>(std::lround(placeOf(b))); }
+// Between two rows' values: both, weighed; the nearer one where only it has one (the other fell in).
+inline double between(double v0, double v1, double w) {
+	if (v0 > 0.0 && v1 > 0.0) return v0 + (v1 - v0) * w;
+	return w < 0.5 ? v0 : v1;
+}
 // The radius at an angle along a path.
 inline double radiusAt(const Table &t, int row, double phi) {
 	const double at = phi / kMostAngle * (kAngles - 1);
@@ -74,6 +81,12 @@ inline double radiusAt(const Table &t, int row, double phi) {
 	const float r0 = t.r[static_cast<std::size_t>(row) * kAngles + a], r1 = t.r[static_cast<std::size_t>(row) * kAngles + a + 1];
 	if (r0 <= 0.0f || r1 <= 0.0f) return 0.0;
 	return r0 + (r1 - r0) * (at - a);
+}
+// The radius at an angle along the path of impact parameter b, between the table's rows.
+inline double radiusAt(const Table &t, double b, double phi) {
+	const double at = placeOf(b);
+	const int i0 = std::min(static_cast<int>(at), kImpacts - 2);
+	return between(radiusAt(t, i0, phi), radiusAt(t, i0 + 1, phi), at - i0);
 }
 inline double smooth(double a, double b, double x) {
 	const double u = std::clamp((x - a) / (b - a), 0.0, 1.0);
@@ -99,8 +112,11 @@ inline void read(const std::vector<float> &from, int w, int h, double x, double 
 inline double bendOf(double b) {
 	if (b >= detail::kLast) return 2.0 / b + 3.7 / (b * b);
 	if (b < 2.6) return -1.0;
-	const float end = detail::table().end[static_cast<std::size_t>(detail::rowOf(b))];
-	return end > 0.0f ? static_cast<double>(end) - detail::kPi : -1.0;
+	const double at = detail::placeOf(b);
+	const int i0 = std::min(static_cast<int>(at), detail::kImpacts - 2);
+	const std::vector<float> &end = detail::table().end;
+	const double e = detail::between(end[static_cast<std::size_t>(i0)], end[static_cast<std::size_t>(i0) + 1], at - i0);
+	return e > 0.0 ? e - detail::kPi : -1.0;
 }
 
 inline void apply(float *rgb, int w, int h, const Params &p) {
@@ -134,13 +150,14 @@ inline void apply(float *rgb, int w, int h, const Params &p) {
 			// the disc: where the path crosses its plane, nearest the camera first
 			if (p.disc >= 3.0 && b >= kFirst && b < kLast) {
 				const int row = rowOf(b);
-				const double end = tab.end[static_cast<std::size_t>(row)], first = std::atan2(nz, nx * ex + ny * ey);
+				const double end = tab.end[static_cast<std::size_t>(row)];
+				double first = std::atan2(nz, nx * ex + ny * ey);
+				if (first <= 0.0) first += kPi;   // (the first crossing ahead of the camera: moved once, not for each k, or the first was counted twice and the fourth lost)
 				double see = 1.0;
 				for (int k = 0; k < 4; ++k) {
-					double phi = first + k * kPi;
-					if (phi <= 0.0) phi += kPi;
+					const double phi = first + k * kPi;
 					if (phi >= kMostAngle || (end > 0.0 && phi >= end)) break;
-					const double r = radiusAt(tab, row, phi);
+					const double r = radiusAt(tab, b, phi);
 					if (r <= 0.0) break;
 					if (r < 3.0 || r > p.disc) continue;
 					// the gas there, and how fast it comes towards the light's way

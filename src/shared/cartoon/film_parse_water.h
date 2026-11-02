@@ -24,7 +24,7 @@ inline std::string waterChangeLine(Spec &s, const std::string &verb, const std::
 		const char *usage = "`bore N at T [height H]`: a wall of water coming down river N";
 		water::River::Bore b;
 		double n = 0.0, v = 0.0;
-		if (t.size() < 4 || !number(t[1], n) || t[2] != "at" || !number(t[3], b.t)) return usage;
+		if (t.size() < 4 || !number(t[1], n) || t[2] != "at" || !number(t[3], b.t) || t.size() % 2 != 0) return usage;   // (a word left without its number is wrong, not dropped)
 		for (std::size_t i = 4; i + 1 < t.size(); i += 2) {
 			if (t[i] == "height" && number(t[i + 1], v) && v > 0.0 && v <= 12.0) b.height = v;
 			else return usage;
@@ -40,6 +40,7 @@ inline std::string waterChangeLine(Spec &s, const std::string &verb, const std::
 		const char *usage = "`tide low L high H [period P] [from T]`: the water going down to L and up to H, every P seconds (120 by default)";
 		sea.tidePeriod = 120.0;
 		bool lowSet = false, highSet = false;
+		if (t.size() % 2 == 0) return usage;
 		for (std::size_t i = 1; i + 1 < t.size(); i += 2) {
 			if (!number(t[i + 1], v[0])) return usage;
 			if (t[i] == "low") sea.tideLow = v[0], lowSet = true;
@@ -58,7 +59,7 @@ inline std::string waterChangeLine(Spec &s, const std::string &verb, const std::
 	}
 	const char *usage = verb == "whirlpool" ? "`whirlpool X Z [radius R] [depth D] [from T] [until T]`" : "`bigwave X Z toward A at T [height H] [length L] [speed S] [width W] [until T]`: at X Z at T";
 	water::Sea::Bend b;
-	if (t.size() < 3 || !number(t[1], b.x) || !number(t[2], b.z)) return usage;
+	if (t.size() < 3 || !number(t[1], b.x) || !number(t[2], b.z) || t.size() % 2 == 0) return usage;
 	b.kind = verb == "whirlpool" ? 0 : 1;
 	if (b.kind == 1) b.radius = 24.0, b.depth = 7.0;
 	for (std::size_t i = 3; i + 1 < t.size(); i += 2) {
@@ -224,7 +225,7 @@ inline std::string waterLine(Spec &s, const std::string &verb, const std::string
 		while (i < t.size()) {
 			const std::string w = t[i++];
 			if (w == "patch") {
-				if (!numbers(3) || v[2] <= 0.0 || s.bank.patches.size() >= 64) return usage;
+				if (!numbers(3) || v[2] <= 0.0 || v[2] > 200.0 || s.bank.patches.size() >= 64) return usage;
 				s.bank.patches.push_back({v[0], v[1], v[2]});
 				continue;
 			}
@@ -322,7 +323,10 @@ inline std::string waterLine(Spec &s, const std::string &verb, const std::string
 		const std::string usage = "`" + verb + " X Z [to X Z] [facing|toward A] [length L] [height H] [count N] [radius R] [river N] [burst T] [seed K]`";
 		waterside::Place p;
 		p.kind = verb;
-		if (verb == "stilthouses" && numbers(1)) p.count = static_cast<int>(v[0]), i += (i < t.size() && t[i] == "at") ? 1 : 0;
+		if (verb == "stilthouses" && t.size() > 2 && t[2] == "at") {   // (`stilthouses N at X Z`: a count only when `at` follows it, or `stilthouses X Z` read X as one)
+			if (!numbers(1) || v[0] < 1.0 || v[0] > 60.0) return usage + ": 1 to 60 huts";
+			p.count = static_cast<int>(v[0]), ++i;
+		}
 		if (!numbers(2)) return usage;
 		p.x = v[0], p.z = v[1], p.x1 = p.x, p.z1 = p.z;
 		bool ended = false;

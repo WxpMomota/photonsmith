@@ -90,19 +90,20 @@ std::string DataFilm::deepAt(const std::string &header, double t, double nt) con
 		}
 		if (spec.seatoon.sparkle.on) {   // what moves through the dark water: the characters, the subs, the serpents
 			std::vector<std::vector<Vec3>> movers;
+			const double tick = std::floor(t * 10.0) / 10.0;   // (their places on the tenths a spark is born on: from t itself, a spark slid with its mover and jumped back ten times a second)
 			for (const Character &c : spec.characters) {
 				std::vector<Vec3> path;
-				for (int k = 0; k < 20; ++k) path.push_back(pbrtOf(chestOf(c, std::max(0.0, t - 0.1 * k))));
+				for (int k = 0; k < 20; ++k) path.push_back(pbrtOf(chestOf(c, std::max(0.0, tick - 0.1 * k))));
 				movers.push_back(path);
 			}
 			for (const subs::Sub &s : spec.subs) {
 				std::vector<Vec3> path;
-				for (int k = 0; k < 20; ++k) path.push_back(subs::subAt(s, natureAt(std::max(0.0, t - 0.1 * k))));
+				for (int k = 0; k < 20; ++k) path.push_back(subs::subAt(s, natureAt(std::max(0.0, tick - 0.1 * k))));
 				movers.push_back(path);
 			}
 			for (const abyss::Serpent &s : spec.abyss.serpents) {
 				std::vector<Vec3> path;
-				for (int k = 0; k < 20; ++k) path.push_back(abyss::serpentHead(s, natureAt(std::max(0.0, t - 0.1 * k))));
+				for (int k = 0; k < 20; ++k) path.push_back(abyss::serpentHead(s, natureAt(std::max(0.0, tick - 0.1 * k))));
 				movers.push_back(path);
 			}
 			seatoon::Sparkle s = spec.seatoon.sparkle;   // (only in dark water: under a sky, as the sun goes down)

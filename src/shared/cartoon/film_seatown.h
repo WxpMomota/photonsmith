@@ -91,7 +91,7 @@ inline std::string townText(const Town &w, double t, const std::function<double(
 			std::snprintf(buf, sizeof buf, "AttributeBegin\n  LightSource \"point\" \"point3 from\" [ %.4f %.4f %.4f ] \"rgb I\" [ 2.2 1.5 0.6 ]\nAttributeEnd\n", hx + 3.0 * toPlaza.x, hy + 2.0, hz + 3.0 * toPlaza.z);
 			lights += buf;
 		}
-		const int kind = (h + w.seed) % 3;
+		const int kind = ((h + w.seed) % 3 + 3) % 3;   // (a negative seed: % is negative too, and every early house was coral)
 		const double size = 0.9 + 0.35 * hash01(s, 3);
 		std::vector<Vec3> lit;   // (its windows: house space, with the way they face)
 		std::vector<Vec3> facing;

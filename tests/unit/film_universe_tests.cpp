@@ -980,6 +980,29 @@ TEST(FilmBlackHole, LightGoesRoundIt) {
 		}
 	EXPECT_GT(std::max(left, right), 1.3 * std::min(left, right)) << "the side coming towards the camera is brighter";
 	EXPECT_GT(over, 0.0) << "the far side of the disc shows up over the top";
+	// a camera passing through the disc's plane: the disc's light goes on smoothly (its first crossing was counted twice from just above, 55% brighter)
+	const auto total = [&](double nz) {
+		lens::Params q = d;
+		q.ny = 1.0, q.nz = nz;
+		std::vector<float> pic(static_cast<std::size_t>(W) * H * 3, 0.0f);
+		lens::apply(pic.data(), W, H, q);
+		double sum = 0.0;
+		for (const float v : pic) sum += v;
+		return sum;
+	};
+	const double above = total(0.02), below = total(-0.02);
+	EXPECT_NEAR(below / above, 1.0, 0.1) << above << " " << below;
+	EXPECT_NEAR(lens::bendOf(3.40), 0.5 * (lens::bendOf(3.39) + lens::bendOf(3.41)), 0.004) << "between the table's rows, not in its steps";
+}
+
+// A shot straight down on a black hole: its look line has numbers, not NaN (its camera's up was (0, 1, 0), along the way it looks).
+TEST(FilmBlackHole, AStraightDownLookHasNumbers) {
+	cs::BlackHole b;
+	b.at = {0.0, 0.0, 0.0};
+	const std::string words = cs::holeLook(b, {0.0, 100.0, 0.0}, {0.0, 0.0, 0.0}, 40.0, 1.0);
+	EXPECT_FALSE(words.empty());
+	EXPECT_EQ(words.find("nan"), std::string::npos) << words;
+	EXPECT_EQ(words.find("inf"), std::string::npos) << words;
 }
 
 // Two galaxies falling through each other: nothing but the two centres' pull throws long tails out of the discs, and it comes out the same however the frames are asked for.

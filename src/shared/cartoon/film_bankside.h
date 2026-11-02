@@ -50,6 +50,10 @@ struct Willow {
 	Vec3 foot;
 	double lean, height;
 	int seed;
+	double water;   // (the height of the water its strands hang to: its shore's, the same every frame)
+};
+struct Weed {
+	double x, z, y, size;   // (y: the water's height where it floats)
 };
 struct Bank {
 	bool on = false;
@@ -60,7 +64,8 @@ struct Bank {
 	std::vector<Clump> clumps;
 	std::vector<Pad> pads;
 	std::vector<Willow> trees;
-	std::vector<Vec3> weed;   // (x, its size, z)
+	std::vector<Weed> weed;
+	std::string key;   // (the name of its files: from every weed's and willow's place, so an edited film's are made again)
 };
 struct Mist {
 	bool on = false;
@@ -71,9 +76,10 @@ struct Mover {
 	double x, z, r;
 };
 
-// A point of the shore: where (pbrt's x z, the height the water stands there) and which way the water lies.
+// A point of the shore: where (pbrt's x z, the height the water stands there), which way the water lies, the metres of shore it stands for, and how far out from it there is
+// water of its own (a river's middle: past it is the other bank's).
 struct Shore {
-	double x, z, y, inX, inZ;
+	double x, z, y, inX, inZ, every, reach;
 };
 inline std::vector<Shore> shoreOf(const std::vector<water::Sea> &seas, const std::vector<water::River> &rivers, const terrain::Field *ground) {
 	std::vector<Shore> out;
@@ -85,7 +91,7 @@ inline std::vector<Shore> shoreOf(const std::vector<water::Sea> &seas, const std
 				const double a = ground->heightAt(x, z) - level, b = ground->heightAt(x + cell, z) - level, c = ground->heightAt(x, z + cell) - level;
 				if ((a < 0.0) == (b < 0.0) && (a < 0.0) == (c < 0.0)) continue;
 				const double gx = b - a, gz = c - a, g = std::max(1e-6, std::hypot(gx, gz));
-				out.push_back({x + 0.5 * cell, z + 0.5 * cell, level, -gx / g, -gz / g});
+				out.push_back({x + 0.5 * cell, z + 0.5 * cell, level, -gx / g, -gz / g, std::max(1.0, cell), 1e30});
 			}
 	}
 	for (const water::River &r : rivers) {
@@ -96,7 +102,7 @@ inline std::vector<Shore> shoreOf(const std::vector<water::Sea> &seas, const std
 			const double w = stream::widthAt(r, s);
 			for (const double side : {-1.0, 1.0}) {
 				const Vec3 q = p.at + p.side * (side * 0.5 * w);
-				out.push_back({q.x, q.z, q.y, -side * p.side.x, -side * p.side.z});
+				out.push_back({q.x, q.z, q.y, -side * p.side.x, -side * p.side.z, 1.0, 0.5 * w});   // (a point every metre)
 			}
 		}
 	}
@@ -109,8 +115,8 @@ inline void prepare(Bank &b, const std::vector<water::Sea> &seas, const std::vec
 	const double level = seas.empty() ? 0.0 : seas[0].level;
 	const auto clumped = [&b](double x, double z, int salt) { return nature::noise2(x * 0.09 + b.seed, z * 0.09, salt); };
 	int k = b.seed * 7001;
-	const double perPoint = ground ? std::max(1.0, ground->cell) : 1.0;
 	for (const Shore &p : shore) {
+		const double perPoint = p.every;   // (a sea's shore point stands for a cell of land; a river's for its metre: a river bank had `reeds` times the cell to the metre)
 		const int clumps = static_cast<int>(b.reeds * perPoint + hash01(k, 1));
 		if (clumped(p.x, p.z, 811) > 0.42)
 			for (int n = 0; n < clumps && b.clumps.size() < 9000; ++n, ++k) {
@@ -122,14 +128,14 @@ inline void prepare(Bank &b, const std::vector<water::Sea> &seas, const std::vec
 		if (clumped(p.x, p.z, 813) > 0.45)
 			for (int n = 0; n < pads && b.pads.size() < 2500; ++n, ++k) {
 				const double out = 1.2 + 6.0 * hash01(k, 2), along = 2.0 * perPoint * (hash01(k, 3) - 0.5), x = p.x + p.inX * out - p.inZ * along, z = p.z + p.inZ * out + p.inX * along;
-				if (groundAt(x, z) > p.y - 0.15) continue;   // (it floats: there must be water under it)
+				if (groundAt(x, z) > p.y - 0.15 || out > p.reach) continue;   // (it floats: there must be water under it, this bank's)
 				b.pads.push_back({x, z, 0.1 + 0.16 * hash01(k, 4), 360.0 * hash01(k, 5), k, hash01(k, 6) < 0.14});
 			}
 		const int weed = static_cast<int>(6.0 * b.duckweed * perPoint);
 		if (clumped(p.x, p.z, 815) > 0.5)
 			for (int n = 0; n < weed && b.weed.size() < 60000; ++n, ++k) {
 				const double out = 0.3 + 5.0 * hash01(k, 2) * hash01(k, 3), along = 2.0 * perPoint * (hash01(k, 4) - 0.5), x = p.x + p.inX * out - p.inZ * along, z = p.z + p.inZ * out + p.inX * along;
-				if (groundAt(x, z) < p.y) b.weed.push_back({x, 0.008 + 0.012 * hash01(k, 5), z});
+				if (groundAt(x, z) < p.y && out <= p.reach) b.weed.push_back({x, z, p.y, 0.008 + 0.012 * hash01(k, 5)});
 			}
 	}
 	for (const Patch &q : b.patches) {
@@ -144,14 +150,19 @@ inline void prepare(Bank &b, const std::vector<water::Sea> &seas, const std::vec
 		}
 		for (int n = 0; n < static_cast<int>(40.0 * area * b.duckweed) && b.weed.size() < 60000; ++n, ++k) {
 			const double a = 6.283 * hash01(k, 1), d = q.r * std::sqrt(hash01(k, 2));
-			b.weed.push_back({q.x + d * std::cos(a), 0.008 + 0.012 * hash01(k, 3), q.z + d * std::sin(a)});
+			b.weed.push_back({q.x + d * std::cos(a), q.z + d * std::sin(a), level, 0.008 + 0.012 * hash01(k, 3)});
 		}
 	}
 	for (int n = 0; n < b.willows && !shore.empty(); ++n, ++k) {
 		const Shore &p = shore[static_cast<std::size_t>(hash01(k, 1) * shore.size()) % shore.size()];
 		const double x = p.x - 1.6 * p.inX, z = p.z - 1.6 * p.inZ, bed = groundAt(x, z);
-		b.trees.push_back({{x, bed > -1e29 ? bed : p.y, z}, std::atan2(p.inX, p.inZ), 7.0 + 3.0 * hash01(k, 2), k});
+		b.trees.push_back({{x, bed > -1e29 ? bed : p.y, z}, std::atan2(p.inX, p.inZ), 7.0 + 3.0 * hash01(k, 2), k, p.y});
 	}
+	std::string words;
+	char buf[96];
+	for (const Weed &q : b.weed) std::snprintf(buf, sizeof buf, "%.3f,%.3f,%.3f;", q.x, q.z, q.y), words += buf;
+	for (const Willow &w : b.trees) std::snprintf(buf, sizeof buf, "%.3f,%.3f,%.3f,%.4f,%.3f,%.3f;", w.foot.x, w.foot.y, w.foot.z, w.lean, w.height, w.water), words += buf;
+	b.key = film_cache::nameOf(words);
 }
 
 namespace detail {
@@ -267,7 +278,7 @@ inline Vec3 pushedBy(const std::vector<Mover> &movers, double x, double z) {
 
 // What grows by the water at t, as scene text. `wind`: the wind on it at (x, z), pbrt's. `eye`: pbrt's.
 template <class WindAt, class LevelAt>
-inline std::string text(const std::string &film, const Bank &b, double t, const Vec3 &eye, const Vec3 &ahead, double hfov, const stir::Field *stirred, const std::vector<Mover> &movers, WindAt windAt, LevelAt levelAt, double level) {
+inline std::string text(const std::string &film, const Bank &b, double t, const Vec3 &eye, const Vec3 &ahead, double hfov, const stir::Field *stirred, const std::vector<Mover> &movers, WindAt windAt, LevelAt levelAt) {
 	if (!b.on) return std::string();
 	std::string out = "# by the water (film_bankside.h)\n";
 	const double wide = std::cos(std::min(kPi, (0.5 * hfov + 14.0) * kPi / 180.0));
@@ -318,13 +329,13 @@ inline std::string text(const std::string &film, const Bank &b, double t, const 
 	if (!flowers.tris.empty()) out += attr(diffuseMaterial({0.95, 0.88, 0.9}), emitMesh(flowers, identity()));
 	if (!hearts.tris.empty()) out += attr(diffuseMaterial({0.92, 0.72, 0.12}), emitMesh(hearts, identity()));
 	if (!b.weed.empty()) {
-		const std::string weed = film_cache::ply(film, "bank1_weed_" + std::to_string(b.seed) + "_" + std::to_string(b.weed.size()), [&] {
+		const std::string weed = film_cache::ply(film, "bank2_weed_" + b.key, [&] {
 			Mesh m;
-			for (const Vec3 &q : b.weed) {
+			for (const Weed &q : b.weed) {
 				const int base = static_cast<int>(m.verts.size());
 				for (int i = 0; i < 4; ++i) {
 					const double a = i * 1.5708 + q.x;
-					m.verts.push_back({-(q.x + q.y * std::cos(a)), level + 0.004, q.z + q.y * std::sin(a)}), m.normals.push_back({0.0, 1.0, 0.0});
+					m.verts.push_back({-(q.x + q.size * std::cos(a)), q.y + 0.004, q.z + q.size * std::sin(a)}), m.normals.push_back({0.0, 1.0, 0.0});   // (on its own water)
 				}
 				m.tris.push_back({base, base + 2, base + 1}), m.tris.push_back({base, base + 3, base + 2});
 			}
@@ -336,14 +347,14 @@ inline std::string text(const std::string &film, const Bank &b, double t, const 
 		const Willow &w = b.trees[n];
 		std::vector<Vec3> tips;
 		detail::willowTrunk(w, tips);
-		const std::string base = "bank3_willow_" + std::to_string(w.seed) + "_";
+		const std::string base = "bank4_willow_" + b.key + "_" + std::to_string(n) + "_";
 		const std::string trunk = film_cache::ply(film, base + "trunk", [&] {
 			std::vector<Vec3> ignored;
 			return detail::storyOf(detail::willowTrunk(w, ignored));
 		});
 		if (!trunk.empty()) out += "AttributeBegin\n  " + diffuseMaterial({0.24, 0.19, 0.14}) + "\n  Shape \"plymesh\" \"string filename\" [ \"" + trunk + "\" ]\nAttributeEnd\n";
 		for (int g = 0; g < 6; ++g) {
-			const std::string strands = film_cache::ply(film, base + std::to_string(g), [&] { return detail::storyOf(detail::willowCurtain(w, tips, g, levelAt(w.foot.x, w.foot.z))); });
+			const std::string strands = film_cache::ply(film, base + std::to_string(g), [&] { return detail::storyOf(detail::willowCurtain(w, tips, g, w.water)); });   // (its shore's water: what the tide was at the first frame made was kept)
 			if (strands.empty()) continue;
 			const Vec3 wind = windAt(w.foot.x, w.foot.z);
 			const Vec3 top = w.foot + Vec3{0.0, 0.62 * w.height, 0.0};
@@ -358,7 +369,9 @@ inline std::string text(const std::string &film, const Bank &b, double t, const 
 // The mud along the waterline: the land's own cells a little above the water, under a wet dark film. Static.
 inline std::string mudText(const std::string &film, const Bank &b, const terrain::Field &g, double level) {
 	if (b.mud <= 0.0) return std::string();
-	const std::string name = film_cache::ply(film, "bank1_mud_" + std::to_string(b.seed) + "_" + std::to_string(static_cast<int>(b.mud * 100.0)) + "_" + std::to_string(g.n), [&] {
+	char words[64];   // (its name: the land's shape and the water's line too, or an edited film kept the old mud)
+	std::snprintf(words, sizeof words, "|%.3f|%.4f|%d", b.mud, level, g.n);
+	const std::string name = film_cache::ply(film, "bank2_mud_" + film_cache::nameOf(g.spec.key() + words), [&] {
 		Mesh m;
 		for (int j = 0; j + 1 < g.n; ++j)
 			for (int i = 0; i + 1 < g.n; ++i) {

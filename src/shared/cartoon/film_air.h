@@ -96,10 +96,12 @@ inline std::string motesText(const Motes &a, const Vec3 &eye, double t, double s
 	for (int k = -kReach; k <= kReach; ++k)
 		for (int j = -2; j <= 2; ++j)
 			for (int i = -kReach; i <= kReach; ++i) {
-				const int cell = (cx + i) * 73856093 ^ (cy + j) * 19349663 ^ (cz + k) * 83492791;
+				// (unsigned: an int overflowed a few tens of metres out, which is undefined, and a compiler need not wrap it as MSVC does)
+				const unsigned bits = static_cast<unsigned>(cx + i) * 73856093u ^ static_cast<unsigned>(cy + j) * 19349663u ^ static_cast<unsigned>(cz + k) * 83492791u;
+				const int cell = static_cast<int>(bits);
 				const int n = static_cast<int>(1.6 * a.amount * hash01(cell, 41) + 0.5);
 				for (int m = 0; m < n; ++m) {
-					const int s = cell * 31 + m;
+					const int s = static_cast<int>(bits * 31u + static_cast<unsigned>(m));
 					const double w = 0.2 + 0.25 * hash01(s, 42), ph = 6.3 * hash01(s, 43);
 					const Vec3 home{(cx + i + hash01(s, 44)) * kCell, (cy + j + hash01(s, 45)) * kCell, (cz + k + hash01(s, 46)) * kCell};
 					const Vec3 p = home + Vec3{0.5 * std::sin(w * t + ph), 0.3 * std::sin(0.7 * w * t + 2.0 * ph), 0.5 * std::cos(0.9 * w * t + ph)};

@@ -33,7 +33,9 @@ struct Pool {
 
 // The land between the water's lowest and highest, wet.
 inline std::string wetBandText(const std::string &film, const terrain::Field &g, double low, double high) {
-	const std::string name = film_cache::ply(film, "tide1_band_" + std::to_string(static_cast<int>(low * 100.0)) + "_" + std::to_string(static_cast<int>(high * 100.0)) + "_" + std::to_string(g.n), [&] {
+	char words[64];   // (its name: the land's shape too, or an edited terrain kept the old band)
+	std::snprintf(words, sizeof words, "|%.4f|%.4f|%d", low, high, g.n);
+	const std::string name = film_cache::ply(film, "tide2_band_" + film_cache::nameOf(g.spec.key() + words), [&] {
 		Mesh m;
 		for (int j = 0; j + 1 < g.n; ++j)
 			for (int i = 0; i + 1 < g.n; ++i) {

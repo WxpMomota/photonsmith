@@ -182,6 +182,15 @@ inline bool writeOnce(const std::filesystem::path &target, const std::string &by
 	return true;
 }
 
+// A short name (FNV-1a, hex) for the words a mesh or picture is made from: a file's name must change when what it was made from does, or an edited film reads the old one.
+inline std::string nameOf(const std::string &words) {
+	std::uint64_t h = 1469598103934665603ull;
+	for (const unsigned char c : words) h = (h ^ c) * 1099511628211ull;
+	char out[17];
+	std::snprintf(out, sizeof out, "%016llx", static_cast<unsigned long long>(h));
+	return out;
+}
+
 // A mesh in story space as a binary PLY, mirrored into pbrt's space the way emitMesh mirrors it (x negated, the winding reversed).
 inline std::string plyBytes(const Mesh &m) {
 	const bool uv = !m.uvs.empty() && m.uvs.size() == m.verts.size();

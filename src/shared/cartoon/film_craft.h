@@ -186,7 +186,7 @@ inline void prepare(Craft &c) {
 	for (std::size_t i = 0; i + 1 < n; ++i) {
 		const auto at = [&](std::size_t k) { return Vec3{c.points[k].first, 0.0, c.points[k].second}; };
 		const Vec3 p0 = at(i > 0 ? i - 1 : i), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2 < n ? i + 2 : i + 1);
-		const int steps = std::max(2, static_cast<int>(2.0 * length(p2 - p1)));
+		const int steps = static_cast<int>(std::clamp(2.0 * length(p2 - p1), 2.0, 20000.0));   // (a point a world away: not billions of steps)
 		for (int k = 1; k <= steps; ++k) {
 			const double u = k / double(steps), u2 = u * u, u3 = u2 * u;
 			Vec3 p = (p1 * 2.0 + (p2 - p0) * u + (p0 * 2.0 - p1 * 5.0 + p2 * 4.0 - p3) * u2 + (p3 - p0 + p1 * 3.0 - p2 * 3.0) * u3) * 0.5;
@@ -236,7 +236,8 @@ inline Vec3 placeAt(const Craft &c, double along, Vec3 *ahead = nullptr) {
 	}
 	return {lerp(c.path[a].x, c.path[b].x, u), 0.0, lerp(c.path[a].z, c.path[b].z, u)};
 }
-// How she rides at t: where her middle is, her heading, and her pitch and roll in degrees, from the water under her.
+// How she rides at t: where her middle is, her heading, and her pitch and roll in degrees, from the water under her. (A roll turns her frame's +x - port, as frameOf's story-space
+// facing puts it - up: so it is port's water over starboard's.)
 struct Riding {
 	Vec3 at, ahead{0.0, 0.0, 1.0};
 	double pitch = 0.0, roll = 0.0, way = 0.0;   // (way: metres a second)
@@ -258,7 +259,7 @@ inline Riding ridingAt(const Craft &c, const Shape &h, const Afloat &water, doub
 	const double bow = heightAt(r.at + r.ahead * L), stern = heightAt(r.at - r.ahead * L), port = heightAt(r.at - side * B), star = heightAt(r.at + side * B);
 	r.at.y = 0.25 * (bow + stern + port + star) + 0.02 * h.draft * std::sin(1.7 * t + c.seed);
 	r.pitch = std::atan2(stern - bow, 2.0 * L) * 57.29578 + 0.6 * std::sin(0.9 * t + c.seed);
-	r.roll = std::atan2(star - port, 2.0 * B) * 57.29578 + (h.length < 6.0 ? 1.4 : 0.7) * std::sin(0.73 * t + 2.0 * c.seed);
+	r.roll = std::atan2(port - star, 2.0 * B) * 57.29578 +(h.length < 6.0 ? 1.4 : 0.7) * std::sin(0.73 * t + 2.0 * c.seed);
 	return r;
 }
 // The hull's frame at a riding (story space).

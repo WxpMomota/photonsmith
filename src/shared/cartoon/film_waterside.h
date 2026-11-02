@@ -117,7 +117,7 @@ inline void lighthouse(Bits &b, const Place &p, double y) {
 		bar(b.dark, on(f, {1.7 * top * std::cos(a), 0.825 * H, 1.7 * top * std::sin(a)}), on(f, {1.7 * top * std::cos(a), 0.86 * H, 1.7 * top * std::sin(a)}), 0.02);
 	}
 	add(b.dark, torus(1.7 * top, 0.02, 32, 5), mul(f, translate(0.0, 0.86 * H, 0.0)));
-	for (int k = 0; k < 5; ++k) add(b.glass, box(0.14 * foot, 0.1 * H * 0.5, 0.08), mul(f, translate(0.0, (0.14 + 0.15 * k) * H, lerp(foot, top, 0.14 + 0.15 * k) + 0.01)));
+	for (int k = 0; k < 5; ++k) add(b.glass, box(0.14 * foot, 0.1 * H * 0.5, 0.08), mul(f, translate(0.0, (0.14 + 0.15 * k) * H, lerp(foot, top, (0.14 + 0.15 * k) / 0.82) + 0.01)));   // (on the wall: it narrows to `top` at 0.82 H)
 }
 // A stone bridge along +z (local), arches of `n`; side faces cut by each arch's round.
 inline void bridge(Bits &b, const Place &p, double y) {

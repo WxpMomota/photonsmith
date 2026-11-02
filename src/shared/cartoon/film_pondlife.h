@@ -38,6 +38,7 @@ struct Life {
 	double x = 0.0, z = 0.0, radius = 6.0, toward = 0.0, height = 1.6;
 	std::vector<double> times;   // (a heron's strikes, a kingfisher's dives, a beaver's slaps; nature's time)
 	std::vector<Touch> touches;  // (worked out on load)
+	std::vector<Touch> leaps;    // (a salmon's take-offs, each its own: in `touches`, sorted by time, one fish's landing came between another's take-off and landing)
 };
 inline const std::vector<std::string> &kinds() {
 	static const std::vector<std::string> k = {"ducks", "swans", "heron", "kingfisher", "frogs", "otter", "beaver", "trout", "salmon"};
@@ -76,6 +77,18 @@ inline Vec3 wayOf(const std::function<Vec3(double)> &at, double t) {
 	return length(d) > 1e-6 ? normalize(d) : Vec3{0.0, 0.0, 1.0};
 }
 inline Mat4 placed(Vec3 at, Vec3 way) { return mul(translate(story(at)), craft::sealifeFacing(story(way))); }
+// Where a heron stands at t (pbrt's) and the way it faces: a slow step every nine seconds along `toward`, three metres there and three back.
+inline Vec3 heronAt(const Life &l, double t, Vec3 &facing) {
+	facing = {std::sin(l.toward * kPi / 180.0), 0.0, std::cos(l.toward * kPi / 180.0)};
+	const double stepEvery = 9.0, n = std::floor(t / stepEvery), f = t / stepEvery - n;
+	const double along = std::fmod(0.35 * (n + smoothstep(0.0, 0.2, f)), 6.0);
+	if (along > 3.0) {   // (coming back: turned round, not snapped back to the start)
+		const Vec3 start = Vec3{l.x, 0.0, l.z} + facing * 3.0;
+		facing = facing * -1.0;
+		return start + facing * (along - 3.0);
+	}
+	return Vec3{l.x, 0.0, l.z} + facing * along;
+}
 
 inline void duck(Parts &p, const Mat4 &at, int sort, double t, int seed) {   // sort 0 drake, 1 duck, 2 duckling
 	const double s = sort == 2 ? 0.42 : 1.0;
@@ -193,7 +206,11 @@ inline void prepare(Life &l, double length) {
 	l.touches.clear();
 	const auto put = [&l](double t, double x, double z, double size, int kind) { l.touches.push_back({t, x, z, size, kind}); };
 	if (l.kind == "heron")
-		for (const double u : l.times) put(u + 0.22, l.x + std::sin(l.toward * kPi / 180.0) * 0.72, l.z + std::cos(l.toward * kPi / 180.0) * 0.72, 0.05, 0);
+		for (const double u : l.times) {   // (where its bill goes in: in front of where it stands then)
+			Vec3 facing;
+			const Vec3 at = detail::heronAt(l, u + 0.22, facing) + facing * 0.72;
+			put(u + 0.22, at.x, at.z, 0.05, 0);
+		}
 	if (l.kind == "kingfisher")
 		for (const double u : l.times) {
 			const double a = l.toward * kPi / 180.0;
@@ -219,6 +236,7 @@ inline void prepare(Life &l, double length) {
 				const double a = 6.283 * hash01(k, static_cast<int>(g) + 5), d = l.radius * std::sqrt(hash01(k, static_cast<int>(g) + 200));
 				put(t, l.x + d * std::cos(a), l.z + d * std::sin(a), 0.07, 2);
 			}
+	l.leaps.clear();
 	if (l.kind == "salmon") {
 		const double a = l.toward * kPi / 180.0;
 		for (int n = 0; n < l.count; ++n)
@@ -227,6 +245,7 @@ inline void prepare(Life &l, double length) {
 				const double x = l.x + l.radius * (hash01(k, static_cast<int>(g) + 5) - 0.5), z = l.z + l.radius * (hash01(k, static_cast<int>(g) + 200) - 0.5);
 				put(t, x, z, 0.14, 0);
 				put(t + 1.05, x + 1.3 * std::sin(a), z + 1.3 * std::cos(a), 0.16, 0);
+				l.leaps.push_back({t, x, z, 0.14, 0});
 			}
 	}
 	std::sort(l.touches.begin(), l.touches.end(), [](const Touch &a, const Touch &b) { return a.t < b.t; });
@@ -261,10 +280,10 @@ inline std::string text(const Life &l, double t, LevelAt levelAt) {
 			strike = std::max(strike, smoothstep(u, u + 0.2, t) * (1.0 - smoothstep(u + 0.3, u + 0.7, t)));
 			if (t > u + 0.25 && t < u + 2.4) fish = true;
 		}
-		const double stepEvery = 9.0, n = std::floor(t / stepEvery), f = t / stepEvery - n;
-		const double along = 0.35 * (n + smoothstep(0.0, 0.2, f)), step = f < 0.2 ? std::sin(kPi * f / 0.2) : 0.0;
-		const Vec3 at = Vec3{l.x, 0.0, l.z} + facing * std::fmod(along, 3.0);
-		heron(p, placed(onWater(at, -0.1), facing), strike, fish, step);
+		const double f = t / 9.0 - std::floor(t / 9.0), step = f < 0.2 ? std::sin(kPi * f / 0.2) : 0.0;
+		Vec3 way;
+		const Vec3 at = heronAt(l, t, way);
+		heron(p, placed(onWater(at, -0.1), way), strike, fish, step);
 	} else if (l.kind == "kingfisher") {
 		const Vec3 perch{l.x, levelAt(l.x, l.z) + l.height, l.z}, water = perch + facing * 1.4 + Vec3{0.0, -l.height, 0.0};
 		p.tube({0.26, 0.2, 0.14}, {story(perch + facing * -0.7 + Vec3{0.0, -0.24, 0.0}), story(perch + Vec3{0.0, -0.05, 0.0}), story(perch + facing * 0.32 + Vec3{0.0, 0.03, 0.0})}, 0.017, identity(), 0.4);
@@ -319,8 +338,7 @@ inline std::string text(const Life &l, double t, LevelAt levelAt) {
 			fishBack(p, m, 0.3);
 		}
 	} else if (l.kind == "salmon") {
-		for (std::size_t n = 0; n + 1 < l.touches.size(); n += 2) {
-			const Touch &a = l.touches[n];
+		for (const Touch &a : l.leaps) {
 			if (t < a.t || t > a.t + 1.05) continue;
 			const double u = (t - a.t) / 1.05;
 			const Vec3 at = Vec3{a.x, levelAt(a.x, a.z) + 1.25 * 4.0 * u * (1.0 - u), a.z} + facing * (1.3 * u);
@@ -335,7 +353,7 @@ inline void stirred(stir::Field &f, const Life &l, double t) {
 	for (const Touch &q : l.touches)
 		if (q.t < t && q.t > t - 30.0) f.rings.push_back(stir::ringOf(q.x, q.z, q.t, q.size, 0.22 * q.size, q.kind != 2));
 	if (l.kind == "ducks" || l.kind == "swans" || l.kind == "beaver" || l.kind == "otter") {
-		const double pace = l.kind == "swans" ? 0.05 : l.kind == "ducks" ? 0.09 : 0.07;
+		const double pace = l.kind == "swans" ? 0.05 : l.kind == "ducks" ? 0.09 : l.kind == "otter" ? 0.06 : 0.07;   // (each as `text` swims it)
 		for (int n = 0; n < std::max(1, l.count); ++n)
 			stir::trail(f, [&l, n, pace](double u) { return detail::wanderAt(l, n, u, pace); }, -1e9, 1e30, t, 0.35, 0.05, l.kind == "swans" ? 0.003 : 0.0018, 0.3);
 	}
