@@ -523,21 +523,30 @@ const film_paths::Terrain * DataFilm::terrainFor(const Character &c) const {
 
 std::string DataFilm::crowding() const {
 	const double step = 0.05;
+	// (only those who can: every program start reads every film, and where someone in a boat is means reading the sea, 9 ms a time: 13 s for one film with a rower and a bystander)
+	const auto aboard = [this](const Character &c) { return std::any_of(spec.aboards.begin(), spec.aboards.end(), [&c](const Spec::Aboard &x) { return x.who == c.name; }); };
+	std::vector<std::pair<const Character *, const Character *>> pairs;
+	for (std::size_t a = 0; a < spec.characters.size(); ++a)
+		for (std::size_t b = a + 1; b < spec.characters.size(); ++b) {
+			const Character &ca = spec.characters[a], &cb = spec.characters[b];
+			if (ca.extra || cb.extra) continue;   // (a crowd keeps to its cells; the others are told of each other)
+			if ((ca.walks.empty() && cb.walks.empty()) || aboard(ca) || aboard(cb)) continue;
+			pairs.push_back({&ca, &cb});
+		}
+	if (pairs.empty()) return std::string();
 	for (double t = 0.0; t <= spec.length; t += step)
-		for (std::size_t a = 0; a < spec.characters.size(); ++a)
-			for (std::size_t b = a + 1; b < spec.characters.size(); ++b) {
-				const Character &ca = spec.characters[a], &cb = spec.characters[b];
-				if (ca.extra || cb.extra) continue;   // (a crowd keeps to its cells; the others are told of each other)
-				Vec3 pa, pb;
-				const bool movingA = momentOf(ca, t, &pa).moving, movingB = momentOf(cb, t, &pb).moving;
-				if (!movingA && !movingB) continue;
-				const double reach = 0.8 * (characterKinds().at(ca.kind).radius * ca.scale + characterKinds().at(cb.kind).radius * cb.scale);
-				if (std::hypot(pa.x - pb.x, pa.z - pb.z) < reach) {
-					char buf[200];
-					std::snprintf(buf, sizeof buf, "%s and %s walk into each other at %.2f s (give one of them a walk `to` a place: it finds its way round the other)", ca.name.c_str(), cb.name.c_str(), t);
-					return buf;
-				}
+		for (const auto &[first, second] : pairs) {
+			const Character &ca = *first, &cb = *second;
+			Vec3 pa, pb;
+			const bool movingA = momentOf(ca, t, &pa).moving, movingB = momentOf(cb, t, &pb).moving;
+			if (!movingA && !movingB) continue;
+			const double reach = 0.8 * (characterKinds().at(ca.kind).radius * ca.scale + characterKinds().at(cb.kind).radius * cb.scale);
+			if (std::hypot(pa.x - pb.x, pa.z - pb.z) < reach) {
+				char buf[200];
+				std::snprintf(buf, sizeof buf, "%s and %s walk into each other at %.2f s (give one of them a walk `to` a place: it finds its way round the other)", ca.name.c_str(), cb.name.c_str(), t);
+				return buf;
 			}
+		}
 	return std::string();
 }
 

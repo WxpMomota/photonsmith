@@ -1,6 +1,7 @@
 // Life on the water and by it (film_stir.h and the films' water lines).
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -171,6 +172,20 @@ TEST(FilmWaterBoats, TheyRideAndStir) {
 	// who rows has its hands on the oars
 	const cartoon::craft::Oar o = cartoon::craft::oarAt(h, 1, 1.0, true);
 	EXPECT_GT(length(o.tip - o.handle), 1.5);
+}
+
+// Every start of the program reads every film. Where someone in a boat is means reading the sea, so checking who walks into whom through a film took 13 s (Down to the Sea), and the
+// app's start-up failed its time limit on CI.
+TEST(FilmWaterBoats, SomeoneInABoatDoesNotSlowAFilmsReading) {
+	const std::string ride = "length 72\nwater sea level 0 waves 0.22 wind 30\nboat rowboat dory at -6 -26 to -12 -54 speed 1\ncast ada as pip at 0 0 0\naboard ada dory rows\n";
+	const std::string film0 = filmOf("rider", ride + "cast pip at 3 0 3\nshot 0 a\n  key 0 3 12  0 0 0  40\n").string();
+	const std::string film1 = filmOf("rider2", ride + "cast pip at 3 0 3\nwalk pip 1 1 3 0 5 0\nshot 0 a\n  key 0 3 12  0 0 0  40\n").string();
+	for (const std::string &file : {film0, film1}) {
+		ff::DataFilm film;
+		const auto t0 = std::chrono::steady_clock::now();
+		ASSERT_EQ(film.load(file), "");
+		EXPECT_LT(std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(), 3.0) << file;
+	}
 }
 
 TEST(FilmWaterPeople, OutOfTheirDepthTheySwim) {
