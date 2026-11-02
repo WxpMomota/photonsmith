@@ -1,0 +1,7 @@
+# A clear river coming round a bend over stones, with a stretch of rapids, reeds and willows along it. Its river is number 0.
+scene    void.pbrt
+terrain  hills  size 400  height 3  seed 5
+sky      10:30 10:30
+river    -40 -70  -8 -36  4 -14  -6 12  -30 40  width 9  speed 1.8  clear  rocks 26  rapids 20 45  seed 3
+bankside reeds 1  willows 3  seed 2
+pondlife kingfisher  at 6 -8  toward 260

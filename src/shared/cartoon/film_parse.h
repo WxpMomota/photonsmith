@@ -197,6 +197,17 @@
 //     seacave  0 -20  radius 8                                   # places: a sea cave, `ruins X Z [length L]` (a sunken city); `icecap [holes N]`: ice overhead
 //     chest    0 -8  open 12                                     # treasure (film_treasure.h): `clam X Z [shut T]`, `bottle X Y Z`, `shells N in X0 Z0 X1 Z1`
 //     sink     coin 0 3 -6  at 4                                 # something let go in the water: coin, anchor, rock, ball (it floats); `moonlight [elevation E]`
+//     ripple   0 -6  at 2  size 0.1                              # water rounds (film_stir.h): something touches the water: rings; `skipstone X Z toward A at T [bounces N]`
+//     boat     rowboat wren at 0 -8 to 6 -30  speed 1.2          # on the surface (film_craft.h): rowboat, canoe, raft, sailboat, fishing, ferry; `... NAME river N [across C]`
+//     aboard   ada wren rows                                     # a character in a boat; `seat N`, `paddles`; `fallin WHO at T [to X Z]`, `climbout WHO at T to X Y Z`
+//     river    ... clear rocks 20 rapids 40 70 depth 1 seed 3    # what a river runs over (film_stream.h); `bore N at T [height H]` a wall of water down it
+//     adrift   paperboat sail at 0 90 river 0 from 3             # carried by the water (film_adrift.h): leaf, paperboat, log, bottle, duck, crate, lantern; a shot can `follow` it
+//     bankside reeds 2 lilies 1 duckweed 1 willows 3 mud 1       # what grows at the water's edge (film_bankside.h); `patch X Z R`; `watermist A`; `water ... ripples R catspaws C`
+//     pondlife ducks 1 at 0 -8 radius 4 young 5                  # film_pondlife.h: ducks, swans, heron (strike T), kingfisher (dive T), frogs, otter, beaver (slap T), trout, salmon
+//     tide     low -1 high 1 period 60                           # the water changing (film_water.h): `flood from Y to Y during T0 T1`, `whirlpool X Z [radius R]`, `bigwave X Z toward A at T`
+//     sandcastle 3 2                                             # what the tide takes (film_tideline.h); `rockpool X Z`
+//     pier     0 -6 toward 0 length 20                           # places (film_waterside.h): harbour, lighthouse, bridge, watermill, steppingstones, stilthouses, dam
+//     toonwater deep 0 0.3 0.5                                   # a toon film's water is drawn (film_toonwater.h): `lines N`, `sparkle N`; `toonwater off`
 //     model    robot                                            # a model of the film's own (film_model.h), read up to `end`: pieces of shapes (add, blend K, cut,
 //       piece  body colour 0.8 0.3 0.2                          #   intersect; `hard` for crisp edges), subdivision cages (`cage box W H D crease S`), modifiers
 //       box    0 0.8 0 size 0.6 0.7 0.4 round 0.03              #   (bend, twist, taper, mirror, array, radial, lattice, solidify, smooth), `sweep`, `loft`,

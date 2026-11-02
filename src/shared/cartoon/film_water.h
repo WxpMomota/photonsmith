@@ -21,6 +21,7 @@
 
 #include "cartoon_lib.h"
 #include "film_ocean.h"
+#include "film_stir.h"
 #include "film_surf.h"
 #include "film_terrain.h"
 #include "nature_lib.h"
@@ -39,7 +40,33 @@ struct Sea {
 	bool fromBelow = false;   // (film_underwater.h) seen from under it: a thin water surface, which lets the sun's light down
 	double holeX = 0.0, holeZ = 0.0, holeR = 0.0;   // (film_undersea.h) a camera at the waterline: the surface keeps clear of its lens, out to holeR (pbrt's x z)
 	Vec3 glow{0.0, 0.0, 0.0};   // (film_glow.h `bioluminescence`) the light its foam gives out where the sea is stirred; none when zero
+	double ripples = 1.0, catspaws = 0.0;   // (film_bankside.h) how much of the small ripples there are (0: a mirror), and how strongly patches of wind run over it
+	// the water changing as the film goes (`tide low L high H period P`, `flood from Y to Y during T0 T1`, `whirlpool`, `bigwave`)
+	double tideLow = 0.0, tideHigh = 0.0, tidePeriod = 0.0, tideFrom = 0.0;
+	struct Flood {
+		double y0, y1, t0, t1;
+	};
+	std::vector<Flood> floods;
+	struct Bend {
+		int kind = 0;   // (0 a whirlpool, 1 a great wave)
+		double x = 0.0, z = 0.0, radius = 20.0, depth = 3.0, t0 = 0.0, t1 = 1e30, speed = 9.0, facing = 0.0, width = 200.0;
+	};
+	std::vector<Bend> bends;
+	// how far its surface stands above `level` at t
+	double riseAt(double t) const {
+		double y = level;
+		if (tidePeriod > 0.0) y = tideLow + (tideHigh - tideLow) * (0.5 - 0.5 * std::cos(6.283185 * (t - tideFrom) / tidePeriod));
+		for (const Flood &f : floods)
+			if (t >= f.t0) y = f.y0 + (f.y1 - f.y0) * std::clamp((t - f.t0) / std::max(0.01, f.t1 - f.t0), 0.0, 1.0);
+		return y - level;
+	}
+	std::string painted;      // (film_toonwater.h) in a toon film: its flat material, and the square its bands' picture covers
+	double paintX = 0.0, paintZ = 0.0, paintSize = 0.0;
 	const Vec3 *glowing() const { return glow.x + glow.y + glow.z > 0.0 ? &glow : nullptr; }
+};
+// A rock in a stream: s metres along, c across, its radius.
+struct Rock {
+	double s = 0.0, c = 0.0, r = 0.4;
 };
 // A river: its waypoints (pbrt's x z), its width and its speed (metres a second), its surface's height when there is no terrain under it. On a terrain a river may
 // instead start at one point and find its own way downhill (`from`), or run along a canyon's riverbed (`canyon`).
@@ -48,6 +75,18 @@ struct River {
 	double width = 8.0, speed = 1.4, y = 0.0;
 	bool downhill = false, canyon = false;
 	std::vector<Vec3> path;   // worked out when the film is loaded (pbrt's x, the water's height, z): the terrain is carved under it
+	// what the water runs over (film_stream.h): `clear` water, `rocks N`, `rapids S0 S1` (metres along), `depth D`
+	bool clear = false, mouth = false;
+	double seaFrom = 0.0;   // (it runs into the film's sea or lake: how far along it reaches the level of that)
+	int rocks = 0, seed = 1;
+	double depth = 0.0;
+	std::vector<std::pair<double, double>> rapids;
+	struct Bore {
+		double t = 0.0, height = 1.0, from = 0.0;
+	};
+	std::vector<Bore> bores;     // (a wall of water running down it: `bore`, a dam going)
+	std::vector<double> along;   // (how far along each point of the path is)
+	std::vector<Rock> stones;
 };
 // A waterfall: the middle of its lip (pbrt's x y z), how wide it is, how far it drops, and which way it pours (a facing).
 struct Fall {
@@ -142,7 +181,7 @@ inline const ocean::Tile &oceanTile(const Sea &s, double t, int which) {
 }
 
 // `width`: how far apart the points the sea is sampled at are (metres): the spectrum's waves shorter than that are averaged away (ocean::sampleFiltered).
-inline void seaAt(const Sea &s, double x, double z, double t, double rippleWeight, Vec3 &p, Vec3 &n, double &fold, double width = 0.0) {
+inline void seaPlain(const Sea &s, double x, double z, double t, double rippleWeight, Vec3 &p, Vec3 &n, double &fold, double width = 0.0) {
 	if (s.spectral) {   // the ocean spectrum: the main tile and its chop (turned by 35 degrees; its pulls and slopes turned back)
 		const ocean::Sample a = ocean::sampleFiltered(oceanTile(s, t, 0), x, z, width);
 		const double c = std::cos(35.0 * kPi / 180.0), sn = std::sin(35.0 * kPi / 180.0);
@@ -182,10 +221,41 @@ inline void seaAt(const Sea &s, double x, double z, double t, double rippleWeigh
 	n = normalize(Vec3{nx, std::max(0.05, ny), nz});
 	fold = std::max(0.0, 1.0 - jac);
 }
+// A whirlpool's funnel or a great wave at (x, z), on the plain surface.
+inline void bendAt(const Sea::Bend &b, double x, double z, double t, Vec3 &p, Vec3 &n, double &fold) {
+	if (b.kind == 0) {
+		const double w = smoothstep(b.t0, b.t0 + 5.0, t) * (1.0 - smoothstep(b.t1 - 5.0, b.t1, t)), dx = x - b.x, dz = z - b.z, r = std::max(1e-3, std::hypot(dx, dz)), R = b.radius;
+		if (w <= 0.0 || r >= R) return;
+		const auto drop = [&](double q) { return -b.depth * w / (1.0 + (q / (0.16 * R)) * (q / (0.16 * R))) * (1.0 - smoothstep(0.6 * R, R, q)); };
+		const double e = 0.01 * R, slope = (drop(r + e) - drop(r)) / e;
+		p.y += drop(r);
+		n = normalize(n + Vec3{-slope * dx / r, 0.0, -slope * dz / r});
+		const double arm = 3.0 * std::atan2(dz, dx) + 5.0 * std::log(std::max(0.02, r / R)) + 1.3 * t, band = 0.5 + 0.5 * std::sin(arm);
+		fold = std::max(fold, w * 0.98 * smoothstep(0.7, 0.98, band) * (1.0 - smoothstep(0.65 * R, R, r)) * smoothstep(0.03 * R, 0.1 * R, r));   // (arms of foam, thin and lacy: the sea's foam breaks them up)
+		return;
+	}
+	const double a = b.facing * kPi / 180.0, dx = std::sin(a), dz = std::cos(a), rx = x - b.x, rz = z - b.z, along = rx * dx + rz * dz, across = -rx * dz + rz * dx, L = b.radius;
+	const double d = along - b.speed * (t - b.t0);
+	if (std::abs(d) > 9.0 * L) return;
+	const double env = std::exp(-(across / b.width) * (across / b.width)) * smoothstep(b.t0, b.t0 + 4.0, t) * (1.0 - smoothstep(b.t1 - 4.0, b.t1, t));
+	const auto shape = [L](double q) { return q < 0.0 ? std::exp(-(q / (2.4 * L)) * (q / (2.4 * L))) : std::exp(-(q / (0.7 * L)) * (q / (0.7 * L))); };
+	const double e = 0.05 * L, slope = b.depth * env * (shape(d + e) - shape(d)) / e, curl = 0.7 * b.depth * env * std::exp(-(d / L) * (d / L));
+	p.y += b.depth * env * shape(d);
+	p.x += dx * curl, p.z += dz * curl;
+	n = normalize(n + Vec3{-slope * dx, 0.0, -slope * dz});
+	const double crest = (d - 0.12 * L) / (0.2 * L);
+	fold = std::max({fold, env * 1.05 * std::exp(-crest * crest), env * 0.72 * smoothstep(-2.2 * L, -0.4 * L, d) * (1.0 - smoothstep(-0.4 * L, 0.0, d))});   // (white along its crest, lace on its back)
+}
+inline void seaAt(const Sea &s, double x, double z, double t, double rippleWeight, Vec3 &p, Vec3 &n, double &fold, double width = 0.0) {
+	seaPlain(s, x, z, t, rippleWeight, p, n, fold, width);
+	p.y += s.riseAt(t);
+	for (const Sea::Bend &b : s.bends) bendAt(b, x, z, t, p, n, fold);
+}
 
 inline std::string shoreText(const Sea &s, double t, const terrain::Field &ground);
 
 inline std::string seaMaterial(const Sea &s) {
+	if (!s.painted.empty()) return s.painted;
 	if (s.fromBelow) return "Material \"thindielectric\" \"float eta\" [ 1.333 ]";
 	if (s.kind == "clear") return glassMaterial(1.333, 0.0);
 	return s.kind == "lake" ? coated({0.025, 0.06, 0.045}, 0.0) : coated({0.015, 0.055, 0.07}, 0.0);   // (a smooth coat over the colour of deep water: the sky in the coat)
@@ -193,15 +263,18 @@ inline std::string seaMaterial(const Sea &s) {
 
 // The sea as scene text at t, seen from `eye` towards `target` (story space, as film_subjects::cameraOf gives them) with a horizontal field of view of `hfov` degrees.
 // `ground`: the terrain (shallows lap its shore), or null. `swell`: the surf on that shore (film_surf.h), or null: the open sea gives way to it in the shallows, its white
-// water and drifting foam join the foam, the shallows are clear water (the sand shows through), and spray blows off the breaking crests.
-inline std::string seaText(const Sea &s, double t, const Vec3 &eyeStory, const Vec3 &targetStory, double hfov, const terrain::Field *ground, const surf::Swell *swell = nullptr) {
+// water and drifting foam join the foam, the shallows are clear water (the sand shows through), and spray blows off the breaking crests. `stirred`: the rings and froth of what
+// has touched it (film_stir.h), or null.
+inline std::string seaText(const Sea &given, double t, const Vec3 &eyeStory, const Vec3 &targetStory, double hfov, const terrain::Field *ground, const surf::Swell *swell = nullptr, const stir::Field *stirred = nullptr) {
+	Sea s = given;   // (at its level now: the rest of this has no need to know it moves)
+	s.level += given.riseAt(t), s.tidePeriod = 0.0, s.floods.clear();
 	const Vec3 eye{-eyeStory.x, eyeStory.y, eyeStory.z}, target{-targetStory.x, targetStory.y, targetStory.z};   // (pbrt's)
 	const double heading = std::atan2(target.z - eye.z, target.x - eye.x);
 	const double half = std::min(kPi, (hfov * 0.5 + 25.0) * kPi / 180.0);   // (a little wider than the picture: waves move points sideways)
 	const double height = std::max(0.5, std::abs(eye.y - s.level));
 	const double r0 = std::max(0.05, 0.08 * height), r1 = 8000.0;
 	const int around = 150, out = 110;
-	const std::shared_ptr<const surf::Grid> grid = swell && swell->on && ground && !s.fromBelow ? surf::gridOf(*ground, s.level, *swell) : nullptr;
+	const std::shared_ptr<const surf::Grid> grid = swell && swell->on && ground && !s.fromBelow ? surf::gridOf(*ground, given.level, *swell) : nullptr;
 	Mesh water, foam;
 	std::vector<double> folds;
 	std::vector<char> shallow;
@@ -209,16 +282,26 @@ inline std::string seaText(const Sea &s, double t, const Vec3 &eyeStory, const V
 	water.verts.reserve(static_cast<std::size_t>(around + 1) * (out + 1));
 	for (int j = 0; j <= out; ++j) {
 		const double r = r0 * std::pow(r1 / r0, j / double(out));
-		const double ripple = std::exp(-r / (25.0 + 6.0 * height));
+		const double ripple = std::exp(-r / (25.0 + 6.0 * height)) * (stirred ? 1.0 + 1.5 * stirred->rain : 1.0);   // (rain roughens what is too far off for its rings)
 		const double spacing = r * std::max(std::log(r1 / r0) / out, 2.0 * half / around);   // (between this ring's points, along and across)
 		for (int i = 0; i <= around; ++i) {
 			const double a = heading - half + 2.0 * half * i / around;
 			const double x = eye.x + r * std::cos(a), z = eye.z + r * std::sin(a);
 			Vec3 p, n;
 			double fold = 0.0;
-			if (r < 2500.0) seaAt(s, x, z, t, ripple, p, n, fold, spacing);
+			double rippled = ripple * s.ripples;
+			if (s.catspaws > 0.0) {   // (patches of wind going over still water)
+				const double wa = s.wind * kPi / 180.0, a2 = nature::noise2((x - 3.0 * t * std::sin(wa)) * 0.035, (z - 3.0 * t * std::cos(wa)) * 0.035, 823);
+				rippled += ripple * s.catspaws * smoothstep(0.52, 0.72, a2);
+			}
+			if (r < 2500.0) seaAt(s, x, z, t, rippled, p, n, fold, spacing);
 			else p = {x, s.level, z}, n = {0.0, 1.0, 0.0};   // (beyond what the waves can show: flat, so the horizon is a clean line)
 			bool clear = false;
+			if (!s.painted.empty()) {   // (painted water is flat, or the ink finds every crest; what moves on it is drawn: film_toonwater.h)
+				n = {0.0, 1.0, 0.0}, fold = 0.0;
+				if (s.bends.empty()) p = {x, s.level, z};
+			}
+			if (stirred && !stirred->froth.empty()) fold = std::max(fold, stirred->foldAt(x, z, t));
 			if (grid) {   // the surf: the open sea's waves giving way to it as the water shoals
 				const surf::At here = surf::at(*grid, *swell, x, z, t);
 				const double e = std::max(0.05, 0.01 * r);
@@ -232,6 +315,7 @@ inline std::string seaText(const Sea &s, double t, const Vec3 &eyeStory, const V
 			}
 			water.verts.push_back({-p.x, p.y, p.z});
 			water.normals.push_back({-n.x, n.y, n.z});
+			if (s.paintSize > 0.0) water.uvs.push_back({std::clamp((p.x - s.paintX) / s.paintSize, 0.001, 0.999), std::clamp((p.z - s.paintZ) / s.paintSize, 0.001, 0.999)});
 			folds.push_back(fold);
 			shallow.push_back(clear ? 1 : 0);
 		}
@@ -239,6 +323,31 @@ inline std::string seaText(const Sea &s, double t, const Vec3 &eyeStory, const V
 	const int w = around + 1;
 	Mesh clearWater;   // (the shallows: clear water over the sand)
 	clearWater.verts = water.verts, clearWater.normals = water.normals;
+	Mesh fine, fineClear;   // (the cells rings touch, cut small: film_stir.h)
+	std::vector<char> cut;
+	if (stirred && stirred->any()) {
+		const auto radiusOf = [&](double j) { return r0 * std::pow(r1 / r0, j / double(out)); };
+		const auto angleOf = [&](double i) { return heading - half + 2.0 * half * i / around; };
+		cut = stir::refineGrid(*stirred, t, out, around,
+			[&](int j, int i) {
+				const double r = radiusOf(j + 0.5), a = angleOf(i + 0.5), along = r * 2.0 * half / around, across = radiusOf(j + 1.0) - radiusOf(j);
+				return stir::Cell{eye.x + r * std::cos(a), eye.z + r * std::sin(a), 0.75 * (along + across), along, across, std::hypot(r, eye.y - s.level)};
+			},
+			[&](int j, int i) {
+				stir::Quad q;
+				const int a = j * w + i, corner[4] = {a, a + 1, a + w + 1, a + w};
+				for (int k = 0; k < 4; ++k) q.p[k] = water.verts[static_cast<std::size_t>(corner[k])], q.n[k] = water.normals[static_cast<std::size_t>(corner[k])];
+				return q;
+			},
+			[&](int j, int i, double u, double v, double &x, double &z) {
+				const double r = radiusOf(j + v), a = angleOf(i + u);
+				x = eye.x + r * std::cos(a), z = eye.z + r * std::sin(a);
+			},
+			[&](int j, int i) -> Mesh & {
+				const int a = j * w + i;
+				return shallow[static_cast<std::size_t>(a)] && shallow[static_cast<std::size_t>(a + 1)] && shallow[static_cast<std::size_t>(a + w)] && shallow[static_cast<std::size_t>(a + w + 1)] ? fineClear : fine;
+			});
+	}
 	std::vector<std::array<int, 3>> deep;
 	for (int j = 0; j < out; ++j)
 		for (int i = 0; i < around; ++i) {
@@ -248,8 +357,9 @@ inline std::string seaText(const Sea &s, double t, const Vec3 &eyeStory, const V
 					const Vec3 c = (water.verts[static_cast<std::size_t>(tri[0])] + water.verts[static_cast<std::size_t>(tri[1])] + water.verts[static_cast<std::size_t>(tri[2])]) * (1.0 / 3.0);
 					if (std::hypot(-c.x - s.holeX, c.z - s.holeZ) < s.holeR) continue;
 				}
-				water.tris.push_back(tri);
-				if (shallow[static_cast<std::size_t>(tri[0])] && shallow[static_cast<std::size_t>(tri[1])] && shallow[static_cast<std::size_t>(tri[2])]) clearWater.tris.push_back(tri);
+				water.tris.push_back(tri);   // (cut cells too: the foam lies on them)
+				if (!cut.empty() && cut[static_cast<std::size_t>(j) * around + i]) continue;
+				if (s.painted.empty() && shallow[static_cast<std::size_t>(tri[0])] && shallow[static_cast<std::size_t>(tri[1])] && shallow[static_cast<std::size_t>(tri[2])]) clearWater.tris.push_back(tri);
 				else deep.push_back(tri);
 			}
 		}
@@ -257,6 +367,8 @@ inline std::string seaText(const Sea &s, double t, const Vec3 &eyeStory, const V
 	opaque.tris = deep;
 	std::string text = "# the " + s.kind + " (film_water.h)\n" + attr(seaMaterial(s), emitMesh(detail::agreeing(opaque), identity()));
 	if (!clearWater.tris.empty()) text += "# the shallows: clear water (film_surf.h)\n" + attr(glassMaterial(1.333, 0.0), emitMesh(detail::agreeing(clearWater), identity()));
+	if (!fine.tris.empty()) text += "# rings on the water (film_stir.h)\n" + attr(seaMaterial(s), emitMesh(detail::agreeing(fine), identity()));
+	if (!fineClear.tris.empty()) text += attr(glassMaterial(1.333, 0.0), emitMesh(detail::agreeing(fineClear), identity()));
 	if (s.foam && s.kind != "clear") {   // the foam: the triangles where the crest folds, a hand's breadth above the water
 		// each triangle the fold reaches is cut into pieces a few pixels across (finer near the camera), and a piece is foam where the fold, smoothly interpolated, is above
 		// a threshold broken by noise: the foam's edge follows the fold's contour and is lacy, not the mesh's triangles

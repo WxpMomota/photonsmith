@@ -775,21 +775,7 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 		for (std::size_t i = 0; i < spec.fogBanks.size(); ++i)
 			out += clouds::fogBankText(spec.key.empty() ? std::string("film") : spec.key, spec.fogBanks[i], static_cast<int>(i), t, nt, groundAt);
 	}
-	if (!spec.seas.empty() || !spec.rivers.empty() || !spec.falls.empty()) {   // water (film_water.h)
-		Vec3 eye, target;
-		double fov = 40.0;
-		film_subjects::cameraOf(header, eye, target, fov);
-		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
-		const double aspect = 16.0 / 9.0, hfov = 2.0 * std::atan(std::tan(fov * kPi / 360.0) * aspect) * 180.0 / kPi;   // (a film's fov is its shorter side's)
-		for (water::Sea sea : spec.seas) {
-			sea.glow = sea.glow * (1.0 / std::max(1.0, exposureAt(t)));   // (living light as bright on the screen however far the night camera has opened up)
-			if (spec.hasUnderwater && undersea::waterlineOf(sea, nt, {-eye.x, eye.y, eye.z}).where == undersea::Waterline::At) sea.holeX = -eye.x, sea.holeZ = eye.z, sea.holeR = 1.5;   // (clear of a lens at the waterline)
-			out += water::seaText(sea, nt, eye, target, hfov, ground.get(), spec.swell.on ? &spec.swell : nullptr);
-		}
-		if (spec.swell.on && ground) out += surf::shallowsCausticText(spec.key.empty() ? std::string("film") : spec.key, nt, -eye.x, eye.z, *ground, spec.seas[0].level, spec.tracedCaustics);
-		for (const water::River &r : spec.rivers) out += water::riverText(r, nt, ground.get());
-		for (const water::Fall &f : spec.falls) out += f.frozen ? (ground ? std::string() : water::cliffText(f)) + ice::frozenFallText(f) : water::fallText(f, nt, ground.get());
-	}
+	if (!spec.seas.empty() || !spec.rivers.empty() || !spec.falls.empty()) out += waterAt(header, t, nt);   // water (film_water.h and those after it: film_waterworld.cpp)
 	out += spectacleText(spec, header, t, nt, exposureAt(t), [this](double ft) { return natureAt(ft); }, weatherAt(t));
 	if (!spec.auroras.empty() || !spec.lightnings.empty() || !spec.meteors.empty()) {   // the sky's spectacles (film_skyfx.h)
 		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
@@ -888,6 +874,8 @@ std::string DataFilm::worldAt(const std::string &given, double t) const {
 		film_subjects::cameraOf(header, eye, target, fov);
 		out = underTheSeaLight(spec, out, header, t, nt, seabedAt(-eye.x, eye.z));
 		if (spec.toon.on) out = undersea::bubblesGrouped(out);   // (round 17: a toon film draws no ink round its bubbles)
+	} else if (spec.toon.on && !spec.paint.off && (!spec.seas.empty() || !spec.rivers.empty())) {
+		out = undersea::bubblesGrouped(out);   // (no ink round the wave lines either: film_toonwater.h)
 	}
 	out = withSkyLook(spec, std::move(out), header, t, nt);
 	return spec.space.on ? cosmos::withSpaceLook(space::recentred(out), spec.space.flare, spec.space.bloom) : out;   // (a floating origin for a film in space: film_space.h)
@@ -983,7 +971,7 @@ std::string DataFilm::castAt(double t) const {
 		std::string text = drawnAt(tc);
 		const bool talks = std::any_of(spec.lines.begin(), spec.lines.end(), [&](const speech::Line &l) { return l.who == c.name && l.t <= tc + 0.1 && l.t >= tc - 30.0; });   // (only a line begun lately: its bubbles are still rising)
 		if (underwater(c) && talks) text += speechBubbles(c, kind, tc);   // (a crab on the seabed talks in bubbles too)
-		if (spec.hasUnderwater && !spec.seas.empty()) text += waterPlay(c, kind, tc);
+		if (!spec.seas.empty() && (spec.hasUnderwater || !c.extra)) text += waterPlay(c, kind, tc);
 		// a smear's multiples: copies of it back along its way on a dash (film_motion.h)
 		if (const motion::Smear *sm = motion::smearFor(spec.smears, c.name); sm && sm->multiples > 0)
 			for (const double u : motion::smearTimes([&](double w) {
@@ -1166,6 +1154,7 @@ static void seaSounds(const Spec &spec, audio::Mix &m, const soundscape::Ears &e
 }
 
 void DataFilm::soundscape(audio::Mix &m) const {
+	waterSounds(m);
 	const bool eagles = std::any_of(spec.flocks.begin(), spec.flocks.end(), [](const wildlife::Flock &f) { return f.kind == "eagles"; });
 	if (spec.falls.empty() && spec.fires.empty() && spec.lavas.empty() && spec.volcanoes.empty() && spec.wildfires.empty() && !spec.swell.on && spec.herds.empty() && !eagles &&
 		spec.forests.empty() && spec.geysers.empty() && spec.rockfalls.empty() && spec.avalanches.empty() && spec.quakes.empty() && spec.whales.empty() && spec.pods.empty() && spec.glaciers.empty() && spec.tornadoes.empty() &&

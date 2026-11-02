@@ -280,6 +280,17 @@ class DataFilm {
 	std::string aboardAt(const std::string &header, double t, double nt) const;     // (round 11: footprints, floating things, interiors, holograms, screens, drawings)
 	std::string castAt(double t) const;                                               // (the characters, as their kinds draw them)
 	std::string waterPlay(const Character &c, const CharacterKind &kind, double t) const;   // (round 17: a character and the water - splashes, bubbles, drips, silt: film_world.cpp)
+	// (water rounds: film_waterworld.cpp) what has touched the water by t, with `eye` in story space; what is on it and by it, as scene text; and what is heard
+	stir::Field stirredAt(double t, double nt, const Vec3 &eye) const;
+	std::string waterAt(const std::string &header, double t, double nt) const;   // (all the film's water at t)
+	std::string onTheWater(const stir::Field &stirred, double t, double nt, const Vec3 &eye, const Vec3 &target, double hfov) const;
+	void waterSounds(audio::Mix &m) const;
+	// A character in a boat: the boat's frame and its seat; where that puts it at t, turned as the boat is; its hands on the oars or the paddle.
+	bool boatSeat(const Character &c, double t, Mat4 &frame, craft::Seat &seat, const craft::Craft *&boat, bool &pulls) const;
+	void waterMoment(const Character &c, double t, Vec3 &where, double &heading, double going, double &swim, bool &airborne, double &wet) const;
+	craft::Afloat afloat() const { return {spec.seas.empty() ? nullptr : &spec.seas[0], &spec.rivers}; }
+	void paintSea(water::Sea &sea) const;   // (a toon film's: film_toonwater.h)
+	void waterHands(const Character &c, double t, CharacterMoment &m) const;
 	std::string marksAt(const std::string &header, double t) const;
 	// Where a character looks of itself while someone speaks (CharacterMoment::look): at the speaker, turning to them just after they begin and back a little after they end
 	// (the look moves smoothly from one speaker to the next); and while it speaks, at the nearest of those who listen. A `look` line is on top of this.
@@ -380,6 +391,8 @@ class DataFilm {
 			if (st.strokes.depthThin <= 0.0) st.strokes.depthThin = 0.75;
 			if (st.inkTint <= 0.0) st.inkTint = 0.5;
 			if (std::find(st.noInk.begin(), st.noInk.end(), "fx/bubbles") == st.noInk.end()) st.noInk.push_back("fx/bubbles");   // (no ink round the bubbles: worldAt groups them)
+		} else if (!spec.paint.off && (!spec.seas.empty() || !spec.rivers.empty()) && std::find(st.noInk.begin(), st.noInk.end(), "fx/bubbles") == st.noInk.end()) {
+			st.noInk.push_back("fx/bubbles");   // (nor round drawn wave lines: film_toonwater.h)
 		}
 		return toon_look::tagOf(st);
 	}

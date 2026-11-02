@@ -797,6 +797,7 @@ void DataFilm::handsAt(const Character &c, double t, CharacterMoment &m) const {
 		}
 	}
 	contactsAt(c, t, m);
+	waterHands(c, t, m);
 }
 
 void DataFilm::contactsAt(const Character &c, double t, CharacterMoment &m) const {
@@ -908,98 +909,6 @@ double DataFilm::natureAt(double t) const {
 	return spec.natureClock[i] + (spec.natureClock[i + 1] - spec.natureClock[i]) * (k - i);
 }
 
-bool DataFilm::wildSubject(const std::string &who, double t, Vec3 &feet, Vec3 &front, Vec3 &chest) const {
-	{   // under the sea (round 15): a diver by name, or schoolN, swimmersN, bigfishN (the Nth line of that word: its first animal, or a school's middle)
-		const double nt = natureAt(t);
-		const auto lift = [&](Vec3 p) { return Vec3{p.x, p.y + seabedAt(p.x, p.z), p.z}; };
-		Vec3 at, way{0, 0, 1};
-		bool found = false;
-		for (const diver::Diver &d : spec.divers)
-			if (d.name == who) {
-				diver::Diver l = d;
-				for (Vec3 &p : l.path) p = lift(p);
-				at = diver::diverAt(l, nt, &way), found = true;
-			}
-		double n = 0.0;
-		const auto numbered = [&](const char *word) {
-			const std::size_t w = std::char_traits<char>::length(word);
-			return who.size() > w && who.compare(0, w, word) == 0 && detail::number(who.substr(w), n) && n >= 1.0 && n == std::floor(n);
-		};
-		if (!found && numbered("school") && static_cast<std::size_t>(n) <= spec.schools.size()) {
-			const school::School &sc = schoolsSwum()[static_cast<std::size_t>(n) - 1];
-			Vec3 sum{0, 0, 0}, vel{0, 0, 0}, v;
-			for (int i = 0; i < sc.count; ++i) sum = sum + school::fishAt(sc, i, nt, &v), vel = vel + v;
-			at = sum * (1.0 / std::max(1, sc.count)), way = vel, found = true;
-		} else if (!found && numbered("swimmers") && static_cast<std::size_t>(n) <= spec.deep.swimmers.size()) {
-			deepsea::Swimmers g = spec.deep.swimmers[static_cast<std::size_t>(n) - 1];
-			if (g.kind != "otters") g.at = lift(g.at);
-			double roll = 0.0;
-			at = deepsea::swimmerAt(g, 0, nt, way, roll, spec.seas.empty() ? 0.0 : spec.seas[0].level), found = true;
-		} else if (!found && numbered("bigfish") && static_cast<std::size_t>(n) <= spec.bigFish.size()) {
-			school::BigFish b = spec.bigFish[static_cast<std::size_t>(n) - 1];
-			b.at = lift(b.at);
-			at = school::bigAt(b, 0, nt, way), found = true;
-		}
-		if (found) {
-			way.y = 0.0;
-			way = length(way) > 1e-9 ? normalize(way) : Vec3{0, 0, 1};
-			feet = story(at.x, at.y, at.z), front = story(way.x, 0.0, way.z), chest = feet;
-			return true;
-		}
-	}
-	const bool herd = who.rfind("herd", 0) == 0, flock = who.rfind("flock", 0) == 0;
-	if (!herd && !flock) return false;
-	double n = 0.0;
-	if (!detail::number(who.substr(herd ? 4 : 5), n) || n < 1.0 || n != std::floor(n)) return false;
-	const std::size_t i = static_cast<std::size_t>(n) - 1;
-	const double nt = natureAt(t);
-	const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
-	Vec3 sum{0, 0, 0}, way{0, 0, 0};
-	double lift = 1.0;
-	int count = 0;
-	if (herd) {
-		if (i >= spec.herds.size()) return false;
-		const wildlife::Herd &h = spec.herds[i];
-		const animals::Species *sp = animals::species(h.kind);
-		if (!sp) return false;
-		for (int a = 0; a < std::min(h.count, 12); ++a, ++count) {   // (the herd's leading animals: the bunch the camera is on)
-			const wildlife::Animal an = wildlife::animalAt(h, *sp, a, nt, ground.get());
-			sum = sum + an.at, way = an.dir;
-		}
-		lift = 0.85 * sp->length;
-	} else {
-		if (i >= spec.flocks.size()) return false;
-		const wildlife::Flock &f = spec.flocks[i];
-		if (f.kind == "eagles") {
-			for (int a = 0; a < f.count; ++a, ++count) {
-				Vec3 fwd;
-				sum = sum + wildlife::eagleAt(f, a, nt, &fwd);
-				way = way + fwd;
-			}
-		} else if ((f.kind == "starlings" || f.kind == "fish") && !f.pos.empty()) {
-			const std::size_t k = std::min(f.pos.size() - 1, static_cast<std::size_t>(std::max(0.0, (t - f.t0) / f.dt)));
-			for (std::size_t a = 0; a < f.pos[k].size(); ++a, ++count) sum = sum + f.pos[k][a], way = way + f.vel[k][a];
-		} else if (f.kind == "geese") {
-			const double speed = f.speed > 0.0 ? f.speed : 15.0;
-			way = normalize(f.to - f.from + Vec3{1e-9, 0, 0});
-			sum = f.from + way * std::min(length(f.to - f.from), (nt - f.t0) * speed), count = 1;
-		} else {   // butterflies: over their patch
-			sum = Vec3{0.5 * (f.x0 + f.x1), f.at.y + (ground ? ground->heightAt(0.5 * (f.x0 + f.x1), 0.5 * (f.z0 + f.z1)) : 0.0) + 0.8, 0.5 * (f.z0 + f.z1)}, count = 1;
-			way = {0, 0, 1};
-		}
-		lift = 0.0;
-	}
-	if (count == 0) return false;
-	const Vec3 mid = sum * (1.0 / count);
-	way.y = 0.0;
-	if (length(way) < 1e-9) way = {0, 0, 1};
-	way = normalize(way);
-	feet = story(mid.x, mid.y, mid.z);
-	front = story(way.x, 0.0, way.z);
-	chest = feet + Vec3{0.0, lift, 0.0};
-	return true;
-}
-
 bool DataFilm::subjectFrame(const std::string &who, double t, Vec3 &feet, Vec3 &front, Vec3 &chest) const {
 	if (const Character *c = character(who)) {
 		const CharacterMoment m = momentOf(*c, t, &feet);
@@ -1106,8 +1015,10 @@ CharacterMoment DataFilm::momentOf(const Character &c, double t, Vec3 *at) const
 		swim = 1.0, airborne = true;
 		where.y = c.start[1] + 0.06 * c.scale * std::sin(2.0 * kPi * t / 3.2 + seedOf(c.name));
 	}
+	double wet = 0.0;
+	waterMoment(c, t, where, heading, going, swim, airborne, wet);
 	CharacterMoment m;
-	m.swim = swim;
+	m.swim = swim, m.wet = wet;
 	m.running = running;
 	m.gait = moving || going > 0.0 ? gait : motion::Gait::Plain;
 	m.crouch = std::max(crouch, motion::gaitCrouch(m.gait) * going);   // (a sneak goes crouched)

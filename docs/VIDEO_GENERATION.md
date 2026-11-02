@@ -2701,6 +2701,58 @@ uvs (its surface cut into near-flat charts along its creases, each laid flat and
 
 **What these do not change.** The join at the knee can still show a crease in a hard bend, and a lying animal's hind feet stick out a little. A scanned model remains the larger step. Metal has not been tried with any of this.
 
+### Cartoons on the water: sea, river and lake (2026-11-01)
+
+Ten features for films on the surface of the water, not under it. Everything here works in a film file; `pbrt_scenes/down-to-the-sea.film` uses them together, and the library has the
+sets `pond`, `riverbend` and `harbour`.
+
+**Water that answers: `ripple X Z at T [size S]`, `skipstone X Z toward A at T [speed S] [bounces N] [height H]`, rain.** (film_stir.h.) Whatever touches the water starts rings, worked out
+from the formula for something dropped in deep water (Cauchy-Poisson): long waves run ahead and short ones come after, and a hollow at the place fills and bounces. Something moving is a
+string of rings from where it was, and added up they are its wake: the V of 19.5 degrees and the curved waves inside it come from nothing but that. Rain makes a ring from each drop within
+16 m of the camera (film `weather rain` or `storm rain`) and roughens the water further off. The water's mesh is far too coarse for rings, so the cells they touch are cut into pieces a few
+centimetres across, never below a pixel or so, at most 240,000 points a frame. A big touch throws up a crown of drops and a jet.
+
+**Boats: `boat rowboat|canoe|raft|sailboat|fishing|ferry NAME at X Z [to X Z]... [speed S] [from T] [length L] [colour R G B] [facing A]`.** (film_craft.h.) Round 16's `boat X Z` is a hull seen
+from under the sea; this one floats above it. She gathers way and loses it, turns along her path, and rides the water read at bow, stern and both sides over a third of her length. Her floor
+lies above the water, because the sea's mesh runs through her. Oars pull when she moves, a sailboat's sails fill on the side the wind leaves and she heels, engines churn froth. `aboard WHO BOAT
+[seat N] [rows|paddles]` puts a character in her, with hands on the oars or paddle. A shot can `follow` her by name. `boat canoe NAME river N [across C]` goes down a river, carried by it.
+
+**People in the water.** A character whose feet are under the film's `water` wades, with rings from their legs. Out of their depth (two thirds of their height) they swim at the surface when
+they walk, and tread water when they stand. Crossing the surface splashes; they get darker wet. `fallin WHO at T [to X Z]` goes over the side, under, and up again treading water. `climbout WHO
+at T to X Y Z` heaves them out onto a bank or a pier, and they stay there (a walk after a `climbout` is not followed); their colours dry over half a minute.
+
+**Rivers: `river ... [clear] [rocks N] [rapids S0 S1]... [depth D] [seed K]`.** (film_stream.h.) The ribbon of one colour is gone. The surface is as fine as the camera can see, its ripples
+travelling with the flow, fastest in the middle (a flow map). A rock humps the water upstream of it, trails a V of standing waves and a white seam, and dimples the water behind it. Rapids
+(metres along) are standing waves that stay put while the water runs through, and the river drops through them. Under it is a channel of gravel and stones, darker and greener with depth, and a
+gravel bank each side; `clear` water shows them. Where a river reaches the film's sea or lake it widens and slips under it. `bore N at T [height H]`: a wall of water comes down river N.
+
+**Things the water carries: `adrift leaf|paperboat|log|bottle|duck|crate|lantern NAME at X Z [river N] [from T] [count N] [size S] [seed K]`.** (film_adrift.h.) On a river it goes with the water
+where it is, turned aside by rocks; one in the way may hold it a few seconds, and in the slack behind one it may circle. Its way is worked out once on load, so it is the same every run. A
+shot can `follow NAME`, low and close, for a whole journey. On a sea it drifts with the wind, and a whirlpool takes it round and in.
+
+**At the water's edge: `bankside [reeds D] [lilies D] [duckweed D] [willows N] [mud W] [patch X Z R]... [seed K]`.** (film_bankside.h.) Plants grow along the shore, which is where the land goes
+under the `water` and both edges of every river, or in `patch`es for a lake with no land. D is how many to the metre. Reeds lean in the wind and part for a boat or someone wading; lily pads rock
+on passing rings and are pushed aside; a willow's strands hang to the water and sway. `water ... ripples R` (0 a mirror, 1 usual), `water ... catspaws C` (dark patches of wind going over still
+water), `watermist A [during T0 T1]` (mist lifting off the water).
+
+**Water's animals: `pondlife KIND [N] at X Z [radius R] [young N] [toward A] [height H] [strike|dive|slap T]... [seed K]`.** (film_pondlife.h.) `ducks` (drake, duck and `young N` in a line, up-ending
+to feed), `swans`, `heron` (one slow step at a time; each `strike T` comes up with a fish), `kingfisher` (`dive T` from a perch `height` above the water), `frogs`, `otter`, `beaver` (`slap T`, then
+gone a while), `trout` (rising), `salmon` (leaping `toward A`, for the foot of a fall). They touch the water with rings and sound. Their times are nature's: under `timelapse` or `slowmo` they do
+not move with the film's clock.
+
+**Water that changes: `tide low L high H [period P] [from T]`, `flood from Y to Y during T0 T1`, `whirlpool X Z [radius R] [depth D] [from T] [until T]`, `bigwave X Z toward A at T [height H]
+[length L] [speed S] [width W]`.** (film_water.h, film_tideline.h.) A tide uncovers a wet dark band of shore. `sandcastle X Z [size S]` slumps once the water reaches it. `rockpool X Z [radius R]`
+is seen when the tide is out. Boats and floating things ride a funnel or a great wave, because they read the same surface. A tide does not move a `surf`'s breakers, which stay at the film's `water`
+level. A flood or a great wave does not pour over the land by itself: the water only stands higher against it.
+
+**Places: `pier X Z toward A [length L]`, `harbour X Z [facing A] [length L]`, `lighthouse X Z [height H]`, `bridge X Z to X Z [arches N] [height H]`, `watermill X Z [facing A] [river N]`,
+`steppingstones X Z to X Z [count N]`, `stilthouses N at X Z [radius R]`, `dam X Z to X Z [height H] [burst T] [river N]`.** (film_waterside.h.) A mill wheel turns as fast as its river runs. After
+dark a lighthouse's lamp brightens and two spots turn; the beams show only in `fog` or `mist`. A dam with `burst T` loses its middle, which tumbles out, and sends a `bore` down its river.
+
+**Water drawn: `toonwater [deep R G B] [mid R G B] [shallow R G B] [lines N] [sparkle N]`.** (film_toonwater.h.) In a `toon` film the water is flat colour by default, stepped by depth over a
+terrain, with no reflections. White wave lines drift on it, star sparkles twinkle along the way to the sun, a touch is a drawn ring, and a splash is a white crown with fat drops. `toonwater off`
+keeps real water in a toon film. A river is flat `mid` colour with its foam.
+
 ### Cartoons of space and the universe (2026-11-01)
 
 Ten things for films about space. **`pbrt_scenes/powers-of-ten.film`** and **`pbrt_scenes/nova-and-robo.film`** use most of them.

@@ -147,8 +147,9 @@ inline double pupilFor(const CharacterMoment &m) {
 }
 // A part's colour from the moment's character line, if it gives one (`sweater red`).
 inline void colourFrom(const CharacterMoment &m, const char *part, Vec3 &colour) {
-	if (!m.colours) return;
-	if (const auto it = m.colours->find(part); it != m.colours->end()) colour = it->second;
+	if (m.colours)
+		if (const auto it = m.colours->find(part); it != m.colours->end()) colour = it->second;
+	if (m.wet > 0.0) colour = colour * (1.0 - 0.38 * m.wet);
 }
 // How much wider a run's gait is than a walk's (film_file.h, DataFilm::kRunStride: its stride is as much longer).
 inline double runWidth(const CharacterMoment &m) { return 1.0 + (film_file::DataFilm::kRunStride - 1.0) * m.running; }

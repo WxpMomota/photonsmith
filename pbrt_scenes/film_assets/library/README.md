@@ -19,3 +19,5 @@ animals/ holds the films' rigged animals (glTF models with their clips: deer, ho
 made by scripts/make_rigged_animals.py), which `herd` and `flock` lines bring in (src/shared/cartoon/film_animals.h). robot.glb is a rigged character a `rigged` line can
 make a kind of (scripts/make_rigged_robot.py; robot.cast names it), nova.glb another (scripts/make_rigged_astronaut.py), and mira.glb one with a face of morph targets (scripts/make_rigged_face.py). stars/ is the star
 catalogue and constellation lines of the real night sky (d3-celestial; its licence is beside them).
+
+Sets by the water: `pond` (a still pond at dawn), `riverbend` (a clear river with rapids; its river is number 0, for `adrift ... river 0` and `boat ... river 0`) and `harbour` (a quay, a pier and a lighthouse on a calm sea).

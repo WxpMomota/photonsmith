@@ -120,6 +120,7 @@ add_library(cpu_renderer STATIC
     src/shared/cartoon/film_parse.cpp
     src/shared/cartoon/film_world.cpp
     src/shared/cartoon/film_overlays.cpp
+    src/shared/cartoon/film_waterworld.cpp
     src/external/stb_image_impl.cpp
     src/external/tinyexr_impl.cpp
     src/external/miniz.c

@@ -65,6 +65,13 @@
 #include "film_cosmic.h"
 #include "film_planetfall.h"
 #include "film_cover.h"
+#include "film_adrift.h"
+#include "film_bankside.h"
+#include "film_craft.h"
+#include "film_pondlife.h"
+#include "film_tideline.h"
+#include "film_toonwater.h"
+#include "film_waterside.h"
 #include "film_skyfx.h"
 #include "film_cache.h"
 #include "film_camera.h"
@@ -207,6 +214,7 @@ struct CharacterMoment {
 	bool moving = false;
 	double going = 0.0;      // how much it is walking, 0 .. 1, eased over 0.3 s as a walk starts and ends (a rigged model fades between its idle and walk clips by it)
 	double swim = 0.0;       // (round 16) under the water: 1 - its walks are swims at its own height, its strokes its kind's (film_kinds.h), laid level by castAt
+	double wet = 0.0;        // (water round 3) how wet it is, 0 to 1: its colours darker
 	double t = 0.0;
 	const std::vector<rig::Gesture> *gestures = nullptr;
 	double detail = 0.0;
@@ -404,6 +412,36 @@ struct Spec {
 	std::vector<water::Sea> seas;
 	std::vector<water::River> rivers;
 	std::vector<water::Fall> falls;
+	// water that answers what touches it (`ripple`, `skipstone`: film_stir.h)
+	std::vector<stir::Plop> plops;
+	std::vector<stir::Skip> skips;
+	// boats on the water and who is in them (`boat KIND NAME ...`, `aboard WHO BOAT ...`: film_craft.h)
+	std::vector<craft::Craft> crafts;
+	struct Aboard {
+		std::string who, boat;
+		int seat = 0;
+		bool pulls = false;   // (it rows, or paddles)
+	};
+	std::vector<Aboard> aboards;
+	// into the water and out of it (`fallin`, `climbout`: film_waterworld.cpp), and what it carries (`adrift`: film_adrift.h)
+	struct Tumble {
+		std::string who;
+		double at = 0.0, x = 0.0, z = 0.0;
+		bool placed = false;   // (it says where: else beside where it was)
+		bool out = false;      // (`climbout`: out onto x y z)
+		double y = 0.0;
+	};
+	std::vector<Tumble> tumbles;
+	std::vector<adrift::Thing> adrifts;
+	// what grows and lives where water meets land (`bankside`, `watermist`: film_bankside.h; `pondlife`: film_pondlife.h)
+	bankside::Bank bank;
+	bankside::Mist waterMist;
+	std::vector<pondlife::Life> lifes;
+	// what the tide leaves (`sandcastle`, `rockpool`: film_tideline.h), places on the water (film_waterside.h), and water drawn (`toonwater`: film_toonwater.h)
+	std::vector<tideline::Castle> castles;
+	std::vector<tideline::Pool> pools;
+	std::vector<waterside::Place> places;
+	toonwater::Paint paint;
 	surf::Swell swell;   // surf on the sea's shore (`surf`: film_surf.h)
 	// clouds you can see round (`clouds`)
 	std::vector<clouds::Clouds> cloudLayers;

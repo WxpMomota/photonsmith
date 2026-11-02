@@ -1,0 +1,10 @@
+# A little harbour on a calm sea in the afternoon: a stone quay, a pier, a lighthouse on the far side, boats going about their day.
+scene    void.pbrt
+sky      16:20 16:20
+water    sea  level 0  waves 0.2  wind 40
+harbour  18 -30  facing 200
+pier     -8 -16  toward 80  length 16
+lighthouse -30 -60  height 24
+boat     fishing tern  at 10 -18
+boat     sailboat gull  at -60 -70  to 50 -80  speed 2
+boat     rowboat dory  at 2 -12  facing 60

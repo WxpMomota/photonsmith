@@ -1,0 +1,9 @@
+# A still pond with no land to speak of: reeds, lilies and duckweed in patches, ducks, a heron in the shallows, mist on the water. For quiet scenes by the water.
+scene    void.pbrt
+sky      07:40 07:40
+water    lake  level 0  waves 0.01  ripples 0.25  catspaws 2
+bankside reeds 2  lilies 1.2  duckweed 1  patch -7 -10 3.2  patch 6 -13 3.6  patch 0 -21 5
+watermist 1
+pondlife ducks 1  at 0 -9  radius 3  young 5
+pondlife heron  at -5 -9  toward 80
+pondlife trout 3  at 2 -8  radius 3

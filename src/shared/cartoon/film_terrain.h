@@ -307,7 +307,7 @@ struct Field {
 		const double u = gx - i, v = gz - j;
 		double rows[4];
 		for (int b = 0; b < 4; ++b) rows[b] = detail::cr(sample(i - 1, j - 1 + b), sample(i, j - 1 + b), sample(i + 1, j - 1 + b), sample(i + 2, j - 1 + b), u);
-		const double h = spec.y + std::max(0.0, detail::cr(rows[0], rows[1], rows[2], rows[3], v)) + detail(px, pz);
+		const double h = spec.y + std::max(spec.channels.empty() ? 0.0 : -12.0, detail::cr(rows[0], rows[1], rows[2], rows[3], v)) + detail(px, pz);   // (a river's bed may be cut below the land's foot)
 		if (spec.waterLevel < -1e29) return h;
 		const double above = h - spec.waterLevel;   // the shallows pulled under: what was a hand's breadth above the water is below it, the bed a little deeper
 		return above > 1.5 ? h : h - smoothstep(1.5, -0.5, above) * (0.8 + 0.5 * std::min(4.0, std::max(0.0, -above)));
@@ -386,7 +386,7 @@ inline std::shared_ptr<const Field> make(const Spec &s) {
 					const double level = a.y + u * (b.y - a.y) - s.y;
 					const double target = d < half ? level - depth * (1.0 - 0.6 * (d / half) * (d / half)) : level - 0.4 * depth + (d - half) * 0.8;
 					float &v = h[static_cast<std::size_t>(j) * n + i];
-					v = static_cast<float>(std::min(static_cast<double>(v), std::max(target, -2.0 * depth)));
+					v = static_cast<float>(std::min(static_cast<double>(v), std::max(target, -10.0)));
 				}
 		}
 	}

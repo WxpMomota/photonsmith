@@ -5,6 +5,7 @@
 
 #include "film_parse_space.h"   // (and film_spec.h)
 #include "film_parse_sea.h"
+#include "film_parse_water.h"
 #include "film_parse_model.h"
 
 namespace cartoon {
@@ -723,7 +724,9 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 				else if (t[i] == "waves" && v >= 0.0 && v <= 15.0) sea.waves = v;
 				else if (t[i] == "wind") sea.wind = v, sea.windSet = true;
 				else if (t[i] == "choppy" && v >= 0.0 && v <= 1.0) sea.choppy = v;
-				else return fail("\"" + t[i] + "\": water takes level, waves (0 to 15 m), wind, choppy (0 to 1) and foam off");
+				else if (t[i] == "ripples" && v >= 0.0 && v <= 3.0) sea.ripples = v;
+				else if (t[i] == "catspaws" && v >= 0.0 && v <= 12.0) sea.catspaws = v;
+				else return fail("\"" + t[i] + "\": water takes level, waves (0 to 15 m), wind, choppy (0 to 1), ripples (0 to 3), catspaws (0 to 12) and foam off");
 			} else {
 				return fail("`water [sea|lake|clear] level Y [waves H] [wind DEGREES] [choppy C] [foam off] [model spectrum|gerstner]`");
 			}
@@ -744,12 +747,20 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 			rv.points.push_back({x, z});
 		}
 		for (; i < t.size(); i += 2) {
-			double v = 0.0;
-			if (i + 1 >= t.size() || !number(t[i + 1], v) || (v < 0.0 && t[i] != "y")) return fail("\"" + t[i] + "\": a river takes width, speed and y, each with a number");   // (y may be below 0)
+			double v = 0.0, w = 0.0;
+			if (t[i] == "clear") {   // (what lies under it: film_stream.h)
+				rv.clear = true, --i;
+				continue;
+			}
+			if (i + 1 >= t.size() || !number(t[i + 1], v) || (v < 0.0 && t[i] != "y")) return fail("\"" + t[i] + "\": a river takes width, speed, y, depth, rocks, seed, each with a number, clear and rapids S0 S1");   // (y may be below 0)
 			if (t[i] == "width" && v > 0.0) rv.width = v;
 			else if (t[i] == "speed") rv.speed = v;
 			else if (t[i] == "y") rv.y = v;
-			else return fail("\"" + t[i] + "\": a river takes width, speed and y");
+			else if (t[i] == "depth" && v > 0.0 && v <= 5.0) rv.depth = v;
+			else if (t[i] == "rocks" && v <= 200.0) rv.rocks = static_cast<int>(v);
+			else if (t[i] == "seed") rv.seed = detail::seedOf(v);
+			else if (t[i] == "rapids" && i + 2 < t.size() && number(t[i + 2], w) && w > v) rv.rapids.push_back({v, w}), ++i;
+			else return fail("\"" + t[i] + "\": a river takes width, speed, y, depth, rocks, seed, clear and rapids S0 S1 (metres along it)");
 		}
 		if (!rv.canyon && rv.points.size() < (rv.downhill ? 1u : 2u))
 			return fail("`river X Z X Z [X Z ...] [width W] [speed S] [y Y]` (at least two waypoints, downstream), `river from X Z ...` (on a terrain: downhill from there) or `river canyon ...`");
@@ -1163,6 +1174,8 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 			}
 		}
 		s.fog.on = true;
+	} else if (waterVerb(verb, line)) {   // on the water, and by it (film_parse_water.h)
+		return waterLine(s, verb, line);
 	} else if (underseaVerb(verb) || underseaVerb17(verb) || barracudaTornado(verb, line)) {   // under the sea: the water, its flow, bubbles, the deep, the seabed and its places (film_parse_sea.h)
 		return underseaLine(s, verb, line);
 	} else if (verb == "kelp" || verb == "coral") {
