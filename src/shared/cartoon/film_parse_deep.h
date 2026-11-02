@@ -54,7 +54,109 @@ inline std::string deepUsage(const std::string &verb) {
 	return it == u.end() ? "`" + verb + "`?" : it->second;
 }
 
-// One of these lines into `s`: "" or what is wrong with it.
+// The lines that read their own words rather than `word value` options: `wear`, `sub`, `ride`.
+inline std::string deepOwnWordsLine(Spec &s, const std::string &verb, const std::string &line) {
+	using detail::number;
+	const std::vector<std::string> t = detail::tokens(line);
+	std::vector<double> v;
+	std::size_t i = 1;
+	const auto numbers = [&](std::size_t n) {   // (the next n numbers, or false)
+		v.assign(n, 0.0);
+		for (std::size_t k = 0; k < n; ++k)
+			if (i + k >= t.size() || !number(t[i + k], v[k])) return false;
+		i += n;
+		return true;
+	};
+	const auto point = [&](Vec3 &p) {
+		if (!numbers(3)) return false;
+		p = {v[0], v[1], v[2]};
+		return true;
+	};
+	const std::string usage = deepUsage(verb);
+
+	if (verb == "wear") {
+		flow::Garment g;
+		if (t.size() < 3 || std::find(flow::garments().begin(), flow::garments().end(), t[2]) == flow::garments().end()) return usage;
+		g.who = t[1], g.kind = t[2], i = 3;
+		while (i < t.size()) {
+			const std::string w = t[i++];
+			if (w == "colour" || w == "color") {
+				if (i >= t.size()) return usage;
+				if (!colourOf(t[i], g.colour)) {
+					if (!numbers(3)) return usage;
+					g.colour = {v[0], v[1], v[2]};
+				} else {
+					++i;
+				}
+				continue;
+			}
+			if (!numbers(1) || v[0] <= 0.0 || v[0] > 6.0) return usage;
+			if (w == "length") g.length = v[0];
+			else if (w == "width") g.width = v[0];
+			else return usage;
+		}
+		s.garments.push_back(g);
+		return std::string();
+	}
+	if (verb == "sub") {
+		subs::Sub b;
+		if (t.size() < 3 || std::find(subs::kinds().begin(), subs::kinds().end(), t[1]) == subs::kinds().end()) return usage;
+		b.kind = t[1], b.name = t[2], i = 3;
+		if (i >= t.size() || t[i++] != "at") return usage;
+		Vec3 p;
+		if (!point(p)) return usage;
+		b.path.push_back(p);
+		while (i < t.size()) {
+			const std::string w = t[i++];
+			if (w == "lights" && i < t.size() && (t[i] == "off" || t[i] == "on")) {
+				b.lights = t[i++] == "on";
+				continue;
+			}
+			if (w == "to") {
+				if (!point(p) || b.path.size() >= 64) return usage;
+				b.path.push_back(p);
+				continue;
+			}
+			if (w == "colour" || w == "color") {
+				if (!numbers(3)) return usage;
+				b.colour = {v[0], v[1], v[2]};
+				continue;
+			}
+			if (!numbers(1)) return usage;
+			if (w == "speed" && v[0] > 0.0 && v[0] <= 12.0) b.speed = v[0];
+			else if (w == "from") b.from = v[0];
+			else if (w == "toward") b.toward = v[0];
+			else if (w == "dive") b.dives.push_back(v[0]);
+			else if (w == "rise") b.rises.push_back(v[0]);
+			else if (w == "seed") b.seed = detail::seedOf(v[0]);
+			else return usage;
+		}
+		s.subs.push_back(b);
+		return std::string();
+	}
+	// ride WHO LANE [across X Y] from T [to T]
+	fastlane::Ride r;
+	if (t.size() < 3) return usage;
+	r.who = t[1], r.lane = t[2], i = 3;
+	bool when = false;
+	while (i < t.size()) {
+		const std::string w = t[i++];
+		if (w == "across") {
+			if (!numbers(2)) return usage;
+			r.x = v[0], r.y = v[1];
+			continue;
+		}
+		if (!numbers(1)) return usage;
+		if (w == "from") r.from = v[0], when = true;
+		else if (w == "to") r.to = v[0];
+		else return usage;
+	}
+	if (!when || r.to <= r.from) return usage;
+	s.rides.push_back(r);
+	return std::string();
+}
+
+// The other lines into `s`: "" or what is wrong with it.
 inline std::string deepLine(Spec &s, const std::string &verb, const std::string &line) {
 	using detail::number;
 	const std::vector<std::string> t = detail::tokens(line);
@@ -118,66 +220,6 @@ inline std::string deepLine(Spec &s, const std::string &verb, const std::string 
 	const auto within = [&](const std::string &w, double lo, double hi) { return !opt.count(w) || (opt[w] >= lo && opt[w] <= hi); };
 	const auto seed = [&]() { return detail::seedOf(get("seed", 1.0)); };
 
-	if (verb == "wear") {
-		flow::Garment g;
-		if (t.size() < 3 || std::find(flow::garments().begin(), flow::garments().end(), t[2]) == flow::garments().end()) return usage;
-		g.who = t[1], g.kind = t[2], i = 3;
-		while (i < t.size()) {
-			const std::string w = t[i++];
-			if (w == "colour" || w == "color") {
-				if (i >= t.size()) return usage;
-				if (!colourOf(t[i], g.colour)) {
-					if (!numbers(3)) return usage;
-					g.colour = {v[0], v[1], v[2]};
-				} else {
-					++i;
-				}
-				continue;
-			}
-			if (!numbers(1) || v[0] <= 0.0 || v[0] > 6.0) return usage;
-			if (w == "length") g.length = v[0];
-			else if (w == "width") g.width = v[0];
-			else return usage;
-		}
-		s.garments.push_back(g);
-		return std::string();
-	}
-	if (verb == "sub") {
-		subs::Sub b;
-		if (t.size() < 3 || std::find(subs::kinds().begin(), subs::kinds().end(), t[1]) == subs::kinds().end()) return usage;
-		b.kind = t[1], b.name = t[2], i = 3;
-		if (i >= t.size() || t[i++] != "at") return usage;
-		Vec3 p;
-		if (!point(p)) return usage;
-		b.path.push_back(p);
-		while (i < t.size()) {
-			const std::string w = t[i++];
-			if (w == "lights" && i < t.size() && (t[i] == "off" || t[i] == "on")) {
-				b.lights = t[i++] == "on";
-				continue;
-			}
-			if (w == "to") {
-				if (!point(p) || b.path.size() >= 64) return usage;
-				b.path.push_back(p);
-				continue;
-			}
-			if (w == "colour" || w == "color") {
-				if (!numbers(3)) return usage;
-				b.colour = {v[0], v[1], v[2]};
-				continue;
-			}
-			if (!numbers(1)) return usage;
-			if (w == "speed" && v[0] > 0.0 && v[0] <= 12.0) b.speed = v[0];
-			else if (w == "from") b.from = v[0];
-			else if (w == "toward") b.toward = v[0];
-			else if (w == "dive") b.dives.push_back(v[0]);
-			else if (w == "rise") b.rises.push_back(v[0]);
-			else if (w == "seed") b.seed = detail::seedOf(v[0]);
-			else return usage;
-		}
-		s.subs.push_back(b);
-		return std::string();
-	}
 	if (verb == "helmet" || verb == "blowring" || verb == "speedlines" || verb == "gulp") {   // (a character's)
 		if (t.size() < 2) return usage;
 		const std::string who = t[1];
@@ -252,27 +294,6 @@ inline std::string deepLine(Spec &s, const std::string &verb, const std::string 
 			sp.name = name, sp.path = path, sp.length = get("length", 30.0), sp.speed = get("speed", 2.5), sp.from = get("from", 0.0), sp.glow = get("glow", 1e30), sp.seed = seed();
 			s.abyss.serpents.push_back(sp);
 		}
-		return std::string();
-	}
-	if (verb == "ride") {
-		fastlane::Ride r;
-		if (t.size() < 3) return usage;
-		r.who = t[1], r.lane = t[2], i = 3;
-		bool when = false;
-		while (i < t.size()) {
-			const std::string w = t[i++];
-			if (w == "across") {
-				if (!numbers(2)) return usage;
-				r.x = v[0], r.y = v[1];
-				continue;
-			}
-			if (!numbers(1)) return usage;
-			if (w == "from") r.from = v[0], when = true;
-			else if (w == "to") r.to = v[0];
-			else return usage;
-		}
-		if (!when || r.to <= r.from) return usage;
-		s.rides.push_back(r);
 		return std::string();
 	}
 	if (verb == "chase") {
@@ -415,6 +436,7 @@ inline std::string deepLookLine(Spec &s, const std::string &verb, const std::str
 // Any of the round's lines: "" or what is wrong.
 inline std::string deepAnyLine(Spec &s, const std::string &verb, const std::string &line) {
 	if (verb == "bubblewipe" || verb == "waterwobble" || verb == "drawnrays" || verb == "seasparkle") return deepLookLine(s, verb, line);
+	if (verb == "wear" || verb == "sub" || verb == "ride") return deepOwnWordsLine(s, verb, line);
 	return deepLine(s, verb, line);
 }
 
