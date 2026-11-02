@@ -215,6 +215,37 @@ TEST(FilmWaterPeople, OverTheSideAndOut) {
 	EXPECT_NEAR(-out.x, 6.0, 0.01);
 }
 
+// Out, and then in again: the fall that comes after the climb is the one that counts, and it goes in from the bank.
+TEST(FilmWaterPeople, InAgainAfterClimbingOut) {
+	ff::DataFilm film;
+	ASSERT_EQ(film.load(filmOf("fall2", "water lake level 0 waves 0.02\nboat rowboat wren at 0 -6\ncast ada as pip at 0 0 0\naboard ada wren\nclimbout ada at 3 to 6 0.5 -6\nfallin ada at 9\nshot 0 a\n  key 0 3 12  0 0 -6  40\n").string()), "");
+	cartoon::Vec3 onBank, again;
+	film.momentOf(film.spec.characters[0], 8.0, &onBank);
+	film.momentOf(film.spec.characters[0], 14.0, &again);
+	EXPECT_NEAR(onBank.y, 0.5, 0.01) << "out on the bank";
+	EXPECT_LT(again.y, 0.0) << "in the water again, not back on the bank";
+	EXPECT_LT(std::hypot(-again.x - 6.0, again.z + 6.0), 3.0) << "in beside the bank it went in from, not by the boat";
+}
+
+// One who was in a boat is told of the others once out of it: a walk straight through where she climbed out to is a mistake the film says.
+TEST(FilmWaterPeople, OutOfTheBoatOthersWalkRoundHer) {
+	ff::DataFilm film;
+	const std::string why = film.load(filmOf("crowd", "water lake level 0 waves 0.02\nboat rowboat wren at 0 -6\ncast ada as pip at 0 0 0\naboard ada wren\nclimbout ada at 2 to 3 0.5 -3\n"
+														"cast bob as pip at -3 0 -3\nwalk bob 4 1  -3 -3  9 -3\nshot 0 a\n  key 0 3 12  0 0 -6  40\n").string());
+	EXPECT_NE(why.find("walk into each other"), std::string::npos) << why;
+}
+
+// A river that dips to the level of the sea on its way and rises again before it gets there: its mouth is where it meets the sea, not that dip.
+TEST(FilmWaterRivers, ItsMouthIsWhereItMeetsTheSea) {
+	cartoon::water::River r;
+	r.width = 4.0;
+	const double heights[6] = {2.0, 0.0, 2.0, 1.0, 0.0, -1.0};
+	for (int i = 0; i < 6; ++i) r.path.push_back({10.0 * i, heights[i], 0.0});
+	cartoon::stream::prepare(r, nullptr, 0.0);
+	ASSERT_TRUE(r.mouth);
+	EXPECT_NEAR(r.seaFrom, 40.0, 1e-6);
+}
+
 TEST(FilmWaterRivers, RunRoundRocksAndCarry) {
 	ff::DataFilm film;
 	ASSERT_EQ(film.load(filmOf("river", "river -40 0  0 0  40 0 width 8 speed 2 clear rocks 8 rapids 20 40 seed 3\nadrift paperboat p1 at -36 0 river 0\nboat canoe reed river 0 from 2\nshot 0 a\n  key 0 3 12  0 0 0  40\n").string()), "");

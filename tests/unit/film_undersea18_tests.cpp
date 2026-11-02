@@ -218,6 +218,20 @@ TEST(FilmUndersea18, ALaneCarriesItsRiderAndAChaserFollows) {
 	EXPECT_NE(problemWith("character a fish at 0 -12 0\ncharacter b fish at 1 -12 0\ncharacter c fish at 2 -12 0\nchase a after b\nchase b after c").find("chasing someone too"), std::string::npos);
 }
 
+TEST(FilmUndersea18, AChaseEndsWhenItsLineSays) {   // (`to T` is a time, not a place as a lane's is)
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("chaseto", std::string(kSea) + "character finn fish at 0 -12 -4\nwalk finn 1 1.0  6 -4  6 -10\ncharacter bruce shark at -3 -12 -4\nchase bruce after finn from 2 to 5 lag 1\n" + kShot, film), "");
+	ASSERT_EQ(film.spec.chases.size(), 1u);
+	EXPECT_NEAR(film.spec.chases[0].from, 2.0, 1e-9);
+	EXPECT_NEAR(film.spec.chases[0].to, 5.0, 1e-9);
+	V3 finn, bruce;
+	film.momentOf(film.spec.characters[0], 3.0, &finn);
+	film.momentOf(film.spec.characters[1], 4.0, &bruce);
+	EXPECT_LT(cartoon::length(finn - bruce), 1e-6) << "during the chase: where its quarry was";
+	film.momentOf(film.spec.characters[1], 9.0, &bruce);
+	EXPECT_NEAR(bruce.x, 3.0, 1e-6) << "after it: back to its own way (it has no walk of its own: where it started, story space)";
+}
+
 // ---- 7: schools that perform ------------------------------------------------------------------------------------------------------------------------------------------
 
 TEST(FilmUndersea18, SchoolsMakeShapesAndWords) {

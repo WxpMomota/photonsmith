@@ -355,6 +355,20 @@ inline bool flattenBilinearMeshShape(const pbrt_scene::Scene &scene, FlatScene &
 	return false;   // not handled here: fall through to the generic 'not supported' warning
 }
 
+// Material `index` with the alpha mask `filename`: itself when it has that mask already, else a copy with it appended to out.materials (and, for a Mix, its two the same way).
+inline int maskedMaterial(FlatScene &out, int index, const std::string &filename, int depth = 0) {
+	if (index < 0 || static_cast<std::size_t>(index) >= out.materials.size() || depth > 8) return index;
+	if (out.materials[static_cast<std::size_t>(index)].alphaTextureFilename == filename) return index;
+	Material copy = out.materials[static_cast<std::size_t>(index)];
+	copy.alphaTextureFilename = filename;
+	if (copy.kind == MaterialKind::Mix) {
+		copy.mixMaterialA = maskedMaterial(out, copy.mixMaterialA, filename, depth + 1);
+		copy.mixMaterialB = maskedMaterial(out, copy.mixMaterialB, filename, depth + 1);
+	}
+	out.materials.push_back(copy);
+	return static_cast<int>(out.materials.size()) - 1;
+}
+
 // A shape's "texture alpha" (an alpha-cutout mask): attached to its resolved material, with a warning for every way it can fail to resolve.
 inline void attachShapeAlphaMask(const pbrt_scene::Scene &scene, FlatScene &out, const pbrt_scene::ShapeDecl &shape) {
 	const auto warn = [&out](const std::string &msg) {
@@ -402,11 +416,13 @@ inline void attachShapeAlphaMask(const pbrt_scene::Scene &scene, FlatScene &out,
 						 "processed will actually be used");
 				}
 				mat.alphaTextureFilename = filename;
-				// A hit on a Mix is one of its two materials, chosen before the mask is read (optix_anyhit_shadow.h): the mask is theirs too.
-
-				if (mat.kind == MaterialKind::Mix)
-					for (const int sub : {mat.mixMaterialA, mat.mixMaterialB})
-						out.materials[static_cast<std::size_t>(sub)].alphaTextureFilename = filename;
+				// A hit on a Mix is one of its two materials, chosen before the mask is read (optix_anyhit_shadow.h): the mask is theirs too - on copies of them, as they
+				// are named materials other shapes may use without it.
+				if (mat.kind == MaterialKind::Mix) {
+					const std::size_t self = static_cast<std::size_t>(shape.materialIndex);
+					const int a = maskedMaterial(out, out.materials[self].mixMaterialA, filename), b = maskedMaterial(out, out.materials[self].mixMaterialB, filename);
+					out.materials[self].mixMaterialA = a, out.materials[self].mixMaterialB = b;   // (`mat` is not used past here: the copies may have moved it)
+				}
 				warnIfImagemapOptionsIgnored(*tex, "alpha", warn);
 			}
 		}

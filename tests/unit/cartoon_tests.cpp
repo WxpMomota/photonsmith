@@ -1984,6 +1984,15 @@ TEST(SmartPower, WorkersReadTheVerdictAndAPauseEndsWhenTheComputerIsFree) {
 	EXPECT_LT(slept, 1.0);
 	EXPECT_NEAR(smart_power::takePaidFor(), 0.2 + slept, 0.1) << "the work and the pause, both settled";
 	EXPECT_DOUBLE_EQ(smart_power::takePaidFor(), 0.0);
+	SetEvent(event);   // a new frame: what came before its samples (its scene, a compile, the pause after the last frame) is not paid for between them
+	smart_power::frameStarts();
+	smart_power::inFrame().since = std::chrono::steady_clock::now() - std::chrono::seconds(30);
+	t0 = std::chrono::steady_clock::now();
+	render_yield::between();
+	const double first = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+	ResetEvent(event);
+	EXPECT_LT(first, 0.1);
+	EXPECT_DOUBLE_EQ(smart_power::takePaidFor(), 0.0);
 	render_yield::hook() = nullptr;
 
 	_putenv_s(smart_power::kEventVariable, "");

@@ -54,24 +54,35 @@ inline std::string deepUsage(const std::string &verb) {
 	return it == u.end() ? "`" + verb + "`?" : it->second;
 }
 
-// The lines that read their own words rather than `word value` options: `wear`, `sub`, `ride`.
-inline std::string deepOwnWordsLine(Spec &s, const std::string &verb, const std::string &line) {
-	using detail::number;
-	const std::vector<std::string> t = detail::tokens(line);
+namespace detail {
+// A line's words and where its reading has got to (`i`, after the verb): the next n numbers into `v`, or the next three as a point; false when they are not there.
+struct DeepWords {
+	std::vector<std::string> t;
 	std::vector<double> v;
 	std::size_t i = 1;
-	const auto numbers = [&](std::size_t n) {   // (the next n numbers, or false)
+	bool numbers(std::size_t n) {
 		v.assign(n, 0.0);
 		for (std::size_t k = 0; k < n; ++k)
 			if (i + k >= t.size() || !number(t[i + k], v[k])) return false;
 		i += n;
 		return true;
-	};
-	const auto point = [&](Vec3 &p) {
+	}
+	bool point(Vec3 &p) {
 		if (!numbers(3)) return false;
 		p = {v[0], v[1], v[2]};
 		return true;
-	};
+	}
+};
+}  // namespace detail
+
+// The lines that read their own words rather than `word value` options: `wear`, `sub`, `ride`.
+inline std::string deepOwnWordsLine(Spec &s, const std::string &verb, const std::string &line) {
+	detail::DeepWords reader{detail::tokens(line)};
+	const std::vector<std::string> &t = reader.t;
+	const std::vector<double> &v = reader.v;
+	std::size_t &i = reader.i;
+	const auto numbers = [&reader](std::size_t n) { return reader.numbers(n); };
+	const auto point = [&reader](Vec3 &p) { return reader.point(p); };
 	const std::string usage = deepUsage(verb);
 
 	if (verb == "wear") {
@@ -159,22 +170,13 @@ inline std::string deepOwnWordsLine(Spec &s, const std::string &verb, const std:
 // The other lines into `s`: "" or what is wrong with it.
 inline std::string deepLine(Spec &s, const std::string &verb, const std::string &line) {
 	using detail::number;
-	const std::vector<std::string> t = detail::tokens(line);
-	std::vector<double> v;
-	std::size_t i = 1;
-	const auto numbers = [&](std::size_t n) {   // (the next n numbers, or false)
-		v.assign(n, 0.0);
-		for (std::size_t k = 0; k < n; ++k)
-			if (i + k >= t.size() || !number(t[i + k], v[k])) return false;
-		i += n;
-		return true;
-	};
+	detail::DeepWords reader{detail::tokens(line)};
+	const std::vector<std::string> &t = reader.t;
+	const std::vector<double> &v = reader.v;
+	std::size_t &i = reader.i;
+	const auto numbers = [&reader](std::size_t n) { return reader.numbers(n); };
+	const auto point = [&reader](Vec3 &p) { return reader.point(p); };
 	const std::string usage = deepUsage(verb);
-	const auto point = [&](Vec3 &p) {
-		if (!numbers(3)) return false;
-		p = {v[0], v[1], v[2]};
-		return true;
-	};
 	// a line's `word value` options, as a map (`at`, `dive`, `rise` repeatable into `times`), its bare words into `flags`; false for a word it does not know
 	std::map<std::string, double> opt;
 	std::map<std::string, std::vector<double>> times;
@@ -194,7 +196,7 @@ inline std::string deepLine(Spec &s, const std::string &verb, const std::string 
 				colour = {v[0], v[1], v[2]};
 				continue;
 			}
-			if (w == "to" && std::find(words.begin(), words.end(), "to") != words.end()) {
+			if (w == "to" && (verb == "fastlane" || verb == "seaserpent")) {   // (a place on their way; a chase's `to` is a time)
 				Vec3 p;
 				if (!point(p) || to.size() >= 64) return false;
 				to.push_back(p);

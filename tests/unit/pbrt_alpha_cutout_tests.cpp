@@ -285,3 +285,34 @@ TEST_F(AlphaCutoutTempTree, AMaskOnAMixIsOnBothItsMaterials) {
 	EXPECT_EQ(mixes, 1);
 	EXPECT_EQ(masked, 2);
 }
+
+// ...on copies of them: a named material the Mix uses may be on other shapes too, which have no mask (a trunk of "bark" beside the leaves' mix of "leaf" and "bark").
+TEST_F(AlphaCutoutTempTree, AMaskOnAMixLeavesItsNamedMaterialsAloneElsewhere) {
+	write("scene.pbrt",
+		  "Texture \"mask\" \"float\" \"imagemap\" \"string filename\" [ \"mask.bmp\" ]\n"
+		  "MakeNamedMaterial \"a\" \"string type\" \"diffuse\"\n"
+		  "MakeNamedMaterial \"b\" \"string type\" \"coateddiffuse\"\n"
+		  "AttributeBegin\n"
+		  "Material \"mix\" \"string materials\" [ \"a\" \"b\" ] \"float amount\" [ 0.5 ]\n"
+		  "Shape \"trianglemesh\" \"texture alpha\" [ \"mask\" ]\n"
+		  "  \"integer indices\" [ 0 1 2  0 2 3 ]\n"
+		  "  \"point3 P\" [ 0 0 0  1 0 0  1 1 0  0 1 0 ]\n"
+		  "AttributeEnd\n"
+		  "NamedMaterial \"b\"\n"
+		  "Shape \"trianglemesh\"\n"
+		  "  \"integer indices\" [ 0 1 2 ]\n"
+		  "  \"point3 P\" [ 0 0 2  1 0 2  1 1 2 ]\n");
+	write("mask.bmp", solidBmp1x1(255, 255, 255));
+	const pbrt_load::LoadResult loaded = pbrt_load::loadFile(path("scene.pbrt"));
+	ASSERT_TRUE(loaded.ok) << loaded.error;
+	SceneData scene;
+	pbrt_gpu::build(loaded.scene, scene);
+	ASSERT_FALSE(scene.triangles.empty());
+	const int plain = scene.triangles.back().materialIdx;
+	ASSERT_GE(plain, 0);
+	EXPECT_LT(scene.materials[static_cast<std::size_t>(plain)].alphaMaskTexIdx, 0) << "the shape of plain \"b\" is not cut by the leaves' mask";
+	int masked = 0;
+	for (const auto &m : scene.materials)
+		if (m.type != MaterialType::Mix && m.alphaMaskTexIdx >= 0) ++masked;
+	EXPECT_EQ(masked, 2) << "the Mix's own two, copied";
+}

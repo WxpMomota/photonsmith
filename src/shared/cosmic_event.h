@@ -284,7 +284,10 @@ inline std::vector<Light> lightsAt(const Params &e) {
 // Adds the event's light to the linear picture (w x h x 3 floats, rows from the top).
 inline void apply(float *rgb, int w, int h, const Params &e) {
 	if (w <= 0 || h <= 0 || e.count <= 0) return;
-	const V eye{e.eye[0], e.eye[1], e.eye[2]}, ahead = unit(V{e.target[0], e.target[1], e.target[2]} - eye), right = unit(cross(V{0.0, 1.0, 0.0}, ahead)), up = cross(ahead, right), middle{e.x, e.y, e.z};   // (a scene's left-handed: looking down -z, +x is on the left)
+	const V eye{e.eye[0], e.eye[1], e.eye[2]}, ahead = unit(V{e.target[0], e.target[1], e.target[2]} - eye), middle{e.x, e.y, e.z};
+	// (as pbrt's LookAt makes the picture's frame - a scene's left-handed: looking down -z, +x is on the left - with the film's up: y, or -z for a camera looking straight up or down,
+	// as film_file.cpp writes it)
+	const V upward = std::hypot(ahead.x, ahead.z) < 1e-4 * std::abs(ahead.y) ? V{0.0, 0.0, -1.0} : V{0.0, 1.0, 0.0}, right = unit(cross(upward, ahead)), up = cross(ahead, right);
 	const double focal = 0.5 * h / std::tan(0.5 * e.fov * detail::kPi / 180.0), c = std::cos(e.tilt * detail::kPi / 180.0), s = std::sin(e.tilt * detail::kPi / 180.0), onePixel = h / 1080.0;
 	const int swarm = e.kind == Merger ? 3 : e.kind == Web ? 6 : 10, gw = std::max(4, w / 3), gh = std::max(4, h / 3);
 	const double level = e.brightness * (e.kind == Collision ? 0.03 : e.kind == Disc ? 0.2 : e.kind == Merger ? 0.5 : 0.07) / (std::max(1, e.count) * swarm);

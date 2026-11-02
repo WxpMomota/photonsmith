@@ -49,8 +49,10 @@ inline void prepare(water::River &r, const terrain::Field *ground, double seaLev
 		r.mouth = r.path.back().y < seaLevel + 0.4;
 		if (r.mouth) {
 			r.seaFrom = L;
-			for (std::size_t i = r.path.size(); i-- > 0;)
-				if (r.path[i].y < seaLevel + 0.12) r.seaFrom = r.along[i];
+			for (std::size_t i = r.path.size(); i-- > 0;) {   // (back from its end to the last place above the sea: a dip to sea level further up is not its mouth)
+				if (r.path[i].y >= seaLevel + 0.12) break;
+				r.seaFrom = r.along[i];
+			}
 		}
 	}
 	if (r.depth <= 0.0) r.depth = std::clamp(r.width / 7.0, 0.3, 1.4);

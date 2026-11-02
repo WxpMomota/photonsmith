@@ -250,12 +250,5 @@ inline void bubbles(const Sub &s, double t, double level, const underwater::Curr
 	}
 }
 
-// The film's subs with their heights made pbrt's (the seabed's under each point, plus its height above it).
-inline std::vector<Sub> lifted(std::vector<Sub> subs, const std::function<double(double, double)> &groundAt) {
-	for (Sub &s : subs)
-		for (Vec3 &p : s.path) p.y += groundAt(p.x, p.z);
-	return subs;
-}
-
 }  // namespace subs
 }  // namespace cartoon

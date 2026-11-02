@@ -1107,6 +1107,8 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 		}
 		if (std::none_of(s.ambience.begin(), s.ambience.end(), [](const dressing::Ambience &am) { return am.kind == "wind"; })) s.ambience.push_back({"wind", 0.5 + 0.5 * st.strength});
 	}
+	for (const Shot &shot : s.shots)
+		if (shot.descending && !s.fall.on) return fail("the shot \"" + shot.name + "\" has a `descend` line: the film needs a `planetfall` line for it to come down");
 	if (s.fall.on && !s.hasTerrain) return fail("`planetfall` comes down to a film's land: it needs a `terrain`");
 	if (s.fall.on && !s.hasSky) return fail("`planetfall` needs a `sky`");
 	if (s.fall.on) s.terrain.ranges = false;   // (the planet goes on past the land: from above a ring of blue-grey hills is a disc on it)

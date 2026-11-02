@@ -524,24 +524,31 @@ const film_paths::Terrain * DataFilm::terrainFor(const Character &c) const {
 std::string DataFilm::crowding() const {
 	const double step = 0.05;
 	// (only those who can: every program start reads every film, and where someone in a boat is means reading the sea, 9 ms a time: 13 s for one film with a rower and a bystander)
-	// (nor one carried by a boat, a sub, a fast lane, or following another in a chase - close behind it on purpose: round 18)
-	const auto aboard = [this](const Character &c) {
-		return std::any_of(spec.aboards.begin(), spec.aboards.end(), [&c](const Spec::Aboard &x) { return x.who == c.name; }) ||
-			   std::any_of(spec.chases.begin(), spec.chases.end(), [&c](const fastlane::Chase &x) { return x.who == c.name; }) ||
-			   std::any_of(spec.rides.begin(), spec.rides.end(), [&c](const fastlane::Ride &x) { return x.who == c.name; });
+	// (nor one carried by a boat, a sub, a fast lane, or following another in a chase - close behind it on purpose: round 18 - while it is: one who climbs out and walks is told; in
+	// the water after falling in it swims, and is left out too)
+	const auto carried = [this](const Character &c, double t) {
+		if (std::any_of(spec.aboards.begin(), spec.aboards.end(), [&c](const Spec::Aboard &x) { return x.who == c.name; })) {
+			const Spec::Tumble *last = nullptr;
+			for (const Spec::Tumble &f : spec.tumbles)
+				if (f.who == c.name && f.at <= t && (!last || f.at >= last->at)) last = &f;
+			if (!last || !last->out) return true;
+		}
+		return std::any_of(spec.chases.begin(), spec.chases.end(), [&](const fastlane::Chase &x) { return x.who == c.name && t >= x.from - 1.0 && t <= x.to + 1.0; }) ||
+			   std::any_of(spec.rides.begin(), spec.rides.end(), [&](const fastlane::Ride &x) { return x.who == c.name && t >= x.from && t <= x.to + 1.5; });
 	};
 	std::vector<std::pair<const Character *, const Character *>> pairs;
 	for (std::size_t a = 0; a < spec.characters.size(); ++a)
 		for (std::size_t b = a + 1; b < spec.characters.size(); ++b) {
 			const Character &ca = spec.characters[a], &cb = spec.characters[b];
 			if (ca.extra || cb.extra) continue;   // (a crowd keeps to its cells; the others are told of each other)
-			if ((ca.walks.empty() && cb.walks.empty()) || aboard(ca) || aboard(cb)) continue;
+			if (ca.walks.empty() && cb.walks.empty()) continue;
 			pairs.push_back({&ca, &cb});
 		}
 	if (pairs.empty()) return std::string();
 	for (double t = 0.0; t <= spec.length; t += step)
 		for (const auto &[first, second] : pairs) {
 			const Character &ca = *first, &cb = *second;
+			if (carried(ca, t) || carried(cb, t)) continue;
 			Vec3 pa, pb;
 			const bool movingA = momentOf(ca, t, &pa).moving, movingB = momentOf(cb, t, &pb).moving;
 			if (!movingA && !movingB) continue;
@@ -1896,7 +1903,9 @@ void DataFilm::cameraAt(double t, std::string &lookAt, std::string &camera, int 
 			key.focus = d;
 		}
 	}
-	lookAt = "LookAt " + num(key.pos[0]) + " " + num(key.pos[1]) + " " + num(key.pos[2]) + "  " + num(key.target[0]) + " " + num(key.target[1]) + " " + num(key.target[2]) + "  0 1 0\n";
+	// (up is up, unless the camera looks straight up or down: then the top of the picture is towards -z, as cosmic_event.h takes it - with up along the view pbrt has no picture)
+	const double across = std::hypot(key.target[0] - key.pos[0], key.target[2] - key.pos[2]), along = std::abs(key.target[1] - key.pos[1]);
+	lookAt = "LookAt " + num(key.pos[0]) + " " + num(key.pos[1]) + " " + num(key.pos[2]) + "  " + num(key.target[0]) + " " + num(key.target[1]) + " " + num(key.target[2]) + (across < 1e-4 * along ? "  0 0 -1\n" : "  0 1 0\n");
 	// the scene's own field of view and lens unless the keys give theirs
 	static const std::regex fovRe("\"float\\s+fov\"\\s*\\[\\s*([-+0-9.eE]+)");
 	static const std::regex lensRe("\"float\\s+lensradius\"\\s*\\[\\s*([-+0-9.eE]+)");

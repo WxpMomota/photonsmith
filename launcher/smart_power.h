@@ -288,8 +288,17 @@ class GpuCanary {
 		D3D11_QUERY_DESC qd{};
 		qd.Query = D3D11_QUERY_EVENT;
 		if (FAILED(device_->CreateTexture2D(&td, nullptr, &texture_)) || FAILED(device_->CreateRenderTargetView(texture_, nullptr, &target_)) || FAILED(device_->CreateQuery(&qd, &query_))) return;
-		std::thread([this] { run(); }).detach();
+		thread_ = std::thread([this] { run(); });
 	}
+	// (one made for a single reading, --diagnose's, ends with it: its thread is stopped before what it uses goes)
+	~GpuCanary() {
+		stop_ = true;
+		if (thread_.joinable()) thread_.join();
+		for (IUnknown *u : {static_cast<IUnknown *>(query_), static_cast<IUnknown *>(target_), static_cast<IUnknown *>(texture_), static_cast<IUnknown *>(context_), static_cast<IUnknown *>(device_)})
+			if (u) u->Release();
+	}
+	GpuCanary(const GpuCanary &) = delete;
+	GpuCanary &operator=(const GpuCanary &) = delete;
 	double readingMs() const {
 		const double out = outFor_.load();
 		return (std::max)(middle_.load(), out >= 1000.0 ? out : 0.0);
@@ -297,27 +306,37 @@ class GpuCanary {
 
   private:
 	void run() {
-		std::vector<double> last(8, 0.0);
+		std::vector<double> last;   // (the last eight; the middle of those there are, so a reading soon after the start is not the middle of zeros)
 		const float colour[4] = {0.0f, 0.0f, 0.0f, 1.0f};
-		for (std::size_t n = 0;; ++n) {
+		for (std::size_t n = 0; !stop_; ++n) {
 			const auto start = std::chrono::steady_clock::now();
 			context_->ClearRenderTargetView(target_, colour);
 			context_->End(query_);
 			context_->Flush();
 			BOOL done = FALSE;
-			for (int spin = 0; context_->GetData(query_, &done, sizeof(done), 0) != S_OK; ++spin) {
+			for (int spin = 0; !stop_; ++spin) {
+				const HRESULT got = context_->GetData(query_, &done, sizeof(done), 0);
+				if (got == S_OK) break;
+				if (FAILED(got)) {   // (the device is gone - a driver reset or update: no more readings, and not a card kept waiting for ever)
+					outFor_ = 0.0, middle_ = 0.0;
+					return;
+				}
 				outFor_ = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
 				if (spin < 2000) std::this_thread::yield();
 				else std::this_thread::sleep_for(std::chrono::milliseconds(1));
 			}
-			last[n % last.size()] = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+			const double took = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+			if (last.size() < 8) last.push_back(took);
+			else last[n % last.size()] = took;
 			outFor_ = 0.0;
 			std::vector<double> sorted = last;
 			std::sort(sorted.begin(), sorted.end());
 			middle_ = sorted[sorted.size() / 2];
-			std::this_thread::sleep_for(std::chrono::milliseconds(250));
+			for (int k = 0; k < 25 && !stop_; ++k) std::this_thread::sleep_for(std::chrono::milliseconds(10));
 		}
 	}
+	std::thread thread_;
+	std::atomic<bool> stop_{false};
 	ID3D11Device *device_ = nullptr;
 	ID3D11DeviceContext *context_ = nullptr;
 	ID3D11Texture2D *texture_ = nullptr;
@@ -558,6 +577,7 @@ struct InFrame {
 	double pausePerWork = 1.0;
 	std::chrono::steady_clock::time_point since = std::chrono::steady_clock::now();
 	std::atomic<double> paidFor{0.0};   // (seconds of this frame's work and pauses already settled: the pause at its end leaves them out)
+	std::atomic<bool> fresh{true};      // (a frame has begun and has not reached its samples yet)
 };
 inline InFrame &inFrame() {
 	static InFrame state;
@@ -566,6 +586,10 @@ inline InFrame &inFrame() {
 inline void betweenSamples() {
 	InFrame &f = inFrame();
 	const auto now = std::chrono::steady_clock::now();
+	if (f.fresh.exchange(false)) {   // (its first: the clock starts here. Making its scene, compiling the card's programs and the pause after the last frame are not work on the card
+		f.since = now;               // to pay for between samples - the pause at the frame's end sees to what it took outside them)
+		return;
+	}
 	const double work = std::chrono::duration<double>(now - f.since).count();
 	if (work < 0.05) return;   // (a batch of samples a time: often enough to keep the gaps short)
 	if (busyNow()) {
@@ -581,6 +605,8 @@ inline void yieldInsideFrames(double pausePerWork) {
 	inFrame().pausePerWork = pausePerWork;
 	render_yield::hook() = &betweenSamples;
 }
+// A worker's frame begins (before its scene is made).
+inline void frameStarts() { inFrame().fresh = true; }
 // How much of the time since the last call was work and pauses settled inside the frame.
 inline double takePaidFor() { return inFrame().paidFor.exchange(0.0); }
 
@@ -596,6 +622,7 @@ inline Signals readOnce(double seconds) {
 	readQuick(s);
 	readCounters(s, gpu, cpu, ours, card);
 	s.gpuWaitMs = canary.readingMs();
+	if (card.adapter) card.adapter->Release();
 	return s;
 }
 
@@ -605,6 +632,7 @@ inline bool start() { return false; }
 inline bool busyNow() { return true; }
 inline void pauseWhileBusy(double seconds) { std::this_thread::sleep_for(std::chrono::duration<double>(seconds)); }
 inline void yieldInsideFrames(double) {}
+inline void frameStarts() {}
 inline double takePaidFor() { return 0.0; }
 
 #endif

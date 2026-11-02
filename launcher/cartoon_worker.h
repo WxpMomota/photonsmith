@@ -154,6 +154,7 @@ inline int run(const Job &job, const LaunchArgs &args, const RenderSetup &setup,
 			return 0;
 		}
 		const auto frameStart = std::chrono::steady_clock::now();
+		if (policy.smart) smart_power::frameStarts();
 		double eye[3] = {args.cam_x, args.cam_y, args.cam_z};
 		int rc = -1;
 		std::string fingerprint;

@@ -924,6 +924,7 @@ TEST(FilmPlanetfall, OrbitToTheGroundInOneShot) {
 	ff::DataFilm bad;
 	EXPECT_NE(loadFilm("fall2", "scene s.pbrt\nlength 12\nplanetfall ocean\n", bad).find("terrain"), std::string::npos);
 	EXPECT_NE(loadFilm("fall3", "scene s.pbrt\nlength 12\nterrain hills size 800 height 10\nsky 10:00 10:00\nplanetfall gas\n", bad).find("rocky"), std::string::npos);
+	EXPECT_NE(loadFilm("fall4", "scene s.pbrt\nlength 12\nterrain hills size 800 height 10\nsky 10:00 10:00\nshot 0 Down\n descend\n", bad).find("planetfall"), std::string::npos) << "a descent with nothing to come down from";
 }
 
 // Other worlds: their ground, a field of crystal, vents that blow in their own time, a glowing wood and what walks in it.
@@ -1046,6 +1047,25 @@ TEST(FilmCosmicEvents, TheirLightAddsUp) {
 	std::vector<float> behind(static_cast<std::size_t>(W) * H * 3, 0.0f);
 	ce::apply(behind.data(), W, H, e);
 	EXPECT_EQ(*std::max_element(behind.begin(), behind.end()), 0.0f) << "behind the camera";
+	// seen from straight above (powers of ten): spread over the picture as from anywhere else, not all on its middle
+	ce::Params above;
+	above.kind = ce::Web, above.count = 1500, above.size = 1000.0, above.eye[1] = 1500.0, above.target[2] = 0.0, above.target[1] = 0.0;
+	std::vector<float> down(static_cast<std::size_t>(W) * H * 3, 0.0f);
+	ce::apply(down.data(), W, H, above);
+	int lit = 0;
+	for (std::size_t i = 0; i < down.size(); i += 3) {
+		EXPECT_TRUE(std::isfinite(down[i]));
+		if (down[i] > 1e-6f) ++lit;
+	}
+	EXPECT_GT(lit, W * H / 4);
+}
+
+// A film's camera looking straight down writes an up the picture can have (pbrt has none along its view).
+TEST(FilmCosmicEvents, AStraightDownCameraHasAnUp) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("down", "scene s.pbrt\nlength 4\nshot 0 Down\n key 0 50 0  0 0 0  40\n", film), "");
+	const std::string s = film.sceneAt(1.0);
+	EXPECT_NE(s.find("0 0 -1\n"), std::string::npos) << s.substr(0, 300);
 }
 
 // A film's `event` line is a frame's look line: where it is and how far through, what the camera sees it from.

@@ -165,14 +165,5 @@ inline std::string laneText(const Lane &l, double t) {
 	return out;
 }
 
-// The film's lanes with their heights made pbrt's, and worked out.
-inline std::vector<Lane> lifted(std::vector<Lane> lanes, const std::function<double(double, double)> &groundAt) {
-	for (Lane &l : lanes) {
-		for (Vec3 &p : l.points) p.y += groundAt(p.x, p.z);
-		prepare(l);
-	}
-	return lanes;
-}
-
 }  // namespace fastlane
 }  // namespace cartoon

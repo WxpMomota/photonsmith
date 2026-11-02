@@ -321,10 +321,12 @@ void DataFilm::waterMoment(const Character &c, double t, Vec3 &where, double &he
 		if (seatPlace(t, place, turned)) where = place, heading = turned;
 		return;
 	}
+	const bool fellLast = fell && (!out || fell->at > out->at);   // (a fall after it climbed out: in again, from where it climbed out to)
 	if (fell) {   // over the side: in an arc, under, up again, treading water
 		Vec3 from = where;
 		double turned = heading;
-		seatPlace(fell->at, from, turned);
+		if (out && fellLast) from = story(out->x, out->y, out->z);
+		else seatPlace(fell->at, from, turned);
 		const Vec3 to = fell->placed ? story(fell->x, level, fell->z) : from + Vec3{std::sin(turned * kPi / 180.0 + 1.57), 0.0, std::cos(turned * kPi / 180.0 + 1.57)} * (0.9 * H);
 		const double u = t - fell->at, flight = 0.55, treading = level - 0.72 * H;
 		Vec3 p{lerp(from.x, to.x, std::min(1.0, u / flight)), 0.0, lerp(from.z, to.z, std::min(1.0, u / flight))};
@@ -332,7 +334,7 @@ void DataFilm::waterMoment(const Character &c, double t, Vec3 &where, double &he
 		else if (u < flight + 0.8) p.y = lerp(level - 0.3 * H, level - 1.25 * H, smoothstep(0.0, 0.8, u - flight));
 		else p.y = lerp(level - 1.25 * H, treading, smoothstep(0.0, 1.1, u - flight - 0.8)) + bob();
 		where = p, heading = turned, airborne = true, wet = 1.0;
-		if (!out) return;
+		if (!out || fellLast) return;
 	}
 	if (out) {   // out of the water: heaved up onto the bank, and it stays there
 		const Vec3 to = story(out->x, out->y, out->z);

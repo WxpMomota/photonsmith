@@ -591,7 +591,7 @@ static double inTheWoodExposure(const Spec &spec, const std::string &header) {
 	for (const std::vector<forest::Tree> &trees : spec.planted)
 		for (const forest::Tree &tree : trees) {
 			if (tree.species == "shrub" || tree.species == "fern" || tree.species == "log" || tree.species == "cactus") continue;
-			const double reach = 8.0 * tree.scale, d = std::hypot(tree.at.x - eye.x, tree.at.z - eye.z);
+			const double reach = 8.0 * tree.scale, d = std::hypot(tree.at.x + eye.x, tree.at.z - eye.z);   // (the trees are pbrt's, the camera story space's: x mirrored)
 			if (d < reach && eye.y - tree.at.y < 8.0 * tree.scale) over += 1.0 - smoothstep(0.25 * reach, reach, d);
 		}
 	return 1.0 + 1.4 * (1.0 - std::exp(-over / 3.0));
