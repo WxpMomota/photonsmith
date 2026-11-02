@@ -175,7 +175,7 @@ inline std::string giantLine(Spec &s, const std::string &verb, const std::string
 			i += 3;
 		} else if (i + 1 < t.size() && number(t[i + 1], a)) {
 			if (t[i] == "toward") (whale ? w.toward : d.toward) = a;
-			else if (t[i] == "seed") (whale ? w.seed : d.seed) = static_cast<int>(a);
+			else if (t[i] == "seed") (whale ? w.seed : d.seed) = seedFrom(a);
 			else if (whale && t[i] == "length" && a >= 4.0 && a <= 30.0) w.length = a;
 			else if (whale && t[i] == "speed" && a >= 0.0 && a <= 8.0) w.speed = a;
 			else if (whale && t[i] == "breach") w.breaches.push_back(a);
@@ -239,7 +239,7 @@ inline std::string glowLine(Spec &s, const std::string &verb, const std::string 
 			i += 2;
 		} else if (i + 1 < t.size() && number(t[i + 1], a)) {
 			if (t[i] == "brightness" && a > 0.0 && a <= 20.0) (flies ? f.brightness : g.brightness) = a;
-			else if (t[i] == "seed") (flies ? f.seed : g.seed) = static_cast<int>(a);
+			else if (t[i] == "seed") (flies ? f.seed : g.seed) = seedFrom(a);
 			else if (flies && t[i] == "height" && a >= 0.3 && a <= 20.0) f.height = a;
 			else return fail("\"" + t[i] + "\": " + usage);
 			i += 2;
@@ -284,7 +284,7 @@ inline std::string iceLine(Spec &s, const std::string &verb, const std::string &
 		else if (glacier && t[i] == "thick" && a >= 2.0 && a <= 1000.0) g.thick = a;
 		else if (glacier && t[i] == "calve") g.calving.push_back(a);
 		else if (!glacier && t[i] == "size" && a >= 1.0 && a <= 2000.0) berg.size = a;
-		else if (t[i] == "seed") (glacier ? g.seed : berg.seed) = static_cast<int>(a);
+		else if (t[i] == "seed") (glacier ? g.seed : berg.seed) = seedFrom(a);
 		else return fail("\"" + t[i] + "\": " + usage + (glacier ? " (length 50 to 20000 m, width 10 to 5000 m, thick 2 to 1000 m)" : " (size 1 to 2000 m)"));
 	}
 	if (glacier) {
@@ -952,7 +952,7 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 				else if (verb == "aurora" && t[i] == "distance" && a > 100.0) au.distance = a;
 				else if (verb == "lightning" && t[i] == "radius" && a >= 0.0) li.radius = a;
 				else if (verb == "lightning" && t[i] == "base" && a > 0.0) li.base = a;
-				else if ((verb == "lightning" || verb == "meteors") && t[i] == "seed") (verb == "lightning" ? li.seed : me.seed) = static_cast<int>(a);
+				else if ((verb == "lightning" || verb == "meteors") && t[i] == "seed") (verb == "lightning" ? li.seed : me.seed) = seedFrom(a);
 				else return fail("\"" + t[i] + "\" is not part of a `" + verb + "` line (aurora: brightness, facing, distance; lightning: at X Z, radius, base, seed; meteors: seed; all: during T0 T1)");
 				i += 2;
 			} else {
@@ -1025,7 +1025,7 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		else return fail("`undergrowth off`, `undergrowth amount A` (above 0, up to 3), or `undergrowth season S` (summer, autumn, winter or spring)");
 	} else if (verb == "plumes" || verb == "spires") {   // what stands on another world (film_alien.h)
 		const std::vector<std::string> t = detail::tokens(line);
-		const std::string usage = verb == "plumes" ? "`plumes N [in X0 Z0 X1 Z1] [height H] [seed K]`: vents of ice or dust that blow in their own time" : "`spires N [in X0 Z0 X1 Z1] [height H] [colour R G B] [seed K]`: a field of crystal, clear glass unless it has a colour";
+		const std::string usage = verb == "plumes" ? "`plumes N [in X0 Z0 X1 Z1] [height H] [colour R G B] [seed K]`: vents of ice or dust that blow in their own time" : "`spires N [in X0 Z0 X1 Z1] [height H] [colour R G B] [seed K]`: a field of crystal, clear glass unless it has a colour";
 		alien::Plumes g;
 		alien::Spires f;
 		double n = 0.0;
@@ -1040,10 +1040,10 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 				g.height = f.height = a;
 				i += 2;
 			} else if (t[i] == "seed" && i + 1 < t.size() && number(t[i + 1], a)) {
-				g.seed = f.seed = static_cast<int>(a);
+				g.seed = f.seed = seedFrom(a);
 				i += 2;
-			} else if (t[i] == "colour" && verb == "spires" && i + 3 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && number(t[i + 3], c)) {
-				f.colour = {a, b, c};
+			} else if (t[i] == "colour" && i + 3 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && number(t[i + 3], c) && std::min({a, b, c}) >= 0.0 && std::max({a, b, c}) <= 1.0) {
+				(verb == "spires" ? f.colour : g.colour) = {a, b, c};   // (a plume's: its dust - rust red, sulphur yellow - and not always the white of ice)
 				i += 4;
 			} else {
 				return fail(usage);
@@ -1194,7 +1194,7 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 				else co.x0 = std::min(a, c), co.z0 = std::min(b, d), co.x1 = std::max(a, c), co.z1 = std::max(b, d);
 				i += 5;
 			} else if (i + 1 < t.size() && number(t[i + 1], a)) {
-				if (t[i] == "seed") (verb == "kelp" ? kp.seed : co.seed) = static_cast<int>(a);
+				if (t[i] == "seed") (verb == "kelp" ? kp.seed : co.seed) = seedFrom(a);
 				else if (verb == "kelp" && t[i] == "height" && a > 0.0) kp.height = a;
 				else return fail("\"" + t[i] + "\" is not part of a `" + verb + "` line (in X0 Z0 X1 Z1, " + (verb == "kelp" ? "height, " : "") + "seed)");
 				i += 2;

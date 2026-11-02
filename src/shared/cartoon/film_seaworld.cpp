@@ -253,10 +253,10 @@ void DataFilm::deepSounds(audio::Mix &m) const {
 		}
 		std::vector<double> bursts = s.dives;
 		bursts.insert(bursts.end(), s.rises.begin(), s.rises.end());
-		for (const double when : bursts)
-			for (int k = 0; k < 14; ++k) ss::place(m, ears, when + 0.1 * k, subs::subAt(s, when), ss::bubble(seed += 13u), 0.6, 30.0);
+		for (const double when : bursts)   // (a dive's and a rise's times are nature's, as all of this but a character's own gulps and rings: heard at the film time they are seen)
+			for (int k = 0; k < 14; ++k) ss::place(m, ears, filmTimeOf(when) + 0.1 * k, subs::subAt(s, when), ss::bubble(seed += 13u), 0.6, 30.0);
 	}
-	for (const airpocket::Big &b : spec.air18.bigs) ss::place(m, ears, b.t, b.at, audio::slide(150.0 / std::max(0.2, std::sqrt(b.radius)), 70.0 / std::max(0.2, std::sqrt(b.radius)), 0.6, 4.0), 0.5, 25.0);
+	for (const airpocket::Big &b : spec.air18.bigs) ss::place(m, ears, filmTimeOf(b.t), b.at, audio::slide(150.0 / std::max(0.2, std::sqrt(b.radius)), 70.0 / std::max(0.2, std::sqrt(b.radius)), 0.6, 4.0), 0.5, 25.0);
 	for (const seatoon::Gulp &g : spec.seatoon.gulps) {   // a gulp: a boing down, the bubble's bloop
 		const Character *c = character(g.who);
 		const Vec3 at = c ? pbrtOf(chestOf(*c, g.t)) : Vec3{0, 0, 0};
@@ -292,14 +292,14 @@ void DataFilm::deepSounds(audio::Mix &m) const {
 			const school::School &sc = schoolsSwum()[static_cast<std::size_t>(sg.school) - 1];
 			const double chord[4][3] = {{0, 4, 7}, {5, 9, 12}, {7, 11, 14}, {0, 4, 7}};
 			for (int p = 0; p * 2.5 < sg.length - 0.5; ++p) {
-				const double t = sg.at + 2.5 * p;
+				const double nt = sg.at + 2.5 * p;   // (nature's, as the school breathes it: shows::perform)
 				Vec3 mid{0, 0, 0};
 				int heard = 0;
-				for (int f = 0; f < sc.count; f += std::max(1, sc.count / 40), ++heard) mid = mid + school::fishAt(sc, f, natureAt(t));
+				for (int f = 0; f < sc.count; f += std::max(1, sc.count / 40), ++heard) mid = mid + school::fishAt(sc, f, nt);
 				mid = mid * (1.0 / std::max(1, heard));
 				for (int v = 0; v < 3; ++v) {
 					const double hz = 440.0 * std::pow(2.0, (sg.key + chord[p % 4][v] - 69.0) / 12.0);
-					ss::place(m, ears, t, mid, ss::voiced(hz, hz * 1.003, 2.6, 400.0 + 120.0 * v, 900.0, 0.08, 0.25, seed += 13u), 0.22, 40.0);
+					ss::place(m, ears, filmTimeOf(nt), mid, ss::voiced(hz, hz * 1.003, 2.6, 400.0 + 120.0 * v, 900.0, 0.08, 0.25, seed += 13u), 0.22, 40.0);
 				}
 			}
 		} else {   // a whale's song from far off: long swoops and moans
@@ -319,33 +319,34 @@ void DataFilm::deepSounds(audio::Mix &m) const {
 	for (const shows::Show &sh : spec.shows)   // a school bursting: a silver whoosh
 		if (sh.shape == "burst" && static_cast<std::size_t>(sh.school) <= spec.schools.size() && sh.school >= 1) {
 			const school::School &sc = schoolsSwum()[static_cast<std::size_t>(sh.school) - 1];
-			ss::place(m, ears, sh.at, school::fishAt(sc, 0, natureAt(sh.at)), audio::noiseBurst(0.9, 0.01, 0.8, 800.0, 5000.0, seed += 13u), 0.6, 30.0);
+			ss::place(m, ears, filmTimeOf(sh.at), school::fishAt(sc, 0, sh.at), audio::noiseBurst(0.9, 0.01, 0.8, 800.0, 5000.0, seed += 13u), 0.6, 30.0);
 		}
 	for (const abyss::Kraken &k : spec.abyss.krakens) {   // the giants: a kraken's groan, a serpent's rumble, an eye opening
-		for (double t = k.rise >= 0.0 ? k.rise : 2.0; t < T; t += 9.0 + 4.0 * audio::unit(seed += 13u)) ss::place(m, ears, t, k.at, ss::voiced(48.0, 36.0, 3.5, 180.0, 420.0, 0.8, 0.3, seed), 1.0, 200.0);
+		for (double t = filmTimeOf(k.rise >= 0.0 ? k.rise : 2.0); t < T; t += 9.0 + 4.0 * audio::unit(seed += 13u)) ss::place(m, ears, t, k.at, ss::voiced(48.0, 36.0, 3.5, 180.0, 420.0, 0.8, 0.3, seed), 1.0, 200.0);
 	}
 	for (const abyss::Serpent &s : spec.abyss.serpents)
-		for (double t = s.from + 1.0; t < T; t += 6.0 + 3.0 * audio::unit(seed += 13u)) ss::place(m, ears, t, abyss::serpentHead(s, natureAt(t)), ss::voiced(70.0, 55.0, 2.0, 250.0, 600.0, 0.9, 0.5, seed), 0.7, 120.0);
-	for (const abyss::Eye &e : spec.abyss.eyes) ss::place(m, ears, e.open, e.at, audio::slide(55.0, 42.0, 3.0, 1.0), 0.9, 120.0);
+		for (double t = filmTimeOf(s.from + 1.0); t < T; t += 6.0 + 3.0 * audio::unit(seed += 13u)) ss::place(m, ears, t, abyss::serpentHead(s, natureAt(t)), ss::voiced(70.0, 55.0, 2.0, 250.0, 600.0, 0.9, 0.5, seed), 0.7, 120.0);
+	for (const abyss::Eye &e : spec.abyss.eyes) ss::place(m, ears, filmTimeOf(e.open), e.at, audio::slide(55.0, 42.0, 3.0, 1.0), 0.9, 120.0);
 	for (const abyss::Squid &q : spec.abyss.squids)
-		for (double t = q.from; t < T; t += 3.0) ss::place(m, ears, t, q.at, audio::noiseBurst(0.8, 0.05, 0.7, 100.0, 600.0, seed += 13u), 0.5, 80.0);   // (each jet)
+		for (double t = q.from; t < natureAt(T); t += 3.0) ss::place(m, ears, filmTimeOf(t), q.at, audio::noiseBurst(0.8, 0.05, 0.7, 100.0, 600.0, seed += 13u), 0.5, 80.0);   // (each jet)
 	for (const fromabove::Hook &h : spec.above.hooks) {   // the hook's plop as it goes in, the reel's whirr as it is snatched up
-		ss::place(m, ears, h.at, {h.x, level, h.z}, audio::slide(700.0, 300.0, 0.15, 9.0), 0.4, 25.0);
-		if (h.yank < 1e29) ss::place(m, ears, h.yank, {h.x, level, h.z}, audio::noiseBurst(1.2, 0.02, 1.0, 2000.0, 6000.0, seed += 13u), 0.35, 25.0);
+		ss::place(m, ears, filmTimeOf(h.at), {h.x, level, h.z}, audio::slide(700.0, 300.0, 0.15, 9.0), 0.4, 25.0);
+		if (h.yank < 1e29) ss::place(m, ears, filmTimeOf(h.yank), {h.x, level, h.z}, audio::noiseBurst(1.2, 0.02, 1.0, 2000.0, 6000.0, seed += 13u), 0.35, 25.0);
 	}
-	for (const fromabove::Net &n : spec.above.nets) ss::place(m, ears, n.at, {n.x, level, n.z}, ss::crash(seed += 13u), 0.5, 40.0);
+	for (const fromabove::Net &n : spec.above.nets) ss::place(m, ears, filmTimeOf(n.at), {n.x, level, n.z}, ss::crash(seed += 13u), 0.5, 40.0);
+	const double natureEnd = natureAt(T);
 	for (const fromabove::Anchor &a : spec.above.anchors) {   // the splash, the chain rattling out, the thud on the bottom
 		double landed = 1e30;
 		fromabove::anchorY(a, a.at + 100.0, level, bed(a.x, a.z), landed);
-		ss::place(m, ears, a.at, {a.x, level, a.z}, ss::crash(seed += 13u), 0.8, 40.0);
-		for (double t = a.at + 0.2; t < std::min(T, landed); t += 0.09) ss::place(m, ears, t, {a.x, level - 1.0, a.z}, audio::knock(900.0 + 300.0 * audio::unit(seed += 13u), 0.05, seed), 0.25, 30.0);
-		if (landed < T) ss::place(m, ears, landed, {a.x, bed(a.x, a.z), a.z}, audio::noiseBurst(1.0, 0.005, 0.9, 60.0, 400.0, seed += 13u), 1.0, 40.0);
+		ss::place(m, ears, filmTimeOf(a.at), {a.x, level, a.z}, ss::crash(seed += 13u), 0.8, 40.0);
+		for (double t = a.at + 0.2; t < std::min(natureEnd, landed); t += 0.09) ss::place(m, ears, filmTimeOf(t), {a.x, level - 1.0, a.z}, audio::knock(900.0 + 300.0 * audio::unit(seed += 13u), 0.05, seed), 0.25, 30.0);
+		if (landed < natureEnd) ss::place(m, ears, filmTimeOf(landed), {a.x, bed(a.x, a.z), a.z}, audio::noiseBurst(1.0, 0.005, 0.9, 60.0, 400.0, seed += 13u), 1.0, 40.0);
 	}
 	for (const fromabove::Lava &l : spec.above.lavas)   // pillow lava hissing and cracking
 		for (double t = 0.5; t < T; t += 0.6 + 0.8 * audio::unit(seed += 13u)) ss::place(m, ears, t, {l.x, bed(l.x, l.z) + 0.5, l.z}, audio::noiseBurst(0.5, 0.01, 0.4, 2000.0, 7000.0, seed), 0.25, 25.0);
-	for (const fromabove::Slump &s : spec.above.slumps) ss::place(m, ears, s.at, {s.x, bed(s.x, s.z), s.z}, audio::noiseBurst(6.0, 0.6, 5.0, 40.0, 500.0, seed += 13u), 1.2, 150.0);
+	for (const fromabove::Slump &s : spec.above.slumps) ss::place(m, ears, filmTimeOf(s.at), {s.x, bed(s.x, s.z), s.z}, audio::noiseBurst(6.0, 0.6, 5.0, 40.0, 500.0, seed += 13u), 1.2, 150.0);
 	for (const fromabove::Brinicle &b : spec.above.brinicles)
-		for (double t = b.at; t < std::min(T, b.at + 20.0); t += 0.7) ss::place(m, ears, t, {b.x, level - spec.iceCap.thickness - 2.0, b.z}, audio::knock(2400.0 + 800.0 * audio::unit(seed += 13u), 0.04, seed), 0.12, 20.0);
+		for (double t = b.at; t < std::min(natureEnd, b.at + 20.0); t += 0.7) ss::place(m, ears, filmTimeOf(t), {b.x, level - spec.iceCap.thickness - 2.0, b.z}, audio::knock(2400.0 + 800.0 * audio::unit(seed += 13u), 0.04, seed), 0.12, 20.0);
 }
 
 }  // namespace film_file

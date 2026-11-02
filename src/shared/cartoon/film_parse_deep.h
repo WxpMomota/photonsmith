@@ -184,6 +184,17 @@ inline std::string deepLine(Spec &s, const std::string &verb, const std::string 
 	std::vector<Vec3> to;
 	Vec3 colour{-1.0, -1.0, -1.0}, place;
 	bool placed = false;
+	// the words each line of a shared list of options has of its own (its usage's): another's was taken and did nothing - `gulp ... size`, `divingbell ... rise`
+	static const std::map<std::string, std::vector<std::string>> own = {
+		{"helmet", {"size"}}, {"blowring", {"at"}}, {"gulp", {"at"}}, {"divingbell", {"size", "lamp", "seed"}}, {"aircave", {"radius", "lamp", "seed"}},
+		{"bigbubble", {"radius", "at", "rise", "wobble", "seed"}}, {"fastlane", {"width", "speed", "streaks", "debris", "turtles", "seed"}},
+		{"seaserpent", {"length", "speed", "from", "glow", "seed"}}, {"choir", {"at", "for", "key"}}, {"whalesong", {"at", "for", "from"}},
+		{"kraken", {"size", "toward", "rise", "reach", "from", "glow", "seed"}}, {"giantsquid", {"length", "toward", "from", "glow", "seed"}},
+		{"hugeeye", {"toward", "size", "open", "close"}}, {"reveal", {"at", "bright", "over"}}, {"whalefall", {"length", "toward", "seed"}},
+		{"hook", {"at", "depth", "yank", "seed"}}, {"net", {"at", "size", "school", "lift", "seed"}}, {"anchor", {"at"}}, {"brinepool", {"radius", "seed"}},
+		{"pillowlava", {"radius", "seed"}}, {"brinicle", {"at", "length"}}, {"turbidity", {"toward", "at", "size", "speed"}}};
+	const auto mine = own.find(verb);
+	const auto itsOwn = [&mine](const std::string &w) { return mine == own.end() || std::find(mine->second.begin(), mine->second.end(), w) != mine->second.end(); };
 	const auto options = [&](const std::vector<std::string> &words, const std::vector<std::string> &repeated, const std::vector<std::string> &bare) {
 		while (i < t.size()) {
 			const std::string w = t[i++];
@@ -192,6 +203,7 @@ inline std::string deepLine(Spec &s, const std::string &verb, const std::string 
 				continue;
 			}
 			if (w == "colour" || w == "color") {
+				if (mine != own.end() && verb != "reveal") return false;
 				if (!numbers(3)) return false;
 				colour = {v[0], v[1], v[2]};
 				continue;
@@ -203,6 +215,7 @@ inline std::string deepLine(Spec &s, const std::string &verb, const std::string 
 				continue;
 			}
 			const std::string word = w == "center" ? "centre" : w;
+			if (!itsOwn(word)) return false;
 			double probe = 0.0;
 			const bool threeNumbers = i + 2 < t.size() && number(t[i], probe) && number(t[i + 1], probe) && number(t[i + 2], probe);
 			if ((word == "reach" || word == "centre" || word == "from") && std::find(words.begin(), words.end(), word) != words.end() && threeNumbers && (word != "from" || verb == "whalesong")) {
@@ -342,6 +355,7 @@ inline std::string deepLine(Spec &s, const std::string &verb, const std::string 
 		if (!point(p) || !options({"size", "toward", "rise", "reach", "from", "glow", "length", "open", "close", "at", "bright", "over", "seed"}, {}, {})) return usage;
 		if (verb == "kraken") {
 			if (!within("size", 1.0, 60.0)) return usage;
+			if (opt.count("from") && !opt.count("reach")) return usage + ": `from T` is when it reaches for the place `reach` names";
 			abyss::Kraken k;
 			k.at = p, k.size = get("size", 6.0), k.toward = get("toward", 0.0), k.rise = get("rise", -1.0), k.glow = get("glow", 1e30), k.seed = seed();
 			if (opt.count("reach")) k.reach = place, k.reachFrom = get("from", 0.0);

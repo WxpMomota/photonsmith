@@ -50,7 +50,7 @@ std::size_t count(const std::string &text, const std::string &what) {
 	for (std::size_t at = text.find(what); at != std::string::npos; at = text.find(what, at + what.size())) ++n;
 	return n;
 }
-double energy(const std::vector<std::int16_t> &pcm, double t0, double t1) {   // (interleaved stereo at 48 kHz)
+double energy(const std::vector<std::int16_t> &pcm, double t0, double t1) {   // (interleaved stereo; t counts 48 kHz frames, the mix's are audio::kRate's - 44.1 kHz)
 	double e = 0.0;
 	for (std::size_t i = static_cast<std::size_t>(t0 * 48000.0) * 2; i < std::min(pcm.size(), static_cast<std::size_t>(t1 * 48000.0) * 2); ++i) e += static_cast<double>(pcm[i]) * pcm[i];
 	return e;
@@ -334,4 +334,28 @@ TEST(FilmUndersea18, TheRoundsLinesNeedTheSeaAndAreHeard) {
 	cartoon::audio::Mix m(10.0);
 	film.deepSounds(m);
 	EXPECT_GT(energy(m.finish(0.0, 0.0), 1.0, 9.0), 0.0) << "its motor and its sonar";
+}
+
+// A line takes its own words only (another line's from a shared list was taken and did nothing), and what nature does is heard when it is seen: in a timelapse, an anchor
+// going in at nature's 20 s splashes at film time 5 s.
+TEST(FilmUndersea18, OwnWordsAndNaturesTimeHeard) {
+	EXPECT_EQ(problemWith("character finn person at 0 -12 -6\ngulp finn at 2"), "");
+	EXPECT_NE(problemWith("character finn person at 0 -12 -6\ngulp finn at 2 size 3"), "") << "a gulp has no size";
+	EXPECT_EQ(problemWith("divingbell 0 -10 -8 size 2"), "");
+	EXPECT_NE(problemWith("divingbell 0 -10 -8 rise 2"), "") << "a bell does not rise";
+	EXPECT_EQ(problemWith("kraken 0 -10 -20 reach 4 -10 -14 from 4"), "");
+	EXPECT_NE(problemWith("kraken 0 -10 -20 from 4"), "") << "`from` is for its reach";
+	EXPECT_NE(problemWith("hook 0 -6 at 1 colour 1 0 0"), "") << "a hook has no colour";
+	EXPECT_EQ(problemWith("reveal 0 8 -40 at 2 colour 0.5 0.7 1.0"), "");
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("timelapse", std::string(kSea) + "timelapse 4\nanchor 0 -8 at 20\nshot 0 S\n  key 0 -10 4  0 -12 -6  55\n", film), "");
+	cartoon::audio::Mix m(12.0);
+	film.deepSounds(m);
+	const std::vector<std::int16_t> pcm = m.finish(0.0, 0.0);
+	const double seen = film.filmTimeOf(20.0);   // (where the picture shows it go in: nature's 20 s)
+	EXPECT_NEAR(film.natureAt(seen), 20.0, 1e-3);
+	EXPECT_LT(seen, 8.0) << "a timelapse: well before film time 20";
+	const double s = static_cast<double>(cartoon::audio::kRate) / 48000.0;   // (energy() counts 48 kHz frames; the mix is kRate's)
+	EXPECT_EQ(energy(pcm, 0.0, (seen - 0.02) * s), 0.0) << "nothing before it";
+	EXPECT_GT(energy(pcm, seen * s, (seen + 0.6) * s), 0.0) << "its splash, then";
 }

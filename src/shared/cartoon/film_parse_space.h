@@ -605,7 +605,7 @@ inline std::string planetfallLine(Spec &s, const std::vector<std::string> &t) {
 		else if (t[i] == "radius" && a >= 1e5) f.radius = a;
 		else if (t[i] == "heading") f.heading = a;
 		else if (t[i] == "clouds" && a >= 0.0 && a <= 1.0) f.clouds = a;
-		else if (t[i] == "seed") f.seed = static_cast<int>(a);
+		else if (t[i] == "seed") f.seed = seedFrom(a);
 		else if (t[i] == "land" && i + 2 < t.size() && number(t[i + 2], b)) f.x = a, f.z = b, ++i;
 		else return usage;
 	}
@@ -632,7 +632,7 @@ inline std::string eventLine(Spec &s, const std::vector<std::string> &t) {
 			else if (t[i] == "count" && a >= 100.0 && a <= 40000.0) e.count = static_cast<int>(a);
 			else if (t[i] == "tilt") e.tilt = a;
 			else if (t[i] == "brightness" && a > 0.0) e.brightness = a;
-			else if (t[i] == "seed") e.seed = static_cast<int>(a);
+			else if (t[i] == "seed") e.seed = seedFrom(a);
 			else return usage;
 			i += 2;
 		} else {

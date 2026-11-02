@@ -894,7 +894,7 @@ inline std::string descentLine(const std::vector<std::string> &t, Descent &d) {
 			else if (w == "land") out.land = a, land = true;
 			else if (w == "size") out.craft.size = a;
 			else if (w == "heat") out.heat = a;
-			else out.craft.seed = static_cast<int>(a);
+			else out.craft.seed = seedFrom(a);
 			i += 2;
 		} else {
 			return "\"" + w + "\": " + usage;

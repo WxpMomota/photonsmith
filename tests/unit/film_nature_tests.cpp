@@ -1254,6 +1254,7 @@ TEST(FilmDocumentary, CamerasFollowHerdsAndNatureRunsSlowInSlowMotion) {
 	EXPECT_NEAR(film.natureAt(5.0), 5.0, 1e-6);
 	EXPECT_NEAR(film.natureAt(11.0) - film.natureAt(10.0), 0.25, 0.01);
 	EXPECT_NEAR(film.natureAt(19.0) - film.natureAt(18.0), 1.0, 0.01);
+	for (const double t : {3.0, 9.5, 12.0, 17.0, 25.0}) EXPECT_NEAR(film.filmTimeOf(film.natureAt(t)), t, 1e-3) << "back to the film's time, where what nature does is heard";
 	// the camera alongside the herd: as it gallops away the camera goes with it, looking at it, focused on it
 	cartoon::Vec3 feet, front, chest;
 	ASSERT_TRUE(film.wildSubject("herd1", 6.0, feet, front, chest));

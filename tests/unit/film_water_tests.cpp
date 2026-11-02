@@ -362,6 +362,27 @@ TEST(FilmWaterPlaces, StiltsCountAndACastleStaysGone) {
 	for (const double t : {62.0, 72.0, 84.0}) EXPECT_EQ(film.worldAt(film.headerAt(t), t).find("# a sandcastle"), std::string::npos) << t;
 }
 
+// A whirlpool and a great wave take their own words; a pier's lamps glow after dark; a seed of any size is whole and small.
+TEST(FilmWaterPlaces, OwnWordsLampsAndSeeds) {
+	const auto problem = [](const std::string &line) {
+		ff::DataFilm film;
+		return film.load(filmOf("words", "water sea level 0\n" + line + "\nshot 0 a\n  key 0 3 12  0 0 -10  40\n").string());
+	};
+	EXPECT_EQ(problem("whirlpool 0 -20 radius 6 depth 2 from 1"), "");
+	EXPECT_NE(problem("whirlpool 0 -20 speed 3"), "") << "a whirlpool has no speed";
+	EXPECT_EQ(problem("bigwave 0 -60 toward 0 at 2 height 3 speed 6"), "");
+	EXPECT_NE(problem("bigwave 0 -60 toward 0 at 2 radius 30"), "") << "a wave has no radius";
+	EXPECT_NE(problem("tide low 0 high 1 period"), "") << "a word without its number";
+	cartoon::waterside::Place pier;
+	pier.kind = "pier", pier.length = 20.0;
+	EXPECT_EQ(cartoon::waterside::staticText(pier, 0.0, 1.0, 0.0).find("AreaLightSource"), std::string::npos) << "by day";
+	EXPECT_NE(cartoon::waterside::staticText(pier, 0.0, 1.0, 1.0).find("AreaLightSource"), std::string::npos) << "at night";
+	EXPECT_EQ(cartoon::seedFrom(7.0), 7);
+	EXPECT_EQ(cartoon::seedFrom(-12.6), -12);
+	EXPECT_LT(std::abs(cartoon::seedFrom(3e12)), 100000);
+	EXPECT_EQ(cartoon::seedFrom(std::nan("")), 1);
+}
+
 TEST(FilmWaterToon, WaterIsDrawn) {
 	ff::DataFilm film;
 	ASSERT_EQ(film.load(filmOf("toon", "toon bands 3 lines 2\nwater sea level 0 waves 0.3\nripple 0 -6 at 1 size 0.2\nshot 0 a\n  key 0 3 4  0 0 -8  40\n").string()), "");

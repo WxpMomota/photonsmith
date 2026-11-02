@@ -930,6 +930,15 @@ double DataFilm::natureAt(double t) const {
 	return spec.natureClock[i] + (spec.natureClock[i + 1] - spec.natureClock[i]) * (k - i);
 }
 
+double DataFilm::filmTimeOf(double nt) const {
+	const double rate = spec.timelapse > 0.0 ? spec.timelapse : 1.0;
+	if (nt <= natureAt(0.0)) return (nt - natureAt(0.0)) / rate;
+	double lo = 0.0, hi = std::max(1.0, spec.length);
+	if (natureAt(hi) <= nt) return hi + (nt - natureAt(hi)) / rate;   // (past the film's end nature runs on at the timelapse's rate)
+	for (int k = 0; k < 40; ++k) (natureAt(0.5 * (lo + hi)) < nt ? lo : hi) = 0.5 * (lo + hi);
+	return hi;
+}
+
 bool DataFilm::subjectFrame(const std::string &who, double t, Vec3 &feet, Vec3 &front, Vec3 &chest) const {
 	if (const Character *c = character(who)) {
 		const CharacterMoment m = momentOf(*c, t, &feet);

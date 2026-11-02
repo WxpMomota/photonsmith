@@ -1176,12 +1176,7 @@ void DataFilm::soundscape(audio::Mix &m) const {
 	const auto groundAt = [&](double x, double z) { return ground ? ground->heightAt(x, z) : 0.0; };
 	const double T = m.seconds();
 	// nature's time back to the film's (natureAt only grows): what happens in nature's time - a boat, a dive, a flight - is heard at the film time it is seen
-	const std::function<double(double)> filmTimeOf = [this, T](double ntv) {
-		double lo = 0.0, hi = T;
-		if (natureAt(hi) <= ntv) return hi + (ntv - natureAt(hi));
-		for (int k = 0; k < 40; ++k) (natureAt(0.5 * (lo + hi)) < ntv ? lo : hi) = 0.5 * (lo + hi);
-		return hi;
-	};
+	const std::function<double(double)> filmTime = [this](double ntv) { return filmTimeOf(ntv); };
 	const auto always = [](double) { return 1.0; };
 	// sound in space, and craft anywhere (film_voyage.h): a descent onto a terrain under a sky, or a ship over it, has no `space` line (it cannot be with a sky) and was silent
 	if (spec.space.on || !spec.ships.empty() || !spec.astronauts.empty() || !spec.descents.empty()) {
@@ -1212,7 +1207,7 @@ void DataFilm::soundscape(audio::Mix &m) const {
 		}
 	}
 	if ((!spec.whales.empty() || !spec.pods.empty()) && !spec.seas.empty())   // the sea's giants (film_giants.h); nature's times back to the film's
-		giants::giantsSound(m, ears, spec.whales, spec.pods, spec.seas[0].level, spec.hasUnderwater, [this](double ft) { return natureAt(ft); }, filmTimeOf);
+		giants::giantsSound(m, ears, spec.whales, spec.pods, spec.seas[0].level, spec.hasUnderwater, [this](double ft) { return natureAt(ft); }, filmTime);
 	// under the sea (film_undersea.h): a diver breathing - the regulator's hiss, then the burble of the breath going out - and the bubbles of a stream
 	for (std::size_t i = 0; i < spec.undersea.breaths.size(); ++i) {
 		const undersea::Breath &b = spec.undersea.breaths[i];
@@ -1223,7 +1218,7 @@ void DataFilm::soundscape(audio::Mix &m) const {
 			for (int k = 0; k < 9; ++k) ss::place(m, ears, t0 + 0.4 * b.every + 0.13 * k, at, ss::bubble(seed + 3u * static_cast<unsigned>(k)), 0.5, 30.0);
 		}
 	}
-	if (spec.hasUnderwater && !spec.seas.empty()) seaSounds(spec, m, ears, [this](double ft) { return natureAt(ft); }, [this](double x, double z) { return seabedAt(x, z); }, filmTimeOf);
+	if (spec.hasUnderwater && !spec.seas.empty()) seaSounds(spec, m, ears, [this](double ft) { return natureAt(ft); }, [this](double x, double z) { return seabedAt(x, z); }, filmTime);
 	for (std::size_t i = 0; i < spec.divers.size(); ++i) {   // a diver breathing as they swim (film_diver.h): the hiss in, the burble out, from where they are
 		diver::Diver d = spec.divers[i];
 		for (Vec3 &p : d.path) p.y += seabedAt(p.x, p.z);

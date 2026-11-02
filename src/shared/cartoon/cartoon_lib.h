@@ -377,6 +377,12 @@ inline std::string translucentMaterial(Vec3 reflectance, Vec3 transmittance) {
 	return buf;
 }
 // A small deterministic pseudo-random number in [0, 1) from an integer and a salt.
+// A film's `seed K` as the int its things are made from: whole, and under 100000 either way (folded), so `seed * 7001 + k` and the like never overflow - a huge seed did, which is
+// undefined - and a number past an int's range is not undefined to cast. Every seed the film files give goes through here.
+inline int seedFrom(double v) {
+	if (!(std::abs(v) < 1e300)) return 1;   // (NaN, infinite)
+	return static_cast<int>(std::fmod(std::trunc(v), 100000.0));
+}
 inline double hash01(int i, int salt) {
 	unsigned x = static_cast<unsigned>(i) * 747796405u + static_cast<unsigned>(salt) * 2891336453u + 12345u;
 	x = ((x >> ((x >> 28u) + 4u)) ^ x) * 277803737u;

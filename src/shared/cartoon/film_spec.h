@@ -719,7 +719,7 @@ namespace detail {
 // A line of a library file (a set, a cast) is numbered kLineFileBase times its file's place in Spec::lineFiles (from 1) plus its line there, so that a problem found
 // after the film is read names the file and line it came from - a set's lines were reported as the film file's lines of those numbers.
 // A `seed` number as the int it is kept in: clamped to an int's range (outside it the conversion is undefined: `seed 1e10` was taken without a word).
-inline int seedOf(double v) { return static_cast<int>(std::clamp(v, -2147483647.0, 2147483647.0)); }
+inline int seedOf(double v) { return seedFrom(v); }   // (cartoon_lib.h: folded under 100000, so a seed's products never overflow)
 constexpr int kLineFileBase = 1000000;
 // The number of line `n` of `file` (`filmFile`'s own lines are their own numbers).
 inline int lineId(Spec &s, const std::string &file, const std::string &filmFile, int n) {

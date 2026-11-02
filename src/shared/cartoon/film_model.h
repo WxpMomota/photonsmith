@@ -425,7 +425,7 @@ inline std::string paintKitLine(Part &p, const std::vector<std::string> &t, bool
 				if (i < t.size() && (t[i] == "x" || t[i] == "y" || t[i] == "z")) q.stripeAxis = t[i++][0];
 			} else if (w == "mottle" && numbers(1)) q.mottle = v[0];
 			else if (w == "res" && numbers(1) && v[0] >= 64 && v[0] <= 4096) q.res = static_cast<int>(v[0]);
-			else if (w == "seed" && numbers(1)) q.seed = static_cast<int>(v[0]);
+			else if (w == "seed" && numbers(1)) q.seed = seedFrom(v[0]);
 			else return "\"" + w + "\": `paint base R G B [wear R G B A] [dirt R G B A] [mottle A] [stripes R G B W [x|y|z]] [spots R G B A] [res N] [seed K]`";
 		}
 		return std::string();
@@ -499,7 +499,7 @@ inline std::string modifierLine(Part &p, const std::vector<std::string> &t, bool
 		while (i < t.size()) {
 			const std::string w = t[i++];
 			if (w == "size" && numbers(1) && v[0] > 0.0005) d.size = v[0];
-			else if (w == "seed" && numbers(1)) d.seed = static_cast<int>(v[0]);
+			else if (w == "seed" && numbers(1)) d.seed = seedFrom(v[0]);
 			else if (w == "bake") d.bake = true;
 			else return "\"" + w + "\": `displace PATTERN AMOUNT [size S] [seed K] [bake]` (size above 0.5 mm)";
 		}
@@ -719,7 +719,7 @@ inline std::string round3Line(Part &p, const std::vector<std::string> &t, bool &
 			else if (w == "colour" && colourAt(p.fur.colour)) continue;
 			else if (w == "curl" && numbers(1)) p.fur.curl = v[0];
 			else if (w == "droop" && numbers(1)) p.fur.droop = v[0];
-			else if (w == "seed" && numbers(1)) p.fur.seed = static_cast<int>(v[0]);
+			else if (w == "seed" && numbers(1)) p.fur.seed = seedFrom(v[0]);
 			else return usage;
 		}
 		return std::string();
@@ -941,7 +941,7 @@ inline std::string modelLine(Model &m, const std::vector<std::string> &raw) {
 			if (w == "up" || w == "all") c.rule = w;
 			else if (w == "slope" && numbers(1)) c.rule = "slope", c.slope = v[0];
 			else if (w == "scale" && numbers(2) && v[0] > 0 && v[1] > 0) c.s0 = v[0], c.s1 = v[1];
-			else if (w == "seed" && numbers(1)) c.seed = static_cast<int>(v[0]);
+			else if (w == "seed" && numbers(1)) c.seed = seedFrom(v[0]);
 			else return usage;
 		}
 		m.covers.push_back(c);

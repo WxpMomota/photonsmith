@@ -258,7 +258,7 @@ inline std::vector<Part> room(const std::map<std::string, double> &opt, const Ve
 // Any generator's parts: model_kit.h's, then these. `error` says when the kind is none of them.
 inline std::vector<Part> makeAny(const std::string &kind, const std::map<std::string, double> &opt, const Vec3 *colour, std::string &error) {
 	const auto o = [&](const std::string &k, double d) { return opt.count(k) ? opt.at(k) : d; };
-	const int seed = static_cast<int>(o("seed", 1));
+	const int seed = seedFrom(o("seed", 1));
 	error.clear();
 	if (kind == "tree") {
 		const int k = static_cast<int>(o("kind", 0));   // (kind as a word: film_model.h turns `kind pine` into kind 1, palm 2, birch 3)

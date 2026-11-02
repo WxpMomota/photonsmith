@@ -320,6 +320,8 @@ class DataFilm {
 	static Vec3 story(double x, double y, double z) { return {-x, y, z}; }   // (pbrt's coordinates to the toolkit's: x mirrored)
 	// Nature's time at film time t (`timelapse`, and `slowmo` windows where it runs slower): what the clouds, the water, the wind and the animals go by.
 	double natureAt(double t) const;
+	// The film time at which nature's time is `nt` (natureAt only grows): what happens in nature's time - a kraken rising, a hook going in, a heron's strike - is heard then.
+	double filmTimeOf(double nt) const;
 	// A herd or a flock as a shot's subject - `herd1`, `herd2` ..., `flock1` ... (the film's herds and flocks in the order of their lines): where its middle is at t, which
 	// way it is going, and the height a camera looks at (story space, as a character's feet, front and chest). False when `who` is none.
 	bool wildSubject(const std::string &who, double t, Vec3 &feet, Vec3 &front, Vec3 &chest) const;

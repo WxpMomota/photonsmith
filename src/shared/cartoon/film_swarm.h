@@ -189,7 +189,7 @@ inline std::string parse(const std::vector<std::string> &t, Swarm &s) {
 		else if (w == "glow") ok = one(s.glow);
 		else if (w == "seed") {
 			double k = 0.0;
-			ok = one(k), s.seed = static_cast<int>(k);
+			ok = one(k), s.seed = seedFrom(k);
 		}
 		if (!ok) return "\"" + w + "\": " + usage;
 	}

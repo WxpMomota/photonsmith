@@ -217,22 +217,21 @@ std::string DataFilm::onTheWater(const stir::Field &stirred, double t, double nt
 		if (since < 14.0) out += tideline::castleText(c, y, tideline::slumped(since), nt);
 	}
 	for (const tideline::Pool &p : spec.pools) out += tideline::poolText(p, groundOf(p.x, p.z), level);
+	double sunUp = 40.0, sunFacing = 0.0;   // (after dark a lighthouse's light turns and the lamps on a pier or a quay glow)
+	if (spec.hasSky) dressing::sunAt(spec.sky, dressing::hourAt(spec.sky, t, spec.storyEnd), sunUp, sunFacing);
+	const double dark = 1.0 - smoothstep(-6.0, 6.0, sunUp);
 	for (const waterside::Place &p : spec.places) {
 		double y = level;
 		if (p.river >= 0 && p.river < static_cast<int>(spec.rivers.size())) y = stream::heightAt(spec.rivers[static_cast<std::size_t>(p.river)], p.x, p.z, nt);
 		else if (spec.seas.empty() && !spec.rivers.empty()) y = stream::heightAt(spec.rivers[0], p.x, p.z, nt);
 		const double onWater = y;   // (a mill's wheel stands in the water, whatever its house stands on)
 		if (p.kind == "lighthouse" || p.kind == "harbour" || p.kind == "watermill") y = std::max(y, groundOf(p.x, p.z));
-		out += waterside::staticText(p, y, nt);
+		out += waterside::staticText(p, y, nt, dark);
 		if (p.kind == "watermill") {
 			const double flow = p.river >= 0 && p.river < static_cast<int>(spec.rivers.size()) ? spec.rivers[static_cast<std::size_t>(p.river)].speed : 1.2;
 			out += waterside::detail::millWheel(p, onWater, nt, flow);
 		}
-		if (p.kind == "lighthouse") {
-			double elevation = 40.0, facing = 0.0;
-			if (spec.hasSky) dressing::sunAt(spec.sky, dressing::hourAt(spec.sky, t, spec.storyEnd), elevation, facing);
-			out += waterside::lanternText(p, y, nt, 1.0 - smoothstep(-6.0, 6.0, elevation));
-		}
+		if (p.kind == "lighthouse") out += waterside::lanternText(p, y, nt, dark);
 	}
 	for (const stir::Skip &k : spec.skips) out += stir::skipText(k, t, level);
 	for (const adrift::Thing &th : spec.adrifts) out += adrift::text(th, nt, spec.rivers, spec.seas.empty() ? nullptr : &spec.seas[0]);
@@ -409,34 +408,35 @@ void DataFilm::waterSounds(audio::Mix &m) const {
 		const std::vector<stir::Hop> hops = stir::hopsOf(k);
 		for (std::size_t n = 0; n < hops.size(); ++n) plop(hops[n].t, hops[n].x, hops[n].z, n + 1 == hops.size() ? 0.05 : 0.015, seed += 13u);
 	}
-	const double T = m.seconds();
+	const double T = m.seconds(), natureEnd = natureAt(T);
+	// (a whirlpool's, a great wave's, a bore's and the animals' times are nature's, as the water they stir goes by: each is heard at the film time it is seen)
 	if (!spec.seas.empty())   // a whirlpool's roar, a great wave coming
 		for (const water::Sea::Bend &b : spec.seas[0].bends) {
 			if (b.kind == 0) {
-				for (double t = std::max(0.0, b.t0); t < std::min(T, b.t1); t += 1.6) ss::place(m, ears, t, {b.x, level, b.z}, audio::noiseBurst(2.2, 0.4, 0.8, 120.0, 900.0, seed += 13u), 0.9, 2.5 * b.radius);
+				for (double t = std::max(0.0, b.t0); t < std::min(natureEnd, b.t1); t += 1.6) ss::place(m, ears, filmTimeOf(t), {b.x, level, b.z}, audio::noiseBurst(2.2, 0.4, 0.8, 120.0, 900.0, seed += 13u), 0.9, 2.5 * b.radius);
 			} else {
 				const double a = b.facing * kPi / 180.0;
-				for (double t = std::max(0.0, b.t0); t < std::min(T, b.t0 + 40.0); t += 1.2) {
+				for (double t = std::max(0.0, b.t0); t < std::min(natureEnd, b.t0 + 40.0); t += 1.2) {
 					const double d = b.speed * (t - b.t0);
-					ss::place(m, ears, t, {b.x + std::sin(a) * d, level, b.z + std::cos(a) * d}, audio::noiseBurst(1.8, 0.3, 0.8, 90.0, 1600.0, seed += 13u), 1.3, 300.0);
+					ss::place(m, ears, filmTimeOf(t), {b.x + std::sin(a) * d, level, b.z + std::cos(a) * d}, audio::noiseBurst(1.8, 0.3, 0.8, 90.0, 1600.0, seed += 13u), 1.3, 300.0);
 				}
 			}
 		}
 	for (const water::River &r : spec.rivers)
 		for (const water::River::Bore &b : r.bores)
-			for (double t = b.t; t < std::min(T, b.t + 16.0); t += 1.0) {
+			for (double t = b.t; t < std::min(natureEnd, b.t + 16.0); t += 1.0) {
 				const Vec3 at = stream::placeAt(r, b.from + (r.speed + std::sqrt(19.6 * b.height)) * (t - b.t)).at;
-				ss::place(m, ears, t, at, audio::noiseBurst(1.5, 0.2, 0.7, 150.0, 2400.0, seed += 13u), 1.0, 120.0);
+				ss::place(m, ears, filmTimeOf(t), at, audio::noiseBurst(1.5, 0.2, 0.7, 150.0, 2400.0, seed += 13u), 1.0, 120.0);
 			}
 	for (const pondlife::Life &l : spec.lifes) {   // what the water's animals do, and their voices
 		for (const pondlife::Touch &q : l.touches) {
-			if (q.kind == 1) ss::place(m, ears, q.t, {q.x, level, q.z}, audio::noiseBurst(0.09, 0.001, 0.08, 900.0, 5000.0, seed += 13u), 1.2, 60.0);
-			plop(q.t, q.x, q.z, q.size, seed += 13u);
+			if (q.kind == 1) ss::place(m, ears, filmTimeOf(q.t), {q.x, level, q.z}, audio::noiseBurst(0.09, 0.001, 0.08, 900.0, 5000.0, seed += 13u), 1.2, 60.0);
+			plop(filmTimeOf(q.t), q.x, q.z, q.size, seed += 13u);
 		}
 		const auto voice = [&](double t, Vec3 at, const std::vector<float> &sound, double gain, double within) { at.y = level + 0.2; ss::place(m, ears, t, at, sound, gain, within); };
 		if (l.kind == "ducks")
 			for (double t = 2.0 + 4.0 * hash01(l.seed, 21), g = 0; t < T; t += 3.0 + 9.0 * hash01(l.seed, static_cast<int>(g) + 22), ++g) {
-				const Vec3 at = pondlife::detail::wanderAt(l, 0, t);
+				const Vec3 at = pondlife::detail::wanderAt(l, 0, natureAt(t));   // (where the drake swims then: in nature's time, as `text` draws him)
 				for (int q = 0; q < 2 + static_cast<int>(g) % 3; ++q) voice(t + 0.17 * q, at, audio::chirp(380.0, 240.0, 0.13, 26.0, 0.07, 0.9), 0.4, 25.0);
 			}
 		if (l.kind == "frogs")

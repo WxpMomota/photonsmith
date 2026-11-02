@@ -20,6 +20,7 @@
 #include "cartoon_lib.h"
 #include "film_cache.h"
 #include "film_craft.h"
+#include "film_flow.h"
 #include "film_stream.h"
 #include "sdf_mesh.h"
 
@@ -41,9 +42,10 @@ using craft::detail::add;
 using craft::detail::bar;
 using craft::detail::boxAt;
 struct Bits {
-	Mesh wood, dark, stone, pale, thatch, metal, glass, red, white;
+	Mesh wood, dark, stone, pale, thatch, metal, glass, red, white, lamps;
+	// `lit`: 0 by day to 1 at night - the lamps' globes glow, warm (seen, not lighting the scene: there are many)
 	void put(std::string &out, double lit = 0.0) const {
-		(void)lit;
+		if (!lamps.tris.empty()) out += lit > 0.02 ? flow::glowAttr(emitMesh(lamps, identity()), Vec3{3.2, 2.3, 1.2} * lit) : attr(diffuseMaterial({0.86, 0.82, 0.72}), emitMesh(lamps, identity()));
 		if (!wood.tris.empty()) out += attr(coated({0.42, 0.29, 0.17}, 0.5), emitMesh(wood, identity()));
 		if (!dark.tris.empty()) out += attr(diffuseMaterial({0.14, 0.1, 0.08}), emitMesh(dark, identity()));
 		if (!stone.tris.empty()) out += attr(diffuseMaterial({0.5, 0.47, 0.42}), emitMesh(stone, identity()));
@@ -73,7 +75,7 @@ inline void pier(Bits &b, const Place &p, double y) {
 	}
 	for (double z = 6.0; z < L; z += 9.0) {
 		post(b.dark, f, {0.5 * W, deck, z}, 2.6, 0.04);
-		add(b.pale, uvSphere(0.14, 12, 8), mul(f, translate(0.5 * W, deck + 2.7, z)));
+		add(b.lamps, uvSphere(0.14, 12, 8), mul(f, translate(0.5 * W, deck + 2.7, z)));
 	}
 }
 inline void harbour(Bits &b, const Place &p, double y) {
@@ -92,7 +94,7 @@ inline void harbour(Bits &b, const Place &p, double y) {
 		add(b.wood, box(0.8, 0.7, 0.8), mul(f, translate(x + 1.3, top + 0.35, -3.2), rotate({0.0, 1.0, 0.0}, 25.0)));
 		add(b.pale, lathe({{0.45, 0.0}, {0.48, 0.12}, {0.32, 0.14}, {0.3, 0.26}, {0.0, 0.26}}, 16), mul(f, translate(x - 1.4, top, -2.4)));
 		post(b.dark, f, {x + 3.0, top, -7.0}, 4.4, 0.05);
-		add(b.pale, uvSphere(0.2, 12, 8), mul(f, translate(x + 3.0, top + 4.5, -7.0)));
+		add(b.lamps, uvSphere(0.2, 12, 8), mul(f, translate(x + 3.0, top + 4.5, -7.0)));
 	}
 	// a crane
 	bar(b.red, on(f, {0.2 * L, top, -3.0}), on(f, {0.2 * L, top + 7.0, -3.0}), 0.22);
@@ -256,8 +258,8 @@ inline void hut(Bits &b, Vec3 at, double facing, int seed) {
 }
 }  // namespace detail
 
-// What does not move, as a mesh in the film's cache would be: here as text for a frame's first use, via the caller's cache of it by place.
-inline std::string staticText(const Place &p, double y, double t) {
+// What does not move, as a mesh in the film's cache would be: here as text for a frame's first use, via the caller's cache of it by place. `dark`: 0 by day to 1 at night (the lamps).
+inline std::string staticText(const Place &p, double y, double t, double dark = 0.0) {
 	detail::Bits b;
 	std::string out = "# " + p.kind + " (film_waterside.h)\n";
 	if (p.kind == "pier") detail::pier(b, p, y);
@@ -290,7 +292,7 @@ inline std::string staticText(const Place &p, double y, double t) {
 			}
 		}
 	}
-	b.put(out);
+	b.put(out, dark);
 	return out;
 }
 // A lighthouse's lantern at t: its lamp, and a turning spot after dark. `dark`: 0 by day to 1 at night.

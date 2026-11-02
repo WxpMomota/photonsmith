@@ -65,6 +65,9 @@ inline std::string waterChangeLine(Spec &s, const std::string &verb, const std::
 	for (std::size_t i = 3; i + 1 < t.size(); i += 2) {
 		if (!number(t[i + 1], v[0])) return usage;
 		const std::string &w = t[i];
+		static const std::vector<std::string> pool = {"radius", "depth", "from", "until"}, wave = {"toward", "at", "height", "length", "speed", "width", "until"};
+		const std::vector<std::string> &own = b.kind == 0 ? pool : wave;   // (each its own words: a whirlpool's `speed` and a wave's `radius` were taken and did nothing, or the other's thing)
+		if (std::find(own.begin(), own.end(), w) == own.end()) return usage;
 		if (w == "radius" || w == "length") b.radius = std::max(1.0, v[0]);
 		else if (w == "depth" || w == "height") b.depth = std::max(0.1, v[0]);
 		else if (w == "from" || w == "at") b.t0 = v[0];
@@ -363,7 +366,7 @@ inline void settleOnWater(Spec &s) {
 		if (c.river >= 0 && c.river < static_cast<int>(s.rivers.size())) craft::downRiver(c, s.rivers[static_cast<std::size_t>(c.river)]);
 	for (adrift::Thing &th : s.adrifts) adrift::prepare(th, s.rivers, s.seas.empty() ? nullptr : &s.seas[0], std::max(600.0, 4.0 * s.length));
 	if (s.bank.on) bankside::prepare(s.bank, s.seas, s.rivers, s.hasTerrain ? terrain::fieldOf(s.terrain).get() : nullptr);
-	for (pondlife::Life &l : s.lifes) pondlife::prepare(l, std::max(60.0, s.length));
+	for (pondlife::Life &l : s.lifes) pondlife::prepare(l, std::max(60.0, s.length * std::max(1.0, s.timelapse)));   // (nature's whole film: a timelapse's frogs stopped at its film length)
 	for (const waterside::Place &p : s.places)   // a dam going sends a wall of water down its river
 		if (p.kind == "dam" && p.burst >= 0.0 && p.river >= 0 && p.river < static_cast<int>(s.rivers.size())) {
 			water::River &r = s.rivers[static_cast<std::size_t>(p.river)];
