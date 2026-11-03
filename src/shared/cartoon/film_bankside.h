@@ -112,7 +112,7 @@ inline std::vector<Shore> shoreOf(const std::vector<water::Sea> &seas, const std
 inline void prepare(Bank &b, const std::vector<water::Sea> &seas, const std::vector<water::River> &rivers, const terrain::Field *ground) {
 	const std::vector<Shore> shore = shoreOf(seas, rivers, ground);
 	const auto groundAt = [&](double x, double z) { return ground && ground->inside(x, z) ? ground->heightAt(x, z) : -1e30; };
-	const double level = seas.empty() ? 0.0 : seas[0].level;
+	const double level = !seas.empty() ? seas[0].level : !rivers.empty() && !rivers[0].path.empty() ? rivers[0].path[0].y : 0.0;   // (a patch's water: the sea's, or with none the river's, as it was drawn)
 	const auto clumped = [&b](double x, double z, int salt) { return nature::noise2(x * 0.09 + b.seed, z * 0.09, salt); };
 	int k = b.seed * 7001;
 	for (const Shore &p : shore) {
@@ -278,7 +278,7 @@ inline Vec3 pushedBy(const std::vector<Mover> &movers, double x, double z) {
 
 // What grows by the water at t, as scene text. `wind`: the wind on it at (x, z), pbrt's. `eye`: pbrt's.
 template <class WindAt, class LevelAt>
-inline std::string text(const std::string &film, const Bank &b, double t, const Vec3 &eye, const Vec3 &ahead, double hfov, const stir::Field *stirred, const std::vector<Mover> &movers, WindAt windAt, LevelAt levelAt) {
+inline std::string text(const std::string &film, const Bank &b, double t, const Vec3 &eye, const Vec3 &ahead, double hfov, const stir::Field *stirred, const std::vector<Mover> &movers, WindAt windAt, LevelAt levelAt, double rise = 0.0) {
 	if (!b.on) return std::string();
 	std::string out = "# by the water (film_bankside.h)\n";
 	const double wide = std::cos(std::min(kPi, (0.5 * hfov + 14.0) * kPi / 180.0));
@@ -341,7 +341,11 @@ inline std::string text(const std::string &film, const Bank &b, double t, const 
 			}
 			return m;
 		});
-		if (!weed.empty()) out += "AttributeBegin\n  " + coated({0.2, 0.42, 0.08}, 0.3) + "\n  Shape \"plymesh\" \"string filename\" [ \"" + weed + "\" ]\nAttributeEnd\n";
+		if (!weed.empty()) {   // (kept at the still water: moved up and down with a tide's rise, `rise`, as the pads are)
+			char lift[64];
+			std::snprintf(lift, sizeof lift, "  Translate 0 %.4f 0\n", rise);
+			out += "AttributeBegin\n" + std::string(rise != 0.0 ? lift : "") + "  " + coated({0.2, 0.42, 0.08}, 0.3) + "\n  Shape \"plymesh\" \"string filename\" [ \"" + weed + "\" ]\nAttributeEnd\n";
+		}
 	}
 	for (std::size_t n = 0; n < b.trees.size(); ++n) {
 		const Willow &w = b.trees[n];

@@ -534,7 +534,12 @@ std::string DataFilm::crowding() const {
 			if (!last || !last->out) return true;
 		}
 		return std::any_of(spec.chases.begin(), spec.chases.end(), [&](const fastlane::Chase &x) { return x.who == c.name && t >= x.from - 1.0 && t <= x.to + 1.0; }) ||
-			   std::any_of(spec.rides.begin(), spec.rides.end(), [&](const fastlane::Ride &x) { return x.who == c.name && t >= x.from && t <= x.to + 1.5; });
+			   std::any_of(spec.rides.begin(), spec.rides.end(), [&](const fastlane::Ride &x) {
+				   double end = x.to;   // (a ride without `to` lets go at its lane's end: it was left out for the rest of the film)
+				   for (const fastlane::Lane &l : spec.lanes)
+					   if (l.name == x.lane && l.total() > 0.0) end = std::min(end, x.from + l.total() / std::max(0.1, l.speed));
+				   return x.who == c.name && t >= x.from && t <= end + 1.5;
+			   });
 	};
 	std::vector<std::pair<const Character *, const Character *>> pairs;
 	for (std::size_t a = 0; a < spec.characters.size(); ++a)
@@ -1435,7 +1440,7 @@ std::vector<Caption> DataFilm::lineCaptions() const {
 		cap.fade = 0.15;
 		cap.centreY = 0.88;
 		cap.width = 0.72;
-		if (const Character *who = character(l.who); who && underwater(*who)) cap.bubble = true, cap.centreY = 0.84, cap.width = 0.6;   // (round 17: said under the water, in a bubble)
+		if (const Character *who = character(l.who); who && underwater(*who) && !l.radio) cap.bubble = true, cap.centreY = 0.84, cap.width = 0.6;   // (round 17: said under the water, in a bubble - a radio's words are in the ear, as its voice is)
 		CaptionLine text;
 		text.text = l.text;
 		text.size = 0.042;

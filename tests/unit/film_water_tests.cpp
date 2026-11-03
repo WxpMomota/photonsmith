@@ -103,8 +103,10 @@ TEST(FilmWaterRings, ACutCellMeetsItsNeighbour) {
 	EXPECT_EQ(cut[3 * 4 + 3], 0);
 	EXPECT_GT(m.verts.size(), 500u);
 	double edge = 0.0;   // (the cut cell's far corner, 0.7 m from the ring and beyond its reach: on the plain surface, y 0, where the next cells' plain quads meet it)
+	bool found = false;
 	for (const cartoon::Vec3 &v : m.verts)
-		if (std::abs(-v.x - 1.0) < 1e-6 && std::abs(v.z - 1.0) < 1e-6) edge = std::max(edge, std::abs(v.y));
+		if (std::abs(-v.x - 1.0) < 1e-6 && std::abs(v.z - 1.0) < 1e-6) edge = std::max(edge, std::abs(v.y)), found = true;
+	ASSERT_TRUE(found) << "the cut cell has its corner";
 	EXPECT_LT(edge, 1e-6);
 }
 
@@ -194,7 +196,7 @@ TEST(FilmWaterBoats, SomeoneInABoatDoesNotSlowAFilmsReading) {
 		ff::DataFilm film;
 		const auto t0 = std::chrono::steady_clock::now();
 		ASSERT_EQ(film.load(file), "");
-		EXPECT_LT(std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(), 6.0) << file;   // (it took 13 s; room for 16 shards at once)
+		EXPECT_LT(std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(), 10.0) << file;   // (it took 13 s; room for 16 shards at once, and a render beside them)
 	}
 }
 

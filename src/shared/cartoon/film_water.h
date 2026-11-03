@@ -275,7 +275,7 @@ inline std::string seaText(const Sea &given, double t, const Vec3 &eyeStory, con
 	const double r0 = std::max(0.05, 0.08 * height), r1 = 8000.0;
 	const int around = 150, out = 110;
 	// (the surf where the water is now - a tide moves it up and down the beach - to a quarter metre, so a tide makes a few of its grids and not one a frame)
-	const std::shared_ptr<const surf::Grid> grid = swell && swell->on && ground && !s.fromBelow ? surf::gridOf(*ground, std::round(s.level * 4.0) / 4.0, *swell) : nullptr;
+	const std::shared_ptr<const surf::Grid> grid = swell && swell->on && ground && !s.fromBelow ? surf::gridOf(*ground, given.level + std::round(given.riseAt(t) * 4.0) / 4.0, *swell) : nullptr;   // (its rise rounded, not its level: a still sea's grid is the one the surf's sound uses)
 	Mesh water, foam;
 	std::vector<double> folds;
 	std::vector<char> shallow;

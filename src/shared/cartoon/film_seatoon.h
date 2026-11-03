@@ -70,7 +70,7 @@ inline std::string asBubbles(const std::string &body) { return body.empty() ? bo
 inline void wipeBubbles(double at, double t, const Vec3 &eye, const Vec3 &target, double fov, std::vector<undersea::Bubble> &out) {
 	const double u = (t - at) / 0.7;   // (-1 .. 1 across the wipe)
 	if (u < -1.0 || u > 1.0) return;
-	const Vec3 f = normalize(target - eye), right = normalize(cross(Vec3{0.0, 1.0, 0.0}, f) + Vec3{1e-9, 0.0, 0.0}), up = cross(f, right);
+	const Vec3 f = normalize(target - eye), right = normalize(cross(cameraUp(f), f)), up = cross(f, right);   // (the film's own up, as its LookAt's)
 	const double d = 0.6, H = d * std::tan(0.5 * fov * kPi / 180.0), W = H * 16.0 / 9.0;
 	for (int i = 0; i < 900; ++i) {
 		const double h1 = hash01(i, 71), h2 = hash01(i, 72), h3 = hash01(i, 73);

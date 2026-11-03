@@ -45,7 +45,11 @@ struct Bits {
 	Mesh wood, dark, stone, pale, thatch, metal, glass, red, white, lamps;
 	// `lit`: 0 by day to 1 at night - the lamps' globes glow, warm (seen, not lighting the scene: there are many)
 	void put(std::string &out, double lit = 0.0) const {
-		if (!lamps.tris.empty()) out += lit > 0.02 ? flow::glowAttr(emitMesh(lamps, identity()), Vec3{3.2, 2.3, 1.2} * lit) : attr(diffuseMaterial({0.86, 0.82, 0.72}), emitMesh(lamps, identity()));
+		if (!lamps.tris.empty()) {   // (a pale globe glowing as it gets dark: black and glowing faintly, a globe went almost black at dusk)
+			char glow[200];
+			std::snprintf(glow, sizeof glow, "AreaLightSource \"diffuse\" \"rgb L\" [ %.4f %.4f %.4f ] \"bool twosided\" true \"bool sampled\" false\n  ", 3.2 * lit, 2.3 * lit, 1.2 * lit);
+			out += attr((lit > 0.02 ? std::string(glow) : std::string()) + diffuseMaterial({0.86, 0.82, 0.72}), emitMesh(lamps, identity()));
+		}
 		if (!wood.tris.empty()) out += attr(coated({0.42, 0.29, 0.17}, 0.5), emitMesh(wood, identity()));
 		if (!dark.tris.empty()) out += attr(diffuseMaterial({0.14, 0.1, 0.08}), emitMesh(dark, identity()));
 		if (!stone.tris.empty()) out += attr(diffuseMaterial({0.5, 0.47, 0.42}), emitMesh(stone, identity()));

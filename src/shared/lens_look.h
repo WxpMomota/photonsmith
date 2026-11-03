@@ -166,15 +166,14 @@ inline std::string parse(const std::string &text, Look &out) {
 		if (!(in >> v) || !std::isfinite(v)) return "\"" + word + "\" needs a number after it";
 		if (word == "bloom") out.bloom = std::clamp(v, 0.0, 1.0);
 		else if (word == "bloom-radius") out.bloomRadius = std::clamp(v, 0.001, 0.5);
-		else if (word == "event") {
-			if (v > 0.0) out.events.emplace_back();   // (`event 0` is none)
-		} else if (word.rfind("event-", 0) == 0) {
+		else if (word == "event") out.events.emplace_back();   // (each `event` word starts one: `event 0` skipping it let its words change the event before)
+		else if (word.rfind("event-", 0) == 0) {
 			if (out.events.empty()) return "\"" + word + "\" comes after `event 1`";
 			cosmic_event::Params &e = out.events.back();
 			// (clamped before the cast: a number past an int's range cast to one is undefined)
 			if (word == "event-kind") e.kind = static_cast<int>(std::clamp(v, -1.0, 1000.0));
 			else if (word == "event-count") e.count = static_cast<int>(std::clamp(v, 1.0, 40000.0));
-			else if (word == "event-seed") e.seed = static_cast<int>(std::fmod(std::trunc(v), 1e9));
+			else if (word == "event-seed") e.seed = static_cast<int>(std::fmod(std::trunc(v), 1e5));   // (as a film's seeds: its products, seed * 9109 + i, stay in an int)
 			else if (word == "event-x") e.x = v;
 			else if (word == "event-y") e.y = v;
 			else if (word == "event-z") e.z = v;

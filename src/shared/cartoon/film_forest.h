@@ -469,7 +469,10 @@ inline Grown grow(const std::string &sp, int v, bool winter, bool spring) {
 		for (int k = 0; k < 26; ++k) {   // (its spots)
 			const double a = 2.0 * kPi * hash01(salt + k, 4), u = 0.2 + 0.72 * std::sqrt(hash01(salt + k, 5)), size = 0.04 + 0.1 * r * hash01(salt + k, 6);
 			const double top = u < 0.55 ? lerp(0.62, 0.5, u / 0.55) : u < 0.9 ? lerp(0.5, 0.2, (u - 0.55) / 0.35) : lerp(0.2, 0.0, (u - 0.9) / 0.1);   // (on the cap's own profile: under it, most were inside)
-			addInto(g.blossom, uvSphere(1.0, 8, 5), mul(translate(spine(1.0) + Vec3{u * r * std::cos(a), top * r + 0.1 * size, u * r * std::sin(a)}), scale(size, 0.35 * size, size)));
+			// (lying on the cap's slope there - 41 degrees and more over most of it: flat, a spot stood out of it on one side and was buried on the other)
+			const double slope = u < 0.55 ? (0.5 - 0.62) / 0.55 : u < 0.9 ? (0.2 - 0.5) / 0.35 : (0.0 - 0.2) / 0.1;   // (the profile's rise over its run, both in r)
+			const Vec3 radial{std::cos(a), 0.0, std::sin(a)}, normal = normalize(Vec3{0.0, 1.0, 0.0} - radial * slope);
+			addInto(g.blossom, uvSphere(1.0, 8, 5), mul(alignY(spine(1.0) + radial * (u * r) + Vec3{0.0, top * r, 0.0} + normal * (0.1 * size), normal), scale(size, 0.35 * size, size)));
 		}
 	} else if (sp == "frond") {   // from another world: great arching plumes from the ground, as tall as a house
 		for (int f = 0; f < 11; ++f) {

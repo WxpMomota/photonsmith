@@ -853,6 +853,10 @@ def quadruped(name, s):
                         if give > 0.0:
                             slide = mul(norm(to), give)
                             U = add(U, slide)
+                        to = sub(wanted, U)   # (and the swing's leg kept within the stance's reach: else only its full length held it, and the knee popped at touch-down)
+                        d = math.sqrt(dot(to, to))
+                        if d > reach:
+                            wanted = add(U, mul(to, reach / d))
                     elif d > reach:
                         ankleAt = add(U, mul(to, reach / d))
                         short = math.sqrt(dot(sub(ankleAt, toe), sub(ankleAt, toe))) - F if down else 0.0

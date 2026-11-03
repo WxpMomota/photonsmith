@@ -375,7 +375,7 @@ inline std::string text(const std::string &film, const terrain::Field &field, co
 				const Vec3 foot{-x, y - 0.02, z};
 				const Mat4 turnIt = rotate({0, 1, 0}, 90.0 * static_cast<int>(hash01(salt, 74) * 4.0));
 				const Vec3 w = under ? Vec3{0.0, 0.0, 0.0} : nature::windLean(foot.x, foot.z, t, 0.18) + dressing::gustAt(gusts, foot.x, foot.z, t) * 0.35;
-				if (under || wooded) places += nature::placeObject(laid("litter", true, 1.0), mul(translate(foot), tilt, turnIt));
+				if (under || wooded) places += nature::placeObject(laid("litter", true, 1.0), mul(translate(Vec3{-x, y, z}), tilt, turnIt));   // (on the ground, as the earth is: at the roots' 2 cm under it, a sixth of the leaves were)
 				const Vec3 onGround{-x, y, z};   // (the earth and what lies on it are on the ground: at the blades' roots, 2 cm under it, they were buried)
 				const std::string soil = detail::soilKey(ground);
 				if (r <= 1 && !under) {   // near the camera: the earth between the blades, what lies on it

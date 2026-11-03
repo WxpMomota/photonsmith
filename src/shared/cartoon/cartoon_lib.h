@@ -376,9 +376,8 @@ inline std::string translucentMaterial(Vec3 reflectance, Vec3 transmittance) {
 	std::snprintf(buf, sizeof(buf), "Material \"diffusetransmission\" \"rgb reflectance\" [ %.4f %.4f %.4f ] \"rgb transmittance\" [ %.4f %.4f %.4f ]", reflectance.x, reflectance.y, reflectance.z, transmittance.x, transmittance.y, transmittance.z);
 	return buf;
 }
-// A small deterministic pseudo-random number in [0, 1) from an integer and a salt.
-// A film's `seed K` as the int its things are made from: whole, and under 100000 either way (folded), so `seed * 7001 + k` and the like never overflow - a huge seed did, which is
-// undefined - and a number past an int's range is not undefined to cast. Every seed the film files give goes through here.
+// A film's `seed K` as the int its things are made from: whole, and under 100000 either way (folded), so a cast is never past an int and the usual `seed * 7001 + k` stays in
+// one (deeper products - a tree's branches, seed * 31 each level - are unsigned where they are made). Every seed the film files' lines give goes through here.
 inline int seedFrom(double v) {
 	if (!(std::abs(v) < 1e300)) return 1;   // (NaN, infinite)
 	return static_cast<int>(std::fmod(std::trunc(v), 100000.0));
@@ -386,6 +385,10 @@ inline int seedFrom(double v) {
 // A grid cell's number for hash01 (the usual spatial hash), in unsigned arithmetic: as ints the products overflow a few tens of cells out, which is undefined (MSVC wraps them, as
 // this does, so the numbers are the ones it always gave).
 inline int cellOf(int a, int b, int c = 0) { return static_cast<int>(static_cast<unsigned>(a) * 73856093u ^ static_cast<unsigned>(b) * 19349663u ^ static_cast<unsigned>(c) * 83492791u); }
+// The up of a film's camera looking along `forward` (pbrt's or story space alike: only x is mirrored): the LookAt's 0 1 0, or 0 0 -1 when it looks nearly straight up or down
+// (film_file.cpp writes it so). Anything that rebuilds the camera's frame - a framing check, a bubble wipe, a sound's pan - takes the same, or its frame was NaN or turned over.
+inline Vec3 cameraUp(Vec3 forward) { return std::hypot(forward.x, forward.z) < 1e-4 * std::abs(forward.y) ? Vec3{0.0, 0.0, -1.0} : Vec3{0.0, 1.0, 0.0}; }
+// A small deterministic pseudo-random number in [0, 1) from an integer and a salt.
 inline double hash01(int i, int salt) {
 	unsigned x = static_cast<unsigned>(i) * 747796405u + static_cast<unsigned>(salt) * 2891336453u + 12345u;
 	x = ((x >> ((x >> 28u) + 4u)) ^ x) * 277803737u;

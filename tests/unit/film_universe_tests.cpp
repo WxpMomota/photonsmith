@@ -30,7 +30,7 @@ LightSource "distant" "point3 from" [ -4 6 5 ] "point3 to" [ 0 0 0 ] "rgb L" [ 2
 
 // A film file in a temporary folder of its own with the open set; "" or the problem.
 std::string loadFilm(const std::string &name, const std::string &filmText, ff::DataFilm &film) {
-	cartoon::film_kinds::install();   // (the person kinds - pip - and the aliens - robot, nova: installed when the film registry is first built, which a test run on its own may not have done)
+	cartoon::film_kinds::install();   // (the person kinds - pip - and the aliens: installed when the film registry is first built, which a test run on its own may not have done)
 	cartoon::film_kinds::aliens::install();
 	const std::filesystem::path d = std::filesystem::temp_directory_path() / ("photonsmith_universe_test_" + name);
 	std::filesystem::remove_all(d);
@@ -1014,6 +1014,12 @@ TEST(FilmBlackHole, AStraightDownLookHasNumbers) {
 	EXPECT_FALSE(words.empty());
 	EXPECT_EQ(words.find("nan"), std::string::npos) << words;
 	EXPECT_EQ(words.find("inf"), std::string::npos) << words;
+	const auto number = [&words](const std::string &word) {   // (straight below it is in the middle of the frame: with the old up it was drawn at the frame's left edge, -2.7)
+		const std::size_t at = words.find(" " + word + " ");
+		return at == std::string::npos ? 1e9 : std::atof(words.c_str() + at + word.size() + 2);
+	};
+	EXPECT_NEAR(number("hole-x"), 0.0, 1e-3) << words;
+	EXPECT_NEAR(number("hole-y"), 0.0, 1e-3) << words;
 }
 
 // Two galaxies falling through each other: nothing but the two centres' pull throws long tails out of the discs, and it comes out the same however the frames are asked for.

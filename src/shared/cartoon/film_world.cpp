@@ -301,7 +301,8 @@ static std::string underTheSea(const Spec &spec, std::string out, const std::str
 	double fov = 40.0;
 	film_subjects::cameraOf(header, eye, target, fov);
 	const Vec3 eyeP{-eye.x, eye.y, eye.z}, targetP{-target.x, target.y, target.z};   // (pbrt's)
-	const water::Sea &sea = spec.seas[0];
+	water::Sea sea = spec.seas[0];   // (at its level now, a tide's or a flood's, as the surface is: the medium, the floor, the caustics and the rest were at the still level)
+	sea.level += spec.seas[0].riseAt(nt), sea.tidePeriod = 0.0, sea.floods.clear();
 	const undersea::Waterline wl = undersea::waterlineOf(sea, nt, eyeP);
 	const std::size_t camera = out.find("Camera \"");
 	if (camera != std::string::npos) {   // (a sphere so big its top is the surface - or, at the waterline, the plane through the lens where the line crosses its dome: the water below it)
@@ -443,7 +444,8 @@ static std::string underTheSeaLight(const Spec &spec, std::string out, const std
 	double fov = 40.0;
 	film_subjects::cameraOf(header, eye, target, fov);
 	const Vec3 eyeP{-eye.x, eye.y, eye.z}, targetP{-target.x, target.y, target.z};
-	const water::Sea &sea = spec.seas[0];
+	water::Sea sea = spec.seas[0];   // (at its level now, as underTheSea's)
+	sea.level += spec.seas[0].riseAt(nt), sea.tidePeriod = 0.0, sea.floods.clear();
 	const undersea::Waterline wl = undersea::waterlineOf(sea, nt, eyeP);
 	if (wl.where != undersea::Waterline::Above) {
 		double rain = 0.0;   // (a `weather rain` line, or a rainy storm, as heavy as it is now)
@@ -996,9 +998,10 @@ std::string DataFilm::castAt(double t) const {
 // and a puff of silt at each step it takes on the seabed.
 std::string DataFilm::waterPlay(const Character &c, const CharacterKind &kind, double t) const {
 	const double level = spec.seas[0].level, dt = 1.0 / 12.0, back = 3.0;
-	// (no one near the water, now or three seconds ago - who walks on the shore, who sits in a boat - has nothing here: two moments, not 37 of them a frame, each of a rower's
-	// some milliseconds)
-	if (!underwater(c) && std::none_of(spec.tumbles.begin(), spec.tumbles.end(), [&c](const Spec::Tumble &f) { return f.who == c.name; })) {
+	// (one sitting in a boat, clear of the water now and over the last three seconds, has nothing here: three moments, not 37 of them a frame, each of a rower's some milliseconds.
+	// Only one aboard: anyone else may leap in and out between the moments looked at, and its splash came and went)
+	const bool aboard = std::any_of(spec.aboards.begin(), spec.aboards.end(), [&c](const Spec::Aboard &a) { return a.who == c.name; });
+	if (aboard && !underwater(c) && std::none_of(spec.tumbles.begin(), spec.tumbles.end(), [&c](const Spec::Tumble &f) { return f.who == c.name; })) {
 		const auto clearOf = [&](double u) { return transformPoint(momentOf(c, std::max(0.0, u)).frame, kind.chest * c.scale).y > level + 0.05; };
 		if (clearOf(t) && clearOf(t - back) && clearOf(t - 0.5 * back)) return std::string();
 	}

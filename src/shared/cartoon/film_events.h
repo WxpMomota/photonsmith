@@ -28,7 +28,7 @@ using ViewAt = std::function<CameraView(double)>;
 // the picture). `aspect` is the picture's width over its height (the fov is across the shorter side). A point behind the camera is heard in the middle.
 inline double panOf(const CameraView &view, Vec3 at, double aspect = 16.0 / 9.0) {
 	const Vec3 f = normalize(view.target - view.eye);
-	const Vec3 right = normalize(cross(f, Vec3{0.0, 1.0, 0.0}));
+	const Vec3 right = normalize(cross(f, cameraUp(f)));   // (the film's own up, as its LookAt's)
 	const Vec3 d = at - view.eye;
 	const double depth = dot(d, f);
 	if (depth <= 1e-6) return 0.0;

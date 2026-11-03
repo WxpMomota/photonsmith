@@ -275,7 +275,8 @@ void DataFilm::deepSounds(audio::Mix &m) const {
 	for (const seatown::Town &w : spec.towns) {   // a town: the market's chatter, the signal's ding as it turns
 		const Vec3 plaza{w.x, bed(w.x, w.z) + 1.5, w.z};
 		for (double t = 0.4; t < T; t += 0.35 + 0.5 * audio::unit(seed += 13u)) ss::place(m, ears, t, plaza, audio::chirp(500.0 + 600.0 * audio::unit(seed + 1u), 400.0 + 700.0 * audio::unit(seed + 2u), 0.12, 20.0, 0.1, 1.0), 0.12, 20.0);
-		for (double t = 6.0; t < T; t += 6.0) ss::place(m, ears, t, plaza + Vec3{0.0, 1.0, 0.0}, audio::bell(std::fmod(t, 12.0) < 1.0 ? 1320.0 : 990.0, 1.2), 0.15, 20.0);
+		for (double nt = 6.0, t = filmTimeOf(nt); t < T; nt += 6.0, t = filmTimeOf(nt))   // (the signal turns in nature's time, as its light does: its ding when it is seen to turn)
+			ss::place(m, ears, t, plaza + Vec3{0.0, 1.0, 0.0}, audio::bell(std::fmod(nt, 12.0) < 1.0 ? 1320.0 : 990.0, 1.2), 0.15, 20.0);
 	}
 	for (std::size_t i = 0; i < spec.lanes.size(); ++i) {   // a fast lane: its roar, from where it passes nearest
 		const fastlane::Lane &l = spec.lanes[i];
@@ -328,7 +329,7 @@ void DataFilm::deepSounds(audio::Mix &m) const {
 		for (double t = filmTimeOf(s.from + 1.0); t < T; t += 6.0 + 3.0 * audio::unit(seed += 13u)) ss::place(m, ears, t, abyss::serpentHead(s, natureAt(t)), ss::voiced(70.0, 55.0, 2.0, 250.0, 600.0, 0.9, 0.5, seed), 0.7, 120.0);
 	for (const abyss::Eye &e : spec.abyss.eyes) ss::place(m, ears, filmTimeOf(e.open), e.at, audio::slide(55.0, 42.0, 3.0, 1.0), 0.9, 120.0);
 	for (const abyss::Squid &q : spec.abyss.squids)
-		for (double t = q.from; t < natureAt(T); t += 3.0) ss::place(m, ears, filmTimeOf(t), q.at, audio::noiseBurst(0.8, 0.05, 0.7, 100.0, 600.0, seed += 13u), 0.5, 80.0);   // (each jet)
+		for (double t = std::max(0.0, filmTimeOf(q.from)); t < T; t += 3.0) ss::place(m, ears, t, q.at, audio::noiseBurst(0.8, 0.05, 0.7, 100.0, 600.0, seed += 13u), 0.5, 80.0);   // (each jet, three film seconds apart: stepped in nature's, a timelapse piled them up)
 	for (const fromabove::Hook &h : spec.above.hooks) {   // the hook's plop as it goes in, the reel's whirr as it is snatched up
 		ss::place(m, ears, filmTimeOf(h.at), {h.x, level, h.z}, audio::slide(700.0, 300.0, 0.15, 9.0), 0.4, 25.0);
 		if (h.yank < 1e29) ss::place(m, ears, filmTimeOf(h.yank), {h.x, level, h.z}, audio::noiseBurst(1.2, 0.02, 1.0, 2000.0, 6000.0, seed += 13u), 0.35, 25.0);
@@ -339,14 +340,14 @@ void DataFilm::deepSounds(audio::Mix &m) const {
 		double landed = 1e30;
 		fromabove::anchorY(a, a.at + 100.0, level, bed(a.x, a.z), landed);
 		ss::place(m, ears, filmTimeOf(a.at), {a.x, level, a.z}, ss::crash(seed += 13u), 0.8, 40.0);
-		for (double t = a.at + 0.2; t < std::min(natureEnd, landed); t += 0.09) ss::place(m, ears, filmTimeOf(t), {a.x, level - 1.0, a.z}, audio::knock(900.0 + 300.0 * audio::unit(seed += 13u), 0.05, seed), 0.25, 30.0);
+		for (double t = filmTimeOf(a.at + 0.2), end = std::min(T, filmTimeOf(landed)); t < end; t += 0.09) ss::place(m, ears, t, {a.x, level - 1.0, a.z}, audio::knock(900.0 + 300.0 * audio::unit(seed += 13u), 0.05, seed), 0.25, 30.0);
 		if (landed < natureEnd) ss::place(m, ears, filmTimeOf(landed), {a.x, bed(a.x, a.z), a.z}, audio::noiseBurst(1.0, 0.005, 0.9, 60.0, 400.0, seed += 13u), 1.0, 40.0);
 	}
 	for (const fromabove::Lava &l : spec.above.lavas)   // pillow lava hissing and cracking
 		for (double t = 0.5; t < T; t += 0.6 + 0.8 * audio::unit(seed += 13u)) ss::place(m, ears, t, {l.x, bed(l.x, l.z) + 0.5, l.z}, audio::noiseBurst(0.5, 0.01, 0.4, 2000.0, 7000.0, seed), 0.25, 25.0);
 	for (const fromabove::Slump &s : spec.above.slumps) ss::place(m, ears, filmTimeOf(s.at), {s.x, bed(s.x, s.z), s.z}, audio::noiseBurst(6.0, 0.6, 5.0, 40.0, 500.0, seed += 13u), 1.2, 150.0);
 	for (const fromabove::Brinicle &b : spec.above.brinicles)
-		for (double t = b.at; t < std::min(natureEnd, b.at + 20.0); t += 0.7) ss::place(m, ears, filmTimeOf(t), {b.x, level - spec.iceCap.thickness - 2.0, b.z}, audio::knock(2400.0 + 800.0 * audio::unit(seed += 13u), 0.04, seed), 0.12, 20.0);
+		for (double t = filmTimeOf(b.at), end = std::min(T, filmTimeOf(b.at + 20.0)); t < end; t += 0.7) ss::place(m, ears, t, {b.x, level - spec.iceCap.thickness - 2.0, b.z}, audio::knock(2400.0 + 800.0 * audio::unit(seed += 13u), 0.04, seed), 0.12, 20.0);
 }
 
 }  // namespace film_file

@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
@@ -385,7 +386,10 @@ inline Animal animalAt(const Herd &h, const animals::Species &sp, int i, double 
 	const double flee = h.flee >= 0.0 ? std::max(0.0, h.flee - h.t0) + 0.15 * std::sqrt(static_cast<double>(i)) + 0.3 * hash01(s, 9) : -1.0;   // (one after another)
 	const double fleeSpeed = sp.fleeSpeed * (0.92 + 0.16 * hash01(s, 10));
 	a.going = goingAt(rel, pace, cycle, pause, offset, flee, fleeSpeed);
-	if (flee < 0.0 && a.going.covered >= total) a.going.covered = total, a.going.paused = true, a.going.speed = 0.0, a.going.still = 1.0, a.going.pause = kArrived;   // (there: it stops)
+	if (flee < 0.0 && a.going.covered >= total) {   // (there: it stops, settling as it would into a pause - from walking to still in a frame, a young one jumped to its mother and it turned at once)
+		const double over = a.going.covered - total;
+		a.going.covered = total, a.going.paused = true, a.going.speed = 0.0, a.going.still = smoothstep(0.0, 0.8 * pace, over), a.going.pause = kArrived;
+	}
 	a.at = from + a.dir * a.going.covered - a.dir * behind + side * across;
 	a.at.y = ground ? ground->heightAt(a.at.x, a.at.z) : 0.0;
 	if (!a.going.paused) {
@@ -610,7 +614,8 @@ inline std::string wakeText(Vec3 at, Vec3 dir, double speed, double size, double
 }
 
 // What the hooves of a running animal throw up behind them: crumbs of earth and bits of turf, thrown low, each a few millimetres across, gone in half a second.
-inline std::string kickedUp(Vec3 at, Vec3 dir, double speed, double size, double t, int seed) {
+// `heightAt`: the ground's height at pbrt's (x, z) (none: flat at `at`'s), where a crumb was thrown from and where it lands.
+inline std::string kickedUp(Vec3 at, Vec3 dir, double speed, double size, double t, int seed, const std::function<double(double, double)> &heightAt = nullptr) {
 	std::string out;
 	const Vec3 side{-dir.z, 0.0, dir.x};
 	constexpr double kRate = 40.0, kLife = 0.5;
@@ -618,12 +623,13 @@ inline std::string kickedUp(Vec3 at, Vec3 dir, double speed, double size, double
 	for (int k = 0; k < static_cast<int>(kRate * kLife); ++k) {
 		const double born = std::floor(t * kRate) / kRate - k / kRate, age = t - born;
 		const int sk = static_cast<int>(std::lround(born * kRate)) * 977 + seed;
-		const Vec3 was = at - dir * (speed * age);   // (where the hooves were when it was thrown: it is left behind, not carried along)
+		Vec3 was = at - dir * (speed * age);   // (where the hooves were when it was thrown: it is left behind, not carried along - on the ground there, up or down a slope)
+		if (heightAt) was.y = heightAt(was.x, was.z);
 		for (int j = 0; j < per; ++j) {
 			const Vec3 origin = was + dir * ((hash01(sk + j, 1) < 0.5 ? 0.45 : -0.45) * size) + side * ((hash01(sk + j, 2) < 0.5 ? 0.18 : -0.18) * size);
 			const Vec3 v = Vec3{0.0, 0.8 + 0.22 * speed * hash01(sk + j, 3), 0.0} + side * (0.8 * (hash01(sk + j, 4) - 0.5)) - dir * (0.12 * speed * hash01(sk + j, 5));
 			const Vec3 p = origin + v * age + Vec3{0.0, -4.9 * age * age, 0.0};
-			if (p.y >= at.y) out += detail::drop(p, 0.003 + 0.006 * hash01(sk + j, 6));
+			if (p.y >= (heightAt ? heightAt(p.x, p.z) : at.y)) out += detail::drop(p, 0.003 + 0.006 * hash01(sk + j, 6));
 		}
 	}
 	return out;
@@ -706,7 +712,9 @@ inline std::string herdText(const Herd &h, double t, const terrain::Field *groun
 			k = static_cast<int>(clipPhase * animals::posesOf(clip));
 		} else if (a.going.paused) {
 			// (what it does is chosen for the whole of a pause - its mother's, for a young one - not for each 13 s of the clock, which changed it half way through)
-			const int which = a.going.pause == kArrived ? 7919 : a.going.pause;
+			// (one at its way's end, or standing in a hunt, has one long pause: a new choice every 13 s of it, or it did the same thing - a shake, a stamp - to the end of the film)
+			const bool longPause = a.going.pause == kArrived || static_cast<std::size_t>(mother) < chased.size();
+			const int which = longPause ? 7919 + static_cast<int>(std::floor(t / 13.0 + hash01(s, 25))) : a.going.pause;
 			const double nearWater = waterLevel > -1e29 && ground ? waterLevel - ground->heightAt(p.x + dir.x * sp->length, p.z + dir.z * sp->length) : -1.0;
 			if (child && shape && shape->clip("suckle") >= 0 && hash01(s + which, 26) < 0.6) {
 				const Vec3 side{-dir.z, 0.0, dir.x};
@@ -718,8 +726,8 @@ inline std::string herdText(const Herd &h, double t, const terrain::Field *groun
 				clip = "suckle";
 			} else if (shape && !child && nearWater > -0.05 && nearWater < 0.6 && shape->clip("drink") >= 0) clip = "drink";
 			else clip = shape ? animals::pauseClip(*shape, sp->grazes, hash01(s + which * 131, 27)) : sp->grazes ? "graze" : "idle";
-			const int c = shape ? shape->clip(clip) : -1;   // (the clip's own length: graze, drink and suckle are 5 s, not the 4 they were taken for)
-			const double len = c >= 0 ? std::max(0.5, shape->rig.clips[static_cast<std::size_t>(c)].length) : 5.0;
+			const int c = shape ? shape->clip(clip) : -1;   // (the clip's own length, whatever the model says: a length taken for it played one at 1.25 times)
+			const double len = c >= 0 ? std::max(0.5, shape->rig.clips[static_cast<std::size_t>(c)].length) : clip == "graze" || clip == "drink" || clip == "suckle" ? 4.0 : 5.0;
 			clipPhase = t / len + hash01(s + which, 11);
 			clipPhase -= std::floor(clipPhase);
 			pausedPhase = true;
@@ -791,18 +799,19 @@ inline std::string herdText(const Herd &h, double t, const terrain::Field *groun
 				// (one standing near the camera has noticed it, and watches)
 				const Vec3 lens{-eye->x, eye->y, eye->z};
 				const double notices = clip == "idle" && hash01(s, 28) < 0.7 ? 1.0 - smoothstep(12.0, 16.0, away) : 0.0;   // (turning to it as it comes near, not all at once at 16 m)
-				// (a lying one's folded legs are the clip's: set on the ground, they were pushed up into its belly)
+				// (a lying one's folded legs are the clip's: set on the ground, they were pushed up into its belly - let go of the ground as it folds, not in its first frame)
+				const double planted = clip == "lie" ? 1.0 - smoothstep(0.05, 0.35, cycles) : 1.0;
 				own = std::make_unique<gltf_skin::Pose>(animals::exactPose(*model, clip, cycles - std::floor(cycles), placing, [&](double x, double z) { return ground ? ground->heightAt(-x, z) : 0.0; }, notices > 0.0 ? &lens : nullptr,
-																		   notices, clip != "lie"));
-				char whose[200];   // (its herd's own numbers: two herds of a seed from one place took each other's poses)
-				std::snprintf(whose, sizeof whose, "%s|%d|%.3f|%.3f|%.3f|%.3f|%.3f", h.kind.c_str(), h.seed, h.fx, h.fz, h.tx, h.tz, h.t0);
+																		   notices, planted));
+				char whose[260];   // (its herd's own numbers: two herds of a seed from one place took each other's poses - its name and coat too)
+				std::snprintf(whose, sizeof whose, "%s|%s|%s|%d|%d|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f", h.kind.c_str(), h.name.c_str(), h.coat.c_str(), h.seed, h.count, h.fur, h.fx, h.fz, h.tx, h.tz, h.t0);
 				pose = poses.exactName(h.kind, clip, *own, film_cache::nameOf(whose) + "_" + std::to_string(i), out, coatOn, pattern, variant, glossy, mud);
 			}
 		if (!own) pose = poses.poseName(h.kind, clip, k, out, coatOn, pattern, variant, glossy, mud);   // (muddy too: only those posed for themselves were, and an animal's mud came and went at 34 m)
 		out += nature::placeObject(pose, placing);
 		if (eye && rain < 0.1 && a.going.speed > 3.0 && !a.going.paused && length(p - *eye) < kDustWithin) {   // (dry ground thrown up from the hooves: its own colour, a little paler)
 			const Vec3 ground0 = ground ? terrain::colourAt(*ground, p.x, p.z) : Vec3{0.4, 0.34, 0.26};
-			const std::string dust = kickedUp(p, dir, a.going.speed, sp->length * (child ? 0.5 : 1.0), t, s + 7);
+			const std::string dust = kickedUp(p, dir, a.going.speed, sp->length * (child ? 0.5 : 1.0), t, s + 7, [&](double x, double z) { return ground ? ground->heightAt(x, z) : 0.0; });
 			if (!dust.empty()) out += "AttributeBegin\n" + diffuseMaterial(lerp(ground0, Vec3{0.3, 0.24, 0.17}, 0.6)) + "\n" + dust + "AttributeEnd\n";
 			if (!film.empty()) {   // (and the cloud of what was too fine to fall, hanging behind it and thinning)
 				std::vector<airborne::Puff> cloud;

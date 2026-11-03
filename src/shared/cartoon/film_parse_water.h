@@ -366,7 +366,8 @@ inline void settleOnWater(Spec &s) {
 		if (c.river >= 0 && c.river < static_cast<int>(s.rivers.size())) craft::downRiver(c, s.rivers[static_cast<std::size_t>(c.river)]);
 	for (adrift::Thing &th : s.adrifts) adrift::prepare(th, s.rivers, s.seas.empty() ? nullptr : &s.seas[0], std::max(600.0, 4.0 * s.length));
 	if (s.bank.on) bankside::prepare(s.bank, s.seas, s.rivers, s.hasTerrain ? terrain::fieldOf(s.terrain).get() : nullptr);
-	for (pondlife::Life &l : s.lifes) pondlife::prepare(l, std::max(60.0, s.length * std::max(1.0, s.timelapse)));   // (nature's whole film: a timelapse's frogs stopped at its film length)
+	// (nature's whole film - a timelapse's frogs stopped at its film length - and at most four hours of it, as a school's swim: a timelapse of 100000 made millions of touches)
+	for (pondlife::Life &l : s.lifes) pondlife::prepare(l, std::clamp(s.length * std::max(1.0, s.timelapse), 60.0, 4.0 * 3600.0));
 	for (const waterside::Place &p : s.places)   // a dam going sends a wall of water down its river
 		if (p.kind == "dam" && p.burst >= 0.0 && p.river >= 0 && p.river < static_cast<int>(s.rivers.size())) {
 			water::River &r = s.rivers[static_cast<std::size_t>(p.river)];

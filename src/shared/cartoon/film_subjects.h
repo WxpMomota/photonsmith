@@ -37,7 +37,7 @@ inline View project(cartoon::Vec3 eye, cartoon::Vec3 target, double fov, cartoon
 	using cartoon::Vec3;
 	View v;
 	const Vec3 f = cartoon::normalize(target - eye);
-	const Vec3 right = cartoon::normalize(cartoon::cross(f, Vec3{0.0, 1.0, 0.0}));
+	const Vec3 right = cartoon::normalize(cartoon::cross(f, cartoon::cameraUp(f)));   // (the film's own up: looking straight down, 0 1 0 gave no right at all)
 	const Vec3 up = cartoon::cross(right, f);
 	const Vec3 d = p - eye;
 	v.distance = cartoon::length(d);

@@ -284,6 +284,9 @@ class DataFilm {
 	stir::Field stirredAt(double t, double nt, const Vec3 &eye) const;
 	std::string waterAt(const std::string &header, double t, double nt) const;   // (all the film's water at t)
 	std::string onTheWater(const stir::Field &stirred, double t, double nt, const Vec3 &eye, const Vec3 &target, double hfov) const;
+	// The water's height at pbrt's (x, z) at nature's nt: the nearest river's where one runs (and stands above the sea), else the sea's `level` (the first river's alone was used
+	// for all of them, and none with a sea).
+	double waterHeight(double x, double z, double nt, double level) const;
 	void waterSounds(audio::Mix &m) const;
 	// A character in a boat: the boat's frame and its seat; where that puts it at t, turned as the boat is; its hands on the oars or the paddle.
 	bool boatSeat(const Character &c, double t, Mat4 &frame, craft::Seat &seat, const craft::Craft *&boat, bool &pulls) const;

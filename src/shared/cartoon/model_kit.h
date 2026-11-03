@@ -132,7 +132,7 @@ inline std::vector<Part> make(const std::string &kind, const std::map<std::strin
 	if (kind == "building") {
 		const int floors = std::clamp(static_cast<int>(o("floors", 3)), 1, 40), windows = std::clamp(static_cast<int>(o("windows", 3)), 0, 20);
 		const double W = o("width", 8.0), D = o("depth", 6.0), H = o("storey", 3.0), top = floors * H;
-		const int seed = seedFrom(o("seed", 1));
+		const int seed = static_cast<int>(std::clamp(o("seed", 1), -2147483647.0, 2147483647.0));   // (clamped to an int, not folded: kit and grow are given the seeds their callers make, past 100000, and folding those changed the pictures)
 		const Vec3 wall = colour ? *colour : Vec3{0.85, 0.72, 0.58};
 		Part walls = part("walls", "matte", wall);
 		walls.hard = true, walls.cell = std::min(W, D) / 60.0;

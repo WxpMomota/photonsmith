@@ -147,9 +147,9 @@ inline std::string eyeShineMaterial(const std::string &kind, double amount) {
 // An animal near the camera is posed for itself: the clip at exactly `phase` (0 .. 1), not the nearest of its few poses, a foot stepping along the ground a little at a time, and each
 // foot that is down set on the land where `place` (the animal's placement, story space) puts it, its leg bending to reach or straightening: the placement tilts a body to the slope
 // under it, and the ground under one hoof is its own. `groundAt`: the land's height at a place in story space.
-// `watching`: how far it turns to `watch` (0 .. 1, easing it in); `feet`: its feet set on the ground (not a lying one's, folded under it).
+// `watching`: how far it turns to `watch` (0 .. 1, easing it in); `feet`: how far its feet are set on the ground (0 .. 1: none for a lying one's, folded under it).
 inline gltf_skin::Pose exactPose(const Model &m, const std::string &clip, double phase, const Mat4 &place, const std::function<double(double, double)> &groundAt, const Vec3 *watch = nullptr,
-								 double watching = 1.0, bool feet = true) {
+								 double watching = 1.0, double feet = 1.0) {
 	const gltf_skin::Rig &rig = m.rig;
 	gltf_skin::Pose pose = gltf_skin::restPose(rig);
 	const auto rest = gltf_skin::worldOf(rig, pose);
@@ -187,7 +187,7 @@ inline gltf_skin::Pose exactPose(const Model &m, const std::string &clip, double
 		}
 	}
 	for (const std::string leg : {"hl", "fl", "hr", "fr"}) {
-		if (!feet) break;
+		if (feet <= 0.0) break;
 		const int upper = nodeOf(leg + ".upper"), lower = nodeOf(leg + ".lower"), foot = nodeOf(leg + ".foot");
 		if (upper < 0 || lower < 0 || foot < 0) continue;
 		const Vec3 U = at(world, upper), K = at(world, lower), A = at(world, foot);
@@ -195,7 +195,7 @@ inline gltf_skin::Pose exactPose(const Model &m, const std::string &clip, double
 		const double down = 1.0 - smoothstep(0.0, 0.7 * standing, up);   // (a foot in the air is the clip's)
 		if (down <= 0.0) continue;
 		const Vec3 sole = transformPoint(place, {A.x, up, A.z});
-		const double raise = down * std::clamp((groundAt(sole.x, sole.z) - sole.y) / size, -2.0 * standing, 2.0 * standing);
+		const double raise = std::min(1.0, feet) * down * std::clamp((groundAt(sole.x, sole.z) - sole.y) / size, -2.0 * standing, 2.0 * standing);
 		const Vec3 now = A - U, wanted = now + Vec3{0.0, raise, 0.0};
 		const double L1 = length(K - U), L2 = length(A - K), d0 = std::hypot(now.y, now.z);
 		const double d1 = std::clamp(std::hypot(wanted.y, wanted.z), std::abs(L1 - L2) + 1e-4, L1 + L2 - 1e-4);

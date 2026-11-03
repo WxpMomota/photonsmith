@@ -60,7 +60,7 @@ inline void branch(Part &wood, std::vector<Vec3> &tips, Vec3 base, Vec3 dir, dou
 		const double a = 2.0 * kPi * (k + hash01(seed * 7 + k, 3)) / n, tilt = spread * (0.7 + 0.6 * hash01(seed * 7 + k, 4));
 		const Vec3 other = cross(dir, side);
 		const Vec3 d = normalize(dir * std::cos(tilt) + (side * std::cos(a) + other * std::sin(a)) * std::sin(tilt));
-		branch(wood, tips, end, d, len * (0.62 + 0.15 * hash01(seed * 7 + k, 5)), r * 0.62, depth - 1, seed * 31 + k + 1, spread);
+		branch(wood, tips, end, d, len * (0.62 + 0.15 * hash01(seed * 7 + k, 5)), r * 0.62, depth - 1, static_cast<int>(static_cast<unsigned>(seed) * 31u + static_cast<unsigned>(k + 1)), spread);   // (unsigned: three levels of `* 31` overflowed an int)
 	}
 }
 // A clump of leaves: overlapping blobs about `at`, `size` across, into `leaves` (meshed, lumpy).
@@ -258,7 +258,7 @@ inline std::vector<Part> room(const std::map<std::string, double> &opt, const Ve
 // Any generator's parts: model_kit.h's, then these. `error` says when the kind is none of them.
 inline std::vector<Part> makeAny(const std::string &kind, const std::map<std::string, double> &opt, const Vec3 *colour, std::string &error) {
 	const auto o = [&](const std::string &k, double d) { return opt.count(k) ? opt.at(k) : d; };
-	const int seed = seedFrom(o("seed", 1));
+	const int seed = static_cast<int>(std::clamp(o("seed", 1), -2147483647.0, 2147483647.0));   // (clamped to an int, not folded: kit and grow are given the seeds their callers make, past 100000, and folding those changed the pictures)
 	error.clear();
 	if (kind == "tree") {
 		const int k = static_cast<int>(o("kind", 0));   // (kind as a word: film_model.h turns `kind pine` into kind 1, palm 2, birch 3)

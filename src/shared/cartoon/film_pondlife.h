@@ -31,6 +31,7 @@ namespace pondlife {
 struct Touch {
 	double t = 0.0, x = 0.0, z = 0.0, size = 0.05;
 	int kind = 0;   // (0 a plop, 1 a slap, 2 a rise)
+	int who = 0;    // (which of them: a frog's own jumps, not every count-th touch of the sorted list)
 };
 struct Life {
 	std::string kind = "ducks";
@@ -204,7 +205,7 @@ inline double goneAfter(const Life &l, double t) {
 // Works out what it does to the water over a film of `length` seconds.
 inline void prepare(Life &l, double length) {
 	l.touches.clear();
-	const auto put = [&l](double t, double x, double z, double size, int kind) { l.touches.push_back({t, x, z, size, kind}); };
+	const auto put = [&l](double t, double x, double z, double size, int kind, int who = 0) { l.touches.push_back({t, x, z, size, kind, who}); };
 	if (l.kind == "heron")
 		for (const double u : l.times) {   // (where its bill goes in: in front of where it stands then)
 			Vec3 facing;
@@ -227,7 +228,7 @@ inline void prepare(Life &l, double length) {
 			for (double t = 2.0 + 7.0 * hash01(l.seed + n, 1), g = 0; t < length; t += 7.0 + 11.0 * hash01(l.seed + n, static_cast<int>(g) + 3), ++g) {
 				const int k = l.seed * 41 + n * 7;
 				const double a = 6.283 * hash01(k, static_cast<int>(g) + 5), d = l.radius * std::sqrt(hash01(k, static_cast<int>(g) + 200));
-				put(t, l.x + d * std::cos(a), l.z + d * std::sin(a), 0.035, 0);
+				put(t, l.x + d * std::cos(a), l.z + d * std::sin(a), 0.035, 0, n);
 			}
 	if (l.kind == "trout")
 		for (int n = 0; n < l.count; ++n)
@@ -305,9 +306,8 @@ inline std::string text(const Life &l, double t, LevelAt levelAt) {
 			const int k = l.seed * 41 + n * 7;
 			Vec3 from{l.x + l.radius * (hash01(k, 1) - 0.5), 0.0, l.z + l.radius * (hash01(k, 2) - 0.5)}, to = from;
 			double when = -1e9;
-			int seen = 0;
 			for (const Touch &q : l.touches) {
-				if (seen++ % l.count != n) continue;
+				if (q.who != n) continue;
 				if (q.t - 0.5 > t) {
 					to = {q.x, 0.0, q.z}, when = q.t - 0.5;
 					break;

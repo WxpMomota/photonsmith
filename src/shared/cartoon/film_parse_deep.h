@@ -203,8 +203,8 @@ inline std::string deepLine(Spec &s, const std::string &verb, const std::string 
 				continue;
 			}
 			if (w == "colour" || w == "color") {
-				if (mine != own.end() && verb != "reveal") return false;
-				if (!numbers(3)) return false;
+				if (verb != "reveal") return false;   // (the only one of these lines a colour is for: a town's, a chase's or a show's was taken and did nothing)
+				if (!numbers(3) || std::min({v[0], v[1], v[2]}) < 0.0 || std::max({v[0], v[1], v[2]}) > 1.0) return false;   // (0 to 1: a negative light stops pbrt)
 				colour = {v[0], v[1], v[2]};
 				continue;
 			}
@@ -356,6 +356,7 @@ inline std::string deepLine(Spec &s, const std::string &verb, const std::string 
 		if (verb == "kraken") {
 			if (!within("size", 1.0, 60.0)) return usage;
 			if (opt.count("from") && !opt.count("reach")) return usage + ": `from T` is when it reaches for the place `reach` names";
+			if (opt.count("reach") && !placed) return usage + ": `reach X Y Z`, a place (one number reached for the world's middle)";
 			abyss::Kraken k;
 			k.at = p, k.size = get("size", 6.0), k.toward = get("toward", 0.0), k.rise = get("rise", -1.0), k.glow = get("glow", 1e30), k.seed = seed();
 			if (opt.count("reach")) k.reach = place, k.reachFrom = get("from", 0.0);

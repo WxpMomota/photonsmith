@@ -168,7 +168,7 @@ std::string DataFilm::waterAt(const std::string &header, double t, double nt) co
 		if (spec.hasUnderwater && undersea::waterlineOf(sea, nt, {-eye.x, eye.y, eye.z}).where == undersea::Waterline::At) sea.holeX = -eye.x, sea.holeZ = eye.z, sea.holeR = 1.5;   // (clear of a lens at the waterline)
 		out += water::seaText(sea, nt, eye, target, hfov, ground.get(), spec.swell.on ? &spec.swell : nullptr, spec.hasUnderwater || painted ? nullptr : &stirred);
 	}
-	if (spec.swell.on && ground) out += surf::shallowsCausticText(spec.key.empty() ? std::string("film") : spec.key, nt, -eye.x, eye.z, *ground, spec.seas[0].level + spec.seas[0].riseAt(nt), spec.tracedCaustics);   // (where the water is now)
+	if (spec.swell.on && ground) out += surf::shallowsCausticText(spec.key.empty() ? std::string("film") : spec.key, nt, -eye.x, eye.z, *ground, spec.seas[0].level + std::round(spec.seas[0].riseAt(nt) * 4.0) / 4.0, spec.tracedCaustics);   // (where the water is now, to a quarter metre: its picture is named by it, one a frame else)
 	for (const water::River &r : spec.rivers) out += stream::text(spec.key.empty() ? std::string("film") : spec.key, r, nt, ground.get(), eye, target, hfov, spec.hasUnderwater ? nullptr : &stirred, painted ? &spec.paint.mid : nullptr);
 	for (const water::Fall &f : spec.falls) out += f.frozen ? (ground ? std::string() : water::cliffText(f)) + ice::frozenFallText(f) : water::fallText(f, nt, ground.get());
 	out += onTheWater(stirred, t, nt, eye, target, hfov);
@@ -190,12 +190,24 @@ void DataFilm::paintSea(water::Sea &sea) const {
 	}
 }
 
+double DataFilm::waterHeight(double x, double z, double nt, double level) const {
+	const water::River *nearest = nullptr;
+	double best = 1e30;
+	for (const water::River &r : spec.rivers)
+		for (const Vec3 &p : r.path)
+			if (const double d = std::hypot(p.x - x, p.z - z) - 0.5 * r.width; d < best) best = d, nearest = &r;
+	if (!nearest) return level;
+	if (spec.seas.empty()) return stream::heightAt(*nearest, x, z, nt);
+	if (best > 6.0) return level;   // (out on the sea, away from any river)
+	return std::max(level, stream::heightAt(*nearest, x, z, nt));
+}
+
 std::string DataFilm::onTheWater(const stir::Field &stirred, double t, double nt, const Vec3 &eye, const Vec3 &target, double hfov) const {
 	std::string out;
 	const std::string film = spec.key.empty() ? std::string("film") : spec.key;
 	const double level = spec.seas.empty() ? (spec.rivers.empty() || spec.rivers[0].path.empty() ? 0.0 : spec.rivers[0].path[0].y) : spec.seas[0].level + spec.seas[0].riseAt(nt);
 	const bool painted = spec.toon.on && !spec.paint.off && !spec.hasUnderwater;   // (as waterAt draws it)
-	const auto surfaceAt = [&](double x, double z) { return spec.seas.empty() && !spec.rivers.empty() ? stream::heightAt(spec.rivers[0], x, z, nt) : level; };
+	const auto surfaceAt = [&](double x, double z) { return waterHeight(x, z, nt, level); };
 	if (painted) {
 		double elevation = 40.0, facing = 0.0;
 		if (spec.hasSky) dressing::sunAt(spec.sky, dressing::hourAt(spec.sky, t, spec.storyEnd), elevation, facing);
@@ -225,7 +237,7 @@ std::string DataFilm::onTheWater(const stir::Field &stirred, double t, double nt
 		if (p.river >= 0 && p.river < static_cast<int>(spec.rivers.size())) y = stream::heightAt(spec.rivers[static_cast<std::size_t>(p.river)], p.x, p.z, nt);
 		else if (spec.seas.empty() && !spec.rivers.empty()) y = stream::heightAt(spec.rivers[0], p.x, p.z, nt);
 		const double onWater = y;   // (a mill's wheel stands in the water, whatever its house stands on)
-		if (p.kind == "lighthouse" || p.kind == "harbour" || p.kind == "watermill") y = std::max(y, groundOf(p.x, p.z));
+		if (land && land->inside(p.x, p.z) && (p.kind == "lighthouse" || p.kind == "harbour" || p.kind == "watermill")) y = std::max(y, land->heightAt(p.x, p.z));   // (on the land under it; with none, on the water - the sand bar is the sandcastle's, not a mill's)
 		out += waterside::staticText(p, y, nt, dark);
 		if (p.kind == "watermill") {
 			const double flow = p.river >= 0 && p.river < static_cast<int>(spec.rivers.size()) ? spec.rivers[static_cast<std::size_t>(p.river)].speed : 1.2;
@@ -246,7 +258,7 @@ std::string DataFilm::onTheWater(const stir::Field &stirred, double t, double nt
 			}
 		out += craft::craftText(c, afloat(), nt, rowed, paddlers);
 	}
-	const auto levelAt = [&](double x, double z) { return spec.seas.empty() && !spec.rivers.empty() ? stream::heightAt(spec.rivers[0], x, z, nt) : level; };
+	const auto levelAt = [&](double x, double z) { return waterHeight(x, z, nt, level); };
 	if (spec.bank.on) {   // what grows by the water, parted by what goes through it
 		std::vector<bankside::Mover> movers;
 		for (const craft::Craft &c : spec.crafts) {
@@ -266,7 +278,7 @@ std::string DataFilm::onTheWater(const stir::Field &stirred, double t, double nt
 			const Vec3 g = dressing::gustAt(spec.gusts, -x, z, nt);
 			return Vec3{-g.x, 0.0, g.z} + Vec3{0.5 * std::sin(wind), 0.0, 0.5 * std::cos(wind)};
 		};
-		out += bankside::text(film, spec.bank, nt, eyeP, ahead, hfov, &stirred, movers, windAt, levelAt);
+		out += bankside::text(film, spec.bank, nt, eyeP, ahead, hfov, &stirred, movers, windAt, levelAt, spec.seas.empty() ? 0.0 : spec.seas[0].riseAt(nt));
 		if (spec.hasTerrain && !spec.seas.empty()) out += bankside::mudText(film, spec.bank, *terrain::fieldOf(spec.terrain), spec.seas[0].level);   // (along a sea's still line: a river's height is not one contour)
 	}
 	if (spec.waterMist.on) {
@@ -327,10 +339,17 @@ void DataFilm::waterMoment(const Character &c, double t, Vec3 &where, double &he
 		return;
 	}
 	const bool fellLast = fell && (!out || fell->at > out->at);   // (a fall after it climbed out: in again, from where it climbed out to)
+	if (out && !fellLast && t - out->at >= 1.1) {   // (out and up on the bank: where it climbed to, without working out the fall it came from - a boat's sea, read at every moment of a film)
+		where = story(out->x, out->y, out->z), airborne = false, wet = 1.0 - smoothstep(4.0, 30.0, t - out->at);
+		return;
+	}
 	if (fell) {   // over the side: in an arc, under, up again, treading water
 		Vec3 from = where;
 		double turned = heading;
-		if (out && fellLast) from = story(out->x, out->y, out->z);
+		const Spec::Tumble *before = nullptr;   // (the climb-out before this fall, if any: it goes in from where that put it - the last climb-out was the wrong one after two of each)
+		for (const Spec::Tumble &f : spec.tumbles)
+			if (f.who == c.name && f.out && f.at < fell->at && (!before || f.at > before->at)) before = &f;
+		if (before) from = story(before->x, before->y, before->z);
 		else seatPlace(fell->at, from, turned);
 		const Vec3 to = fell->placed ? story(fell->x, level, fell->z) : from + Vec3{std::sin(turned * kPi / 180.0 + 1.57), 0.0, std::cos(turned * kPi / 180.0 + 1.57)} * (0.9 * H);
 		const double u = t - fell->at, flight = 0.55, treading = level - 0.72 * H;
@@ -408,26 +427,33 @@ void DataFilm::waterSounds(audio::Mix &m) const {
 		const std::vector<stir::Hop> hops = stir::hopsOf(k);
 		for (std::size_t n = 0; n < hops.size(); ++n) plop(hops[n].t, hops[n].x, hops[n].z, n + 1 == hops.size() ? 0.05 : 0.015, seed += 13u);
 	}
-	const double T = m.seconds(), natureEnd = natureAt(T);
-	// (a whirlpool's, a great wave's, a bore's and the animals' times are nature's, as the water they stir goes by: each is heard at the film time it is seen)
+	const double T = m.seconds();
+	// (a whirlpool's, a great wave's, a bore's and the animals' times are nature's, as the water they stir goes by: each is heard at the film time it is seen - its sound stepped in
+	// the film's seconds, from when it begins to when it ends, and where it is then in nature's: stepped in nature's, a timelapse piled its bursts on one another)
+	const auto filmSpan = [&](double n0, double n1, double &t0, double &t1) { t0 = std::max(0.0, filmTimeOf(n0)), t1 = std::min(T, n1 > 1e29 ? T : filmTimeOf(n1)); };
+	double t0 = 0.0, t1 = 0.0;
 	if (!spec.seas.empty())   // a whirlpool's roar, a great wave coming
 		for (const water::Sea::Bend &b : spec.seas[0].bends) {
 			if (b.kind == 0) {
-				for (double t = std::max(0.0, b.t0); t < std::min(natureEnd, b.t1); t += 1.6) ss::place(m, ears, filmTimeOf(t), {b.x, level, b.z}, audio::noiseBurst(2.2, 0.4, 0.8, 120.0, 900.0, seed += 13u), 0.9, 2.5 * b.radius);
+				filmSpan(b.t0, b.t1, t0, t1);
+				for (double t = t0; t < t1; t += 1.6) ss::place(m, ears, t, {b.x, level, b.z}, audio::noiseBurst(2.2, 0.4, 0.8, 120.0, 900.0, seed += 13u), 0.9, 2.5 * b.radius);
 			} else {
 				const double a = b.facing * kPi / 180.0;
-				for (double t = std::max(0.0, b.t0); t < std::min(natureEnd, b.t0 + 40.0); t += 1.2) {
-					const double d = b.speed * (t - b.t0);
-					ss::place(m, ears, filmTimeOf(t), {b.x + std::sin(a) * d, level, b.z + std::cos(a) * d}, audio::noiseBurst(1.8, 0.3, 0.8, 90.0, 1600.0, seed += 13u), 1.3, 300.0);
+				filmSpan(b.t0, b.t0 + 40.0, t0, t1);
+				for (double t = t0; t < t1; t += 1.2) {
+					const double d = b.speed * (natureAt(t) - b.t0);
+					ss::place(m, ears, t, {b.x + std::sin(a) * d, level, b.z + std::cos(a) * d}, audio::noiseBurst(1.8, 0.3, 0.8, 90.0, 1600.0, seed += 13u), 1.3, 300.0);
 				}
 			}
 		}
 	for (const water::River &r : spec.rivers)
-		for (const water::River::Bore &b : r.bores)
-			for (double t = b.t; t < std::min(natureEnd, b.t + 16.0); t += 1.0) {
-				const Vec3 at = stream::placeAt(r, b.from + (r.speed + std::sqrt(19.6 * b.height)) * (t - b.t)).at;
-				ss::place(m, ears, filmTimeOf(t), at, audio::noiseBurst(1.5, 0.2, 0.7, 150.0, 2400.0, seed += 13u), 1.0, 120.0);
+		for (const water::River::Bore &b : r.bores) {
+			filmSpan(b.t, b.t + 16.0, t0, t1);
+			for (double t = t0; t < t1; t += 1.0) {
+				const Vec3 at = stream::placeAt(r, b.from + (r.speed + std::sqrt(19.6 * b.height)) * (natureAt(t) - b.t)).at;
+				ss::place(m, ears, t, at, audio::noiseBurst(1.5, 0.2, 0.7, 150.0, 2400.0, seed += 13u), 1.0, 120.0);
 			}
+		}
 	for (const pondlife::Life &l : spec.lifes) {   // what the water's animals do, and their voices
 		for (const pondlife::Touch &q : l.touches) {
 			if (q.kind == 1) ss::place(m, ears, filmTimeOf(q.t), {q.x, level, q.z}, audio::noiseBurst(0.09, 0.001, 0.08, 900.0, 5000.0, seed += 13u), 1.2, 60.0);
