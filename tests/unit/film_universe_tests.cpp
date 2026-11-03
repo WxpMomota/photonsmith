@@ -30,6 +30,8 @@ LightSource "distant" "point3 from" [ -4 6 5 ] "point3 to" [ 0 0 0 ] "rgb L" [ 2
 
 // A film file in a temporary folder of its own with the open set; "" or the problem.
 std::string loadFilm(const std::string &name, const std::string &filmText, ff::DataFilm &film) {
+	cartoon::film_kinds::install();   // (the person kinds - pip - and the aliens - robot, nova: installed when the film registry is first built, which a test run on its own may not have done)
+	cartoon::film_kinds::aliens::install();
 	const std::filesystem::path d = std::filesystem::temp_directory_path() / ("photonsmith_universe_test_" + name);
 	std::filesystem::remove_all(d);
 	std::filesystem::create_directories(d);
@@ -914,6 +916,7 @@ TEST(FilmPlanetfall, OrbitToTheGroundInOneShot) {
 	std::set<double> skies;
 	for (double h = 5.0; h < 300000.0; h *= 1.01) skies.insert(pf::skyHeight(h));
 	EXPECT_LT(skies.size(), 200u);
+	EXPECT_GT(skies.size(), 100u) << "and a new one as it falls: not one sky all the way";
 	EXPECT_EQ(pf::starsAt(100.0), 0.0);
 	EXPECT_EQ(pf::starsAt(200000.0), 1.0);
 	ff::DataFilm film;
@@ -938,10 +941,18 @@ TEST(FilmOtherWorlds, GroundPlantsAndCreatures) {
 	const std::string s = film.sceneAt(2.0);
 	EXPECT_NE(s.find("# spires (film_alien.h)"), std::string::npos);
 	EXPECT_NE(s.find("Material \"dielectric\" \"float eta\" [ 1.52 ]"), std::string::npos) << "clear crystal";
-	EXPECT_NE(s.find("anim_"), std::string::npos) << "the creatures have their model";
-	bool blows = false;
-	for (double t = 0.0; t < 16.0 && !blows; t += 1.0) blows = film.sceneAt(std::min(7.9, t * 0.5)).find("# plumes (film_alien.h)") != std::string::npos;
+	EXPECT_NE(s.find("ObjectBegin \"anim_"), std::string::npos) << "the creatures have their model (its object, not only a placement of its name)";
+	// the vents in their own time: one of them blowing at one moment and resting at another (it was enough to blow at any moment)
+	const cartoon::alien::Plumes &vents = film.spec.plumes.at(0);
+	bool blows = false, rests = false;
+	for (double t = 0.0; t < 16.0; t += 0.25) {
+		cartoon::alien::Plumes one = vents;
+		one.count = 1;
+		const bool on = !cartoon::alien::plumesText("photonsmith-test-plumes", one, nullptr, t, {0.0, 0.0, 0.0}, "p").empty();
+		(on ? blows : rests) = true;
+	}
 	EXPECT_TRUE(blows);
+	EXPECT_TRUE(rests);
 	const auto g = cartoon::forest::detail::grow("glowcap", 1, false, false);
 	EXPECT_FALSE(g.blossom.tris.empty()) << "its spots";
 	EXPECT_NE(cartoon::forest::detail::blossomMaterial("glowcap", 1).find("AreaLightSource"), std::string::npos);

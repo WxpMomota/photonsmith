@@ -1372,6 +1372,14 @@ TEST(FilmForest, TheLightInAWood) {
 		return at == std::string::npos ? std::string() : s.substr(at, 40);
 	};
 	EXPECT_NE(stops(in), stops(out)) << "more light let in under the trees";
-	ASSERT_EQ(loadNature("woodlight2", "scene s.pbrt\nlength 8\nterrain hills size 400 height 2 seed 3\nsky 6:30 12:30\nshot 0 A\n key 0 1.6 0  0 1.6 -10  50\n", film), "");
-	EXPECT_NE(film.sceneAt(0.2), film.sceneAt(7.9)) << "the dew goes";
+	// (from 5:00, when the sun is low and the dew is on: at 6:30 it was already 22 degrees up and there was none - the whole scenes differed anyway, with the sun)
+	ASSERT_EQ(loadNature("woodlight2", "scene s.pbrt\nlength 8\nterrain hills size 400 height 2 seed 3\nsky 5:00 12:30\nshot 0 A\n key 0 1.6 0  0 1.6 -10  50\n", film), "");
+	// (the grass's own material, not the whole scene: the sun moves five hours, and every frame differed with the dew or without it)
+	const auto grass = [](const std::string &s) {   // (its object: its materials, the wet coat among them)
+		const std::size_t at = s.find("ObjectBegin \"cover_grass"), end = at == std::string::npos ? at : s.find("ObjectEnd", at);
+		return end == std::string::npos ? std::string() : s.substr(at, end - at);
+	};
+	const std::string dawn = grass(film.sceneAt(0.2)), noon = grass(film.sceneAt(7.9));
+	ASSERT_FALSE(dawn.empty());
+	EXPECT_NE(dawn, noon) << "the dew goes";
 }

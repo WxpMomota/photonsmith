@@ -1847,6 +1847,18 @@ TEST(RunPolicy, SmartPowerIsFullPowerUntilTheComputerIsBusy) {
 }
 
 TEST(SmartPower, OnlyWhatNeedsTheCardMakesTheComputerBusyAndItIsFreeAgainTenSecondsLater) {
+	// (the machine's own RAY_TRACER_SMART_BUSY - set when someone tries Smart power by hand - is put aside for the test and given back after it)
+	const char *given = std::getenv("RAY_TRACER_SMART_BUSY");
+	const std::string busyBefore = given ? given : "";
+	const auto setBusy = [](const std::string &v) {
+#ifdef _WIN32
+		_putenv_s("RAY_TRACER_SMART_BUSY", v.c_str());
+#else
+		if (v.empty()) unsetenv("RAY_TRACER_SMART_BUSY");
+		else setenv("RAY_TRACER_SMART_BUSY", v.c_str(), 1);
+#endif
+	};
+	setBusy("");
 	const smart_power::Limits limits;
 	smart_power::Signals idle;
 	idle.idleSeconds = 600;
@@ -1892,11 +1904,7 @@ TEST(SmartPower, OnlyWhatNeedsTheCardMakesTheComputerBusyAndItIsFreeAgainTenSeco
 
 	set_env_var("RAY_TRACER_SMART_BUSY", "1");
 	EXPECT_EQ(smart_power::busyReason(idle, limits), "RAY_TRACER_SMART_BUSY says so");
-#ifdef _WIN32
-	_putenv_s("RAY_TRACER_SMART_BUSY", "");
-#else
-	unsetenv("RAY_TRACER_SMART_BUSY");
-#endif
+	setBusy(busyBefore);
 
 	set_env_var("RAY_TRACER_SMART_IDLE_SECONDS", "300");
 	EXPECT_EQ(smart_power::Limits::fromEnvironment().idleSeconds, 300);
@@ -1971,6 +1979,7 @@ TEST(SmartPower, WorkersReadTheVerdictAndAPauseEndsWhenTheComputerIsFree) {
 	render_yield::between();
 	smart_power::takePaidFor();
 	smart_power::yieldInsideFrames(1.0);
+	render_yield::between();   // (a frame's first call only starts its clock: the one after it is the one that reads the computer)
 	smart_power::inFrame().since = std::chrono::steady_clock::now() - std::chrono::milliseconds(200);
 	render_yield::between();
 	EXPECT_DOUBLE_EQ(smart_power::takePaidFor(), 0.0) << "a free computer: nothing to pay";

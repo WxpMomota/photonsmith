@@ -67,7 +67,7 @@
 //     jump       kai  7.0 to 3 -7  height 0.5                   # NAME, at 7 s, a jump to there: a crouch before it, an arc, a landing that squashes and is heard
 //     sit        kai  9.0 height 0.45 until 14                  # NAME sits down at 9 s on a seat that high (0: the ground) and stands up at 14 s
 //     gesture    kai  "reach to the wall" 12 13 contact 12.8    # contact: the hand meets something (a touch on the soundtrack)
-//     say        kai  14.4 "Look, the first star."  rate 1.1  pitch 2   # NAME, a line it says from 14.4 s: its voice, its mouth and a caption (film_speech.h; `nocaption`)
+//     say        kai  14.4 "Look, the first star."  rate 1.1  pitch 2   # NAME, a line it says from 14.4 s: its voice, its mouth and a caption (film_speech.h; `nocaption`; `radio [delay S]`: heard S later, 0 to 600)
 //     feel       pip  happy 3 3.5 6 6.8  amount 0.8             # NAME, an expression on its face eased in and out (film_faces.h: happy, sad, angry, surprised, ...)
 //     look       pip  at ann 2 2.5 8 8.5                        # NAME turns its head and eyes to someone, a prop or a point (`at X Y Z`) and back
 //     crowd      folk person 12 in -8 -12 8 -4  seed 3          # NAME KIND COUNT in X0 Z0 X1 Z1: extras of varied looks that wander, pause and turn, each in a cell of its
@@ -129,7 +129,7 @@
 //                                                               # `area A` (the square they are spread over, round `at X Z`), `seed N`; they drift and cast shadows
 //                                                               # `clouds deck [thick T]`: one layer to fly through; `fogbank at X Z [depth D] [during T0 T1]`: fog in
 //                                                               # the low ground, burning off
-//     biome    savanna                                         # the land as a biome (savanna, jungle, desert, tundra, arctic): its ground's colours, its plants, its sound
+//     biome    savanna                                         # the land as a biome (savanna, jungle, desert, tundra, arctic; other worlds' rust, frost, glass, moonrock, bloom): its ground's colours, its plants (`plants N`, not on a bare one), its sound
 //     forest   mixed 3000  season autumn                        # conifer, broadleaf, birch, palm, shrub, acacia, kapok, cactus, fern; or mixed (by height), savanna,
 //                                                               # jungle, desert or tundra (a biome's mix): so many trees where the land suits them;
 //                                                               # `season summer to autumn from T0 to T1` (each tree turning in its own time; `then winter from T2 to T3`
@@ -239,7 +239,7 @@
 //     galaxy   swirl  at 0 0 -80000  size 50000  tilt 60        # a galaxy: spiral, barred or elliptical, tipped by `tilt`, turned by `turn`
 //     star     vega  at 0 0 -30000  radius 5000  kind blue      # a star close up: sun, red, orange, white, blue (or `temperature K`);
 //                                                               # `prominences N` looping off its limb, `flare T` bursting from it
-//     blackhole maw at 0 0 -30000  radius 2000  tilt 8  jets 20    # a black hole: its shadow, its disc (`disc` radii), the disc bent over it, `jets`
+//     blackhole maw at 0 0 -30000  radius 2000  tilt 8  jets 20    # a black hole: its shadow, its disc (`disc` radii), the disc bent over it, `jets`; `lens 1` (one hole a film): light bent round it
 //     comet    halley at 0 0 -20000  move 300 0 0  tail 20000  # a comet: its nucleus, its coma, its ion and dust tails away from the sun (or `away X Y Z`)
 //     asteroids belt at 0 0 -30000  radius 20000  count 4000      # rocks by the thousand: a `ring` going round (`width`, `tilt`) or a drifting `field`
 //     remnant  crab at 0 0 -40000  size 12000  blast 3          # a dying star: a `supernova` (at `blast T`), a `pulsar` (`period`), a `planetary` nebula

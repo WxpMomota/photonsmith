@@ -876,7 +876,7 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 			}
 		}
 		s.forests.push_back(f);
-	} else if (verb == "biome") {   // the land as a biome: savanna, jungle, desert, tundra or arctic
+	} else if (verb == "biome") {   // the land as a biome: savanna, jungle, desert, tundra, arctic, or another world's rust, frost, glass, moonrock, bloom
 		const std::vector<std::string> t = detail::tokens(line);
 		static const std::vector<std::string> biomes = {"savanna", "jungle", "desert", "tundra", "arctic", "rust", "frost", "glass", "moonrock", "bloom"};
 		double count = 0.0;

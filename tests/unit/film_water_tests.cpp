@@ -85,7 +85,7 @@ TEST(FilmWaterRings, RainIsTheSameEveryTimeAndOnlyNearTheCamera) {
 }
 
 TEST(FilmWaterRings, ACutCellMeetsItsNeighbour) {
-	// where a ring has not reached, the cut surface lies on the plain one; a cell it touches is cut small, and only that one
+	// a cell a ring touches is cut small, one it has not reached is not, and the cut surface comes to the plain one's height at the cells' far edges
 	st::Field f;
 	f.rings.push_back(st::ringOf(0.5, 0.5, 0.0, 0.03, 0.005));
 	cartoon::Mesh m;
@@ -98,9 +98,14 @@ TEST(FilmWaterRings, ACutCellMeetsItsNeighbour) {
 			return q;
 		},
 		[](int j, int i, double u, double v, double &x, double &z) { x = i + u, z = j + v; }, [&m](int, int) -> cartoon::Mesh & { return m; });
+	ASSERT_EQ(cut.size(), 16u);
 	EXPECT_EQ(cut[0], 1);
 	EXPECT_EQ(cut[3 * 4 + 3], 0);
 	EXPECT_GT(m.verts.size(), 500u);
+	double edge = 0.0;   // (the cut cell's far corner, 0.7 m from the ring and beyond its reach: on the plain surface, y 0, where the next cells' plain quads meet it)
+	for (const cartoon::Vec3 &v : m.verts)
+		if (std::abs(-v.x - 1.0) < 1e-6 && std::abs(v.z - 1.0) < 1e-6) edge = std::max(edge, std::abs(v.y));
+	EXPECT_LT(edge, 1e-6);
 }
 
 TEST(FilmWaterRings, AStoneSkips) {
@@ -140,12 +145,16 @@ std::filesystem::path filmOf(const std::string &name, const std::string &body) {
 }  // namespace
 
 TEST(FilmWaterLines, ProblemsAreSaid) {
+	// (each for its own reason, said: any error at all passed before)
 	ff::DataFilm film;
-	EXPECT_NE(film.load(filmOf("noa", "ripple 0 0 at 1\nshot 0 a\n  key 0 2 6  0 0 0  40\n").string()), "") << "no water to ripple";
+	const std::string a = film.load(filmOf("noa", "ripple 0 0 at 1\nshot 0 a\n  key 0 2 6  0 0 0  40\n").string());
+	EXPECT_NE(a.find("touch the water"), std::string::npos) << a;
 	ff::DataFilm film2;
-	EXPECT_NE(film2.load(filmOf("nob", "water lake level 0\naboard ada wren\nshot 0 a\n  key 0 2 6  0 0 0  40\n").string()), "") << "no such boat";
+	const std::string b = film2.load(filmOf("nob", "water lake level 0\ncast ada as pip at 0 0 0\naboard ada wren\nshot 0 a\n  key 0 2 6  0 0 0  40\n").string());
+	EXPECT_NE(b.find("no boat or sub called"), std::string::npos) << b;
 	ff::DataFilm film3;
-	EXPECT_NE(film3.load(filmOf("noc", "water lake level 0\nbankside reeds 2\nshot 0 a\n  key 0 2 6  0 0 0  40\n").string()), "") << "a lake with no land has no shore";
+	const std::string c = film3.load(filmOf("noc", "water lake level 0\nbankside reeds 2\nshot 0 a\n  key 0 2 6  0 0 0  40\n").string());
+	EXPECT_NE(c.find("no shore"), std::string::npos) << c;
 	ff::DataFilm film4;
 	EXPECT_NE(film4.load(filmOf("nod", "water lake level 0\nboat submarine x at 0 0\nshot 0 a\n  key 0 2 6  0 0 0  40\n").string()), "") << "no such kind";
 }
@@ -154,6 +163,7 @@ TEST(FilmWaterBoats, TheyRideAndStir) {
 	ff::DataFilm film;
 	ASSERT_EQ(film.load(filmOf("boats", "water sea level 0 waves 1 wind 30\nboat rowboat wren at 0 0 to 0 -40 speed 1.2\nboat sailboat gull at 20 -10 to 60 -10\ncast ada as pip at 0 0 0\naboard ada wren rows\nshot 0 a\n  key 0 3 12  0 0 -10  40\n").string()), "");
 	ASSERT_EQ(film.spec.crafts.size(), 2u);
+	ASSERT_EQ(film.spec.seas.size(), 1u);
 	const cartoon::craft::Craft &c = film.spec.crafts[0];
 	const cartoon::craft::Shape h = cartoon::craft::shapeOf(c.kind, c.length, c.colour);
 	const cartoon::craft::Afloat afloat{&film.spec.seas[0], nullptr};
@@ -169,7 +179,7 @@ TEST(FilmWaterBoats, TheyRideAndStir) {
 	EXPECT_TRUE(film.wildSubject("wren", 5.0, feet, front, chest)) << "a shot can follow her";
 	const cartoon::stir::Field f = film.stirredAt(10.0, 10.0, {0.0, 3.0, 12.0});
 	EXPECT_GT(f.rings.size(), 20u) << "a wake";
-	// who rows has its hands on the oars
+	// her oars: long enough to reach the water from the rowlocks (who rows holds them: the oar's own handle)
 	const cartoon::craft::Oar o = cartoon::craft::oarAt(h, 1, 1.0, true);
 	EXPECT_GT(length(o.tip - o.handle), 1.5);
 }
@@ -184,13 +194,14 @@ TEST(FilmWaterBoats, SomeoneInABoatDoesNotSlowAFilmsReading) {
 		ff::DataFilm film;
 		const auto t0 = std::chrono::steady_clock::now();
 		ASSERT_EQ(film.load(file), "");
-		EXPECT_LT(std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(), 3.0) << file;
+		EXPECT_LT(std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count(), 6.0) << file;   // (it took 13 s; room for 16 shards at once)
 	}
 }
 
 TEST(FilmWaterPeople, OutOfTheirDepthTheySwim) {
 	ff::DataFilm film;
 	ASSERT_EQ(film.load(filmOf("swim", "water lake level 0 waves 0.02\ncast deep as pip at 0 -3 -6\ncast wade as pip at 3 -0.3 -6\ncast dry as pip at -4 0 -6\nshot 0 a\n  key 0 3 12  0 0 -6  40\n").string()), "");
+	ASSERT_EQ(film.spec.characters.size(), 3u);
 	cartoon::Vec3 at;
 	film.momentOf(film.spec.characters[0], 5.0, &at);
 	const auto &kind = ff::characterKinds().at(film.spec.characters[0].kind);
@@ -249,6 +260,8 @@ TEST(FilmWaterRivers, ItsMouthIsWhereItMeetsTheSea) {
 TEST(FilmWaterRivers, RunRoundRocksAndCarry) {
 	ff::DataFilm film;
 	ASSERT_EQ(film.load(filmOf("river", "river -40 0  0 0  40 0 width 8 speed 2 clear rocks 8 rapids 20 40 seed 3\nadrift paperboat p1 at -36 0 river 0\nboat canoe reed river 0 from 2\nshot 0 a\n  key 0 3 12  0 0 0  40\n").string()), "");
+	ASSERT_EQ(film.spec.rivers.size(), 1u);
+	ASSERT_EQ(film.spec.adrifts.size(), 1u);
 	const cartoon::water::River &r = film.spec.rivers[0];
 	ASSERT_EQ(r.stones.size(), 8u);
 	EXPECT_GT(cartoon::stream::speedAt(r, 0.0, 8.0), 2.5 * cartoon::stream::speedAt(r, 3.9, 8.0)) << "fastest in the middle";
@@ -263,7 +276,7 @@ TEST(FilmWaterRivers, RunRoundRocksAndCarry) {
 	const cartoon::adrift::Thing &th = film.spec.adrifts[0];
 	ASSERT_EQ(th.ways.size(), 1u);
 	EXPECT_GT(th.ways[0].back().s, th.ways[0].front().s + 40.0) << "carried down";
-	EXPECT_EQ(th.ways[0].size(), film.spec.adrifts[0].ways[0].size());
+	for (const cartoon::adrift::Thing::Step &step : th.ways[0]) EXPECT_LT(std::abs(step.c), 0.5 * r.width) << "between the banks, at " << step.s;
 	cartoon::Vec3 feet, front, chest;
 	EXPECT_TRUE(film.wildSubject("p1", 6.0, feet, front, chest));
 	EXPECT_TRUE(film.wildSubject("reed", 6.0, feet, front, chest));
@@ -277,6 +290,7 @@ TEST(FilmWaterBanks, PlantsPartAndLifeTouchesTheWater) {
 	ASSERT_EQ(film.load(filmOf("pond", "water lake level 0 waves 0.01 ripples 0.2 catspaws 2\nbankside reeds 2 lilies 1 duckweed 1 patch 0 -8 3\nwatermist 1\npondlife ducks 1 at 0 -6 radius 2 young 4\npondlife heron at -3 -6 strike 2\npondlife frogs 2 at 2 -6 radius 2\npondlife trout 2 at 1 -8\nshot 0 a\n  key 0 2 4  0 0 -8  40\n").string()), "");
 	EXPECT_GT(film.spec.bank.clumps.size(), 10u);
 	EXPECT_GT(film.spec.bank.pads.size(), 5u);
+	ASSERT_EQ(film.spec.lifes.size(), 4u);
 	EXPECT_FALSE(film.spec.lifes[1].touches.empty()) << "the heron's strike touches the water";
 	EXPECT_FALSE(film.spec.lifes[2].touches.empty());
 	const std::string text = film.worldAt(film.headerAt(2.3), 2.3);
@@ -323,6 +337,7 @@ TEST(FilmWaterChanges, TideFloodWhirlAndWave) {
 TEST(FilmWaterChanges, ABoreRunsDownTheRiverAndADamSendsOne) {
 	ff::DataFilm film;
 	ASSERT_EQ(film.load(filmOf("dam", "river 0 -100  0 100 width 8 speed 1\ndam -6 -60 to 6 -60 height 4 burst 3 river 0\nshot 0 a\n  key 8 3 0  0 0 0  40\n").string()), "");
+	ASSERT_EQ(film.spec.rivers.size(), 1u);
 	ASSERT_EQ(film.spec.rivers[0].bores.size(), 1u);
 	const cartoon::water::River &r = film.spec.rivers[0];
 	double white = 0.0;
@@ -335,7 +350,7 @@ TEST(FilmWaterChanges, ABoreRunsDownTheRiverAndADamSendsOne) {
 TEST(FilmWaterPlaces, TheyAllDrawAndAMillTurns) {
 	ff::DataFilm film;
 	ASSERT_EQ(film.load(filmOf("places", "water lake level 0\npier 0 -8 toward 90 length 12\nharbour 20 -30\nlighthouse -20 -40 height 20\nbridge -10 -20 to 10 -20 arches 3\nwatermill 12 -10\nsteppingstones 0 -6 to 4 -6\nstilthouses 3 at -20 -14\ndam 30 -30 to 40 -30\nsandcastle 2 -3\nrockpool -2 -3\nshot 0 a\n  key 0 3 12  0 0 -10  40\n").string()), "");
-	EXPECT_EQ(film.spec.places.size(), 8u);
+	ASSERT_EQ(film.spec.places.size(), 8u);
 	const std::string text = film.worldAt(film.headerAt(1.0), 1.0);
 	for (const char *word : {"# pier", "# harbour", "# lighthouse", "# bridge", "# watermill", "# steppingstones", "# stilthouses", "# dam", "# a mill wheel", "# a sandcastle", "# a rock pool"}) EXPECT_NE(text.find(word), std::string::npos) << word;
 	EXPECT_EQ(cartoon::tideline::slumped(0.0), 0.0);

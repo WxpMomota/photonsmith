@@ -604,7 +604,7 @@ TEST(FilmReal, AFootStandsOnTheLandUnderIt) {
 	const auto model = animals::modelOf("horses");
 	ASSERT_TRUE(model);
 	const cartoon::Mat4 place = cartoon::translate(V3{0.0, 1.0, 0.0});
-	const auto bumpy = [](double x, double z) { return 1.0 + 0.05 * std::sin(3.0 * x) + 0.04 * std::cos(2.0 * z); };
+	const auto bumpy = [](double x, double z) { return 1.0 + 0.05 * std::sin(3.0 * x) + 0.12 * std::cos(2.0 * z); };   // (bumps bigger than the margin: at 4 cm no correction at all passed)
 	const gltf_skin::Pose flat = animals::exactPose(*model, "idle", 0.1, place, [](double, double) { return 1.0; });
 	const gltf_skin::Pose set = animals::exactPose(*model, "idle", 0.1, place, bumpy);
 	const auto footOf = [&](const gltf_skin::Pose &pose, const std::string &leg) {
@@ -677,7 +677,7 @@ TEST(FilmReal, GrassMakesWayForWhatWalksThroughIt) {
 	const auto frame = [&](const std::vector<cover::Press> &presses) { return cover::text("photonsmith-test-press", *field, {}, {0.0, 1.5, 6.0}, {0.0, 0.0, 0.0}, 45.0, 1.0, 0.0, {}, {}, 0.0, 0.0, presses); };
 	const std::string alone = frame({});
 	EXPECT_NE(frame({{0.0, 2.0, 0.6, 0.0}}), alone);
-	EXPECT_NE(frame({{0.0, 2.0, 0.6, 0.0}}), frame({{0.0, 2.0, 0.6, 3.0}})) << "it comes back";
+	EXPECT_NE(frame({{0.0, 2.0, 0.6, 0.0}}), frame({{0.0, 2.0, 0.6, 3.0}})) << "it rises some way as the press ages (it does not go all the way back)";
 	EXPECT_EQ(frame({{0.0, 400.0, 0.6, 0.0}}), alone) << "nothing near it";
 }
 
@@ -686,15 +686,16 @@ TEST(FilmReal, HeadsAreTheirOwn) {
 	namespace animals = cartoon::animals;
 	const auto wolf = animals::modelOf("wolves"), horse = animals::modelOf("horses");
 	ASSERT_TRUE(wolf && horse);
-	const V3 shut = jointAt(*wolf, "walk", 0.2, "tongue"), open = jointAt(*wolf, "run", 0.2, "tongue");
-	EXPECT_NE(shut.y - jointAt(*wolf, "walk", 0.2, "head").y, open.y - jointAt(*wolf, "run", 0.2, "head").y) << "a running wolf's mouth is open";
-	const auto angleOf = [](const cartoon::animals::Model &m, const std::string &clip, double t, const std::string &joint) {
+	const auto turnOf = [](const cartoon::animals::Model &m, const std::string &clip, double t, const std::string &joint, int axis) {   // (a joint's own turn about one axis: its quaternion's part)
 		gltf_skin::Pose pose = gltf_skin::restPose(m.rig);
 		gltf_skin::apply(m.rig, m.rig.clips[static_cast<std::size_t>(m.clip(clip))], t, pose);
 		for (std::size_t i = 0; i < m.rig.nodes.size(); ++i)
-			if (m.rig.nodes[i].name == joint) return std::abs(pose[i].q[2]);
+			if (m.rig.nodes[i].name == joint) return std::abs(pose[i].q[axis]);
 		return 0.0;
 	};
+	const auto angleOf = [&turnOf](const cartoon::animals::Model &m, const std::string &clip, double t, const std::string &joint) { return turnOf(m, clip, t, joint, 2); };
+	// (the jaw's own turn, not the tongue's height against the head's: the clips nod the head differently, and that differed with the jaw never moving)
+	EXPECT_GT(turnOf(*wolf, "run", 0.2, "jaw", 0), turnOf(*wolf, "walk", 0.2, "jaw", 0) + 0.08) << "a running wolf's mouth is open";
 	EXPECT_GT(angleOf(*horse, "idle", 0.7, "blink.l"), 0.4) << "the lid is down";
 	EXPECT_LT(angleOf(*horse, "idle", 1.5, "blink.l"), 0.02) << "and up again";
 	const std::string object = animals::poseObject(*wolf, "test_wolf", "run", 0, "wolves", 0.0, "natural", 0);

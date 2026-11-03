@@ -1051,7 +1051,7 @@ never overlap. The camera may be inside any of them.
 
 ```
 water    sea  level 0  waves 0.6
-whale    at -40 -120  toward 90  length 14  speed 2  breach 14  breach 40   # `during T0 T1`, `seed N`
+whale    at -40 -120  toward 90  length 14  speed 2  breach 14  breach 40   # `during T0 T1`, `seed N` (any seed: whole, and under 100000 - 100007 is 7)
 dolphins 6  at 30 -40  toward 270  speed 6                                   # `during T0 T1`, `seed N`
 ```
 
@@ -1522,7 +1522,8 @@ A biome is a land's colours, its plants and its sound, from one line (it needs a
 acacias with their flat umbrellas of crowns and a few bushes), `jungle` (deep greens, mossy rock; kapok giants 25-30 m tall on buttress roots with broad domes of crowns
 over palms, broadleaf trees and ferns), `desert` (sand, bands of red rock on the slopes, scattered stones; saguaro cacti - ribbed columns with arms bending up - among
 scrub), `tundra` (moss and lichen, snow on the heights and drifted in the hollows; low scrub and a few stunted conifers) or `arctic` (snow, blue ice where it is steep,
-rock where it is steeper; nothing grows). It plants a forest of its mix (`plants N`, or as many as the land's size suits) unless the film plants its own, and is heard as
+rock where it is steeper; nothing grows). It plants a forest of its mix (`plants N`, or as many as the land's size suits; a bare land - `arctic`, `rust`, `frost`, `glass`,
+`moonrock` - refuses `plants`) unless the film plants its own, and is heard as
 it is unless the film has an `ambience`. The species and mixes are a `forest`'s too: `forest acacia 200`, `forest jungle 3000 in ...`, `forest desert 400`.
 
 **Plants changing over time: `season A to B`, `grow`, `flowers`.** (film_forest.h, film_flowers.h)
@@ -1617,7 +1618,7 @@ ahead along its way and gently down (the horizon in the picture), or at a point 
 spaced along the path, so the drone goes at an even pace, easing in at the start and out at the end; a `fly` shot has no `key` lines.
 
 `timelapse F` runs nature F times faster than the film - the clouds drift, the waves roll, rivers and waterfalls run and the trees sway at F times their pace - while the
-camera, the characters and the animals keep theirs; the sun and the stars go as the `sky` line's hours say (three hours over twenty seconds is a time-lapse already). `exposure
+camera, the characters and the herds keep theirs (the pond's animals and the sea's giants go by nature's time: what they do is heard when it is seen); the sun and the stars go as the `sky` line's hours say (three hours over twenty seconds is a time-lapse already). `exposure
 auto` follows the sun: 1 by day (8 degrees up and higher), opening up smoothly to about 30 times (2^4.9) when it is 12 degrees below the horizon, so a film that runs from
 sunset into night stays readable; it is written into each frame's Film line as pbrt's `"float iso"` (100 times the exposure, or the set's own iso multiplied by it).
 
@@ -2732,22 +2733,25 @@ shot can `follow NAME`, low and close, for a whole journey. On a sea it drifts w
 
 **At the water's edge: `bankside [reeds D] [lilies D] [duckweed D] [willows N] [mud W] [patch X Z R]... [seed K]`.** (film_bankside.h.) Plants grow along the shore, which is where the land goes
 under the `water` and both edges of every river, or in `patch`es for a lake with no land. D is how many to the metre. Reeds lean in the wind and part for a boat or someone wading; lily pads rock
-on passing rings and are pushed aside; a willow's strands hang to the water and sway. `water ... ripples R` (0 a mirror, 1 usual), `water ... catspaws C` (dark patches of wind going over still
+on passing rings and are pushed aside; a willow's strands hang to the water and sway; duckweed floats on its own shore's water. `mud W` darkens W of the land above a sea's still line (on a
+`terrain`; not along rivers). `water ... ripples R` (0 a mirror, 1 usual), `water ... catspaws C` (dark patches of wind going over still
 water), `watermist A [during T0 T1]` (mist lifting off the water).
 
 **Water's animals: `pondlife KIND [N] at X Z [radius R] [young N] [toward A] [height H] [strike|dive|slap T]... [seed K]`.** (film_pondlife.h.) `ducks` (drake, duck and `young N` in a line, up-ending
 to feed), `swans`, `heron` (one slow step at a time; each `strike T` comes up with a fish), `kingfisher` (`dive T` from a perch `height` above the water), `frogs`, `otter`, `beaver` (`slap T`, then
 gone a while), `trout` (rising), `salmon` (leaping `toward A`, for the foot of a fall). They touch the water with rings and sound. Their times are nature's: under `timelapse` or `slowmo` they do
-not move with the film's clock.
+not move with the film's clock, and each plop is heard at the film time it is seen.
 
 **Water that changes: `tide low L high H [period P] [from T]`, `flood from Y to Y during T0 T1`, `whirlpool X Z [radius R] [depth D] [from T] [until T]`, `bigwave X Z toward A at T [height H]
-[length L] [speed S] [width W]`.** (film_water.h, film_tideline.h.) A tide uncovers a wet dark band of shore. `sandcastle X Z [size S]` slumps once the water reaches it. `rockpool X Z [radius R]`
-is seen when the tide is out. Boats and floating things ride a funnel or a great wave, because they read the same surface. A tide does not move a `surf`'s breakers, which stay at the film's `water`
-level. A flood or a great wave does not pour over the land by itself: the water only stands higher against it.
+[length L] [speed S] [width W] [until T]`.** (film_water.h, film_tideline.h.) Their times are nature's, and each is heard when it is seen; a whirlpool and a great wave each take only
+their own words, and a word without its number is refused. A tide uncovers a wet dark band of shore. `sandcastle X Z [size S]` slumps once the water reaches it, and once the
+water has been over it 14 seconds in all it is gone, and does not stand again when the tide goes out; without a `terrain` it stands on a sand bar just over the still water. `rockpool X Z [radius R]`
+is seen when the tide is out. Boats and floating things ride a funnel or a great wave, because they read the same surface. A `surf`'s breakers (to the nearest quarter metre), the shallows' caustics,
+Snell's window and a camera at the waterline follow a tide or a flood. A flood or a great wave does not pour over the land by itself: the water only stands higher against it.
 
 **Places: `pier X Z toward A [length L]`, `harbour X Z [facing A] [length L]`, `lighthouse X Z [height H]`, `bridge X Z to X Z [arches N] [height H]`, `watermill X Z [facing A] [river N]`,
-`steppingstones X Z to X Z [count N]`, `stilthouses N at X Z [radius R]`, `dam X Z to X Z [height H] [burst T] [river N]`.** (film_waterside.h.) A mill wheel turns as fast as its river runs. After
-dark a lighthouse's lamp brightens and two spots turn; the beams show only in `fog` or `mist`. A dam with `burst T` loses its middle, which tumbles out, and sends a `bore` down its river.
+`steppingstones X Z to X Z [count N]`, `stilthouses N at X Z [radius R]` (N 1 to 60, or `stilthouses X Z [count N]`), `dam X Z to X Z [height H] [burst T] [river N]`.** (film_waterside.h.) A mill wheel turns as fast as its river runs. After
+dark the lamps on a pier and a quay glow, and a lighthouse's lamp brightens and two spots turn; the beams show only in `fog` or `mist`. A dam with `burst T` loses its middle, which tumbles out, and sends a `bore` down its river.
 
 **Water drawn: `toonwater [deep R G B] [mid R G B] [shallow R G B] [lines N] [sparkle N]`.** (film_toonwater.h.) In a `toon` film the water is flat colour by default, stepped by depth over a
 terrain, with no reflections. White wave lines drift on it, star sparkles twinkle along the way to the sun, a touch is a drawn ring, and a splash is a white crown with fat drops. `toonwater off`
@@ -2756,7 +2760,9 @@ keeps real water in a toon film. A river is flat `mid` colour with its foam.
 ### Under the sea, round 18: cartoons (2026-11-02)
 
 Ten more features for cartoons under the sea. Heights on these lines are above the seabed, as on rounds 14 to 17, and x z are pbrt's. `pbrt_scenes/the-lantern-below.film` uses them
-together.
+together. What nature does on them - a kraken's `rise`, an eye's `open`, a squid's or a serpent's `from`, a hook, a net, an anchor, a brinicle, a slump, a big bubble, a sub's way,
+dives and rises, a school's show and choir - is in nature's time (under `timelapse` or `slowmo`, nature's seconds), and heard at the film time it is seen; what a character does -
+`gulp`, `blowring` - is in the film's. Each line takes only the words its usage shows (`gulp ... size` is refused, not ignored).
 
 **More sea characters: `character NAME mermaid|merman|seaturtle|shark|jellyfish|seahorse|puffer at X Y Z`.** (film_sea_cast.h.) A mermaid treads water upright with her tail slowly waving,
 and when she swims she lies level and drives with her tail up and down, arms along her sides. Her hair streams behind her and lifts in the water; `hair` lines give her strands instead. A
@@ -2797,8 +2803,8 @@ and goes back. Each fish keeps circling its place so it never stops. A word is u
 outwards in a flash of silver and it comes back together. A choir sings a slow chord, phrase by phrase, from among the fish while the school breathes in and out. Whale song is long swoops
 heard from far off, from the film's humpbacks if it has any. The show changes the school's worked-out swim, so a shot that follows the school sees the show too.
 
-**Giants in the dark: `kraken X Y Z [size S] [toward A] [rise T] [reach X Y Z] [from T] [glow T]`, `giantsquid X Y Z [length L] [toward A] [from T] [glow T]`, `seaserpent NAME at X Y Z to X Y Z ...
-[length L] [speed S] [from T] [glow T]`, `hugeeye X Y Z [toward A] [size S] [open T] [close T]`, `reveal X Y Z at T [bright B] [colour R G B] [over D]`, `whalefall X Z [length L] [toward A]`.**
+**Giants in the dark: `kraken X Y Z [size S] [toward A] [rise T] [reach X Y Z [from T]] [glow T]`, `giantsquid X Y Z [length L] [toward A] [from T] [glow T]`, `seaserpent NAME at X Y Z to X Y Z ...
+[length L] [speed S] [from T] [glow T]`, `hugeeye X Y Z [toward A] [size S] [open T] [close T]`, `reveal X Y Z at T [bright B] [colour R G B] [over D]` (over 0.05 to 60 s, 3), `whalefall X Z [length L] [toward A]`.**
 (film_abyss.h.) A kraken's eight arms curl, and the front two stretch for `reach` from T. With `rise T` it comes up out of the deep over eight seconds. A giant squid jets ahead in pulses, its
 feeding tentacles trailing. A sea serpent swims along its points in waves with a crest down its back, and a shot can follow it. A huge eye opens in the dark: a gold iris, a slit pupil.
 `glow T` lights a giant's rows of lights. `reveal` is a light that comes up behind a giant (a silhouette) or in front of it. A whale fall is a skeleton furred with bacteria, with crabs and
@@ -2822,11 +2828,11 @@ Every one of these features has its own sounds.
 
 Ten things for films about space. **`pbrt_scenes/powers-of-ten.film`** and **`pbrt_scenes/nova-and-robo.film`** use most of them.
 
-**Orbit to the ground in one shot.** `planetfall KIND [from H] [to H] [at T] [over D] [radius R] [land X Z] [heading B] [clouds C] [seed N] [straight]` in a film with a `terrain`, and a shot with `descend` in place of `key` lines. Round the terrain the planet goes on, past the horizon of the highest camera, meshed and painted by the logarithm of the distance so that it is as fine from any height; the camera falls through two sheets of cloud; the physical sky is worked out from its height, so the stars come out as the air thins (film_planetfall.h). With `from` below `to` it rises instead, and with `straight` it looks straight down at one steady pace.
+**Orbit to the ground in one shot.** `planetfall KIND [from H] [to H] [at T] [over D] [radius R] [land X Z] [heading B] [clouds C] [seed N] [straight]` in a film with a `terrain` and a `sky`, and a shot with `descend` in place of `key` lines (a `descend` needs a `planetfall`, and a shot has one way for its camera to go: a move, `fly`, `descend` or `spacecam`). Round the terrain the planet goes on, past the horizon of the highest camera, meshed and painted by the logarithm of the distance so that it is as fine from any height; the camera falls through two sheets of cloud; the physical sky is worked out from its height, so the stars come out as the air thins (film_planetfall.h). With `from` below `to` it rises instead, and with `straight` it looks straight down at one steady pace.
 
-**Other worlds.** `biome rust|frost|glass|moonrock|bloom`; `spires N in X0 Z0 X1 Z1 [height H] [colour R G B]`, crystal; `plumes N in ... [colour R G B]` (up to 400), vents that blow in their own time, white as ice or the colour of their dust (film_alien.h); forest kinds `glowcap` and `frond`; `herd striders` and `herd crawlers`. `planet` works in a film on land, as something hanging in the sky.
+**Other worlds.** `biome rust|frost|glass|moonrock|bloom`; `spires N [in X0 Z0 X1 Z1] [height H] [colour R G B]` (colours 0 to 1), crystal; `plumes N in ... [colour R G B]` (up to 400), vents that blow in their own time, white as ice or the colour of their dust (film_alien.h); forest kinds `glowcap` and `frond`; `herd striders` and `herd crawlers`. `planet` works in a film on land, as something hanging in the sky.
 
-**A true black hole.** `blackhole ... lens 1` bends the finished picture as the Schwarzschild orbit equation says, and draws the disc through it: the arch over the top, the ring under it, the side coming towards you brighter, the Einstein ring (black_hole_lens.h). It bends what is behind it, not what is near it.
+**A true black hole.** `blackhole ... lens 1` bends the finished picture as the Schwarzschild orbit equation says, and draws the disc through it: the arch over the top, the ring under it, the side coming towards you brighter, the Einstein ring (black_hole_lens.h). It bends what is behind it, not what is near it. One black hole of a film can have `lens 1`; the others are drawn with their disc.
 
 **Great things happening.** `event KIND at X Y Z size S [from T] [over D] [count N] [tilt DEGREES] [brightness B] [seed N]` (cosmic_event.h).
 
@@ -2853,7 +2859,7 @@ S is how wide the whole of it is. They are drawn on the finished picture: each s
 ```
 ambience breath 1                                       # inside a helmet, the only sound there is
 say     nova  6.5 "Can anyone hear me?" radio           # thin, a little hard, a hiss and a click at each end
-say     kai   2 "We hear you!" radio delay 1.3          # ... from far away: what is said arrives later
+say     kai   2 "We hear you!" radio delay 1.3          # ... from far away: heard 1.3 s later (0 to 600), its caption and the music's dip with it
 hud     "AIR 96%"  at -0.84 0.82  size 0.035  from 2    # words fixed to the frame, X and Y -1 to 1, X the left edge
 flightpath earth mars "THE WAY"  from 3  over 4         # a dashed arc on the sky between two planets or ships, a marker going along it
 ```

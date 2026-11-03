@@ -50,9 +50,10 @@ std::size_t count(const std::string &text, const std::string &what) {
 	for (std::size_t at = text.find(what); at != std::string::npos; at = text.find(what, at + what.size())) ++n;
 	return n;
 }
-double energy(const std::vector<std::int16_t> &pcm, double t0, double t1) {   // (interleaved stereo; t counts 48 kHz frames, the mix's are audio::kRate's - 44.1 kHz)
+double energy(const std::vector<std::int16_t> &pcm, double t0, double t1) {   // (interleaved stereo at the mix's rate, audio::kRate: it counted 48 kHz frames, 8% off)
 	double e = 0.0;
-	for (std::size_t i = static_cast<std::size_t>(t0 * 48000.0) * 2; i < std::min(pcm.size(), static_cast<std::size_t>(t1 * 48000.0) * 2); ++i) e += static_cast<double>(pcm[i]) * pcm[i];
+	const double rate = static_cast<double>(cartoon::audio::kRate);
+	for (std::size_t i = static_cast<std::size_t>(t0 * rate) * 2; i < std::min(pcm.size(), static_cast<std::size_t>(t1 * rate) * 2); ++i) e += static_cast<double>(pcm[i]) * pcm[i];
 	return e;
 }
 const auto flat = [](double, double) { return -15.0; };
@@ -139,6 +140,8 @@ TEST(FilmUndersea18, SubsGoTheirWayAndCarryTheirCrew) {
 	ff::DataFilm film;
 	ASSERT_EQ(loadFilm("sub", std::string(kSea) + "sub round nemo at 0 3 -8 to 12 3 -8 speed 1.5 dive 4\ncharacter ann person at 0 -12 -8\naboard ann nemo\nsay ann 2 \"Dive!\"\n" + kShot, film), "");
 	EXPECT_TRUE(film.spec.riders.count("ann") && film.spec.dry.count("ann"));
+	ASSERT_EQ(film.spec.characters.size(), 1u);
+	ASSERT_EQ(film.spec.subs.size(), 1u);
 	V3 at;
 	film.momentOf(film.spec.characters[0], 6.0, &at);
 	const V3 sub = cartoon::subs::subAt(film.spec.subs[0], film.natureAt(6.0));
@@ -146,7 +149,7 @@ TEST(FilmUndersea18, SubsGoTheirWayAndCarryTheirCrew) {
 	EXPECT_LT(film.momentOf(film.spec.characters[0], 6.0).swim, 0.5) << "sitting, not swimming";
 	const std::string scene = film.sceneAt(6.0);
 	EXPECT_GE(count(scene, "LightSource \"spot\""), 2u) << "its searchlights";
-	EXPECT_NE(scene.find("thindielectric"), std::string::npos) << "its dome";
+	EXPECT_NE(scene.find("thindielectric\" \"float eta\" [ 1.5 ]"), std::string::npos) << "its dome (its own glass: the sea from below is a thindielectric too, of 1.333)";
 	V3 feet, front, chest;
 	EXPECT_TRUE(film.wildSubject("nemo", 6.0, feet, front, chest)) << "a shot can follow it";
 	EXPECT_NE(problemWith("character ann person at 0 -12 0\naboard ann ghost").find("no boat or sub"), std::string::npos);
@@ -185,13 +188,19 @@ TEST(FilmUndersea18, ATownsTrafficWaitsAtTheSignal) {
 	w.traffic = 40;
 	V3 f;
 	const V3 c{0.0, -15.0, 0.0};
-	bool waited = false;
-	for (int i = 3; i < w.traffic; i += 4)   // (the street fish: one is waiting at the plaza's edge while it is red)
+	bool waited = false, went = false;
+	for (int i = 3; i < w.traffic; i += 4) {   // (the street fish: one waits while it is red, and the same ones go while it is green - a fish that never moved passed)
 		for (double t = 6.05; t < 11.5; t += 0.25) {
 			const V3 a = cartoon::seatown::fishAt(w, i, t, c, f), b = cartoon::seatown::fishAt(w, i, t + 0.25, c, f);
 			if (std::hypot(a.x - b.x, a.z - b.z) < 0.03) waited = true;
 		}
+		for (double t = 0.55; t < 5.5; t += 0.25) {
+			const V3 a = cartoon::seatown::fishAt(w, i, t, c, f), b = cartoon::seatown::fishAt(w, i, t + 0.25, c, f);
+			if (std::hypot(a.x - b.x, a.z - b.z) > 0.1) went = true;
+		}
+	}
 	EXPECT_TRUE(waited);
+	EXPECT_TRUE(went);
 	const std::string text = cartoon::seatown::townText(w, 3.0, flat);
 	EXPECT_NE(text.find("AreaLightSource"), std::string::npos) << "its windows lit";
 	EXPECT_NE(problemWith("seatown 0 0 radius 200").find("seatown X Z"), std::string::npos);
@@ -246,6 +255,7 @@ TEST(FilmUndersea18, SchoolsMakeShapesAndWords) {
 	EXPECT_LT(width, 0.65);
 	ff::DataFilm film;
 	ASSERT_EQ(loadFilm("show", std::string(kSea) + "school sardines 120 at 0 6 -12 radius 2\nschoolshow 1 ring at 2 for 10 size 4 toward 0 centre 0 7 -12\nchoir 1 at 1 for 6\n" + kShot, film), "");
+	ASSERT_FALSE(film.schoolsSwum().empty());
 	const cartoon::school::School &sc = film.schoolsSwum()[0];
 	double off = 0.0;   // (mid-show, every fish on the ring: 2 m from its middle, in the plane facing +z)
 	for (int i = 0; i < sc.count; ++i) {
@@ -292,6 +302,7 @@ TEST(FilmUndersea18, HooksNetsAnchorsAndTheDeepsPlaces) {
 	ASSERT_EQ(loadFilm("above", std::string(kSea) + "school sardines 150 at 3 8 -12 radius 2\nnet 3 -12 at 1 size 7 school 1 lift 15\nhook -2 -6 at 0\nanchor 5 -8 at 1\n"
 												   "brinepool -6 -16 radius 4\npillowlava 8 -16 radius 3\nturbidity -10 -20 toward 90 at 3\nboat rowboat dinghy at -2 -8\n" + kShot, film), "")
 		<< "a boat floats over an underwater film";
+	ASSERT_FALSE(film.schoolsSwum().empty());
 	const cartoon::school::School &sc = film.schoolsSwum()[0];
 	double before = -1e30, after = -1e30;
 	for (int i = 0; i < sc.count; ++i) before = std::max(before, cartoon::school::fishAt(sc, i, film.natureAt(14.0)).y), after = std::max(after, cartoon::school::fishAt(sc, i, film.natureAt(22.0)).y);
@@ -355,7 +366,6 @@ TEST(FilmUndersea18, OwnWordsAndNaturesTimeHeard) {
 	const double seen = film.filmTimeOf(20.0);   // (where the picture shows it go in: nature's 20 s)
 	EXPECT_NEAR(film.natureAt(seen), 20.0, 1e-3);
 	EXPECT_LT(seen, 8.0) << "a timelapse: well before film time 20";
-	const double s = static_cast<double>(cartoon::audio::kRate) / 48000.0;   // (energy() counts 48 kHz frames; the mix is kRate's)
-	EXPECT_EQ(energy(pcm, 0.0, (seen - 0.02) * s), 0.0) << "nothing before it";
-	EXPECT_GT(energy(pcm, seen * s, (seen + 0.6) * s), 0.0) << "its splash, then";
+	EXPECT_EQ(energy(pcm, 0.0, seen - 0.02), 0.0) << "nothing before it";
+	EXPECT_GT(energy(pcm, seen, seen + 0.6), 0.0) << "its splash, then";
 }
