@@ -287,6 +287,20 @@ class DataFilm {
 	// The water's height at pbrt's (x, z) at nature's nt: the nearest river's where one runs (and stands above the sea), else the sea's `level` (the first river's alone was used
 	// for all of them, and none with a sea).
 	double waterHeight(double x, double z, double nt, double level) const;
+	// ---- rooms (indoor round 1: film_roomworld.cpp) ----
+	std::string roomsAt(const std::string &header, double t, double nt) const;   // its rooms at t: what is still (cached), what moves, the lamps
+	std::string roomsStatic() const;                                             // every room's still part, as the way-finding reads it
+	std::string placeUses();                                                     // a walk to each piece of furniture someone uses (before findWays)
+	void timeUses();                                                             // when each gets there, and what it does then (after it)
+	void roomMoment(const Character &c, double t, Vec3 &where, double &heading) const;   // on a seat, in a bed, at a window
+	void roomPose(const Character &c, double t, CharacterMoment &m) const;       // lying back, leaning
+	camera_keyframes::Key peekKey(const Shot &shot) const;                       // a shot's camera outside a window looking in
+	void keepIndoors(camera_keyframes::Key &key) const;                          // a camera that moves by itself kept inside the room it looks into
+	double indoorExposure(double t) const;                                       // how far a camera in a room is opened up (0: not in one)
+	int floorSurfaceAt(Vec3 story) const;                                        // the floor under a footfall (an sfx::Surface; -1: no room's)
+	double roomSendAt(Vec3 story) const;                                         // how much echo a room gives what is said in it (-1: no room)
+	void roomSounds(audio::Mix &m) const;                                        // its rooms' own sounds
+	double darkOutside(double t) const;                                          // 0 by day .. 1 at night (the lamps that no switch names follow it)
 	void waterSounds(audio::Mix &m) const;
 	// A character in a boat: the boat's frame and its seat; where that puts it at t, turned as the boat is; its hands on the oars or the paddle.
 	bool boatSeat(const Character &c, double t, Mat4 &frame, craft::Seat &seat, const craft::Craft *&boat, bool &pulls) const;

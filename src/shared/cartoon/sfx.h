@@ -17,7 +17,7 @@
 namespace cartoon {
 namespace sfx {
 
-enum class Surface { Dust, Stone, Grass, Wood, Metal, Snow };
+enum class Surface { Dust, Stone, Grass, Wood, Metal, Snow, Tile, Carpet };
 
 // Two sounds mixed (b from `offset` seconds in, scaled by `gain`).
 inline std::vector<float> layered(std::vector<float> a, const std::vector<float> &b, double gain, double offset = 0.0) {
@@ -45,6 +45,10 @@ inline std::vector<float> footstep(Surface s, int seed) {
 			return layered(audio::knock(260.0 * v, 0.10, take(seed, 8u)), audio::additive(1180.0 * v, {{1.0, 1.0, 9.0}, {2.76, 0.5, 13.0}, {5.4, 0.25, 18.0}}, 0.5, 0.001), 0.12, 0.002);
 		case Surface::Snow:
 			return layered(audio::noiseBurst(0.26, 0.03, 10.0, 1400.0 * v, 500.0, take(seed, 9u)), audio::noiseBurst(0.20, 0.01, 16.0, 6000.0, 3500.0, take(seed, 10u)), 0.3, 0.05);
+		case Surface::Tile:   // (a hard click and a ring of the floor)
+			return layered(audio::knock(320.0 * v, 0.07, take(seed, 11u)), audio::noiseBurst(0.04, 0.0005, 90.0, 6500.0 * v, 3000.0, take(seed, 12u)), 0.5, 0.002);
+		case Surface::Carpet:   // (hardly anything: a soft pad)
+			return audio::noiseBurst(0.16, 0.012, 24.0, 600.0 * v, 220.0, take(seed, 13u));
 	}
 	return {};
 }
@@ -74,7 +78,10 @@ struct Palette {
 inline void play(audio::Mix &m, const std::vector<FilmEvent> &events, const Palette &p = {}) {
 	for (const FilmEvent &e : events) {
 		switch (e.kind) {
-			case EventKind::Footfall: m.put(e.t, footstep(p.ground, e.seed), p.footfall * e.strength, e.pan, p.send); break;
+			case EventKind::Footfall:   // (on its own floor where it says: a room's; carpet quieter, tiles louder)
+				m.put(e.t, footstep(e.surface >= 0 ? static_cast<Surface>(e.surface) : p.ground, e.seed),
+					  p.footfall * e.strength * (e.surface == static_cast<int>(Surface::Carpet) ? 0.5 : e.surface == static_cast<int>(Surface::Tile) ? 1.15 : 1.0), e.pan, p.send);
+				break;
 			case EventKind::Impact: m.put(e.t, impact(p.weight, e.seed), p.impact * e.strength, e.pan, p.send * 2.0); break;
 			case EventKind::Flash: m.put(e.t, flash(e.seed), p.flash * e.strength, e.pan, p.send * 3.0); break;
 			case EventKind::Touch: m.put(e.t, touch(e.seed), p.touch * e.strength, e.pan, p.send * 2.0); break;

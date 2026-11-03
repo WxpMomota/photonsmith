@@ -55,6 +55,7 @@
 #include "film_battle.h"
 #include "film_zerog.h"
 #include "film_interior.h"
+#include "film_rooms.h"
 #include "film_screens.h"
 #include "film_explain.h"
 #include "film_flowers.h"
@@ -180,6 +181,10 @@ struct Shot {
 	double bladesRotation = 0.0, apertureRatio = 1.0;
 	cosmos::SpaceCam spaceCam;   // (`spacecam`) a journey in space (film_voyage.h)
 	bool descending = false;     // (`descend`) the film's `planetfall`, from orbit to the ground (film_planetfall.h)
+	bool cutaway = false;        // (`cutaway`) the walls between the camera and the room it is looking into not drawn, as a dolls' house's (film_roomworld.cpp)
+	std::string peek;            // (`peek ROOM`) the camera outside a window of ROOM, looking in
+	int peekWindow = 0;
+	double peekFrom = 1.6;
 	shot_lighting::Lighting lighting;   // (`lighting`) key, fill and rim lights round the subject, from the camera
 	std::string lightOn;                // ... on this character's chest ("": what the camera looks at)
 };
@@ -251,6 +256,7 @@ struct CharacterMoment {
 	bool airborne = false;   // in the air in a jump
 	double sit = 0.0;        // 0 standing .. 1 sitting, on a seat `seat` high
 	double seat = 0.0;
+	double lie = 0.0, lean = 0.0;   // (indoors) 0..1 lying back from its feet in a bed or on a sofa, leaning forward on a counter: castAt tips the whole body (film_roomworld.cpp)
 	Vec3 jiggle;             // how far what dangles from its head swings behind it (story space; film_motion.h `jiggle`: zero when the film has none)
 	double skinLight = 0.0;  // how far light goes into its skin (`skin-light`; 0: painted)
 	bool realEyes = false;   // eyes with a cornea over the iris (`eyes real`)
@@ -640,6 +646,7 @@ struct Spec {
 	std::vector<zerog::Blob> blobs;     // (round 11: `blob`, water floating with no weight; film_zerog.h)
 	std::vector<zerog::Drift> drifts;   // (`drift`: small things floating)
 	std::vector<interior::Interior> interiors;   // (`interior`: corridors, cockpits, airlocks, a ring station's floor; film_interior.h)
+	rooms::Indoors indoors;                      // (`room`, `house` and what happens in them: film_rooms.h, film_roomlife.h)
 	std::vector<screens::Hologram> holograms;   // (`hologram`, `screen`: film_screens.h)
 	std::vector<screens::Screen> screens;
 	explain::Overlays explain;   // (`label`, `orbitline`, `scalebar`, `compare`: an explainer's drawings; film_explain.h)

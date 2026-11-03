@@ -242,6 +242,7 @@ Film filmOf(Registry &r, const film_file::DataFilm &d, bool drafted, int id, con
 			if (w.kind == "rain") particles::rainSound(m, w);
 		sfx::play(m, p->events());
 		p->soundscape(m);   // (its nature placed where it is heard from: film_soundscape.h)
+		if (p->spec.indoors.any()) p->roomSounds(m);   // (its rooms': film_roomworld.cpp)
 		p->thunder(m);
 		p->speak(m);
 		p->playTheme(m);

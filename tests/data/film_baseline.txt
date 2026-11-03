@@ -1,5 +1,13 @@
 # Every film, shot by shot: film|shot|fingerprint of the scene at the shot's middle (at preview coarseness)|name. Written by
 # `python scripts/anim/film.py baseline --write` (ray_tracer --film-baseline); a difference is a film that changed - on purpose or not.
+a-day-at-home|1|72a02768e3658ce6|Morning
+a-day-at-home|2|97903bfb2d43c54a|The kitchen
+a-day-at-home|3|61173826eb36a028|The house
+a-day-at-home|4|4941f3fa902c7ae0|Rain
+a-day-at-home|5|1cfd0672962943ac|In the rain
+a-day-at-home|6|00f2fd52dc360bbe|Evening
+a-day-at-home|7|8033657e7ebe3f2b|Power cut
+a-day-at-home|8|f053069f1ba085d3|Good night
 a-walk-at-dusk|1|e859e3b8594f62d8|Setting out
 a-walk-at-dusk|2|61af484746e830db|Along the path
 a-walk-at-dusk|3|583028adcb9d90c1|The lantern

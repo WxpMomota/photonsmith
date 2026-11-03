@@ -6,6 +6,13 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **Cartoons indoors: rooms and houses (2026-11-02).** `room KIND NAME at X Z` builds a furnished kitchen, bedroom, living room, bathroom, classroom, shop or hall in a style;
+  `house` puts rooms in a row with doorways between them and open stairs to the rooms upstairs. Daylight comes in at the windows with the sun's patch on the floor and dust in the
+  beam, rain runs down the panes, curtains draw and blow. Lamps, candles, a fire and the television come on at dusk, at a `switch`, and go out in a `powercut`; a camera in a room
+  opens up for its light. Characters walk to the furniture and `sit` on it, `lie` in bed or along the sofa, `open` the fridge, `lean` on the counter or `lookout` of a window. A shot
+  can be a dolls'-house `cutaway` or `peek` in at a window, and a moving camera stays inside the room. Wallpaper, floors and clutter (that can grow into a mess) are drawn for
+  the room, and the sound is the room's: its echo, footsteps on its floor, the fridge, the clock, rain on the roof, muffled sound from next door. Showcase: `a-day-at-home`.
+
 * **The rounds reviewed (2026-11-02).** Some ninety fixes over everything since late October. What nature does - a kraken rising, a hook going in, a heron's strike, a whirlpool, a
   bore - is now heard at the moment it is seen, in a time-lapse or slow motion too. Lines that were taken and did nothing are refused with a message: another line's word
   (`gulp ... size`), `kraken ... from` without `reach`, `plants` on a bare biome, a second `lens 1`, two ways for one shot's camera, `descend` without `planetfall`, a word

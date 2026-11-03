@@ -906,8 +906,13 @@ std::string DataFilm::castAt(double t) const {
 		const hair::Groom *g = own ? own : all;
 		return g && g->style != "off" ? g : nullptr;
 	};
-	// (round 16) a swimmer laid level in the water round its chest as it goes - the whole of it, hair and all - and where a point of it then is
-	const auto swimTurn = [](const Character &c, const CharacterKind &kind, const CharacterMoment &m) {
+	// (round 16) a swimmer laid level in the water round its chest as it goes - the whole of it, hair and all - and where a point of it then is; (indoors) one lying back
+	// from its feet on a bed or a sofa, or leaning forward on a counter
+	const auto bodyTurn = [](const Character &c, const CharacterKind &kind, const CharacterMoment &m) {
+		if (m.lie > 0.0 || m.lean > 0.0) {
+			const Vec3 feet = transformPoint(m.frame, {0.0, 0.0, 0.0}), right = normalize(transformPoint(m.frame, {1.0, 0.0, 0.0}) - feet);
+			return mul(translate(feet), rotate(right, 14.0 * m.lean - 90.0 * m.lie), translate(feet * -1.0));
+		}
 		if (m.swim <= 0.0 || kind.aquatic) return identity();   // (a fish or an octopus swims as it is: film_sea_kinds.h)
 		const Vec3 chest = transformPoint(m.frame, kind.chest * c.scale), right = normalize(transformPoint(m.frame, {1.0, 0.0, 0.0}) - transformPoint(m.frame, {0.0, 0.0, 0.0}));
 		return mul(translate(chest), rotate(right, 80.0 * m.going), translate(chest * -1.0));
@@ -921,7 +926,7 @@ std::string DataFilm::castAt(double t) const {
 			CharacterMoment sm = momentOf(c, born);
 			speakingAt(c, born, sm);
 			if (sm.voice < 0.06) continue;
-			const Vec3 mouth = transformPoint(swimTurn(c, kind, sm), transformPoint(sm.frame, kind.head * c.scale + Vec3{0.0, -0.06 * c.scale, 0.12 * c.scale}));
+			const Vec3 mouth = transformPoint(bodyTurn(c, kind, sm), transformPoint(sm.frame, kind.head * c.scale + Vec3{0.0, -0.06 * c.scale, 0.12 * c.scale}));
 			for (int q = 0; q < 5; ++q) {   // (a talker's burble: big enough to see across a shot)
 				const int key = static_cast<int>(born * 10.0) * 7 + q + seedOf(c.name) * 131;
 				undersea::Bubble b;
@@ -970,8 +975,9 @@ std::string DataFilm::castAt(double t) const {
 				const Vec3 gust = m.swim > 0.0 ? spec.current.velocity(tc) + Vec3{0.15 * std::sin(0.9 * tc + m.seed), 0.0, 0.12 * std::cos(0.7 * tc)} : dressing::gustAt(spec.gusts, at.x, at.z, tc);
 				drawn += hair::text(*groom, scalp, kind.headFrame(was), gust, colour, c.scale, m.seed, m.swim);   // (under the water it floats: round 16)
 			}
-			if (m.swim > 0.0) drawn = motion::wrapped(drawn, swimTurn(c, kind, m));
-			if (wears(c)) drawn += wornAt(c, kind, tc, m, m.swim > 0.0 ? swimTurn(c, kind, m) : identity());   // (round 18: garments, a helmet, speed lines)
+			const bool turned = m.swim > 0.0 || m.lie > 0.0 || m.lean > 0.0;
+			if (turned) drawn = motion::wrapped(drawn, bodyTurn(c, kind, m));
+			if (wears(c)) drawn += wornAt(c, kind, tc, m, turned ? bodyTurn(c, kind, m) : identity());   // (round 18: garments, a helmet, speed lines)
 			return drawn;
 		};
 		const double tc = motion::heldTime(spec.stepping, c.name, t, spec.fps);   // (on twos: the moment of the frame it holds; film_motion.h)
@@ -1467,6 +1473,7 @@ std::string DataFilm::aboardAt(const std::string &header, double t, double nt) c
 	}
 	for (const zerog::Drift &d : spec.drifts) out += zerog::driftText(d, nt);
 	for (const interior::Interior &in : spec.interiors) out += interior::interiorText(in, nt);   // (film_interior.h)
+	if (spec.indoors.any()) out += roomsAt(header, t, nt);   // (indoor round 1: film_roomworld.cpp)
 	for (const screens::Hologram &h : spec.holograms) out += screens::hologramText(h, nt);   // (film_screens.h)
 	for (const screens::Screen &sc : spec.screens) out += screens::screenText(sc, nt, spec.key.empty() ? std::string("film") : spec.key, spec.ships);
 	if (spec.explain.any() || spec.night.trap) out += overlaysAt(header, t, nt);

@@ -2824,6 +2824,59 @@ stream behind a character when it swims fast, and a gulp is a big wobbling bubbl
 (characters, subs, serpents) once it is dark: under a `sky` it fades in as the sun goes down. Speed lines and sparks are grouped with the bubbles, so a toon film draws no ink round them.
 Every one of these features has its own sounds.
 
+### Rooms and houses: cartoons indoors (2026-11-02)
+
+Ten features for cartoons that happen inside. x z are pbrt's, as everywhere in a film file; a room's own words (its walls, windows, furniture) are its own: its front wall (wall 1 in
+`peek ... window N` counting) has the door, its back wall the windows. `pbrt_scenes/a-day-at-home.film` uses them together: Pip and Nova's day in, from a sunny morning through an
+afternoon of rain to a power cut at bedtime. A room can stand on any set; the stage (`scene film_assets/stage/set.pbrt`) is a plain one to start from.
+
+**Rooms by kind: `room KIND NAME at X Z [size W D H] [facing A] [style cosy|modern|old] [windows N] [y Y]`.** (film_rooms.h, film_furniture.h.) KIND is kitchen, bedroom, living, bathroom,
+classroom, shop or hall. Each is furnished as its kind is: a kitchen has a fridge, a counter, a stove and a table with chairs, a living room a sofa with a table in front of it, a television,
+an armchair, a bookshelf, a fireplace and a lamp, a bedroom a bed, a bedside table, a wardrobe and a desk, a classroom rows of desks and a board, a shop shelves of goods and a till, a bathroom
+a bath, a basin and a toilet. Nothing stands in front of a doorway, nothing tall in front of a window, and a piece that has no room where its kind puts it goes against another wall.
+`furnish ROOM KIND ...` adds pieces (an aquarium, a mirror, candles, a cabinet, a plant, `fairy` lights ...) against the first wall they fit. The style picks the colours: cosy is warm
+wood and red, modern pale and grey, old dark wood and green.
+
+**Houses: `house NAME at X Z rooms KIND ... [upstairs KIND ...] [facing A] [style S] [depth D]`, `door ROOM [to ROOM2] open T [AMOUNT] [close T] ...`.** The rooms stand in a row, each with a
+doorway into the next near its back, a front door on the first, and windows front and back. Upstairs rooms stand over the rooms below, and open stairs go up the first room's left wall
+through a hole in its ceiling. The rooms are called NAME.KIND (`home.kitchen`; a second of a kind `home.bedroom2`). A `door` line hangs a door in a doorway and opens and shuts it, with a
+creak and a knock. The rooms are in what a walk finds its way round: `walk pip 2 0.8 to X Z` from one room to another goes through the doorways and round the furniture.
+Indoors a character passes closer to things (0.28 m), so a doorway is not too narrow for it. (A walk finds its way on one floor: it does not climb the stairs to a room upstairs.)
+
+**Daylight in at the windows, `curtains ROOM open|closed|blowing [at T]`.** (film_roomlife.h.) The film's `sky` lights a room through its windows: a soft light in at each one, and the sun's
+own patch on the floor through the panes, moving as the day goes. In the sun dust drifts in the beam. With `weather rain` drops run down the panes and the light greys. Curtains hang at every
+window once a `curtains` line names the room; they draw across, open, or blow in a draught.
+
+**Lamps: `switch ROOM [LAMP] on T [off T]`, `powercut T [until T]`.** A room's lamps - a ceiling light (two in a classroom or a shop), a table lamp on the bedside table, a floor lamp, candles, a fire in
+the fireplace, the television's glow, fairy lights - come on as it gets dark outside, and go off as the day comes. A `switch` line puts them, or one kind of them (`switch k ceiling on 4`),
+on and off at the times it says instead, with a click. A power cut puts out everything electric: the candles and the fire burn on. With `exposure auto`, a camera in a room opens up for
+the room's light: a little by day, more by lamplight, most by candlelight.
+
+**The camera indoors: `cutaway`, `peek ROOM [window N] [from D]` (in a shot).** A camera that moves by itself (`follow`, a move) and looks into a room stays inside its walls and under its
+ceiling, out of the furniture. `cutaway` leaves out each wall between the camera and the room it is outside of: a dolls' house, every room of a house seen at once from the front. `peek`
+puts the camera outside window N of the room (from 1; the first), D metres out (1.6), looking in.
+
+**Using the furniture: `sit WHO on ITEM`, `lie WHO in|on ITEM`, `open WHO ITEM`, `lean WHO on ITEM`, `lookout WHO [window N]`, each `[in ROOM] at T [until T]`.** The character walks there
+from wherever it is, finding its way, then turns and sits on a sofa, a chair, an armchair, a stool, a bed or a toilet; lies back on a bed or along a sofa; opens a fridge, a wardrobe, a cabinet
+or a stove with a reach for the handle (its door swings open, shut again after three seconds unless `until` says); leans on a counter or a desk; or stands at a window looking out. At `until`
+it gets up. Without `in ROOM` it uses the first room that has one free; `lookout` without it uses the room the character starts in. Where something else stands in the way it stands
+beside it, and of a bed's two sides it takes the one with room.
+
+**Clutter: `clutter ROOM tidy|lived|messy [grows T0 T1]`.** Mugs, plates, books and vases on the tables, the counter, the desk and the mantelpiece, and shoes, toy blocks, balls, cushions
+and boxes about the floor - none on the furniture's feet or in a doorway. Tidy leaves the table's vase; messy is everywhere. `grows` brings the mess in a thing at a time between T0 and T1,
+from tidy to what the line says.
+
+**Indoor sound.** Each room has its own echo: a tiled bathroom rings, a carpeted bedroom is dry, a big room more than a small one. Footsteps sound of the floor under them - wood, tiles,
+carpet, softer on a rug. A fridge hums, a clock ticks on the mantelpiece or the bookshelf, a fire crackles, a television murmurs; rain drums on the roof while the camera is inside; and what happens in
+another room is heard through the wall, quieter and with its highs gone.
+
+**Patterns and paint: `walls ROOM paint R G B`, `walls ROOM wallpaper stripes|roses|checks|herringbone|tiles [colour R G B] [colour R G B]`, `floor ROOM wood|boards|tiles|carpet|checks
+[colour R G B]`.** (film_roomlook.h.) Wallpaper and floors are pictures drawn for the room, repeating at their true size: stripes, a rose pattern, checks, herringbone and tiles on the walls;
+wood, boards, tiles, a carpet's weave and black-and-white checks on the floor. Without a line each kind has its own: tiles in a kitchen and a bathroom, carpet in a bedroom, wood elsewhere.
+
+**Glass, mirrors and water.** A mirror reflects the room; the television's screen glows with a changing programme; a glass cabinet shows what is inside it; an aquarium has water, weed,
+gravel and fish going round it with a stream of bubbles. The panes are thin glass, so at night with the lamps on a window shows the room in it, as a real one does.
+
 ### Cartoons of space and the universe (2026-11-01)
 
 Ten things for films about space. **`pbrt_scenes/powers-of-ten.film`** and **`pbrt_scenes/nova-and-robo.film`** use most of them.

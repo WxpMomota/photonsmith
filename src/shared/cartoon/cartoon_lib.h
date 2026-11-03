@@ -615,6 +615,7 @@ struct FilmEvent {
 	double strength = 1.0;   // 0..1 (film_events quietens it with the distance from the camera)
 	double pan = 0.0;        // -1 left .. 1 right: where the camera sees it
 	int seed = 0;            // which take of its sound (two footfalls in a row should not sound the same)
+	int surface = -1;        // (a footfall) what it comes down on, an sfx::Surface; below 0: the film's own ground
 };
 
 // A character's foot at a moment (Film::feetAt): where it is - in story space, or in the space of what it stands on when that moves (a sinking platform) - and whether

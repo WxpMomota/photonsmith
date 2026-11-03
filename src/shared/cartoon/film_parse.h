@@ -217,6 +217,12 @@
 //     kraken   0 2 -30  size 6  glow 5                           # giants (film_abyss.h): giantsquid, `seaserpent NAME at ...`, hugeeye, `reveal X Y Z at T`, whalefall
 //     hook     0 -6  at 2  yank 12                               # film_fromabove.h: `net X Z at T [school N] [lift T]`, anchor, brinepool, pillowlava, brinicle, turbidity
 //     bubblewipe at 10                                           # drawn looks (film_seatoon.h): waterwobble, drawnrays, `speedlines WHO`, `gulp WHO at T`, seasparkle
+//     room     kitchen k at 0 0  style cosy                      # indoors (film_rooms.h, film_parse_rooms.h): kitchen, bedroom, living, bathroom, classroom, shop, hall
+//     house    home at 0 0 rooms living kitchen upstairs bedroom  # rooms in a row with doorways, stairs up; rooms named home.living ...; `door ROOM to ROOM2 open T`
+//     curtains k closed at 8                                     # film_roomlife.h: `switch ROOM [LAMP] on T [off T]`, `powercut T until T`, `clutter ROOM messy [grows T0 T1]`
+//     walls    k wallpaper roses                                 # film_roomlook.h: `walls ROOM paint R G B`, `floor ROOM wood|boards|tiles|carpet|checks`, `furnish ROOM aquarium ...`
+//     sit      pip on sofa at 2 until 9                          # it walks there (film_roomworld.cpp): `lie WHO in bed`, `open WHO fridge`, `lean WHO on counter`, `lookout WHO`
+//       cutaway                                                  # (in a shot) the walls between the camera and the room left out; `peek ROOM [window N] [from D]`
 //     model    robot                                           # a model of the film's own (film_model.h), read up to `end`: pieces of shapes (add, blend K, cut,
 //       piece  body colour 0.8 0.3 0.2                          #   intersect; `hard` for crisp edges), subdivision cages (`cage box W H D crease S`), modifiers
 //       box    0 0.8 0 size 0.6 0.7 0.4 round 0.03              #   (bend, twist, taper, mirror, array, radial, lattice, solidify, smooth), `sweep`, `loft`,

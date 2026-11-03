@@ -257,7 +257,9 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 	for (const Spec::Prop &pr : spec.props)
 		if (std::find(scene.names.begin(), scene.names.end(), pr.name) == scene.names.end())
 			return detail::lineWhere(spec, filePath, pr.line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + pr.name + "`";
+	if (const std::string e = placeUses(); !e.empty()) return filePath + ":" + e;   // (a walk to each piece of furniture someone uses: film_roomworld.cpp)
 	if (const std::string e = findWays(); !e.empty()) return filePath + ":" + e;
+	timeUses();
 	if (spec.hasTerrain) {   // the points of `look ... at`, `touch`, `mark at` and `cloth ... at` above the ground there, as every height on a terrain is (they were the scene's own y)
 		const std::shared_ptr<const terrain::Field> land = terrain::fieldOf(spec.terrain);
 		const auto lift = [&land](Vec3 &p) {
@@ -414,7 +416,7 @@ std::string DataFilm::findWays() {
 			fx = -last.x, fy = last.y, fz = last.z;
 		}
 		const std::string set = setAt(w.t0);
-		if (!flattened.count(set)) flattened[set] = film_paths::flattenText(set, meshes);
+		if (!flattened.count(set)) flattened[set] = film_paths::flattenText(set + roomsStatic(), meshes);   // (its rooms' walls, stairs and furniture too: the way round them)
 		const pbrt_flatten::FlatScene &flat = flattened[set];
 		// the map round the walk: the set between its ankles and its head, whoever else stands there, grown by its size
 		double x0 = fx, x1 = fx, z0 = fz, z1 = fz;
@@ -431,7 +433,7 @@ std::string DataFilm::findWays() {
 			momentOf(other, w.t0, &at);
 			film_paths::addDisc(g, -at.x, at.z, characterKinds().at(other.kind).radius * other.scale);
 		}
-		const film_paths::Grid ways = film_paths::grown(g, kind.radius * c->scale);
+		const film_paths::Grid ways = film_paths::grown(g, spec.indoors.any() ? std::min(0.28, kind.radius * c->scale) : kind.radius * c->scale);   // (indoors closer: through a doorway)
 		w.points.clear();
 		w.heights.clear();
 		for (const auto &[tx, tz] : w.targets) {
@@ -1053,6 +1055,7 @@ CharacterMoment DataFilm::momentOf(const Character &c, double t, Vec3 *at) const
 	double wet = 0.0;
 	waterMoment(c, t, where, heading, going, swim, airborne, wet);
 	deepMoment(c, t, where, heading, going, swim, airborne);   // (round 18: a lane, a chase, a sub)
+	if (!spec.indoors.uses.empty()) roomMoment(c, t, where, heading);   // (on a seat, in a bed, at a window: film_roomworld.cpp)
 	CharacterMoment m;
 	m.swim = swim, m.wet = wet;
 	m.running = running;
@@ -1064,6 +1067,7 @@ CharacterMoment DataFilm::momentOf(const Character &c, double t, Vec3 *at) const
 		if (s > m.sit) m.sit = s, m.seat = st.height * c.scale;
 	}
 	m.frame = mul(translate(where), rotate({0.0, 1.0, 0.0}, heading));
+	if (!spec.indoors.uses.empty()) roomPose(c, t, m);   // (lying back, leaning, reaching)
 	m.steps = steps;
 	m.moving = moving;
 	m.going = going;
@@ -1232,6 +1236,7 @@ std::vector<FilmEvent> DataFilm::events() const {
 				const CameraView v = viewAt(f.t);
 				e.pan = panOf(v, f.at);
 				e.strength = audibility(length(f.at - v.eye)) * (c.walks[i].style == WalkLine::Run ? 1.3 : 1.0);
+				if (spec.indoors.any()) e.surface = floorSurfaceAt(f.at);   // (on a room's floor: wood, tiles, carpet - film_roomworld.cpp)
 				out.push_back(e);
 			}
 		}
@@ -1418,8 +1423,9 @@ void DataFilm::speak(audio::Mix &mix) const {
 			mix.put(t0 + heardLate(i), sound, 0.62, 0.0, 0.02);
 			continue;
 		}
-		if (recordingOf(i)) mix.put(t0, sound, 0.8 * gain, panOf(view, at) * 0.6, under ? 0.45 : 0.2);   // (a computer's voice: its recording)
-		else mix.put(t0, sound, 0.55 * gain, panOf(view, at) * 0.6, under ? 0.45 : 0.25);
+		const double room = spec.indoors.any() ? roomSendAt(at) : -1.0;   // (said in a room: as much of its echo as that room has, film_roomworld.cpp)
+		if (recordingOf(i)) mix.put(t0, sound, 0.8 * gain, panOf(view, at) * 0.6, under ? 0.45 : room >= 0.0 ? room : 0.2);   // (a computer's voice: its recording)
+		else mix.put(t0, sound, 0.55 * gain, panOf(view, at) * 0.6, under ? 0.45 : room >= 0.0 ? room : 0.25);
 	}
 }
 
@@ -1675,6 +1681,8 @@ double DataFilm::acrossShotTime(double t) const {
 }
 
 double DataFilm::exposureAt(double t) const {
+	if (spec.exposureAuto && spec.indoors.any())   // (a camera in a room: opened up for a room's light, a lamp's or a window's, not the sky's: film_roomworld.cpp)
+		if (const double inside = indoorExposure(t); inside > 0.0) return spec.exposure * inside;
 	if (!spec.exposureAuto || !spec.hasSky) return spec.exposure;
 	double el = 0.0, facing = 0.0;
 	dressing::sunAt(spec.sky, dressing::hourAt(spec.sky, t, spec.storyEnd), el, facing);
@@ -1872,11 +1880,14 @@ void DataFilm::cameraAt(double t, std::string &lookAt, std::string &camera, int 
 		key.fov = 58.0;
 	} else if (shot.spaceCam.kind != cosmos::SpaceCam::None) {   // a journey in space (film_voyage.h)
 		key = cosmos::spaceCamKey(shot.spaceCam, (t - shot.start) / span);
+	} else if (!shot.peek.empty()) {   // in at a window (film_roomworld.cpp)
+		key = peekKey(shot);
 	} else if (shot.move.kind != Shot::Move::None) {
 		key = moveKey(shot, t, span);
 	} else {
 		key = camera_keyframes::at(shot.path, std::min(1.0, std::max(0.0, (t - shot.start) / span)), span);
 	}
+	if ((shot.following || shot.move.kind != Shot::Move::None) && spec.indoors.any()) keepIndoors(key);   // (a camera that moves by itself stays in the room: film_roomworld.cpp)
 	if (shot.handheld > 0.0) {   // a hand-held camera: a slow wander of where it is and what it looks at (sums of sines: the same every run)
 		const double a = shot.handheld, p = static_cast<double>(k) * 1.7;
 		const double dx = std::sin(1.31 * t + p) + 0.5 * std::sin(3.07 * t + 2.0 * p), dy = std::sin(1.73 * t + 0.4 * p) + 0.5 * std::sin(2.71 * t + p);
