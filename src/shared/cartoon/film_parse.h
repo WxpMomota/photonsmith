@@ -114,7 +114,8 @@
 //     ambience birds 0.6                                        # a sound under the whole film: wind, birds, crickets, water or night, at a gain
 //     mute     birds                                            # no birds heard: no birdsong (the trees' or an ambience's), no eagles' cries, no geese, no owl
 //     music    none                                             # no music: without a cues file (film_assets/<key>/cues.txt) a film plays its drafted score
-//                                                               # (film_score.h, `--film-score`) under its sounds; `music draft` says so
+//                                                               # (film_score.h, `--film-score`) under its sounds; `music draft` says so; `music clear`: the
+//                                                               # music is not muffled while the camera is under the water (the voices and sounds still are)
 //     terrain  mountains  size 1500  height 320  seed 3         # the land (film_terrain.h): hills, mountains, dunes, canyon or coast, eroded, coloured by height, slope and water,
 //                                                               # with far ranges round it (`far off`); `at X Z`, `y Y`, `focus X Z` (finest there; a valley floor round it),
 //                                                               # `snow H` (the snow line above y), `erosion E` (0 to 3); on a terrain every height is above the ground
@@ -404,7 +405,7 @@ struct FilmParts {
 	std::vector<PartText> parts;   // none: the film is not in parts
 	std::string key, name, about, tags, error;
 	double still = -1.0;
-	bool draftMusic = true;
+	bool draftMusic = true, clearMusic = false;
 };
 FilmParts partsOf(const std::string &text, const std::string &where);
 

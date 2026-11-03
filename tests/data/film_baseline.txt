@@ -224,6 +224,14 @@ tengwang|56|1940601775feb7af|The stars over the river
 tengwang|57|61394eb350570369|The manuscript
 tengwang|58|ce808850ed728313|Dawn
 tengwang|59|d5560262f6b0c819|The title
+the-great-blue|1|be2e15612bbff5c1|The descent
+the-great-blue|2|2697f79588716e70|The reef
+the-great-blue|3|7ac0995ea716e5d0|Mantas
+the-great-blue|4|5f483f75cc7689c8|The bait ball
+the-great-blue|5|588f9be4e455fc0d|The bubble net
+the-great-blue|6|2d6c6ed14d0c7f26|Whale shark
+the-great-blue|7|972968e1b078894a|The kelp forest
+the-great-blue|8|795d8b1f9a7ab249|The breach
 the-lantern-below|1|fd490a4788c97fd2|The reef
 the-lantern-below|2|9b6721a2e06dfa09|The hook
 the-lantern-below|3|2e09fbe740b2919d|Pip
@@ -232,6 +240,14 @@ the-lantern-below|5|ecfafe167ba76d5a|Town
 the-lantern-below|6|e73fee9ceac8f12b|The dark
 the-lantern-below|7|fd04bf9e4af3974c|Grandpa Kraken
 the-lantern-below|8|e006779e0d8fe066|Lantern night
+the-midnight-garden|1|f4b8cef11d0e2d89|Moonlight
+the-midnight-garden|2|d8dc5db2832a3cde|Spawning
+the-midnight-garden|3|a34ef26a026da411|Into the dark
+the-midnight-garden|4|d27435df6cfb02a9|Lanternfish
+the-midnight-garden|5|1a9e6e2a501d2950|The angler
+the-midnight-garden|6|ca5fbac289259714|Giant squid
+the-midnight-garden|7|b755b991e8cc4b0f|The vents
+the-midnight-garden|8|b3e20935285bbc5a|The whale fall
 thunder-plains|1|35f1864e597f8a2c|The plain
 thunder-plains|2|2378aed5235e79ad|Wheeling
 thunder-plains|3|0cabadac7e9b2406|The storm comes

@@ -1,0 +1,73 @@
+# The Great Blue: a day in the open ocean, filmed as a wildlife documentary (no toon look, no cartoon characters) - a diver over a coral reef, manta rays under Snell's window,
+# a sardine bait ball with dolphins, sharks and diving gannets, humpbacks blowing a bubble net, a whale shark, a kelp forest with sea lions, and a humpback breaching at sunset.
+# Heights on the sea's lines are above the seabed (15 m down: no terrain); the camera's keys are the world's (the surface at 0). x z are pbrt's.
+film    the-great-blue
+name    The Great Blue
+about   A day in the open ocean: a coral reef, manta rays, a sardine run, humpbacks, a whale shark, a kelp forest and a humpback breaching at sunset.
+scene   film_assets/wild/set.pbrt
+length  60
+tags    water, nature, backlight
+
+music      clear
+water      sea  level 0  waves 0.45
+sky        10:00 18:40  south 0 physical
+underwater clarity 2.4  colour blue  ripples
+exposure   auto
+current    0.07 toward 60
+
+# the reef, a diver over it, and a boat going over
+reef       60 in -12 -20 12 -6
+clownfish  -2.6 0 -7.4  count 3
+seabed     anemones 4 in -6 -10 4 -7
+seabed     seagrass 40 in 6 -8 16 0
+seabed     gardeneels 50 in -10 -5 -3 0
+seabed     starfish 12 in -8 -6 8 -2
+critters   nudibranchs 6 in -2 -8 2 -6
+shells     80 in -8 -8 8 0
+swimmers   stingrays 2  at 3 0 -5  radius 2  rise 11
+diver      ana from -1 11 -5 to 6 3 -13 via 1 6 -9 at 0.3  speed 0.6  suit blue
+
+# mantas and eagle rays flying overhead
+swimmers   mantas 3  at 32 8 -16  radius 6
+swimmers   eaglerays 6  at 36 6 -12  radius 5
+# a bait ball: dolphins herding, sharks striking, gannets diving in from the sky
+sardinerun 62 7 -28  radius 3.2  gannets 10  dolphins 4  from 22
+slowmo     25 28 0.35
+# humpbacks and their bubble net
+bigfish    humpbacks 2  at 92 6 -30  radius 9
+bubbles    net 92 -30 at 29  radius 6  depth 12
+whalesong  at 28 for 18 from 92 8 -30
+# a whale shark over a second reef, reef sharks, and a school of jacks that bursts as a shark comes through
+reef       40 in 110 -30 132 -14
+bigfish    whaleshark 1  at 122 6 -22  radius 9
+bigfish    reefsharks 3  at 118 3 -18  radius 7
+school     jacks 400 at 116 7 -12  radius 3.5  strike 41 hunter sharks
+# a kelp forest with sea lions playing in it
+kelpforest 40 in 140 -24 160 -4
+swimmers   sealions 3  at 150 6 -14  radius 4
+# a humpback breaching at sunset, slowed down
+whale      at 197 -40  toward 90  length 14  speed 2  during 50 60  breach 54
+slowmo     53.5 60 0.6
+
+shot 0 The descent
+  key   1.5 -2.4 -0.5   -0.6 -6.5 -7   62
+  key   1.2 -3.0 -1.0   0 -8 -8   60
+shot 7 The reef
+  key   -3 -12.6 -1   -1 -13.4 -9   50
+  key   -1.5 -12.4 -1.6   0 -13.2 -9.5   48
+shot 14 Mantas
+  key   28 -13 -6   32 -6 -16   64
+  key   29 -13 -6.5   33 -5.5 -16   62
+shot 21 The bait ball
+  key   57 -9.5 -20   62 -8 -28   60
+shot 29 The bubble net
+  key   86 -13 -22   92 -5 -30   64
+shot 37 Whale shark
+  key   112 -10 -6   119 -9 -18   58
+  key   113 -10 -7   120 -9 -19   56
+shot 45 The kelp forest
+  key   144 -13 -2   151 -7 -16   62
+  key   145 -12.5 -3   151 -6 -16   60
+shot 52 The breach
+  key   197 0 -18   197 4.5 -40   62
+  waterline

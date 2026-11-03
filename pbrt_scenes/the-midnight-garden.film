@@ -1,0 +1,62 @@
+# The Midnight Garden: the sea at night, filmed as a wildlife documentary (no toon look, no cartoon characters) - a diver with a torch on a moonlit reef as the corals spawn and the
+# plankton lights up round everything that moves, then a remote robot sub on into the dark: siphonophores, comb jellies, lanternfish, an anglerfish, a giant squid, black smokers and
+# pillow lava, a brine pool, and a whale fall. Heights on the sea's lines are above the seabed (15 m down: no terrain); the camera's keys are the world's. x z are pbrt's.
+film    the-midnight-garden
+name    The Midnight Garden
+about   The sea at night: a diver on a moonlit reef as the corals spawn, then a robot sub into the dark past siphonophores, lanternfish, an anglerfish and a giant squid to the vents.
+scene   film_assets/wild/set.pbrt
+length  60
+tags    water, nature, night, emissive
+
+music      clear
+water      sea  level 0  waves 0.3
+sky        23:00 23:30  south 0 physical
+moonlight  elevation 55  toward 200  bright 1.2
+underwater clarity 2  colour blue  lamp 0.5 blue
+exposure   auto 0.2
+current    0.05 toward 80
+seasparkle amount 1.0
+
+# the reef by moonlight: glowing under the lamps, and spawning
+reef       50 in -10 -18 10 -6 fluoresce
+nightdive  glow 2  spawn 7 22
+seabed     anemones 4 in -6 -10 4 -7
+critters   shrimp 8 in -3 -9 3 -6
+shells     60 in -6 -8 6 -2
+diver      kai from -6 9 2 to -2 3 -6 via -5 6 -2 at 0.5  speed 0.5  lamp  suit black
+octopus    3 0 -9  toward 200  jet 12
+
+# a remote robot sub, out into the dark
+sub        robot rov at 6 6 -6 to 30 5 -14 to 60 4 -20 to 90 3 -24 to 112 3 -28  speed 2.6  from 15  toward 120
+deepsea    siphonophores 2  in 14 6 -20 28 8 -14
+deepsea    combjellies 16  in 14 3 -15 26 7 -8
+deepsea    lanternfish 120  in 30 2 -22 44 7 -12
+deepsea    sparks
+deepsea    anglerfish 2  in 50 2 -19 52 3 -17
+giantsquid 74 5 -22  length 11  toward 250  from 36  glow 37.5
+# the vents: black smokers, pillow lava, a brine pool, and a whale fall
+vents      4 in 112 -40 126 -32
+pillowlava 121 -22  radius 5
+brinepool  106 -25  radius 4
+whalefall  98 -32  length 13  toward 30
+whalesong  at 50 for 10
+
+shot 0 Moonlight
+  key   -2.5 -13.2 1.0   -3 -4 -4   66
+shot 7 Spawning
+  key   -1.0 -12.8 0.5   0.5 -13.2 -8   52
+  key   -0.6 -12.6 0.0   0.8 -13.0 -8   50
+shot 15 Into the dark
+  follow rov  behind 5  up 1.2  side 2  fov 58
+shot 23 Lanternfish
+  key   34 -10 -10   38 -10 -17   58
+shot 29 The angler
+  key   50.2 -12.3 -16.2   51 -12.5 -18   36
+shot 35 Giant squid
+  key   67.5 -9.6 -17.5   74 -10 -22   58
+shot 43 The vents
+  key   108 -9 -16   119 -10 -34   60
+  key   109 -9.5 -17   119 -10 -34   58
+shot 52 The whale fall
+  key   94 -12 -24   98 -14 -32   54
+  key   95 -11.6 -25   98 -14 -32   52

@@ -250,6 +250,12 @@ TEST(FilmUndersea17, MusicHeardFromUnderTheWater) {
 	const std::vector<float> fc = film.musicCutoffs();
 	ASSERT_FALSE(fc.empty());
 	EXPECT_LT(fc[300], 1500.0f) << "the camera is under the water";
+	EXPECT_FALSE(film.spec.clearMusic);
+	ff::DataFilm clear;   // (`music clear`: the score is left as it is - cartoons.cpp gives such a film no musicCutoffs - and still drafted)
+	ASSERT_EQ(loadFilm("musicclear", std::string(kSea) + "music clear\ncharacter finn fish at 0 -12 -4\nshot 0 S\n  key 0 -10 4  0 -12 -4  50\n", clear), "");
+	EXPECT_TRUE(clear.spec.clearMusic);
+	EXPECT_TRUE(clear.spec.draftMusic);
+	EXPECT_NE(problemWith("music loud"), "");
 	const std::string score = cartoon::score::draft(film);
 	EXPECT_NE(score.find("send 0.9"), std::string::npos) << "the sea's style: deep in the reverb";
 	EXPECT_NE(score.find("spread 0.07"), std::string::npos) << "bubbles of notes";

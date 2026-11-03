@@ -636,8 +636,10 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 			else if (const std::string e = toon_look::parse(rest, s.toon); !e.empty()) return fail(e);
 		} else if (verb == "music") {
 			const std::vector<std::string> t = detail::tokens(line);
-			if (t.size() != 2 || (t[1] != "none" && t[1] != "draft")) return fail("`music none` (no music) or `music draft` (the drafted score when there is no cues file)");
-			s.draftMusic = t[1] == "draft";
+			if (t.size() != 2 || (t[1] != "none" && t[1] != "draft" && t[1] != "clear"))
+				return fail("`music none` (no music), `music draft` (the drafted score when there is no cues file) or `music clear` (not muffled under the water)");
+			if (t[1] == "clear") s.clearMusic = true;
+			else s.draftMusic = t[1] == "draft";
 		} else if (verb == "prop") {
 			const std::vector<std::string> t = detail::tokens(line);
 			Spec::Prop pr;
@@ -1257,8 +1259,10 @@ FilmParts partsOf(const std::string &text, const std::string &where) {
 		} else if (verb == "still") {
 			if (!detail::number(rest, out.still) || out.still < 0.0) return fail(i, "still is a time in seconds (in the whole film)");
 		} else if (verb == "music") {
-			if (rest != "none" && rest != "draft") return fail(i, "`music none` (no music) or `music draft` (the drafted score when there is no cues file)");
-			out.draftMusic = rest == "draft";
+			if (rest != "none" && rest != "draft" && rest != "clear")
+				return fail(i, "`music none` (no music), `music draft` (the drafted score when there is no cues file) or `music clear` (not muffled under the water)");
+			if (rest == "clear") out.clearMusic = true;
+			else out.draftMusic = rest == "draft";
 		} else if (verb == "shot" || verb == "key") {
 			return fail(i, "a shot belongs to a part: the lines before the first `part` are what every part shares");
 		} else if (verb == "title" || verb == "episode" || verb == "theme") {

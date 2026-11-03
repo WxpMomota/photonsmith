@@ -6,6 +6,13 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **Two films under the sea, shot as wildlife documentaries (2026-11-03).** `the-great-blue`: a day in the open ocean, from a diver over a coral reef past manta rays, a
+  sardine bait ball (dolphins, sharks, diving gannets, in slow motion), humpbacks blowing a bubble net, a whale shark and a kelp forest with sea lions, to a humpback breaching
+  at sunset seen from the waterline. `the-midnight-garden`: the sea at night, a diver with a torch on a moonlit reef as the corals spawn, then a robot sub into the dark past
+  siphonophores, comb jellies, lanternfish, an anglerfish and a giant squid to black smokers, pillow lava, a brine pool and a whale fall. No toon look and no cartoon
+  characters; each has a composed score (its cues file). `music clear` keeps a film's music clear while the camera is under the water (the voices and the sea's sounds are
+  still muffled), and by moonlight the glints on the surface no longer give every bright light in the picture a star.
+
 * **Cartoons indoors, round 2: what is done at home (2026-11-02).** Walks go up and down the stairs to rooms on other floors (`go WHO to ROOM`), and nothing upstairs stands over
   the stairs any more. Characters `carry` mugs, plates and books from one piece to another (things are props: `give` hands them over). Kitchens `cook`: a pan on the gas, a whistling
   kettle, toast that pops up, the oven, a meal eaten up. Baths fill and drain, showers run, the mirror steams up and wet feet leave prints. Nights have torches, flickering lamps and

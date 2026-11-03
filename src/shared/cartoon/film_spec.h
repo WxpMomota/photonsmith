@@ -662,6 +662,7 @@ struct Spec {
 	std::vector<dressing::Ambience> ambience;
 	bool muteBirds = false;   // (`mute birds`: no birdsong, no eagles' cries, no geese - whatever flies in the picture)
 	bool draftMusic = true;   // (`music none`: no drafted score when there is no cues file)
+	bool clearMusic = false;  // (`music clear`: the score is not muffled while the camera is under the water - the voices and the sea's sounds still are)
 	toon_look::Style toon;    // the toon look (`toon`): written into every frame's header as its `# @rt-toon` line
 	double terminator = 0.0;  // the shadow terminator offset (`terminator`, shadow_terminator.h): written into every material of the frames; 0 none
 	std::string version;      // (not a line: a hash of the film file's text as read - what a simulation kept between frames is kept under, film_cloth.h)

@@ -228,7 +228,7 @@ Film filmOf(Registry &r, const film_file::DataFilm &d, bool drafted, int id, con
 	// how loud its characters speak (its music is ducked under it)
 	if (!d.spec.lines.empty() || !d.spec.characters.empty()) f.speechAt = [p](double t) { return p->speechAt(t); };
 	f.trackAt = [p](const std::string &name, double t) { return p->lightLevel(name, t); };
-	if (d.spec.hasUnderwater) f.musicCutoffs = [p]() { return p->musicCutoffs(); };   // (round 17: its music muffled while the camera is under the water)
+	if (d.spec.hasUnderwater && !d.spec.clearMusic) f.musicCutoffs = [p]() { return p->musicCutoffs(); };   // (round 17: its music muffled while the camera is under the water)
 	// every film file has a soundtrack: its set's sound and its rain, its footsteps, touches and lines, and its music - its cues file's (withFilmFiles) or, when it has none,
 	// the score drafted from what happens in it (film_score.h; `music none` leaves it out), ducked under the lines as a cues file's music is. (One with no music and nothing
 	// else to hear has a soft wind: a video of a film is never silent.)
@@ -251,7 +251,7 @@ Film filmOf(Registry &r, const film_file::DataFilm &d, bool drafted, int id, con
 		std::vector<std::string> problems = sheet.problems;
 		audio::Mix music(m.seconds());
 		music_cues::play(music, sheet, {}, p->shotStarts(), names, problems);
-		if (p->spec.hasUnderwater) music.lowPass(p->musicCutoffs());
+		if (p->spec.hasUnderwater && !p->spec.clearMusic) music.lowPass(p->musicCutoffs());
 		m.add(music, speech ? music_cues::duckingOf(speech, m.seconds() + 4.0) : std::vector<float>());
 		for (const std::string &problem : problems) std::cerr << "[score] " << p->spec.key << ": " << problem << std::endl;
 	};
@@ -313,7 +313,8 @@ void addFilmFile(Registry &r, const std::string &file) {
 	std::vector<std::string> names;
 	int samples = 0;
 	for (std::size_t k = 0; k < parts.parts.size(); ++k) {
-		const film_file::DataFilm &d = r.data[before + k];
+		film_file::DataFilm &d = r.data[before + k];
+		d.spec.clearMusic = d.spec.clearMusic || parts.clearMusic;   // (`music clear` is the whole film's line)
 		films.push_back(filmOf(r, d, drafted, 0, std::string()));
 		ins.push_back(parts.parts[k].in);
 		const std::string own = d.shotNames();   // (a part with no shots is one shot, "The whole film")

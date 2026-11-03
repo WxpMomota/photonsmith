@@ -460,7 +460,9 @@ static std::string underTheSeaLight(const Spec &spec, std::string out, const std
 			for (const skyfx::Strike &s : l.strikes) out += sealight::underFlashText(skyfx::strokes(s, t - s.t), Vec3{s.x - eyeP.x, l.base, s.z - eyeP.z});
 		if (!spec.tracedCaustics && spec.hasSky) out = sealight::withCaustics(out, spec.key.empty() ? std::string("film") : spec.key, nt, eyeP, sea.level, sea.level - seabed, spec.toon.on);
 		const std::string glints = sealight::glintsText(out, nt, eyeP, sea.level);
-		if (!glints.empty()) out = night::withWords(out + glints, sealight::glintLook());
+		double el = 60.0, facing = 180.0;   // (the stars are the sun's: by moonlight the exposure is opened so far that every spark, lamp and glowing crack got one)
+		if (spec.hasSky) dressing::sunAt(spec.sky, dressing::hourAt(spec.sky, t, spec.storyEnd), el, facing);
+		if (!glints.empty()) out = el > 0.0 ? night::withWords(out + glints, sealight::glintLook()) : out + glints;
 		out += sealight::rainText(rain, nt, eyeP, sea.level);
 	}
 	if (wl.where == undersea::Waterline::At) out = night::withWords(out, undersea::waterlineLook(eyeP, targetP, fov, wl.elevation, t));

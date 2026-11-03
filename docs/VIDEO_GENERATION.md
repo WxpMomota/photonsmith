@@ -2824,6 +2824,22 @@ stream behind a character when it swims fast, and a gulp is a big wobbling bubbl
 (characters, subs, serpents) once it is dark: under a `sky` it fades in as the sun goes down. Speed lines and sparks are grouped with the bubbles, so a toon film draws no ink round them.
 Every one of these features has its own sounds.
 
+### Under the sea, filmed for real: two documentaries (2026-11-03)
+
+The features of rounds 14 to 18 without the cartoon: no `toon` line, no talking characters, the animals and places as they are. `pbrt_scenes/the-great-blue.film` is a day in
+the open ocean - a diver over a coral reef, manta rays under Snell's window, a sardine run with dolphins, sharks and diving gannets (`slowmo` for the plunges), humpbacks blowing a
+bubble net, a whale shark and a school of jacks bursting from a shark, a kelp forest with sea lions, and nature round 9's `whale ... breach` seen from the waterline at sunset,
+slowed. `pbrt_scenes/the-midnight-garden.film` is the sea at night - a diver with a torch on a moonlit, fluorescing reef as the corals spawn, then a `sub robot` into the dark past
+the deep's animals and a giant squid to the vents, pillow lava, a brine pool and a whale fall (`exposure auto 0.2`: by moonlight the automatic exposure opens up a long way). Each
+has a composed score in its cues file (`film_assets/<key>/cues.txt`: piano, strings, a cello line, bells), cued to its shots: the breach's leap and crash, the jacks' burst, the
+squid coming out of the dark.
+
+**`music clear`.** The music of a film under the water is muffled while the camera is under the surface (round 17). `music clear` keeps it clear - a documentary's score is not
+in the water - while the voices and the sea's own sounds are muffled as before.
+
+**Glints by moonlight.** The sun's glints on the surface seen from below are drawn as small stars (round 15), by a star look on the whole picture for lights far brighter than
+white. By moonlight the exposure is opened so far that every spark, lamp and glowing crack was made a star too; the moon's glints are now drawn without the star look.
+
 ### Rooms and houses: cartoons indoors (2026-11-02)
 
 Ten features for cartoons that happen inside. x z are pbrt's, as everywhere in a film file; a room's own words (its walls, windows, furniture) are its own: its front wall (wall 1 in
