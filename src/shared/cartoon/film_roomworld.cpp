@@ -13,6 +13,7 @@
 //                     on the roof - and what is in another room heard through the wall, muffled
 
 #include "film_file.h"
+#include "film_homelife.h"
 #include "film_roomlife.h"
 #include "film_roomlook.h"
 #include "film_soundscape.h"
@@ -96,7 +97,7 @@ std::string DataFilm::roomsAt(const std::string &header, double t, double nt) co
 			if (e.x > 0.5 * r.w) leaveOut |= 8;
 		}
 		const std::vector<int> opened = openedIn(spec, static_cast<int>(i));
-		out += rooms::staticText(film, r, opened, leaveOut);
+		out += rooms::staticText(film, r, opened, leaveOut, rooms::steamOf(in.home.doings, static_cast<int>(i), t));   // (a mirror steamed up: round 2)
 		std::vector<std::pair<int, double>> openness;
 		for (const int item : opened) {
 			double v = 0.0;
@@ -112,7 +113,7 @@ std::string DataFilm::roomsAt(const std::string &header, double t, double nt) co
 			if (closed < 0.6) out += rooms::motesText(r, nt, toSun);
 		}
 	}
-	return out;
+	return out + homeAt(header, t, nt);   // (what is done there: round 2, film_homeworld.cpp)
 }
 
 std::string DataFilm::placeUses() {
@@ -122,12 +123,14 @@ std::string DataFilm::placeUses() {
 			if (each.name == u.who) c = &each;
 		if (!c) continue;
 		WalkLine w;
-		w.line = u.line, w.t0 = u.t0, w.speed = 0.9;
+		w.line = u.line, w.t0 = u.t0, w.speed = u.speed;
 		w.targets.push_back({u.stand.x, u.stand.z});
+		w.floors.push_back(u.stand.y);   // (its room's floor: upstairs, by the stairs - film_ways.cpp)
 		const auto at = std::find_if(c->walks.begin(), c->walks.end(), [&u](const WalkLine &o) { return o.t0 > u.t0; });
 		if (at != c->walks.begin() && std::prev(at)->t0 == u.t0) return std::to_string(u.line) + ": " + u.who + " already walks at " + std::to_string(u.t0) + " s";
 		c->walks.insert(at, w);
 	}
+	placeHome();   // (round 2's: a carry's walks, a pet's after its owner - film_homeworld.cpp)
 	return std::string();
 }
 
@@ -151,11 +154,12 @@ void DataFilm::timeUses() {
 			if (std::find(poses.begin(), poses.end(), "reach") != poses.end()) c->gestures.push_back({"reach", u.arrive, u.arrive + 0.4, std::max(u.arrive + 0.5, end - 0.4), end + 0.2, -1.0});
 		}
 	}
+	timeHome();   // (round 2's: picks and puts, knocks, falls, slips: film_homeworld.cpp)
 }
 
 void DataFilm::roomMoment(const Character &c, double t, Vec3 &where, double &heading) const {
 	for (const rooms::Use &u : spec.indoors.uses) {
-		if (u.who != c.name) continue;
+		if (u.who != c.name || u.verb == "go") continue;   // (a `go` is only its walk)
 		const double w = useWeight(u, t);
 		if (w <= 0.0) continue;
 		const Vec3 seat = story(u.seat.x, where.y, u.seat.z);
@@ -177,6 +181,7 @@ void DataFilm::roomPose(const Character &c, double t, CharacterMoment &m) const 
 			m.lean = std::max(m.lean, w);
 		}
 	}
+	homePose(c, t, m);   // (round 2's: a nap, a torch, a dance, a slip - film_homeworld.cpp)
 }
 
 camera_keyframes::Key DataFilm::peekKey(const Shot &shot) const {
@@ -226,6 +231,8 @@ double DataFilm::indoorExposure(double t) const {
 	if (i < 0) return 0.0;
 	const rooms::Room &r = spec.indoors.rooms[static_cast<std::size_t>(i)];
 	const double dark = darkOutside(t);
+	for (const rooms::Doing &d : spec.indoors.home.doings)   // (shadow play: a bare bulb lights it, the lamps turned down - opened up as for candles, the bulb burnt the shadow out)
+		if (d.verb == "dim" && d.roomIndex == i && t >= d.t0 && t < d.t1) return lerp(1.8, 0.9, dark);
 	double lamps = 0.0;   // (how much of its light is a lamp's, lit)
 	for (const rooms::Lamp &l : r.lamps)
 		if (l.electric) lamps = std::max(lamps, rooms::lampOn(spec.indoors, r, l, t, dark));
@@ -240,7 +247,7 @@ int DataFilm::floorSurfaceAt(Vec3 story) const {
 	const rooms::Room &r = spec.indoors.rooms[static_cast<std::size_t>(i)];
 	const Vec3 local = rooms::toLocal(r, p);
 	for (const rooms::Item &it : r.items) {   // (a rug under it)
-		if (!it.flat) continue;
+		if (it.kind != "rug" && it.kind != "mat") continue;   // (a bathroom's mirror is flat too, on its wall)
 		const rooms::detail::Rect f = rooms::detail::footprint(it);
 		if (local.x > f.x0 && local.x < f.x1 && local.z > f.z0 && local.z < f.z1) return static_cast<int>(sfx::Surface::Carpet);
 	}
@@ -322,6 +329,7 @@ void DataFilm::roomSounds(audio::Mix &m) const {
 			ss::place(m, ears, t, rooms::toPbrt(r, {0.0, r.h + 0.5, 0.0}), audio::noiseBurst(0.03, 0.001, 0.02, 1500.0, 5000.0, seed += 13u), 0.05 * std::min(1.0, w.amount), 10.0);
 		}
 	}
+	homeSounds(m, heard);   // (round 2's: film_homeworld.cpp)
 }
 
 }  // namespace film_file

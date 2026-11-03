@@ -126,8 +126,17 @@ inline double lampOn(const Indoors &in, const Room &r, const Lamp &l, double t, 
 		named = true;
 		if (t >= s.on && t < s.off) on = 1.0;
 	}
-	if (named || !l.electric) return named ? on : 1.0;
-	return dark;
+	double by = 1.0;   // (round 2: a `flicker` - mostly near full, wavering, a tenth of a second now and then nearly out - and the lamps turned down for shadow play)
+	for (const Doing &d : in.home.doings) {
+		if (d.room != r.name || t < d.t0 || t >= d.t1) continue;
+		if (d.verb == "flicker" && l.electric && (d.what.empty() || d.what == l.kind || d.what == l.name)) {
+			const int slot = static_cast<int>(std::floor(t * 10.0)), seed = r.seed * 17 + static_cast<int>(l.at.x * 100.0);
+			by *= hash01(slot, seed) < 0.18 ? 0.08 + 0.1 * hash01(slot, seed + 1) : 0.72 + 0.18 * std::sin(37.0 * t + seed) * std::sin(11.0 * t);
+		}
+		if (d.verb == "dim") by *= 0.15;
+	}
+	if (named || !l.electric) return (named ? on : 1.0) * by;
+	return dark * by;
 }
 // The lamps of a room at t: each one's bulb (its light) where it is on; candles and a fire flickering; a television's screen glowing in shifting colours.
 inline std::string lampsText(const Indoors &in, const Room &r, double t, double dark) {

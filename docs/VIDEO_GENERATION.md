@@ -2841,7 +2841,8 @@ wood and red, modern pale and grey, old dark wood and green.
 doorway into the next near its back, a front door on the first, and windows front and back. Upstairs rooms stand over the rooms below, and open stairs go up the first room's left wall
 through a hole in its ceiling. The rooms are called NAME.KIND (`home.kitchen`; a second of a kind `home.bedroom2`). A `door` line hangs a door in a doorway and opens and shuts it, with a
 creak and a knock. The rooms are in what a walk finds its way round: `walk pip 2 0.8 to X Z` from one room to another goes through the doorways and round the furniture.
-Indoors a character passes closer to things (0.28 m), so a doorway is not too narrow for it. (A walk finds its way on one floor: it does not climb the stairs to a room upstairs.)
+Indoors a character passes closer to things (0.28 m), so a doorway is not too narrow for it. A walk to a room upstairs (`go`, or a use of a piece there) takes the stairs: see
+round 2 below.
 
 **Daylight in at the windows, `curtains ROOM open|closed|blowing [at T]`.** (film_roomlife.h.) The film's `sky` lights a room through its windows: a soft light in at each one, and the sun's
 own patch on the floor through the panes, moving as the day goes. In the sun dust drifts in the beam. With `weather rain` drops run down the panes and the light greys. Curtains hang at every
@@ -2876,6 +2877,55 @@ wood, boards, tiles, a carpet's weave and black-and-white checks on the floor. W
 
 **Glass, mirrors and water.** A mirror reflects the room; the television's screen glows with a changing programme; a glass cabinet shows what is inside it; an aquarium has water, weed,
 gravel and fish going round it with a stream of bubbles. The panes are thin glass, so at night with the lamps on a window shows the room in it, as a real one does.
+
+### What is done at home: cartoons indoors, round 2 (2026-11-02)
+
+Ten more for films indoors, on the rooms and houses above. `pbrt_scenes/a-busy-evening.film` uses them together: a birthday tea in Pip and Nova's kitchen, the cat's mischief, a
+bath upstairs and a stormy night.
+
+**Going upstairs: `go WHO to ROOM [ITEM] at T [speed S]`.** (film_ways.cpp.) The character walks to somewhere clear in the middle of the room, or up to the piece it names. A room on
+another floor is reached by the stairs: the walk goes to their foot, up them a tread at a time, steps off beside the top where the rail stops, and goes on across the floor above (and down
+the same way). Every use of a piece upstairs (`sit pip on bed in home.bedroom`) climbs too. The stairs have a landing at their foot and a hole long enough to climb under; nothing upstairs
+stands over the hole. A walk to a floor with no stairs to it is said when the film is read.
+
+**Things to carry: `thing NAME KIND on ITEM [in ROOM]`, `carry WHO THING to ITEM [in ROOM] at T [speed S]`.** (film_homelife.h.) A mug, a plate, a bowl, a book, a vase, a ball, a box, a
+bottle, a block, a cushion or a shoe stands on a piece's top, at its front edge (several side by side). `carry` walks to it, picks it up, walks to ITEM and puts it down on that one's top.
+A thing is a prop of the film, so `pick`, `put` and `give NAME THING T to OTHER` hand it about too. It is carried in one hand (a pet carries it in its mouth).
+
+**Cooking: `cook ROOM pot|kettle|toast|oven|meal at T [until T]`.** A pan on the hob's front ring with its blue gas flame, steam rising once it boils and its lid rattling; a kettle on
+the back ring that rumbles and, six seconds on, whistles with a jet of steam; a toaster on the counter whose toast browns and pops up five seconds on; the oven's window glowing;
+a plate at each chair round the table, steaming, eaten up between T and `until`. Each has its sound: the gas, the bubbling, the whistle, the pop and ding, the oven's hum, the cutlery.
+
+**Bath time: `bath ROOM at T [until T]`, `shower ROOM at T [until T]`.** The bath fills from its tap over ten seconds, bubbles on top, and is let out at `until` with a gurgle; a
+shower over its end sprays while it runs. Hot water steams the mirror over the basin (every bathroom has one now): it fogs over half a minute and clears over a minute after. Whoever walks
+out of the bathroom after leaves wet footprints for a few steps, drying in half a minute, and the room rings more while the water runs.
+
+**The night: `torch WHO at T [until T]`, `flicker ROOM [LAMP] at T [until T]`, and lightning.** (film_homefun.h.) A torch held up in the right hand throws a cone of light ahead, with a
+click on and off. A flickering lamp wavers and every so often nearly goes out, buzzing. A film's `lightning` flashes in at every window of every room, a cold light for a moment; its
+thunder follows as far behind as the strike is.
+
+**Shadow play: `shadowplay WHO [animal rabbit|bird|wolf] at T [until T]`.** A bare bulb on a stand behind the character, the room's lamps turned down: its shadow is thrown on the wall it
+faces, bigger the nearer it stands to the bulb. With `animal` its hands make one in front of its chest: a rabbit whose ears twitch, a bird whose wings beat, a wolf whose jaw snaps.
+
+**Pets: `character NAME cat|dog`, `nap PET [on ITEM] [in ROOM] at T [until T]`, `wait PET [in ROOM] at T [until T]`, `heel PET WHO at T [until T]`.** (film_pets.h.) A cartoon cat and
+dog on four legs, trotting with their feet held where they come down; the cat's tail sways, the dog's wags while it stands about. `nap` curls it up asleep on a sofa, a bed or an armchair, or
+on the floor in the sun by a window, purring if it is a cat. `wait` sits it inside the front door, facing it, and a dog barks when the door opens. `heel` sends it after WHO: each of WHO's
+walks, a moment later, to just behind where it goes. Poses: paw, beg, nod, look up. Colours: fur, belly, eyes, nose (and ears, a dog's).
+
+**Slapstick: `fall THING at T`, `knock PET THING at T`, `puddle ROOM X Z at T [size R]`, `pile ROOM books|boxes|plates [on ITEM] falls T`.** A thing tumbles off its piece to the floor:
+a mug, a plate, a bowl, a vase or a bottle smashes into pieces with a crash, and what held water leaves a puddle; anything else bounces and rolls. `knock` sends a pet to it to bat it off with
+a paw. Whoever walks over a puddle slips: feet up, onto its back with a squeak and a thud, and up again. A door opened into someone just inside it knocks them back a step with a bonk. A pile
+of books, boxes or plates topples, its pieces scattering, the top ones furthest.
+
+**Parties: `party ROOM birthday|christmas|halloween|plain [at T] [until T]`, `confetti ROOM at T`, `blowout WHO [in ROOM] at T`, `guests ROOM N [kind person|pip] [name NAME]`,
+`dance WHO|ROOM at T [until T]`.** Balloons tied to the chairs and the sofa, bobbing on their strings, and streamers from the middle of the ceiling to its corners; a birthday cake with
+candles on the table, which `blowout` sends someone to blow out, wisps of smoke after; a Christmas tree in a free corner with twinkling lights, a star and presents; pumpkins with glowing faces
+on the table and in the windows. Confetti bursts from the ceiling with a pop and lies where it lands. `guests` brings in N characters of their own looks (NAME-1, NAME-2 ...: `guest`),
+standing about the room a step apart, turned to its middle. `dance` sets a character, or everyone in a room then, bobbing to a beat, swaying and turning, arms up and waving by turns.
+
+**Following through the house: `trail WHO [behind D] [up H]` (in a shot).** The camera goes along WHO's own way behind it, D metres back (1.8) and H over its floor (by its size), so it
+passes through the doorways and up the stairs behind the walker. With `cutaway` in the shot it moves along beside the house instead, outside its front wall at the walker's place, rising with
+its floor, the front walls left out.
 
 ### Cartoons of space and the universe (2026-11-01)
 

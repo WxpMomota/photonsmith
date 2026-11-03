@@ -6,6 +6,14 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **Cartoons indoors, round 2: what is done at home (2026-11-02).** Walks go up and down the stairs to rooms on other floors (`go WHO to ROOM`), and nothing upstairs stands over
+  the stairs any more. Characters `carry` mugs, plates and books from one piece to another (things are props: `give` hands them over). Kitchens `cook`: a pan on the gas, a whistling
+  kettle, toast that pops up, the oven, a meal eaten up. Baths fill and drain, showers run, the mirror steams up and wet feet leave prints. Nights have torches, flickering lamps and
+  lightning flashing in at the windows, and `shadowplay` throws a character's shadow (or a rabbit, a bird or a wolf made with its hands) on the wall. Cats and dogs nap, wait by the
+  door, follow their owners and knock things off tables; things fall and break, puddles make people slip, doors knock people back, piles topple. Parties have balloons, streamers,
+  a birthday cake to blow out, a Christmas tree or pumpkins, confetti, guests and dancing. A `trail` camera follows a walker through the doorways and up the stairs, or along
+  beside a cutaway house. Showcase: `a-busy-evening`.
+
 * **Cartoons indoors: rooms and houses (2026-11-02).** `room KIND NAME at X Z` builds a furnished kitchen, bedroom, living room, bathroom, classroom, shop or hall in a style;
   `house` puts rooms in a row with doorways between them and open stairs to the rooms upstairs. Daylight comes in at the windows with the sun's patch on the floor and dust in the
   beam, rain runs down the panes, curtains draw and blow. Lamps, candles, a fire and the television come on at dusk, at a `switch`, and go out in a `powercut`; a camera in a room

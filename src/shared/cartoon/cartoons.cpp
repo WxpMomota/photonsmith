@@ -373,6 +373,7 @@ Registry &registry() {
 		film_kinds::aliens::install();   // (and the aliens and the robot: film_aliens.h)
 		film_kinds::sea::install();      // (and the sea's characters: film_sea_kinds.h)
 		film_kinds::seacast::install();  // (and round 18's: film_sea_cast.h)
+		film_kinds::pets::install();     // (and the pets: film_pets.h, indoor round 2)
 		for (const Film &f : kFilms) {
 			reg->made.push_back(withFilmFiles(f));
 			reg->all.push_back(&reg->made.back());

@@ -102,7 +102,8 @@ inline std::string textured(const std::string &film, const std::string &tex, con
 }  // namespace detail
 
 // The material of a group of room `r` (`tex`: a name for its texture, the film's own).
-inline std::string materialOf(const std::string &film, const Room &r, const std::string &group, const std::string &tex) {
+inline std::string materialOf(const std::string &film, const Room &r, const std::string &group, const std::string &tex, double fog = 0.0) {
+	if (group == "mirror" && fog > 0.0) return metalMaterial(lerp(Vec3{0.92, 0.93, 0.94}, Vec3{0.78, 0.8, 0.82}, fog), lerp(0.003, 0.32, fog));   // (steamed up: indoor round 2)
 	const Palette p = paletteOf(r.style);
 	if (group.rfind("wall", 0) == 0) {
 		if (!r.look.paper.empty()) return detail::textured(film, tex, r.look.paper, r.look.paper == "tiles" ? Vec3{0.92, 0.93, 0.92} : r.look.wall, r.look.paper == "tiles" ? Vec3{0.62, 0.64, 0.62} : r.look.paper2, r.seed, 1.0);
@@ -162,13 +163,13 @@ inline std::string keyOf(const Room &r, const std::vector<int> &opened) {
 				  r.ceilingHole, r.floorHole, r.holeX0, r.holeX1, r.holeZ0, r.holeZ1);
 	words += b;
 	for (const Opening &o : r.openings) std::snprintf(b, sizeof b, "|o%d,%.3f,%.3f,%.3f,%.3f,%d", o.wall, o.along, o.width, o.height, o.sill, o.door), words += b;
-	for (const Item &it : r.items) std::snprintf(b, sizeof b, "|i%s,%.3f,%.3f,%.1f,%d", it.kind.c_str(), it.x, it.z, it.turn, it.salt), words += b;
+	for (const Item &it : r.items) std::snprintf(b, sizeof b, "|i%s,%.3f,%.3f,%.1f,%d%s", it.kind.c_str(), it.x, it.z, it.turn, it.salt, it.water ? "" : "d"), words += b;
 	for (const Lamp &l : r.lamps) std::snprintf(b, sizeof b, "|l%s,%.3f,%.3f,%.3f", l.kind.c_str(), l.at.x, l.at.y, l.at.z), words += b;
 	for (const int i : opened) words += "|x" + std::to_string(i);
 	return film_cache::nameOf(words);
 }
 // A room's still part as scene text: a placement of its meshes (written once), each in its material. `leaveOut`: walls not to draw (bit w: wall w), for a cutaway.
-inline std::string staticText(const std::string &film, const Room &r, const std::vector<int> &opened, int leaveOut = 0) {
+inline std::string staticText(const std::string &film, const Room &r, const std::vector<int> &opened, int leaveOut = 0, double fog = 0.0) {
 	const std::string key = keyOf(r, opened);
 	std::optional<Groups> built;   // (made only when a file is missing)
 	const auto groups = [&]() -> Groups & {
@@ -180,7 +181,7 @@ inline std::string staticText(const std::string &film, const Room &r, const std:
 		if (name.rfind("wall", 0) == 0 && (leaveOut >> (name[4] - '0') & 1)) continue;
 		const std::string file = film_cache::ply(film, "room1_" + key + "_" + name, [&] { return groups()[name]; });
 		if (file.empty()) continue;
-		out += "AttributeBegin\n  " + materialOf(film, r, name, "room_" + key.substr(0, 8) + "_" + name) + "\n" + film_cache::plyShape(file) + "AttributeEnd\n";
+		out += "AttributeBegin\n  " + materialOf(film, r, name, "room_" + key.substr(0, 8) + "_" + name, std::round(fog * 20.0) / 20.0) + "\n" + film_cache::plyShape(file) + "AttributeEnd\n";
 	}
 	return out;
 }

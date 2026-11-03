@@ -106,14 +106,16 @@ static std::string closeShot(Spec &s, std::string &shotText, std::string &shotEa
 	if (!ease.empty() && (sh.move.kind != Shot::Move::None || !sh.fly.empty() || sh.following || sh.coverage || sh.descending || sh.spaceCam.kind != cosmos::SpaceCam::None))
 		return named + " has `ease camera`, which is for a shot of `key` lines";
 	// (one way for its camera to go: with two, one was dropped without a word - a `descend` won over an `orbit`)
-	const int ways = (sh.move.kind != Shot::Move::None ? 1 : 0) + (!sh.fly.empty() ? 1 : 0) + (sh.descending ? 1 : 0) + (sh.spaceCam.kind != cosmos::SpaceCam::None ? 1 : 0) + (!sh.peek.empty() ? 1 : 0);
-	if (ways > 1) return named + " has more than one of a move (`orbit`, `dolly`...), `fly`, `descend`, `spacecam` and `peek`: one way for its camera to go";
+	const int ways = (sh.move.kind != Shot::Move::None ? 1 : 0) + (!sh.fly.empty() ? 1 : 0) + (sh.descending ? 1 : 0) + (sh.spaceCam.kind != cosmos::SpaceCam::None ? 1 : 0) + (!sh.peek.empty() ? 1 : 0) +
+					 (!sh.trail.empty() ? 1 : 0);
+	if (ways > 1) return named + " has more than one of a move (`orbit`, `dolly`...), `fly`, `descend`, `spacecam`, `peek` and `trail`: one way for its camera to go";
 	const bool others = !shotText.empty() || sh.following || sh.coverage;
 	if (sh.move.kind != Shot::Move::None) return others ? named + " has a move and `key`, `follow` or `auto` lines too" : std::string();
 	if (!sh.fly.empty()) return others ? named + " has a `fly` line and `key`, `follow` or `auto` lines too" : std::string();
 	if (sh.descending) return others ? named + " has a `descend` line and `key`, `follow` or `auto` lines too" : std::string();   // (from orbit to the ground: film_planetfall.h)
 	if (sh.spaceCam.kind != cosmos::SpaceCam::None) return others ? named + " has a `spacecam` line and `key`, `follow` or `auto` lines too" : std::string();   // (a journey in space: film_voyage.h)
 	if (!sh.peek.empty()) return others ? named + " has a `peek` line and `key`, `follow` or `auto` lines too" : std::string();   // (in at a window: film_roomworld.cpp)
+	if (!sh.trail.empty()) return others ? named + " has a `trail` line and `key`, `follow` or `auto` lines too" : std::string();   // (along a walker's way: film_homeworld.cpp)
 	if (sh.following || sh.coverage) {
 		if (!shotText.empty()) return named + " has both `key` lines and `" + (sh.following ? "follow" : "auto") + "`";
 		if (sh.following && sh.coverage) return named + " has both `follow` and `auto`";

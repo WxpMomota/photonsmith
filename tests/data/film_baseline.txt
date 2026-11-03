@@ -1,13 +1,21 @@
 # Every film, shot by shot: film|shot|fingerprint of the scene at the shot's middle (at preview coarseness)|name. Written by
 # `python scripts/anim/film.py baseline --write` (ray_tracer --film-baseline); a difference is a film that changed - on purpose or not.
-a-day-at-home|1|72a02768e3658ce6|Morning
-a-day-at-home|2|97903bfb2d43c54a|The kitchen
-a-day-at-home|3|61173826eb36a028|The house
-a-day-at-home|4|4941f3fa902c7ae0|Rain
-a-day-at-home|5|1cfd0672962943ac|In the rain
-a-day-at-home|6|00f2fd52dc360bbe|Evening
-a-day-at-home|7|8033657e7ebe3f2b|Power cut
-a-day-at-home|8|f053069f1ba085d3|Good night
+a-busy-evening|1|b419de232ea82796|Birthday tea
+a-busy-evening|2|fc1d28a4f0064a82|Confetti
+a-busy-evening|3|ad9e152feec1251d|Mittens
+a-busy-evening|4|1cca25e28aae7e92|Up to bed
+a-busy-evening|5|0838ced28744f081|Bath time
+a-busy-evening|6|f64366aee364469f|The storm
+a-busy-evening|7|ffa54a1a537c72c7|Shadows
+a-busy-evening|8|154d941d6c994d5f|Good night
+a-day-at-home|1|4620df80a822eab5|Morning
+a-day-at-home|2|7bc50fc876d78197|The kitchen
+a-day-at-home|3|c11ce5580bacb4f3|The house
+a-day-at-home|4|4ecd71e4b9c6e26a|Rain
+a-day-at-home|5|925b84a78a4eb288|In the rain
+a-day-at-home|6|413cf57c0af13ace|Evening
+a-day-at-home|7|3b5b57e1e17f287f|Power cut
+a-day-at-home|8|e782531eb854de92|Good night
 a-walk-at-dusk|1|e859e3b8594f62d8|Setting out
 a-walk-at-dusk|2|61af484746e830db|Along the path
 a-walk-at-dusk|3|583028adcb9d90c1|The lantern

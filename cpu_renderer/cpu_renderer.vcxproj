@@ -92,6 +92,8 @@
     <ClCompile Include="..\src\shared\cartoon\film_waterworld.cpp" />
     <ClCompile Include="..\src\shared\cartoon\film_seaworld.cpp" />
     <ClCompile Include="..\src\shared\cartoon\film_roomworld.cpp" />
+    <ClCompile Include="..\src\shared\cartoon\film_homeworld.cpp" />
+    <ClCompile Include="..\src\shared\cartoon\film_ways.cpp" />
     <!-- BDPT/MLT CLI entry points - see cpu_interface_bdpt.cpp's own file
          comment. Kept as its own translation unit organizationally (keeps
          the BDPT/MLT-specific includes/logic out of cpu_interface.cpp) but

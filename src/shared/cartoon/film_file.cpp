@@ -255,7 +255,7 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 	if (spec.actingWords) actFromWords();
 	if (spec.hasSky || spec.space.on) leaveOutSkyLights();
 	for (const Spec::Prop &pr : spec.props)
-		if (std::find(scene.names.begin(), scene.names.end(), pr.name) == scene.names.end())
+		if (pr.thing.empty() && std::find(scene.names.begin(), scene.names.end(), pr.name) == scene.names.end())   // (a room's thing is drawn by the film: film_homeworld.cpp)
 			return detail::lineWhere(spec, filePath, pr.line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + pr.name + "`";
 	if (const std::string e = placeUses(); !e.empty()) return filePath + ":" + e;   // (a walk to each piece of furniture someone uses: film_roomworld.cpp)
 	if (const std::string e = findWays(); !e.empty()) return filePath + ":" + e;
@@ -391,138 +391,6 @@ std::string DataFilm::setAt(double t) const {
 	return out + dressingAt(t);
 }
 
-std::string DataFilm::findWays() {
-	std::vector<std::pair<Character *, std::size_t>> walks;
-	for (Character &c : spec.characters)
-		for (std::size_t i = 0; i < c.walks.size(); ++i)
-			if (!c.walks[i].targets.empty()) walks.push_back({&c, i});
-	std::stable_sort(walks.begin(), walks.end(), [](const auto &a, const auto &b) { return a.first->walks[a.second].t0 < b.first->walks[b.second].t0; });
-	std::map<std::string, pbrt_flatten::FlatScene> flattened;   // (by the set's text: a set that does not move is flattened once)
-	const pbrt_flatten::MeshResolver meshes = [](const std::string &path, std::vector<float> &positions, std::vector<int> &indices, std::vector<float> &uvs, std::vector<float> &normals) {
-		ply_mesh::LoadResult m = ply_mesh::loadFile(path);
-		if (!m.ok) return false;
-		positions = std::move(m.mesh.positions);
-		indices = std::move(m.mesh.indices);
-		uvs = std::move(m.mesh.uvs);
-		normals = std::move(m.mesh.normals);
-		return true;
-	};
-	for (const auto &[c, i] : walks) {
-		WalkLine &w = c->walks[i];
-		const CharacterKind &kind = characterKinds().at(c->kind);
-		double fx = c->start[0], fz = c->start[2], fy = c->start[1];   // from where its last walk left it
-		if (i > 0) {
-			const Vec3 last = endOf(*c, i - 1);
-			fx = -last.x, fy = last.y, fz = last.z;
-		}
-		const std::string set = setAt(w.t0);
-		if (!flattened.count(set)) flattened[set] = film_paths::flattenText(set + roomsStatic(), meshes);   // (its rooms' walls, stairs and furniture too: the way round them)
-		const pbrt_flatten::FlatScene &flat = flattened[set];
-		// the map round the walk: the set between its ankles and its head, whoever else stands there, grown by its size
-		double x0 = fx, x1 = fx, z0 = fz, z1 = fz;
-		for (const auto &[x, z] : w.targets) x0 = std::min(x0, x), x1 = std::max(x1, x), z0 = std::min(z0, z), z1 = std::max(z1, z);
-		const double half = std::min(30.0, 0.5 * std::max(x1 - x0, z1 - z0) + 6.0);
-		const double cell = std::max(0.05, std::min(0.12, kind.radius * c->scale * 0.4));
-		const double height = std::min(2.0, kind.height * c->scale), step = stepOf(*c);
-		const film_paths::Terrain terrain = film_paths::terrainOf(flat, 0.5 * (x0 + x1), 0.5 * (z0 + z1), half, cell, c->start[1]);
-		std::vector<double> floors;
-		film_paths::Grid g = film_paths::reachable(terrain, fx, fy, fz, step, std::min(0.15, 0.4 * height), height, floors);   // (the floor it can walk on, from where it stands)
-		for (const Character &other : spec.characters) {
-			if (&other == c) continue;
-			Vec3 at;
-			momentOf(other, w.t0, &at);
-			film_paths::addDisc(g, -at.x, at.z, characterKinds().at(other.kind).radius * other.scale);
-		}
-		const film_paths::Grid ways = film_paths::grown(g, spec.indoors.any() ? std::min(0.28, kind.radius * c->scale) : kind.radius * c->scale);   // (indoors closer: through a doorway)
-		w.points.clear();
-		w.heights.clear();
-		for (const auto &[tx, tz] : w.targets) {
-			std::vector<std::pair<double, double>> leg;
-			std::string why;
-			if (!film_paths::findWay(ways, fx, fz, tx, tz, leg, why)) {
-				if (why == "something is in the way there" && std::isnan(film_paths::floorFrom(g, floors, tx, tz)) &&
-					terrain.roomy(terrain.grid.col(tx), terrain.grid.row(tz), terrain.floorAt(tx, tz, fy + 50.0, 100.0), std::min(0.15, 0.4 * height), height))
-					why = "it cannot get up or down there (a drop or a rise of more than a step)";   // (the place has room: the way there is the trouble)
-				char buf[200];
-				std::snprintf(buf, sizeof buf, "%d: %s cannot find a way to %g %g: %s", w.line, c->name.c_str(), tx, tz, why.c_str());
-				return buf;
-			}
-			// along each leg every quarter of a metre, at the floor's height (over a hill, up the steps)
-			double px = fx, pz = fz;
-			for (const auto &[lx, lz] : leg) {
-				const int n = std::max(1, static_cast<int>(std::ceil(std::hypot(lx - px, lz - pz) / 0.25)));
-				for (int k = 1; k <= n; ++k) {
-					const double u = static_cast<double>(k) / n, x = px + (lx - px) * u, z = pz + (lz - pz) * u;
-					const double y = film_paths::floorFrom(g, floors, x, z);
-					w.points.push_back({x, z});
-					w.heights.push_back(std::isnan(y) ? c->start[1] : (std::abs(y - c->start[1]) < terrain.flat ? c->start[1] : y));
-				}
-				px = lx, pz = lz;
-			}
-			fx = tx;
-			fz = tz;
-		}
-	}
-	return std::string();
-}
-
-void DataFilm::heightsOfWalks() {
-	terrains.clear();
-	const auto grounded = [this](const Character &c) { return motion::amountFor(spec.footing, c.name) > 0.5; };
-	const bool anyWalks = std::any_of(spec.characters.begin(), spec.characters.end(), [&](const Character &c) { return !c.walks.empty() || grounded(c); });
-	if (!anyWalks) return;
-	const pbrt_flatten::MeshResolver meshes = [](const std::string &path, std::vector<float> &positions, std::vector<int> &indices, std::vector<float> &uvs, std::vector<float> &normals) {
-		ply_mesh::LoadResult m = ply_mesh::loadFile(path);
-		if (!m.ok) return false;
-		positions = std::move(m.mesh.positions);
-		indices = std::move(m.mesh.indices);
-		uvs = std::move(m.mesh.uvs);
-		normals = std::move(m.mesh.normals);
-		return true;
-	};
-	const pbrt_flatten::FlatScene flat = film_paths::flattenText(setAt(0.0), meshes);
-	for (Character &c : spec.characters) {
-		double x0 = c.start[0], x1 = x0, z0 = c.start[2], z1 = z0;
-		for (const WalkLine &w : c.walks)
-			for (const auto &[x, z] : w.points) x0 = std::min(x0, x), x1 = std::max(x1, x), z0 = std::min(z0, z), z1 = std::max(z1, z);
-		const double half = std::min(30.0, 0.5 * std::max(x1 - x0, z1 - z0) + 2.0);
-		auto terrain = std::make_shared<film_paths::Terrain>(film_paths::terrainOf(flat, 0.5 * (x0 + x1), 0.5 * (z0 + z1), half, 0.1, c.start[1]));
-		if (grounded(c)) {   // (`footing ground`: it stands on the floor under it - one near where it was put, else the film's land however far above or below)
-			const double nearby = terrain->floorAt(c.start[0], c.start[2], c.start[1], std::max(0.6, stepOf(c)));   // (not `near`: a Windows macro)
-			if (nearby != c.start[1] || !spec.hasTerrain) {
-				c.start[1] = nearby;
-			} else if (const std::shared_ptr<const terrain::Field> land = terrain::fieldOf(spec.terrain); land->inside(c.start[0], c.start[2])) {
-				c.start[1] = land->heightAt(c.start[0], c.start[2]);
-				terrain = std::make_shared<film_paths::Terrain>(film_paths::terrainOf(flat, 0.5 * (x0 + x1), 0.5 * (z0 + z1), half, 0.1, c.start[1]));   // (its floors searched from there)
-			}
-		}
-		double y = c.start[1];
-		bool uneven = false;
-		const double step = stepOf(c);
-		for (std::size_t i = 0; i < c.walks.size(); ++i) {
-			WalkLine &w = c.walks[i];
-			if (!w.targets.empty()) {   // (found already, on the floor)
-				if (!w.heights.empty()) y = w.heights.back();
-				continue;
-			}
-			w.heights.clear();
-			for (const auto &[x, z] : w.points) {
-				// a jump lands on the highest floor within its height; a walk keeps to a floor within a step of the last
-				y = terrain->floorAt(x, z, y, w.style == WalkLine::Jump ? std::max(step, w.height) : step);
-				w.heights.push_back(y);
-			}
-		}
-		for (const WalkLine &w : c.walks)
-			for (double h : w.heights) uneven = uneven || h != c.start[1];
-		if (uneven || grounded(c)) terrains[c.name] = terrain;   // (its feet on the floor too)
-	}
-}
-
-const film_paths::Terrain * DataFilm::terrainFor(const Character &c) const {
-	const auto it = terrains.find(c.name);
-	return it == terrains.end() ? nullptr : it->second.get();
-}
-
 std::string DataFilm::crowding() const {
 	const double step = 0.05;
 	// (only those who can: every program start reads every film, and where someone in a boat is means reading the sea, 9 ms a time: 13 s for one film with a rower and a bystander)
@@ -549,6 +417,10 @@ std::string DataFilm::crowding() const {
 			const Character &ca = spec.characters[a], &cb = spec.characters[b];
 			if (ca.extra || cb.extra) continue;   // (a crowd keeps to its cells; the others are told of each other)
 			if (ca.walks.empty() && cb.walks.empty()) continue;
+			if (std::any_of(spec.indoors.home.acts.begin(), spec.indoors.home.acts.end(), [&](const rooms::Act &x) {   // (a pet at its owner's heels: close behind on purpose)
+					return x.verb == "heel" && ((x.who == ca.name && x.what == cb.name) || (x.who == cb.name && x.what == ca.name));
+				}))
+				continue;
 			pairs.push_back({&ca, &cb});
 		}
 	if (pairs.empty()) return std::string();
@@ -559,6 +431,7 @@ std::string DataFilm::crowding() const {
 			Vec3 pa, pb;
 			const bool movingA = momentOf(ca, t, &pa).moving, movingB = momentOf(cb, t, &pb).moving;
 			if (!movingA && !movingB) continue;
+			if (spec.indoors.any() && std::abs(pa.y - pb.y) > 1.5) continue;   // (one upstairs, the other down: indoor round 2)
 			const double reach = 0.8 * (characterKinds().at(ca.kind).radius * ca.scale + characterKinds().at(cb.kind).radius * cb.scale);
 			if (std::hypot(pa.x - pb.x, pa.z - pb.z) < reach) {
 				char buf[200];
@@ -985,7 +858,7 @@ std::string DataFilm::walksInTurn() {
 			const double end = w.style == WalkLine::Jump ? w.t0 + flightOf(w) : w.t0 + pathOf(c, i).length() / std::max(1e-6, pathOf(c, i).speed);
 			WalkLine &next = c.walks[i + 1];
 			if (next.t0 >= end - 1e-3) continue;
-			if (c.extra) {
+			if (c.extra || next.follows) {   // (a crowd's, a pet's after its owner: put off)
 				next.t0 = end;
 				continue;
 			}
@@ -1067,7 +940,7 @@ CharacterMoment DataFilm::momentOf(const Character &c, double t, Vec3 *at) const
 		if (s > m.sit) m.sit = s, m.seat = st.height * c.scale;
 	}
 	m.frame = mul(translate(where), rotate({0.0, 1.0, 0.0}, heading));
-	if (!spec.indoors.uses.empty()) roomPose(c, t, m);   // (lying back, leaning, reaching)
+	if (spec.indoors.any()) roomPose(c, t, m);   // (lying back, leaning, reaching; round 2's naps, torches, dances, slips)
 	m.steps = steps;
 	m.moving = moving;
 	m.going = going;
@@ -1882,12 +1755,14 @@ void DataFilm::cameraAt(double t, std::string &lookAt, std::string &camera, int 
 		key = cosmos::spaceCamKey(shot.spaceCam, (t - shot.start) / span);
 	} else if (!shot.peek.empty()) {   // in at a window (film_roomworld.cpp)
 		key = peekKey(shot);
+	} else if (!shot.trail.empty()) {   // along a walker's own way (round 2: film_homeworld.cpp)
+		key = trailKey(shot, t);
 	} else if (shot.move.kind != Shot::Move::None) {
 		key = moveKey(shot, t, span);
 	} else {
 		key = camera_keyframes::at(shot.path, std::min(1.0, std::max(0.0, (t - shot.start) / span)), span);
 	}
-	if ((shot.following || shot.move.kind != Shot::Move::None) && spec.indoors.any()) keepIndoors(key);   // (a camera that moves by itself stays in the room: film_roomworld.cpp)
+	if ((shot.following || shot.move.kind != Shot::Move::None) && shot.trail.empty() && spec.indoors.any()) keepIndoors(key);   // (a camera that moves by itself stays in the room: film_roomworld.cpp)
 	if (shot.handheld > 0.0) {   // a hand-held camera: a slow wander of where it is and what it looks at (sums of sines: the same every run)
 		const double a = shot.handheld, p = static_cast<double>(k) * 1.7;
 		const double dx = std::sin(1.31 * t + p) + 0.5 * std::sin(3.07 * t + 2.0 * p), dy = std::sin(1.73 * t + 0.4 * p) + 0.5 * std::sin(2.71 * t + p);

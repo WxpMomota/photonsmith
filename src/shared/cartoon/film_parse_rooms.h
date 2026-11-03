@@ -10,6 +10,7 @@
 //   lean WHO on ITEM [in ROOM] at T [until T]    lookout WHO [in ROOM] [window N] at T [until T]      (it walks there from where it is, film_roomworld.cpp)
 //   (in a shot)  cutaway      peek ROOM [window N] [from D]                                            (film_roomworld.cpp)
 
+#include "film_parse_home.h"
 #include "film_rooms.h"
 #include "film_roomlook.h"
 #include "film_spec.h"
@@ -18,7 +19,8 @@ namespace cartoon {
 namespace film_file {
 
 inline bool indoorVerb(const std::string &verb, const std::vector<std::string> &t) {
-	static const std::vector<std::string> k = {"room", "house", "door", "curtains", "switch", "powercut", "clutter", "furnish", "walls", "floor", "lie", "open", "lean", "lookout", "cutaway", "peek"};
+	if (homeVerb(verb)) return true;   // (round 2's: film_parse_home.h)
+	static const std::vector<std::string> k = {"room", "house", "door", "curtains", "switch", "powercut", "clutter", "furnish", "walls", "floor", "lie", "open", "lean", "lookout", "cutaway", "peek", "go"};
 	if (verb == "sit") return t.size() > 2 && t[2] == "on";   // (`sit WHO on ITEM`: the other `sit` is film_parse.cpp's)
 	return std::find(k.begin(), k.end(), verb) != k.end();
 }
@@ -32,33 +34,13 @@ inline rooms::Room *roomNamed(Spec &s, const std::string &name) {
 inline bool colourAt(const std::vector<std::string> &t, std::size_t i, Vec3 &c) {
 	return i + 2 < t.size() && number(t[i], c.x) && number(t[i + 1], c.y) && number(t[i + 2], c.z) && std::min({c.x, c.y, c.z}) >= 0.0 && std::max({c.x, c.y, c.z}) <= 1.0;
 }
-// Somewhere to stand near `want` (pbrt) that a walker can get to: clear of the walls and the furniture by more than one's size indoors (film_file.cpp's findWays) - `want`
-// itself, or the nearest such place round it.
-inline Vec3 clearSpot(const rooms::Room &r, Vec3 want) {
-	const double gap = 0.4;   // (its size, 0.28, and a map cell's half: where it can stand, not just where it would fit)
-	const auto ok = [&](Vec3 p) {
-		if (std::abs(p.x) > 0.5 * r.w - rooms::kWall - gap || std::abs(p.z) > 0.5 * r.d - rooms::kWall - gap) return false;
-		for (std::size_t i = 0; i < r.items.size(); ++i) {
-			if (r.items[i].flat) continue;
-			const rooms::detail::Rect f = rooms::detail::footprint(r.items[i], gap);
-			if (p.x > f.x0 && p.x < f.x1 && p.z > f.z0 && p.z < f.z1) return false;
-		}
-		return true;
-	};
-	const Vec3 w = rooms::toLocal(r, want);
-	if (ok(w)) return want;
-	for (double d = 0.1; d < 3.5; d += 0.1)
-		for (int a = 0; a < 16; ++a) {
-			const Vec3 p = w + Vec3{d * std::cos(a * kPi / 8.0), 0.0, d * std::sin(a * kPi / 8.0)};
-			if (ok(p)) return rooms::toPbrt(r, p);
-		}
-	return want;
-}
+using rooms::clearSpot;
 }  // namespace detail
 
 // A line for rooms into `s`: "" or what is wrong with it. (The rooms are set out, and what refers to them checked, at the film's end: settleRooms.)
 inline std::string indoorLine(Spec &s, const std::string &verb, const std::string &line, int n) {
 	using detail::number;
+	if (homeVerb(verb)) return homeLine(s, verb, line, n);
 	const std::vector<std::string> t = detail::tokens(line);
 	rooms::Indoors &in = s.indoors;
 	if (verb == "room") {
@@ -239,7 +221,8 @@ inline std::string indoorLine(Spec &s, const std::string &verb, const std::strin
 	}
 	// what a character does with a room's furniture
 	const char *usage = verb == "sit" ? "`sit WHO on ITEM [in ROOM] at T [until T]`" : verb == "lie" ? "`lie WHO in|on ITEM [in ROOM] at T [until T]`" : verb == "open" ? "`open WHO ITEM [in ROOM] at T [until T]`"
-						: verb == "lean" ? "`lean WHO on ITEM [in ROOM] at T [until T]`" : "`lookout WHO [in ROOM] [window N] at T [until T]`";
+						: verb == "lean" ? "`lean WHO on ITEM [in ROOM] at T [until T]`" : verb == "go" ? "`go WHO to ROOM [ITEM] at T [speed S]` (up or down the stairs if it is on another floor)"
+						: "`lookout WHO [in ROOM] [window N] at T [until T]`";
 	rooms::Use u;
 	u.verb = verb, u.line = n;
 	if (t.size() < 2) return usage;
@@ -252,6 +235,10 @@ inline std::string indoorLine(Spec &s, const std::string &verb, const std::strin
 	} else if (verb == "open") {
 		if (i >= t.size()) return usage;
 		u.item = t[i++];
+	} else if (verb == "go") {   // (a room, and a piece in it to go up to)
+		if (i + 1 >= t.size() || t[i] != "to") return usage;
+		u.room = t[i + 1], i += 2;
+		if (i < t.size() && t[i] != "at" && t[i] != "speed") u.item = t[i++];
 	} else {
 		u.item = "window";
 	}
@@ -263,6 +250,7 @@ inline std::string indoorLine(Spec &s, const std::string &verb, const std::strin
 		else if (t[i] == "at" && number(t[i + 1], v) && v >= 0.0) u.t0 = v, timed = true;
 		else if (t[i] == "until" && number(t[i + 1], v)) u.t1 = v;
 		else if (t[i] == "window" && verb == "lookout" && number(t[i + 1], v) && v >= 1.0) u.itemIndex = static_cast<int>(v) - 1;
+		else if (t[i] == "speed" && verb == "go" && number(t[i + 1], v) && v >= 0.2 && v <= 6.0) u.speed = v;
 		else return usage;
 	}
 	if (!timed || u.t1 <= u.t0 + 0.5) return usage + std::string(" (`until` at least half a second after `at`)");
@@ -296,10 +284,24 @@ inline std::string settleRooms(Spec &s) {
 		if (indexOf(sw.room) < 0) return "`switch`: no room called \"" + sw.room + "\"";
 	for (std::size_t k = 0; k < in.uses.size(); ++k) {
 		rooms::Use &u = in.uses[k];
+		if (u.verb == "nap" || u.verb == "wait" || u.verb == "knock" || u.verb == "blowout") continue;   // (round 2's: settleHome)
 		const std::string where = "`" + u.verb + " " + u.who + "` (line " + std::to_string(u.line) + ")";
 		if (!u.room.empty()) {
 			u.roomIndex = indexOf(u.room);
 			if (u.roomIndex < 0) return where + ": no room called \"" + u.room + "\"";
+		}
+		if (u.verb == "go") {   // (indoor round 2) somewhere clear in the middle of the room, or in front of the piece it names
+			const rooms::Room &r = in.rooms[static_cast<std::size_t>(u.roomIndex)];
+			Vec3 want = rooms::toPbrt(r, {0.0, 0.0, 0.0});
+			if (!u.item.empty()) {
+				for (std::size_t ii = 0; ii < r.items.size() && u.itemIndex < 0; ++ii)
+					if (r.items[ii].kind == u.item) u.itemIndex = static_cast<int>(ii);
+				if (u.itemIndex < 0) return where + ": no " + u.item + " in " + r.name;
+				const rooms::Item &it = r.items[static_cast<std::size_t>(u.itemIndex)];
+				want = rooms::toPbrt(r, Vec3{it.x, 0.0, it.z} + rooms::frontOf(it) * (0.5 * it.d + 0.6));
+			}
+			u.stand = u.seat = detail::clearSpot(r, want);
+			continue;
 		}
 		if (u.verb == "lookout") {   // a window of the room (the first, or `window N`): the room it says, or the one it starts in
 			for (const Character &c : s.characters)
@@ -327,7 +329,7 @@ inline std::string settleRooms(Spec &s) {
 				bool taken = false;
 				for (std::size_t j = 0; j < k; ++j) {
 					const rooms::Use &o = in.uses[j];
-					if (o.who != u.who && o.roomIndex == static_cast<int>(ri) && o.itemIndex == static_cast<int>(ii) && o.t0 < u.t1 && u.t0 < o.t1 && o.verb != "open") taken = true;
+					if (o.who != u.who && o.roomIndex == static_cast<int>(ri) && o.itemIndex == static_cast<int>(ii) && o.t0 < u.t1 && u.t0 < o.t1 && o.verb != "open" && o.verb != "go") taken = true;
 				}
 				if (!taken) found = static_cast<int>(ii), foundRoom = static_cast<int>(ri);
 			}
@@ -365,7 +367,7 @@ inline std::string settleRooms(Spec &s) {
 		u.stand = detail::clearSpot(r, u.stand);   // (not in another piece: beside a chair pulled up to a table)
 		if (u.verb == "open" || u.verb == "lean") u.seat = u.stand;
 	}
-	return std::string();
+	return settleHome(s);   // (what is done at home: film_parse_home.h)
 }
 
 }  // namespace film_file

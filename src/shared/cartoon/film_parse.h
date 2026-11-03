@@ -223,6 +223,12 @@
 //     walls    k wallpaper roses                                 # film_roomlook.h: `walls ROOM paint R G B`, `floor ROOM wood|boards|tiles|carpet|checks`, `furnish ROOM aquarium ...`
 //     sit      pip on sofa at 2 until 9                          # it walks there (film_roomworld.cpp): `lie WHO in bed`, `open WHO fridge`, `lean WHO on counter`, `lookout WHO`
 //       cutaway                                                  # (in a shot) the walls between the camera and the room left out; `peek ROOM [window N] [from D]`
+//     go       pip to home.bedroom at 30                         # round 2 (film_parse_home.h): up the stairs to a room on another floor (film_ways.cpp)
+//     thing    cup mug on counter                                # film_homelife.h: `carry WHO THING to ITEM at T`; `cook ROOM pot|kettle|toast|oven|meal at T`
+//     bath     home.bathroom at 40 until 52                      # `shower ROOM at T`; `party ROOM birthday|christmas|halloween`, `confetti`, `blowout WHO`, `guests ROOM N`, `dance`
+//     torch    pip at 60 until 66                                # film_homefun.h: `flicker ROOM`, `shadowplay WHO [animal A]`, `fall THING`, `puddle ROOM X Z`, `pile ROOM books`
+//     character mittens cat at 1 0 0                             # film_pets.h: cat, dog; `nap PET on sofa at T`, `wait PET at T`, `heel PET WHO at T`, `knock PET THING at T`
+//       trail  pip                                               # (in a shot) the camera along pip's way behind it, through doorways and up the stairs
 //     model    robot                                           # a model of the film's own (film_model.h), read up to `end`: pieces of shapes (add, blend K, cut,
 //       piece  body colour 0.8 0.3 0.2                          #   intersect; `hard` for crisp edges), subdivision cages (`cage box W H D crease S`), modifiers
 //       box    0 0.8 0 size 0.6 0.7 0.4 round 0.03              #   (bend, twist, taper, mirror, array, radial, lattice, solidify, smooth), `sweep`, `loft`,

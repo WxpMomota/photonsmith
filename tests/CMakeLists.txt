@@ -285,6 +285,8 @@ add_executable(unit_tests
     ${CMAKE_SOURCE_DIR}/../src/shared/cartoon/film_waterworld.cpp
     ${CMAKE_SOURCE_DIR}/../src/shared/cartoon/film_seaworld.cpp
     ${CMAKE_SOURCE_DIR}/../src/shared/cartoon/film_roomworld.cpp
+    ${CMAKE_SOURCE_DIR}/../src/shared/cartoon/film_homeworld.cpp
+    ${CMAKE_SOURCE_DIR}/../src/shared/cartoon/film_ways.cpp
     unit/cartoon_pip_tests.cpp
     unit/uploaded_scene_tests.cpp
     unit/lens_look_tests.cpp
@@ -295,6 +297,7 @@ add_executable(unit_tests
     unit/film_universe_tests.cpp
     unit/film_water_tests.cpp
     unit/film_rooms_tests.cpp
+    unit/film_home_tests.cpp
     unit/film_blender3_tests.cpp
     unit/film_round4_tests.cpp
     unit/film_space11_tests.cpp
@@ -415,6 +418,8 @@ add_executable(cpu_integrator_tests
     ${CMAKE_SOURCE_DIR}/../src/shared/cartoon/film_waterworld.cpp
     ${CMAKE_SOURCE_DIR}/../src/shared/cartoon/film_seaworld.cpp
     ${CMAKE_SOURCE_DIR}/../src/shared/cartoon/film_roomworld.cpp
+    ${CMAKE_SOURCE_DIR}/../src/shared/cartoon/film_homeworld.cpp
+    ${CMAKE_SOURCE_DIR}/../src/shared/cartoon/film_ways.cpp
     ${CMAKE_SOURCE_DIR}/../src/data/rgb_spectrum_table_data.cpp
     ${CMAKE_SOURCE_DIR}/../src/external/stb_image_impl.cpp
     ${CMAKE_SOURCE_DIR}/../src/external/image_writer.cpp   # write_png / stbi_write_png, which film_captions.h (cartoon_tests.cpp) and scene_builder_tests.cpp call (the MSBuild target compiles it too)

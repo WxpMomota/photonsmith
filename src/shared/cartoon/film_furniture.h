@@ -143,7 +143,7 @@ inline void pieceOf(const Item &it, Groups &g, const Mat4 &F, bool doorShut = tr
 		addBox(g[k == "rug" ? "rug" : "dark"], I, {0.0, 0.006, 0.0}, {w, 0.012, d});
 	} else if (k == "bath") {
 		addMesh(g["white"], lathe({{0.0, 0.05}, {0.32, 0.05}, {0.36, 0.55}, {0.4, 0.6}, {0.0, 0.6}}, 24), mul(I, scale(w / 0.8, 1.0, d / 0.8)));
-		addBox(g["water"], I, {0.0, 0.42, 0.0}, {w * 0.78, 0.01, d * 0.72});
+		if (it.water) addBox(g["water"], I, {0.0, 0.42, 0.0}, {w * 0.78, 0.01, d * 0.72});   // (else a `bath` line fills it: film_homelife.h)
 		tube(g["metal"], I, {{-0.5 * w + 0.12, 0.55, 0.0}, {-0.5 * w + 0.12, 0.78, 0.0}, {-0.5 * w + 0.25, 0.78, 0.0}}, 0.015);
 	} else if (k == "basin") {
 		addBox(g["white"], I, {0.0, 0.42, -0.1}, {0.18, 0.84, 0.18});

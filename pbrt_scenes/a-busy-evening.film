@@ -1,0 +1,79 @@
+# A Busy Evening: a showcase of indoor round 2 (docs/VIDEO_GENERATION.md, "What is done at home"). Pip's birthday tea in the kitchen - the kettle, the cake, confetti and a
+# dance - the cat's mischief in the living room, bath time upstairs, and a stormy night: the lights flicker and go out, a torch, and shadow play on the bedroom wall.
+# The house faces the camera (its front wall towards -z): the living room on the left (pbrt x 2.1), the kitchen on the right (pbrt x -2.5); upstairs the bathroom over the
+# living room (and the stairs), the bedroom over the kitchen.
+film    a-busy-evening
+name    A Busy Evening
+about   Pip's birthday tea, the cat's mischief, bath time and a stormy night at home.
+scene   film_assets/stage/set.pbrt
+length  72
+tags    cartoon, indoors, showcase
+
+toon     bands 3  lines 2
+sky      18:30 23:00  south 0
+exposure auto
+weather  rain 0.7 from 54 to 72
+lightning 5 during 56 64
+
+house    home at 0 0 rooms living kitchen upstairs bathroom bedroom  style cosy
+walls    home.living wallpaper stripes colour 0.82 0.74 0.6 colour 0.7 0.6 0.48
+walls    home.kitchen paint 0.86 0.9 0.82
+floor    home.kitchen checks
+walls    home.bedroom wallpaper roses colour 0.86 0.8 0.82
+walls    home.bathroom wallpaper tiles
+clutter  home.kitchen tidy
+furnish  home.bedroom candles
+
+party    home.kitchen birthday
+cook     home.kitchen kettle at 1
+cook     home.kitchen meal at 0 until 30
+confetti home.kitchen at 9.5
+dance    home.kitchen at 10.5 until 20
+
+cast pip   at 0.9 0 0.3  facing -90
+cast nova  at -3.4 0 -1.2  facing 0
+character mittens cat at 2.6 0 -0.6  facing 0
+character biscuit dog at -1.3 0 -1.4  facing 0
+guests   home.kitchen 2
+
+say      nova 2.5 "Happy birthday, Pip!"
+blowout  pip at 2
+say      pip 9 "Yay!"
+
+thing    vase1 vase on coffeetable
+nap      mittens on sofa at 0 until 19
+knock    mittens vase1 at 20
+nap      mittens on sofa at 24.3 until 72
+walk     pip 26 0.9 to 2.1 -0.82 to 3.0 -0.82
+say      pip 32.5 "Mittens!"
+heel     biscuit pip at 28
+
+go       pip to home.bedroom at 34 speed 1.3
+bath     home.bathroom at 40 until 53
+go       pip to home.bathroom at 45 speed 1.2
+go       pip to home.bedroom at 54 speed 1.2
+say      pip 50.5 "Bath time!"
+
+flicker  home.bedroom at 56 until 61
+powercut 61 until 72
+torch    pip at 61.5 until 65.5
+say      pip 62 "Who turned off the lights?"
+shadowplay pip animal wolf at 65.5 until 72
+
+shot 0 Birthday tea
+  key   -1.0 1.6 -1.75   -3.0 0.9 0.4   62
+shot 9 Confetti
+  key   -0.9 1.9 -1.7   -2.8 0.8 0.6   66
+shot 20 Mittens
+  key   2.6 2.0 -1.85   2.0 0.15 -0.35   74
+shot 34 Up to bed
+  trail pip
+shot 45 Bath time
+  key   0.8 4.3 -1.6   2.4 3.3 1.0   62
+shot 56 The storm
+  key   -1.2 4.3 -1.6   -3.0 3.4 0.8   62
+shot 64.5 Shadows
+  key   -1.0 4.0 0.9   -3.4 3.6 -2.0   66
+shot 69 Good night
+  key   0 3.6 -9   0 2.4 0   40
+  cutaway

@@ -185,6 +185,8 @@ struct Shot {
 	std::string peek;            // (`peek ROOM`) the camera outside a window of ROOM, looking in
 	int peekWindow = 0;
 	double peekFrom = 1.6;
+	std::string trail;           // (indoor round 2: `trail WHO`) the camera along WHO's own way behind it, through the doorways and up the stairs (with `cutaway`: beside the house)
+	double trailBehind = 1.8, trailUp = 0.0;   // (how far back along its way; how high over its floor - 0: by its size)
 	shot_lighting::Lighting lighting;   // (`lighting`) key, fill and rim lights round the subject, from the camera
 	std::string lightOn;                // ... on this character's chest ("": what the camera looks at)
 };
@@ -198,6 +200,8 @@ struct WalkLine {
 	std::vector<std::pair<double, double>> points;   // pbrt x z (for a walk that finds its way: the way found, when the film is loaded)
 	std::vector<std::pair<double, double>> targets;  // (`to X Z ...`) the places it goes to, finding its way
 	std::vector<double> heights;                     // the floor's height at each point (from the set: uneven ground), or none (the character's own height)
+	std::vector<double> floors;                      // (indoors) the floor each target is on (pbrt's y; NaN or none: the walker's own): another is up or down the stairs
+	bool follows = false;                            // (indoor round 2: `heel`) a pet's walk after its owner: put off until its walk before has ended, as a crowd's are
 	int line = 0;
 };
 struct Character {
@@ -257,6 +261,7 @@ struct CharacterMoment {
 	double sit = 0.0;        // 0 standing .. 1 sitting, on a seat `seat` high
 	double seat = 0.0;
 	double lie = 0.0, lean = 0.0;   // (indoors) 0..1 lying back from its feet in a bed or on a sofa, leaning forward on a counter: castAt tips the whole body (film_roomworld.cpp)
+	double tilt = 0.0;       // (indoor round 2) degrees it is tipped back from its feet: a slip on a wet floor, a door in the face (film_homeworld.cpp)
 	Vec3 jiggle;             // how far what dangles from its head swings behind it (story space; film_motion.h `jiggle`: zero when the film has none)
 	double skinLight = 0.0;  // how far light goes into its skin (`skin-light`; 0: painted)
 	bool realEyes = false;   // eyes with a cornea over the iris (`eyes real`)
@@ -285,6 +290,7 @@ struct CharacterKind {
 	// (round 17, film_sea_kinds.h) a sea creature: `aquatic` swims level as it is (castAt does not lay it flat as it lays a person); `crawls` walks on the seabed
 	// under the water instead of swimming
 	bool aquatic = false, crawls = false;
+	bool curls = false;   // (indoor round 2, film_pets.h) a pet: lying down it curls up as its own drawing says (CharacterMoment::lie), not laid back on its back by castAt
 	// (round 18, film_flow.h) something of it trails and flows - hair, a tail fin, arms - drawn from where it has been (CharacterMoment::wake); and its own lean of its body
 	// at a moment (a mermaid laid level as she swims), for what it wears
 	bool flows = false;
@@ -404,6 +410,7 @@ struct Spec {
 		std::string name;
 		Vec3 home;   // its handle, where the scene has it (pbrt's)
 		int line = 0;
+		std::string thing;   // (indoor round 2: `thing NAME KIND on ITEM`) a room's small thing of this kind, drawn by film_homeworld.cpp; "": a block of the scene
 	};
 	struct Handling {
 		enum Kind { Pick, Put, Give } kind = Pick;

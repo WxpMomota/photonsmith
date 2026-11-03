@@ -45,6 +45,7 @@ struct Item {
 	double seat = -1.0;   // (the height a character sits at on it; below 0: not a seat)
 	bool flat = false;    // (a rug: walked over, other things stand on it)
 	int salt = 0;
+	bool water = true;    // (a bath) its water drawn with it; false: it is filled and let out (`bath`: film_homelife.h)
 };
 struct Lamp {
 	std::string kind, name;   // ceiling, table, floor, candles, fairy, fire, tv
@@ -97,13 +98,68 @@ struct Use {
 	double faceTo = 0.0;        // the way it faces there (a character's facing: 0 +z, 90 +x, pbrt's)
 	double seatHeight = 0.0;
 	double arrive = -1.0;       // when it gets there (its walk's end)
+	double speed = 0.9;         // (indoor round 2: `go ... speed S`) how fast it walks there
 };
+
+// ---- indoor round 2: what is done at home (film_homelife.h, film_homefun.h, film_pets.h; film_parse_home.h reads it, film_homeworld.cpp plays it) ----
+// A small thing on a piece of furniture (`thing NAME KIND on ITEM [in ROOM]`): a prop of the film, so `pick`, `put` and `give` take it too.
+struct Thing {
+	std::string name, kind, item, room;
+	int line = 0;
+	Vec3 home;    // (worked out: pbrt's, on the piece's top)
+	Vec3 front;   // (and the way the piece faces, pbrt's: what falls off it falls that way)
+};
+// `carry WHO THING to ITEM [in ROOM] at T [speed S]`: it walks to the thing, picks it up, walks to ITEM and puts it down on it.
+struct Carry {
+	std::string who, thing, item, room;
+	double t0 = 0.0, speed = 0.9;
+	int line = 0;
+	Vec3 pickStand, putStand, putAt;     // (worked out, pbrt's)
+	double picked = -1.0, put = -1.0;    // (when, once its walks are found)
+};
+// Something going on in a room over a time: `cook ROOM pot|kettle|toast|oven|meal`, `bath ROOM fill`, `shower ROOM on`, `flicker ROOM [LAMP]`, `party ROOM KIND`, `confetti ROOM`.
+struct Doing {
+	std::string verb, room, what;
+	double t0 = 0.0, t1 = 1e30;
+	int line = 0, roomIndex = -1;
+};
+// Something a character does over a time: `torch WHO`, `shadowplay WHO [animal A]`, `dance WHO`, `heel PET WHO`, `blowout WHO`.
+struct Act {
+	std::string verb, who, what;
+	double t0 = 0.0, t1 = 1e30;
+	int line = 0;
+};
+// Slapstick: `fall THING at T` and `knock PET THING at T` (the thing off its piece onto the floor: a mug, a plate, a vase, a bowl, a bottle breaks), `puddle ROOM at X Z at T
+// [size R]`, `pile ROOM books|boxes|plates [on ITEM] falls T` (a stack that topples).
+struct Mishap {
+	std::string verb, room, thing, of, item, who;
+	double t = 0.0, size = 0.35;
+	Vec3 at, from;   // (pbrt's: a puddle's middle, a pile's foot; for a fall, where it lands and where it was - worked out)
+	int line = 0, roomIndex = -1;
+};
+// A character knocked back (a door opened into it) or slipping on a puddle at t: worked out once the walks are found.
+struct Bump {
+	std::string who;
+	double t = 0.0;
+	bool slip = false;
+};
+struct Home {
+	std::vector<Thing> things;
+	std::vector<Carry> carries;
+	std::vector<Doing> doings;
+	std::vector<Act> acts;
+	std::vector<Mishap> mishaps;
+	std::vector<Bump> bumps;
+	std::vector<std::pair<std::string, std::string>> guests;   // (`guests ROOM N`: each one it brought in and its room, set about it when the rooms are)
+};
+
 struct Indoors {
 	std::vector<Room> rooms;
 	std::vector<Door> doors;
 	std::vector<Switch> switches;
 	std::vector<Use> uses;
 	std::vector<std::pair<double, double>> powerCuts;
+	Home home;
 	bool any() const { return !rooms.empty(); }
 };
 
@@ -183,9 +239,37 @@ inline std::vector<Rect> keepClear(const Room &r) {
 		out.push_back(o.wall < 2 ? Rect{c.x - half, std::min(c.z, a.z), c.x + half, std::max(c.z, a.z)} : Rect{std::min(c.x, a.x), c.z - half, std::max(c.x, a.x), c.z + half});
 	}
 	if (r.stairs) out.push_back({-0.5 * r.w, -0.5 * r.d, -0.5 * r.w + 1.25, 0.5 * r.d});
+	if (r.floorHole) {   // (upstairs: the stairs' hole, and room to step off them beside their top - round 1 stood a bed over the hole)
+		out.push_back({r.holeX0 - 0.05, r.holeZ0 - 0.05, r.holeX1 + 0.05, r.holeZ1});
+		out.push_back({r.holeX1, r.holeZ1 - 1.4, r.holeX1 + 1.1, r.holeZ1});
+	}
 	return out;
 }
 }  // namespace detail
+
+// Somewhere to stand near `want` (pbrt) that a walker can get to: clear of the walls and the furniture by more than one's size indoors (film_ways.cpp's findWays) - `want`
+// itself, or the nearest such place round it (upstairs, clear of the stairs' hole too).
+inline Vec3 clearSpot(const Room &r, Vec3 want) {
+	const double gap = 0.4;   // (its size, 0.28, and a map cell's half: where it can stand, not just where it would fit)
+	const auto ok = [&](Vec3 p) {
+		if (std::abs(p.x) > 0.5 * r.w - kWall - gap || std::abs(p.z) > 0.5 * r.d - kWall - gap) return false;
+		for (std::size_t i = 0; i < r.items.size(); ++i) {
+			if (r.items[i].flat) continue;
+			const detail::Rect f = detail::footprint(r.items[i], gap);
+			if (p.x > f.x0 && p.x < f.x1 && p.z > f.z0 && p.z < f.z1) return false;
+		}
+		if (r.floorHole && p.x > r.holeX0 - gap && p.x < r.holeX1 + gap && p.z > r.holeZ0 - gap && p.z < r.holeZ1 + gap) return false;
+		return true;
+	};
+	const Vec3 w = toLocal(r, want);
+	if (ok(w)) return want;
+	for (double d = 0.1; d < 3.5; d += 0.1)
+		for (int a = 0; a < 16; ++a) {
+			const Vec3 p = w + Vec3{d * std::cos(a * kPi / 8.0), 0.0, d * std::sin(a * kPi / 8.0)};
+			if (ok(p)) return toPbrt(r, p);
+		}
+	return want;
+}
 
 // A piece of furniture's size and seat (its kind's).
 inline Item itemOf(const std::string &kind) {
@@ -272,9 +356,17 @@ inline void furnish(Room &r) {
 		place(r, "fridge", 3, 0.88);
 		place(r, "counter", 3, 0.5);
 		place(r, "stove", 3, 0.16);
-		place(r, "table", -1, 0.4, 0.0, 0.2);
+		double tx = 0.4, tz = 0.2;   // (where it fits: a house's doorway beside it once left a kitchen with no table - round 2; the chairs round wherever it went)
+		// (not beside the stairs: there a table moved over leaves no way past it)
+		const std::vector<std::pair<double, double>> tries = r.stairs ? std::vector<std::pair<double, double>>{{0.0, 0.0}}
+																	   : std::vector<std::pair<double, double>>{{0.0, 0.0}, {0.25, 0.0}, {0.0, -0.3}, {0.25, -0.3}, {-0.25, 0.0}, {0.0, -0.6}};
+		for (const auto &[dx, dz] : tries)
+			if (place(r, "table", -1, 0.4 + dx / r.w, 0.0, 0.2 + dz)) {
+				tx = 0.4 + dx / r.w, tz = 0.2 + dz;
+				break;
+			}
 		for (const auto &[dx, dz, turn] : std::vector<std::array<double, 3>>{{-0.45, -0.65, 0.0}, {0.45, -0.65, 0.0}, {-0.45, 0.65, 180.0}, {0.45, 0.65, 180.0}})
-			place(r, "chair", -1, 0.4 + dx / r.w, 0.0, 0.2 + dz, turn);
+			place(r, "chair", -1, tx + dx / r.w, 0.0, tz + dz, turn);
 		place(r, "plant", 2, 0.92);
 	} else if (k == "bedroom") {
 		place(r, "bed", 2, 0.55);
@@ -282,7 +374,7 @@ inline void furnish(Room &r) {
 		place(r, "wardrobe", 3, 0.3);
 		place(r, "rug", -1, 0.5, 0.0, 0.1);
 		place(r, "desk", 3, 0.75);
-		place(r, "chair", -1, 0.5 + (0.5 * r.w - kWall - 1.0) / r.w, 0.0, (0.75 - 0.5) * r.d, -90.0);
+		place(r, "chair", -1, 0.5 + (0.5 * r.w - kWall - 0.86) / r.w, 0.0, (0.75 - 0.5) * r.d, -90.0);   // (pulled in to the desk: a metre out it shut a narrow bedroom's doorway off from the rest of it)
 	} else if (k == "living") {
 		if (place(r, "sofa", 2, 0.5)) {   // (a table in front of it, wherever it went, with room to stand between to sit down)
 			const Item s = r.items.back();
@@ -299,7 +391,14 @@ inline void furnish(Room &r) {
 	} else if (k == "bathroom") {
 		place(r, "bath", 1, 0.5);
 		place(r, "toilet", 3, 0.3);
-		place(r, "basin", 2, 0.45);
+		if (place(r, "basin", 2, 0.45)) {   // (a mirror over it, on the wall: steam fogs it - indoor round 2)
+			Item m = itemOf("mirror");
+			const Item &b = r.items.back();
+			m.turn = b.turn, m.flat = true, m.salt = r.seed * 131 + static_cast<int>(r.items.size());
+			const Vec3 back = Vec3{b.x, 0.0, b.z} - frontOf(b) * (0.5 * b.d - 0.5 * m.d - 0.005);
+			m.x = back.x, m.z = back.z;
+			r.items.push_back(m);
+		}
 	} else if (k == "classroom") {
 		place(r, "board", 3, 0.5, 0.01);
 		place(r, "desk", -1, 0.5 + (0.5 * r.w - 1.2) / r.w, 0.0, 0.0, -90.0);
@@ -403,8 +502,8 @@ inline std::string layHouse(Indoors &in, const std::string &name, double x, doub
 		// the rooms may have moved as it was added)
 		Room &hall = in.rooms[start], &above = in.rooms[start + down.size()];
 		const double x0 = -0.5 * hall.w + kWall, x1 = x0 + 1.0, zTop = 0.5 * hall.d - kWall;
-		hall.ceilingHole = above.floorHole = true;
-		hall.holeX0 = above.holeX0 = x0, hall.holeX1 = above.holeX1 = x1, hall.holeZ0 = above.holeZ0 = zTop - 2.6, hall.holeZ1 = above.holeZ1 = zTop;
+		hall.ceilingHole = above.floorHole = true;   // (a hole long enough for a grown-up to climb under its edge: round 1's 2.6 m left 1.6 m of headroom)
+		hall.holeX0 = above.holeX0 = x0, hall.holeX1 = above.holeX1 = x1, hall.holeZ0 = above.holeZ0 = std::max(zTop - 3.2, -0.5 * hall.d + kWall + 0.4), hall.holeZ1 = above.holeZ1 = zTop;
 	}
 	return std::string();
 }
@@ -528,22 +627,64 @@ inline void slab(const Room &r, Mesh &m, const Mat4 &F, double y0, double y1, bo
 	boxOver(r.holeX1, r.holeZ0, x1, r.holeZ1);
 }
 
-// The stairs: steps of 20 cm up 26 cm treads along the left wall, from the front to the hole's back edge, a rail along them.
+// The stairs (a room with `stairs`, its local frame): steps of about 20 cm up treads of 26 cm at most along the left wall, from a landing at the front (room to stand at their
+// foot: round 1's began a hand from the front wall) to the hole's back edge.
+struct Steps {
+	int count = 0;
+	double rise = 0.0, riseEach = 0.0, tread = 0.0, x0 = 0.0, x1 = 0.0, zTop = 0.0, zBottom = 0.0;
+};
+inline Steps stepsOf(const Room &r) {
+	Steps s;
+	s.rise = r.h + kSlab, s.x0 = r.holeX0, s.x1 = r.holeX1, s.zTop = r.holeZ1;
+	s.count = static_cast<int>(std::ceil(s.rise / 0.2));
+	s.riseEach = s.rise / s.count, s.tread = std::min(0.26, (s.zTop - (-0.5 * r.d + kWall + 0.85)) / s.count);
+	s.zBottom = s.zTop - s.count * s.tread;
+	return s;
+}
 inline void stairPieces(const Room &r, Groups &g, const Mat4 &F) {
-	const double rise = r.h + kSlab, x0 = r.holeX0, x1 = r.holeX1, zTop = r.holeZ1;
-	const int steps = static_cast<int>(std::ceil(rise / 0.2));
-	const double riseEach = rise / steps, tread = std::min(0.26, (zTop - (-0.5 * r.d + kWall + 0.1)) / steps);
-	for (int k = 0; k < steps; ++k) {   // (open treads on a stringer each side: the room seen under them, not a wall of steps)
-		const double z = zTop - (steps - k) * tread, top = (k + 1) * riseEach;
+	const Steps s = stepsOf(r);
+	const double x0 = s.x0, x1 = s.x1, tread = s.tread;
+	for (int k = 0; k < s.count; ++k) {   // (open treads on a stringer each side: the room seen under them, not a wall of steps)
+		const double z = s.zTop - (s.count - k) * tread, top = (k + 1) * s.riseEach;
 		detail::addBox(g["wood"], F, {0.5 * (x0 + x1), top - 0.025, z + 0.5 * tread}, {x1 - x0, 0.05, tread});
 		for (const double x : {x0 + 0.03, x1 - 0.03}) detail::addBox(g["wood"], F, {x, top - 0.17, z + 0.5 * tread}, {0.06, 0.34, tread});
 	}
-	const double zBottom = zTop - steps * tread;
-	detail::addMesh(g["wood"], sdf::tubeMesh({{x1 - 0.04, 0.95, zBottom}, {x1 - 0.04, rise + 0.95, zTop}}, 0.025, 1.0, 8), F);
-	for (int k = 0; k <= steps; k += 3) {
-		const double z = zBottom + k * tread;
-		detail::addBox(g["wood"], F, {x1 - 0.04, 0.5 * (k * riseEach + 0.95 + k * riseEach), z}, {0.03, 0.95, 0.03});
+	// a rail along them, stopping three treads short of the top: one steps off there, beside the last treads, onto the floor above
+	const int railed = s.count - 3;
+	detail::addMesh(g["wood"], sdf::tubeMesh({{x1 - 0.04, 0.95, s.zBottom}, {x1 - 0.04, railed * s.riseEach + 0.95, s.zBottom + railed * tread}}, 0.025, 1.0, 8), F);
+	for (int k = 0; k <= railed; k += 3) {
+		const double z = s.zBottom + k * tread;
+		detail::addBox(g["wood"], F, {x1 - 0.04, 0.5 * (k * s.riseEach + 0.95 + k * s.riseEach), z}, {0.03, 0.95, 0.03});
 	}
+}
+// The stairs between two floors, as a walk takes them: the room they are in, and the way up - from their foot on its floor, along the middle of each tread, to beside the top
+// on the floor above (pbrt's points; a walk down takes them the other way).
+struct Flight {
+	int room = -1;
+	std::vector<Vec3> points;
+};
+inline std::vector<Vec3> flightPoints(const Room &r) {
+	const Steps s = stepsOf(r);
+	const double xc = 0.5 * (s.x0 + s.x1);
+	std::vector<Vec3> local{{xc, 0.0, s.zBottom - 0.4}};
+	for (int k = 0; k + 1 < s.count; ++k) local.push_back({xc, (k + 1) * s.riseEach, s.zBottom + (k + 0.5) * s.tread});
+	local.push_back({s.x1 + 0.55, s.rise, s.zTop - 1.5 * s.tread});   // (off the second-last tread, sideways where the rail stops)
+	std::vector<Vec3> out;
+	for (const Vec3 &p : local) out.push_back(toPbrt(r, p));
+	return out;
+}
+// The stairs from the floor at height `fromY` to the one at `toY` (pbrt's, either way up), the nearest to `from` of any that join them: false when none do.
+inline bool flightBetween(const Indoors &in, double fromY, double toY, Vec3 from, Flight &f) {   // (not `near`: a Windows macro)
+	const double low = std::min(fromY, toY), high = std::max(fromY, toY);
+	double best = 1e30;
+	for (std::size_t i = 0; i < in.rooms.size(); ++i) {
+		const Room &r = in.rooms[i];
+		if (!r.stairs || std::abs(r.y - low) > 0.5 || std::abs(r.y + r.h + kSlab - high) > 0.5) continue;
+		const Vec3 c = toPbrt(r, {0.0, 0.0, 0.0});
+		const double d = std::hypot(c.x - from.x, c.z - from.z);
+		if (d < best) best = d, f.room = static_cast<int>(i), f.points = flightPoints(r);
+	}
+	return f.room >= 0;
 }
 
 }  // namespace rooms
