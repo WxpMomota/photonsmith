@@ -1,243 +1,393 @@
 # The Great Blue: a composed score (written by a script; change it as any cues file). Every time is the film's (@).
 
-# --- The descent (0-7): a held chord, bells, a rush of bubbles
-@0.00  pad  50 57 66 76 length 7.60 gain 0.045 send 0.90
-@0.00  bass  38 length 7.00 gain 0.055 send 0.30
-@0.80  bell  81 length 3.00 gain 0.028 send 0.95
-@2.60  bell  78 length 3.00 gain 0.028 send 0.95
-@4.40  bell  76 length 3.00 gain 0.028 send 0.95
-@5.80  bell  74 length 3.00 gain 0.028 send 0.95
-@5.60  swell  length 1.60 gain 0.060 send 0.80
+# --- The descent (0-7): out of the silence of deep water - a low D, the choir breathing in, harp rising as the light comes down, the theme's first two notes on the cello
+@0.00  drone  38 length 7.40 gain 0.200 send 0.90
+@0.40  choir  50 57 length 6.80 gain 0.120 send 0.95
+@2.80  choir  62 66 length 4.40 gain 0.104 send 0.95
+@3.00  strings  50 57 64 66 length 4.30 gain 0.140 send 0.90
+@1.20  pluck  57 length 1.20 gain 0.072 pan -0.30 send 0.80
+@1.62  pluck  64 length 1.20 gain 0.072 pan -0.18 send 0.80
+@2.04  pluck  66 length 1.20 gain 0.072 pan -0.06 send 0.80
+@2.46  pluck  69 length 1.20 gain 0.072 pan 0.06 send 0.80
+@2.88  pluck  76 length 1.20 gain 0.072 pan 0.18 send 0.80
+@3.30  pluck  78 length 1.20 gain 0.072 pan 0.30 send 0.80
+@3.72  pluck  57 length 1.20 gain 0.072 pan -0.30 send 0.80
+@4.14  pluck  64 length 1.20 gain 0.072 pan -0.18 send 0.80
+@4.56  pluck  66 length 1.20 gain 0.072 pan -0.06 send 0.80
+@4.98  pluck  69 length 1.20 gain 0.072 pan 0.06 send 0.80
+@5.40  pluck  76 length 1.20 gain 0.072 pan 0.18 send 0.80
+@5.82  pluck  78 length 1.20 gain 0.072 pan 0.30 send 0.80
+@6.24  pluck  57 length 1.20 gain 0.072 pan -0.30 send 0.80
+@6.66  pluck  64 length 1.20 gain 0.072 pan -0.18 send 0.80
+@3.60  bowed  54 length 0.88 gain 0.200 send 0.80
+@4.47  bowed  57 length 0.88 gain 0.200 send 0.80
+@5.35  bowed  62 length 1.75 gain 0.200 send 0.80
+@1.00  bell  86 length 2.80 gain 0.056 send 0.95
+@3.20  bell  81 length 2.80 gain 0.056 send 0.95
+@5.40  bell  88 length 2.80 gain 0.056 send 0.95
+@5.60  swell  length 1.50 gain 0.200 send 0.80
 
-# --- The reef (7-14): the theme on the piano over plucked chords
-@7.00  pad  62 66 69 length 2.67 gain 0.035 send 0.90
-@7.00  bass  50 length 2.37 gain 0.070 send 0.30
-@9.37  pad  59 62 66 length 2.67 gain 0.035 send 0.90
-@9.37  bass  47 length 2.37 gain 0.070 send 0.30
-@11.74  pad  55 59 62 67 length 2.59 gain 0.035 send 0.90
-@11.74  bass  43 length 2.29 gain 0.070 send 0.30
-@7.00  pluck  74 78 81 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.120
-@7.39  pluck  81 78 74 length 0.50 gain 0.022 pan 0.25 send 0.70 spread 0.120
-@7.79  pluck  74 78 81 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.120
-@8.18  pluck  81 78 74 length 0.50 gain 0.022 pan 0.25 send 0.70 spread 0.120
-@8.58  pluck  74 78 81 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.120
-@8.97  pluck  81 78 74 length 0.50 gain 0.022 pan 0.25 send 0.70 spread 0.120
-@9.37  pluck  71 74 78 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.120
-@9.76  pluck  78 74 71 length 0.50 gain 0.022 pan 0.25 send 0.70 spread 0.120
-@10.16  pluck  71 74 78 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.120
-@10.55  pluck  78 74 71 length 0.50 gain 0.022 pan 0.25 send 0.70 spread 0.120
-@10.95  pluck  71 74 78 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.120
-@11.34  pluck  78 74 71 length 0.50 gain 0.022 pan 0.25 send 0.70 spread 0.120
-@11.74  pluck  67 71 74 79 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.120
-@12.13  pluck  79 74 71 67 length 0.50 gain 0.022 pan 0.25 send 0.70 spread 0.120
-@12.53  pluck  67 71 74 79 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.120
-@12.92  pluck  79 74 71 67 length 0.50 gain 0.022 pan 0.25 send 0.70 spread 0.120
-@13.32  pluck  67 71 74 79 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.120
-@13.71  pluck  79 74 71 67 length 0.50 gain 0.022 pan 0.25 send 0.70 spread 0.120
-@7.00  piano  74 length 0.79 gain 0.060 send 0.60
-@7.79  piano  78 length 0.79 gain 0.060 send 0.60
-@8.58  piano  81 length 1.18 gain 0.060 send 0.60
-@10.16  piano  83 length 0.79 gain 0.060 send 0.60
-@10.95  piano  81 length 0.79 gain 0.060 send 0.60
-@11.74  piano  78 length 0.79 gain 0.060 send 0.60
-@12.53  piano  76 length 0.79 gain 0.060 send 0.60
+# --- The reef (7-14): the theme on the piano, the harp in eighths, the strings warm under it
+@7.00  strings  50 57 62 66 length 2.05 gain 0.160 send 0.90
+@7.00  bass  38 length 1.75 gain 0.240 send 0.30
+@8.75  strings  47 59 62 66 length 2.05 gain 0.160 send 0.90
+@8.75  bass  47 length 1.75 gain 0.240 send 0.30
+@10.50  strings  43 59 62 67 length 2.05 gain 0.160 send 0.90
+@10.50  bass  43 length 1.75 gain 0.240 send 0.30
+@12.25  strings  45 57 61 64 length 2.05 gain 0.160 send 0.90
+@12.25  bass  45 length 1.75 gain 0.240 send 0.30
+@7.00  pluck  62 69 74 78 length 0.50 gain 0.072 pan -0.25 send 0.70 spread 0.080
+@7.44  pluck  78 74 69 62 length 0.50 gain 0.072 pan 0.25 send 0.70 spread 0.080
+@7.88  pluck  62 69 74 78 length 0.50 gain 0.072 pan -0.25 send 0.70 spread 0.080
+@8.31  pluck  78 74 69 62 length 0.50 gain 0.072 pan 0.25 send 0.70 spread 0.080
+@8.75  pluck  59 71 74 78 length 0.50 gain 0.072 pan -0.25 send 0.70 spread 0.080
+@9.19  pluck  78 74 71 59 length 0.50 gain 0.072 pan 0.25 send 0.70 spread 0.080
+@9.62  pluck  59 71 74 78 length 0.50 gain 0.072 pan -0.25 send 0.70 spread 0.080
+@10.06  pluck  78 74 71 59 length 0.50 gain 0.072 pan 0.25 send 0.70 spread 0.080
+@10.50  pluck  55 71 74 79 length 0.50 gain 0.072 pan -0.25 send 0.70 spread 0.080
+@10.94  pluck  79 74 71 55 length 0.50 gain 0.072 pan 0.25 send 0.70 spread 0.080
+@11.38  pluck  55 71 74 79 length 0.50 gain 0.072 pan -0.25 send 0.70 spread 0.080
+@11.81  pluck  79 74 71 55 length 0.50 gain 0.072 pan 0.25 send 0.70 spread 0.080
+@12.25  pluck  57 69 73 76 length 0.50 gain 0.072 pan -0.25 send 0.70 spread 0.080
+@12.69  pluck  76 73 69 57 length 0.50 gain 0.072 pan 0.25 send 0.70 spread 0.080
+@13.12  pluck  57 69 73 76 length 0.50 gain 0.072 pan -0.25 send 0.70 spread 0.080
+@13.56  pluck  76 73 69 57 length 0.50 gain 0.072 pan 0.25 send 0.70 spread 0.080
+@7.00  piano  66 length 0.88 gain 0.260 send 0.60
+@7.88  piano  69 length 0.88 gain 0.260 send 0.60
+@8.75  piano  74 length 1.75 gain 0.260 send 0.60
+@10.50  piano  73 length 0.88 gain 0.260 send 0.60
+@11.38  piano  69 length 0.88 gain 0.260 send 0.60
+@12.25  piano  71 length 1.75 gain 0.260 send 0.60
+@7.00  bell  78 length 0.53 gain 0.040 send 0.95
+@7.88  bell  81 length 0.53 gain 0.040 send 0.95
+@8.75  bell  86 length 1.05 gain 0.040 send 0.95
+@10.50  bell  85 length 0.53 gain 0.040 send 0.95
+@11.38  bell  81 length 0.53 gain 0.040 send 0.95
+@12.25  bell  83 length 1.05 gain 0.040 send 0.95
+@13.30  swell  length 0.90 gain 0.160 send 0.80
 
-# --- Mantas (14-21): slow strings, a cello line, high bells
-@14.00  strings  55 62 71 length 3.85 gain 0.050 send 0.90
-@14.00  bass  43 length 3.55 gain 0.060 send 0.30
-@17.55  strings  57 64 73 length 3.77 gain 0.050 send 0.90
-@17.55  bass  45 length 3.47 gain 0.060 send 0.30
-@14.30  bowed  62 length 1.58 gain 0.050 send 0.80
-@15.88  bowed  64 length 0.79 gain 0.050 send 0.80
-@16.67  bowed  66 length 1.58 gain 0.050 send 0.80
-@18.25  bowed  69 length 2.37 gain 0.050 send 0.80
-@20.62  bowed  71 length 0.79 gain 0.050 send 0.80
-@15.00  bell  86 length 2.50 gain 0.020 send 0.95
-@17.40  bell  88 length 2.50 gain 0.020 send 0.95
-@19.60  bell  90 length 2.50 gain 0.020 send 0.95
+# --- Mantas (14-21): wide and slow - the theme's second phrase on the cellos, horns answering, the choir behind
+@14.00  strings  43 59 62 67 length 2.05 gain 0.192 send 0.90
+@14.00  bass  43 length 1.75 gain 0.260 send 0.30
+@15.75  strings  40 59 64 67 length 2.05 gain 0.192 send 0.90
+@15.75  bass  40 length 1.75 gain 0.260 send 0.30
+@17.50  strings  45 57 61 64 length 2.05 gain 0.192 send 0.90
+@17.50  bass  45 length 1.75 gain 0.260 send 0.30
+@19.25  strings  45 57 62 64 length 1.18 gain 0.192 send 0.90
+@19.25  bass  45 length 0.88 gain 0.260 send 0.30
+@20.12  strings  45 57 61 64 length 1.18 gain 0.192 send 0.90
+@20.12  bass  45 length 0.88 gain 0.260 send 0.30
+@14.00  choir  62 67 71 length 2.05 gain 0.088 send 0.95
+@15.75  choir  64 67 71 length 2.05 gain 0.088 send 0.95
+@17.50  choir  64 69 73 length 2.05 gain 0.088 send 0.95
+@19.25  choir  62 69 74 length 2.05 gain 0.088 send 0.95
+@14.00  bowed  55 length 0.88 gain 0.240 send 0.80
+@14.88  bowed  59 length 0.88 gain 0.240 send 0.80
+@15.75  bowed  64 length 1.75 gain 0.240 send 0.80
+@17.50  bowed  62 length 0.88 gain 0.240 send 0.80
+@18.38  bowed  61 length 0.88 gain 0.240 send 0.80
+@19.25  bowed  57 length 1.75 gain 0.240 send 0.80
+@17.50  brass  69 length 0.88 gain 0.128 send 0.75
+@18.38  brass  71 length 0.88 gain 0.128 send 0.75
+@19.25  brass  73 length 1.75 gain 0.128 send 0.75
+@14.00  pluck  55 length 1.20 gain 0.056 pan -0.30 send 0.80
+@14.88  pluck  59 length 1.20 gain 0.056 pan -0.18 send 0.80
+@15.75  pluck  62 length 1.20 gain 0.056 pan -0.06 send 0.80
+@16.62  pluck  67 length 1.20 gain 0.056 pan 0.06 send 0.80
+@17.50  pluck  71 length 1.20 gain 0.056 pan 0.18 send 0.80
+@18.38  pluck  74 length 1.20 gain 0.056 pan 0.30 send 0.80
+@19.25  pluck  55 length 1.20 gain 0.056 pan -0.30 send 0.80
+@20.12  pluck  59 length 1.20 gain 0.056 pan -0.18 send 0.80
 
-# --- The bait ball (21-29): urgent and minor; held still through the slow motion (25-28)
-@21.00  strings  59 62 66 length 1.88 gain 0.035 send 0.90
-@22.58  strings  55 59 62 67 length 2.83 gain 0.035 send 0.90
-@21.00  knock  43 gain 0.027 send 0.30
-@21.20  knock  43 gain 0.018 send 0.30
-@21.39  knock  43 gain 0.018 send 0.30
-@21.59  knock  43 gain 0.018 send 0.30
-@21.79  knock  43 gain 0.027 send 0.30
-@21.99  knock  43 gain 0.018 send 0.30
-@22.18  knock  43 gain 0.018 send 0.30
-@22.38  knock  43 gain 0.018 send 0.30
-@22.58  knock  43 gain 0.027 send 0.30
-@22.78  knock  43 gain 0.018 send 0.30
-@22.97  knock  43 gain 0.018 send 0.30
-@23.17  knock  43 gain 0.018 send 0.30
-@23.37  knock  43 gain 0.027 send 0.30
-@23.57  knock  43 gain 0.018 send 0.30
-@23.76  knock  43 gain 0.018 send 0.30
-@23.96  knock  43 gain 0.018 send 0.30
-@24.16  knock  43 gain 0.027 send 0.30
-@24.36  knock  43 gain 0.018 send 0.30
-@24.55  knock  43 gain 0.018 send 0.30
-@24.75  knock  43 gain 0.018 send 0.30
-@24.95  knock  43 gain 0.027 send 0.30
-@21.00  bass  35 47 length 0.39 gain 0.055 send 0.20
-@21.39  bass  35 length 0.39 gain 0.055 send 0.20
-@21.79  bass  35 length 0.39 gain 0.055 send 0.20
-@22.18  bass  35 length 0.39 gain 0.055 send 0.20
-@22.58  bass  35 47 length 0.39 gain 0.055 send 0.20
-@22.97  bass  35 length 0.39 gain 0.055 send 0.20
-@23.37  bass  35 length 0.39 gain 0.055 send 0.20
-@23.76  bass  35 length 0.39 gain 0.055 send 0.20
-@24.16  bass  35 47 length 0.39 gain 0.055 send 0.20
-@24.55  bass  35 length 0.39 gain 0.055 send 0.20
-@21.00  pluck  83 86 90 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.050
-@21.20  pluck  90 86 83 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.050
-@21.39  pluck  83 86 90 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.050
-@21.59  pluck  90 86 83 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.050
-@21.79  pluck  83 86 90 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.050
-@21.99  pluck  90 86 83 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.050
-@22.18  pluck  83 86 90 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.050
-@22.38  pluck  90 86 83 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.050
-@22.58  pluck  83 86 90 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.050
-@22.78  pluck  90 86 83 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.050
-@22.97  pluck  83 86 90 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.050
-@23.17  pluck  90 86 83 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.050
-@23.37  pluck  83 86 90 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.050
-@23.57  pluck  90 86 83 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.050
-@23.76  pluck  83 86 90 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.050
-@23.96  pluck  90 86 83 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.050
-@24.16  pluck  83 86 90 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.050
-@24.36  pluck  90 86 83 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.050
-@24.55  pluck  83 86 90 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.050
-@24.75  pluck  90 86 83 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.050
-@24.95  pluck  83 86 90 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.050
-@24.70  swell  length 1.20 gain 0.050 send 0.80
-@25.00  strings  47 59 62 66 71 length 3.20 gain 0.045 send 0.95
-@25.00  bell  83 86 90 length 3.00 gain 0.020 send 0.95 spread 0.400
-@28.00  knock  43 gain 0.030 send 0.30
-@28.20  knock  43 gain 0.020 send 0.30
-@28.39  knock  43 gain 0.020 send 0.30
-@28.59  knock  43 gain 0.020 send 0.30
-@28.79  knock  43 gain 0.030 send 0.30
-@28.99  knock  43 gain 0.020 send 0.30
+# --- The bait ball (21-29): the hunt, in B minor - driving strings in sixteenths, low horns, timpani; the slow motion (25-28) held in one long breath; the drive comes back
+@21.00  strings  59 length 0.20 gain 0.168 send 0.50
+@21.25  strings  59 length 0.20 gain 0.120 send 0.50
+@21.50  strings  71 length 0.20 gain 0.120 send 0.50
+@21.75  strings  59 length 0.20 gain 0.120 send 0.50
+@21.00  bass  47 length 0.95 gain 0.300 send 0.30
+@21.00  timpani  35 length 1.00 gain 0.200 send 0.45
+@21.50  timpani  35 length 0.60 gain 0.128 send 0.45
+@22.00  strings  59 length 0.20 gain 0.168 send 0.50
+@22.25  strings  59 length 0.20 gain 0.120 send 0.50
+@22.50  strings  71 length 0.20 gain 0.120 send 0.50
+@22.75  strings  59 length 0.20 gain 0.120 send 0.50
+@22.00  bass  43 length 0.95 gain 0.300 send 0.30
+@22.00  timpani  43 length 1.00 gain 0.200 send 0.45
+@22.50  timpani  43 length 0.60 gain 0.128 send 0.45
+@23.00  strings  59 length 0.20 gain 0.168 send 0.50
+@23.25  strings  59 length 0.20 gain 0.120 send 0.50
+@23.50  strings  71 length 0.20 gain 0.120 send 0.50
+@23.75  strings  59 length 0.20 gain 0.120 send 0.50
+@23.00  bass  40 length 0.95 gain 0.300 send 0.30
+@23.00  timpani  40 length 1.00 gain 0.200 send 0.45
+@23.50  timpani  40 length 0.60 gain 0.128 send 0.45
+@24.00  strings  58 length 0.20 gain 0.168 send 0.50
+@24.25  strings  58 length 0.20 gain 0.120 send 0.50
+@24.50  strings  70 length 0.20 gain 0.120 send 0.50
+@24.75  strings  58 length 0.20 gain 0.120 send 0.50
+@24.00  bass  42 length 0.95 gain 0.300 send 0.30
+@24.00  timpani  42 length 1.00 gain 0.200 send 0.45
+@24.50  timpani  42 length 0.60 gain 0.128 send 0.45
+@21.00  brass  47 length 1.50 gain 0.180 send 0.60
+@22.50  brass  50 length 0.50 gain 0.180 send 0.60
+@23.00  brass  54 length 1.00 gain 0.180 send 0.60
+@24.00  brass  53 length 1.00 gain 0.180 send 0.60
+@21.00  impact  0.5 gain 0.160 send 0.70
+@25.00  impact  0.7 gain 0.180 send 0.90
+@25.00  strings  47 59 62 66 71 length 3.30 gain 0.168 send 0.95
+@25.00  choir  59 62 66 length 3.20 gain 0.112 send 0.95
+@25.00  drone  35 length 3.60 gain 0.200 send 0.90
+@25.40  bell  83 length 2.20 gain 0.056 send 0.95
+@26.30  bell  78 length 2.20 gain 0.056 send 0.95
+@27.20  bell  81 length 2.20 gain 0.056 send 0.95
+@27.20  swell  length 0.80 gain 0.200 send 0.80
+@28.00  strings  59 length 0.20 gain 0.140 send 0.50
+@28.25  strings  59 length 0.20 gain 0.140 send 0.50
+@28.00  timpani  40 length 0.60 gain 0.200 send 0.45
+@28.50  strings  58 length 0.20 gain 0.140 send 0.50
+@28.75  strings  58 length 0.20 gain 0.140 send 0.50
+@28.50  timpani  42 length 0.60 gain 0.200 send 0.45
 
-# --- The bubble net (29-37): a hush under the whales' song, bubbles of bells rising
-@29.00  drone  38 length 8.50 gain 0.050 send 0.90
-@29.00  pad  55 59 62 66 length 4.48 gain 0.040 send 0.90
-@33.18  pad  52 57 61 64 length 4.48 gain 0.040 send 0.90
-@29.60  bowed  57 length 1.58 gain 0.045 send 0.85
-@31.18  bowed  62 length 1.58 gain 0.045 send 0.85
-@32.76  bowed  61 length 1.58 gain 0.045 send 0.85
-@34.34  bowed  59 length 2.37 gain 0.045 send 0.85
-@31.00  bell  74 78 81 86 90 length 1.40 gain 0.016 send 0.95 spread 0.110
-@33.50  bell  74 78 81 86 90 length 1.40 gain 0.016 send 0.95 spread 0.110
-@35.60  bell  74 78 81 86 90 length 1.40 gain 0.016 send 0.95 spread 0.110
+# --- The bubble net (29-37): the humpbacks rise through their ring of bubbles - low horns and the choir climbing, harp bubbles, a long build
+@29.00  impact  0.5 gain 0.160 send 0.85
+@29.00  strings  47 59 62 66 length 2.30 gain 0.180 send 0.90
+@29.00  bass  47 length 2.00 gain 0.280 send 0.30
+@31.00  strings  43 59 62 67 length 2.30 gain 0.180 send 0.90
+@31.00  bass  43 length 2.00 gain 0.280 send 0.30
+@33.00  strings  50 57 62 66 length 2.30 gain 0.180 send 0.90
+@33.00  bass  38 length 2.00 gain 0.280 send 0.30
+@35.00  strings  45 57 61 64 length 2.30 gain 0.180 send 0.90
+@35.00  bass  45 length 2.00 gain 0.280 send 0.30
+@29.00  choir  59 62 66 length 2.30 gain 0.104 send 0.95
+@31.00  choir  59 62 67 length 2.30 gain 0.104 send 0.95
+@33.00  choir  62 66 69 length 2.30 gain 0.104 send 0.95
+@35.00  choir  61 64 69 length 2.30 gain 0.104 send 0.95
+@29.50  brass  47 length 2.00 gain 0.160 send 0.70
+@31.50  brass  50 length 1.00 gain 0.160 send 0.70
+@32.50  brass  54 length 1.00 gain 0.160 send 0.70
+@33.50  brass  55 length 2.00 gain 0.160 send 0.70
+@35.50  brass  57 length 1.50 gain 0.160 send 0.70
+@31.00  bowed  66 length 2.00 gain 0.160 send 0.85
+@33.00  bowed  71 length 2.00 gain 0.160 send 0.85
+@35.00  bowed  69 length 2.00 gain 0.160 send 0.85
+@29.20  pluck  59 length 1.20 gain 0.048 pan -0.30 send 0.80
+@29.53  pluck  62 length 1.20 gain 0.048 pan -0.22 send 0.80
+@29.86  pluck  66 length 1.20 gain 0.048 pan -0.15 send 0.80
+@30.19  pluck  71 length 1.20 gain 0.048 pan -0.08 send 0.80
+@30.52  pluck  74 length 1.20 gain 0.048 send 0.80
+@30.85  pluck  78 length 1.20 gain 0.048 pan 0.08 send 0.80
+@31.18  pluck  83 length 1.20 gain 0.048 pan 0.15 send 0.80
+@31.51  pluck  86 length 1.20 gain 0.048 pan 0.23 send 0.80
+@31.84  pluck  90 length 1.20 gain 0.048 pan 0.30 send 0.80
+@32.17  pluck  59 length 1.20 gain 0.048 pan -0.30 send 0.80
+@32.50  pluck  62 length 1.20 gain 0.048 pan -0.22 send 0.80
+@32.83  pluck  66 length 1.20 gain 0.048 pan -0.15 send 0.80
+@33.16  pluck  71 length 1.20 gain 0.048 pan -0.08 send 0.80
+@33.49  pluck  74 length 1.20 gain 0.048 send 0.80
+@33.82  pluck  78 length 1.20 gain 0.048 pan 0.08 send 0.80
+@34.15  pluck  83 length 1.20 gain 0.048 pan 0.15 send 0.80
+@34.48  pluck  86 length 1.20 gain 0.048 pan 0.23 send 0.80
+@34.81  pluck  90 length 1.20 gain 0.048 pan 0.30 send 0.80
+@35.14  pluck  59 length 1.20 gain 0.048 pan -0.30 send 0.80
+@35.47  pluck  62 length 1.20 gain 0.048 pan -0.22 send 0.80
+@35.80  pluck  66 length 1.20 gain 0.048 pan -0.15 send 0.80
+@36.13  pluck  71 length 1.20 gain 0.048 pan -0.08 send 0.80
+@36.46  pluck  74 length 1.20 gain 0.048 send 0.80
+@35.00  swell  length 2.00 gain 0.220 send 0.85
+@35.20  timpani  45 length 0.50 gain 0.032 pan -0.12 send 0.50
+@35.29  timpani  45 length 0.50 gain 0.032 pan 0.12 send 0.50
+@35.37  timpani  45 length 0.50 gain 0.034 pan -0.12 send 0.50
+@35.46  timpani  45 length 0.50 gain 0.036 pan 0.12 send 0.50
+@35.54  timpani  45 length 0.50 gain 0.039 pan -0.12 send 0.50
+@35.63  timpani  45 length 0.50 gain 0.042 pan 0.12 send 0.50
+@35.71  timpani  45 length 0.50 gain 0.047 pan -0.12 send 0.50
+@35.80  timpani  45 length 0.50 gain 0.053 pan 0.12 send 0.50
+@35.88  timpani  45 length 0.50 gain 0.059 pan -0.12 send 0.50
+@35.97  timpani  45 length 0.50 gain 0.066 pan 0.12 send 0.50
+@36.05  timpani  45 length 0.50 gain 0.074 pan -0.12 send 0.50
+@36.14  timpani  45 length 0.50 gain 0.083 pan 0.12 send 0.50
+@36.22  timpani  45 length 0.50 gain 0.092 pan -0.12 send 0.50
+@36.31  timpani  45 length 0.50 gain 0.103 pan 0.12 send 0.50
+@36.39  timpani  45 length 0.50 gain 0.114 pan -0.12 send 0.50
+@36.48  timpani  45 length 0.50 gain 0.126 pan 0.12 send 0.50
+@36.56  timpani  45 length 0.50 gain 0.139 pan -0.12 send 0.50
+@36.65  timpani  45 length 0.50 gain 0.153 pan 0.12 send 0.50
+@36.73  timpani  45 length 0.50 gain 0.168 pan -0.12 send 0.50
+@36.82  timpani  45 length 0.50 gain 0.183 pan 0.12 send 0.50
+@36.90  timpani  45 length 0.50 gain 0.200 pan -0.12 send 0.50
+@36.99  timpani  45 length 0.50 gain 0.217 pan 0.12 send 0.50
 
-# --- Whale shark (37-45): the theme in full; a burst as the shark strikes the jacks (41)
-@37.00  strings  50 62 66 69 length 2.35 gain 0.045 send 0.90
-@37.00  bass  38 length 2.05 gain 0.065 send 0.30
-@39.05  strings  47 59 62 66 length 2.35 gain 0.045 send 0.90
-@39.05  bass  47 length 2.05 gain 0.065 send 0.30
-@41.11  strings  43 59 62 67 length 2.35 gain 0.045 send 0.90
-@41.11  bass  43 length 2.05 gain 0.065 send 0.30
-@43.16  strings  45 57 61 64 length 2.35 gain 0.045 send 0.90
-@43.16  bass  45 length 2.05 gain 0.065 send 0.30
-@37.00  pluck  62 74 78 81 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.100
-@37.39  pluck  81 78 74 62 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.100
-@37.79  pluck  62 74 78 81 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.100
-@38.18  pluck  81 78 74 62 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.100
-@38.58  pluck  62 74 78 81 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.100
-@38.97  pluck  81 78 74 62 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.100
-@39.05  pluck  59 71 74 78 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.100
-@39.45  pluck  78 74 71 59 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.100
-@39.84  pluck  59 71 74 78 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.100
-@40.24  pluck  78 74 71 59 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.100
-@40.63  pluck  59 71 74 78 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.100
-@41.03  pluck  78 74 71 59 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.100
-@41.11  pluck  55 71 74 79 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.100
-@41.50  pluck  79 74 71 55 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.100
-@41.89  pluck  55 71 74 79 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.100
-@42.29  pluck  79 74 71 55 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.100
-@42.68  pluck  55 71 74 79 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.100
-@43.08  pluck  79 74 71 55 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.100
-@43.16  pluck  57 69 73 76 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.100
-@43.55  pluck  76 73 69 57 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.100
-@43.95  pluck  57 69 73 76 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.100
-@44.34  pluck  76 73 69 57 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.100
-@44.74  pluck  57 69 73 76 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.100
-@45.13  pluck  76 73 69 57 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.100
-@37.20  piano  74 length 0.79 gain 0.065 send 0.60
-@37.99  piano  78 length 0.79 gain 0.065 send 0.60
-@38.78  piano  81 length 1.18 gain 0.065 send 0.60
-@40.36  piano  83 length 0.79 gain 0.065 send 0.60
-@41.15  piano  81 length 0.79 gain 0.065 send 0.60
-@41.94  piano  78 length 0.79 gain 0.065 send 0.60
-@42.73  piano  76 length 0.79 gain 0.065 send 0.60
-@43.52  piano  74 length 0.79 gain 0.065 send 0.60
-@40.80  swell  length 1.00 gain 0.050 send 0.80
-@41.00  impact  0.45 gain 0.040 send 0.60
+# --- Whale shark (37-45): the theme in full on the horns, choir and strings - the biggest fish in the sea; a burst as the sharks strike the jacks (41)
+@37.00  impact  0.6 gain 0.200 send 0.80
+@37.00  strings  50 57 62 66 length 2.30 gain 0.208 send 0.90
+@37.00  bass  38 length 2.00 gain 0.300 send 0.30
+@39.00  strings  47 59 62 66 length 2.30 gain 0.208 send 0.90
+@39.00  bass  47 length 2.00 gain 0.300 send 0.30
+@41.00  strings  43 59 62 67 length 2.30 gain 0.208 send 0.90
+@41.00  bass  43 length 2.00 gain 0.300 send 0.30
+@43.00  strings  45 57 61 64 length 2.30 gain 0.208 send 0.90
+@43.00  bass  45 length 2.00 gain 0.300 send 0.30
+@37.00  choir  62 66 69 length 2.30 gain 0.120 send 0.95
+@39.00  choir  62 66 71 length 2.30 gain 0.120 send 0.95
+@41.00  choir  62 67 71 length 2.30 gain 0.120 send 0.95
+@43.00  choir  61 64 69 length 2.30 gain 0.120 send 0.95
+@37.00  brass  54 length 1.00 gain 0.220 send 0.60
+@38.00  brass  57 length 1.00 gain 0.220 send 0.60
+@39.00  brass  62 length 2.00 gain 0.220 send 0.60
+@41.00  brass  61 length 1.00 gain 0.220 send 0.60
+@42.00  brass  57 length 1.00 gain 0.220 send 0.60
+@43.00  brass  59 length 2.00 gain 0.220 send 0.60
+@37.00  bowed  66 length 1.00 gain 0.140 send 0.80
+@38.00  bowed  69 length 1.00 gain 0.140 send 0.80
+@39.00  bowed  74 length 2.00 gain 0.140 send 0.80
+@41.00  bowed  73 length 1.00 gain 0.140 send 0.80
+@42.00  bowed  69 length 1.00 gain 0.140 send 0.80
+@43.00  bowed  71 length 2.00 gain 0.140 send 0.80
+@37.00  timpani  38 length 1.60 gain 0.200 send 0.50
+@39.00  timpani  38 length 1.60 gain 0.200 send 0.50
+@41.00  timpani  38 length 1.60 gain 0.200 send 0.50
+@43.00  timpani  33 length 1.60 gain 0.200 send 0.50
+@41.00  timpani  38 length 0.60 gain 0.240 send 0.45
+@41.00  flash  gain 0.080 send 0.90
+@41.00  pluck  55 length 1.20 gain 0.056 pan -0.30 send 0.80
+@41.22  pluck  59 length 1.20 gain 0.056 pan -0.18 send 0.80
+@41.44  pluck  62 length 1.20 gain 0.056 pan -0.06 send 0.80
+@41.66  pluck  67 length 1.20 gain 0.056 pan 0.06 send 0.80
+@41.88  pluck  71 length 1.20 gain 0.056 pan 0.18 send 0.80
+@42.10  pluck  74 length 1.20 gain 0.056 pan 0.30 send 0.80
+@42.32  pluck  55 length 1.20 gain 0.056 pan -0.30 send 0.80
+@42.54  pluck  59 length 1.20 gain 0.056 pan -0.18 send 0.80
+@42.76  pluck  62 length 1.20 gain 0.056 pan -0.06 send 0.80
+@42.98  pluck  67 length 1.20 gain 0.056 pan 0.06 send 0.80
+@43.20  pluck  71 length 1.20 gain 0.056 pan 0.18 send 0.80
+@43.42  pluck  74 length 1.20 gain 0.056 pan 0.30 send 0.80
+@43.64  pluck  55 length 1.20 gain 0.056 pan -0.30 send 0.80
+@43.86  pluck  59 length 1.20 gain 0.056 pan -0.18 send 0.80
+@44.08  pluck  62 length 1.20 gain 0.056 pan -0.06 send 0.80
+@44.30  pluck  67 length 1.20 gain 0.056 pan 0.06 send 0.80
+@44.52  pluck  71 length 1.20 gain 0.056 pan 0.18 send 0.80
+@44.74  pluck  74 length 1.20 gain 0.056 pan 0.30 send 0.80
+@43.60  swell  length 1.40 gain 0.180 send 0.80
 
-# --- The kelp forest (45-52): light and playful for the sea lions
-@45.00  pad  55 59 62 67 length 2.04 gain 0.035 send 0.90
-@45.00  bass  43 length 1.74 gain 0.050 send 0.30
-@46.74  pad  62 66 69 length 2.04 gain 0.035 send 0.90
-@46.74  bass  50 length 1.74 gain 0.050 send 0.30
-@48.47  pad  57 61 64 length 2.04 gain 0.035 send 0.90
-@48.47  bass  45 length 1.74 gain 0.050 send 0.30
-@50.21  pad  62 66 69 length 2.04 gain 0.035 send 0.90
-@50.21  bass  50 length 1.74 gain 0.050 send 0.30
-@45.00  pluck  67 71 74 79 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.080
-@45.26  pluck  79 74 71 67 length 0.50 gain 0.022 pan 0.25 send 0.70 spread 0.080
-@45.53  pluck  67 71 74 79 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.080
-@45.79  pluck  79 74 71 67 length 0.50 gain 0.022 pan 0.25 send 0.70 spread 0.080
-@46.05  pluck  67 71 74 79 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.080
-@46.32  pluck  79 74 71 67 length 0.50 gain 0.022 pan 0.25 send 0.70 spread 0.080
-@46.58  pluck  67 71 74 79 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.080
-@46.74  pluck  74 78 81 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.080
-@47.00  pluck  81 78 74 length 0.50 gain 0.022 pan 0.25 send 0.70 spread 0.080
-@47.26  pluck  74 78 81 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.080
-@47.53  pluck  81 78 74 length 0.50 gain 0.022 pan 0.25 send 0.70 spread 0.080
-@47.79  pluck  74 78 81 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.080
-@48.05  pluck  81 78 74 length 0.50 gain 0.022 pan 0.25 send 0.70 spread 0.080
-@48.32  pluck  74 78 81 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.080
-@48.47  pluck  69 73 76 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.080
-@48.74  pluck  76 73 69 length 0.50 gain 0.022 pan 0.25 send 0.70 spread 0.080
-@49.00  pluck  69 73 76 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.080
-@49.26  pluck  76 73 69 length 0.50 gain 0.022 pan 0.25 send 0.70 spread 0.080
-@49.53  pluck  69 73 76 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.080
-@49.79  pluck  76 73 69 length 0.50 gain 0.022 pan 0.25 send 0.70 spread 0.080
-@50.05  pluck  69 73 76 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.080
-@50.21  pluck  74 78 81 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.080
-@50.47  pluck  81 78 74 length 0.50 gain 0.022 pan 0.25 send 0.70 spread 0.080
-@50.74  pluck  74 78 81 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.080
-@51.00  pluck  81 78 74 length 0.50 gain 0.022 pan 0.25 send 0.70 spread 0.080
-@51.26  pluck  74 78 81 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.080
-@51.53  pluck  81 78 74 length 0.50 gain 0.022 pan 0.25 send 0.70 spread 0.080
-@51.79  pluck  74 78 81 length 0.50 gain 0.022 pan -0.25 send 0.70 spread 0.080
-@45.30  mallet  79 length 0.39 gain 0.040 send 0.60
-@45.69  mallet  81 length 0.39 gain 0.040 send 0.60
-@46.09  mallet  83 length 0.79 gain 0.040 send 0.60
-@46.88  mallet  81 length 0.79 gain 0.040 send 0.60
-@47.67  mallet  78 length 0.79 gain 0.040 send 0.60
-@48.46  mallet  81 length 0.39 gain 0.040 send 0.60
-@48.85  mallet  83 length 0.39 gain 0.040 send 0.60
-@49.25  mallet  86 length 1.18 gain 0.040 send 0.60
+# --- The kelp forest (45-52): light through the fronds and sea lions at play - the theme turned playful on the piano and plucks, then gathering for the end
+@45.00  strings  43 59 62 66 length 2.05 gain 0.144 send 0.90
+@45.00  bass  43 length 1.75 gain 0.220 send 0.30
+@46.75  strings  50 57 62 66 length 2.05 gain 0.144 send 0.90
+@46.75  bass  38 length 1.75 gain 0.220 send 0.30
+@48.50  strings  40 59 64 67 length 2.05 gain 0.144 send 0.90
+@48.50  bass  40 length 1.75 gain 0.220 send 0.30
+@50.25  strings  45 57 61 64 length 2.05 gain 0.144 send 0.90
+@50.25  bass  45 length 1.75 gain 0.220 send 0.30
+@45.00  pluck  55 71 74 78 length 0.50 gain 0.080 pan -0.25 send 0.70 spread 0.050
+@45.44  pluck  78 74 71 55 length 0.50 gain 0.080 pan 0.25 send 0.70 spread 0.050
+@45.88  pluck  55 71 74 78 length 0.50 gain 0.080 pan -0.25 send 0.70 spread 0.050
+@46.31  pluck  78 74 71 55 length 0.50 gain 0.080 pan 0.25 send 0.70 spread 0.050
+@46.75  pluck  62 69 74 78 length 0.50 gain 0.080 pan -0.25 send 0.70 spread 0.050
+@47.19  pluck  78 74 69 62 length 0.50 gain 0.080 pan 0.25 send 0.70 spread 0.050
+@47.62  pluck  62 69 74 78 length 0.50 gain 0.080 pan -0.25 send 0.70 spread 0.050
+@48.06  pluck  78 74 69 62 length 0.50 gain 0.080 pan 0.25 send 0.70 spread 0.050
+@48.50  pluck  52 71 76 79 length 0.50 gain 0.080 pan -0.25 send 0.70 spread 0.050
+@48.94  pluck  79 76 71 52 length 0.50 gain 0.080 pan 0.25 send 0.70 spread 0.050
+@49.38  pluck  52 71 76 79 length 0.50 gain 0.080 pan -0.25 send 0.70 spread 0.050
+@49.81  pluck  79 76 71 52 length 0.50 gain 0.080 pan 0.25 send 0.70 spread 0.050
+@50.25  pluck  57 69 73 76 length 0.50 gain 0.080 pan -0.25 send 0.70 spread 0.050
+@50.69  pluck  76 73 69 57 length 0.50 gain 0.080 pan 0.25 send 0.70 spread 0.050
+@51.12  pluck  57 69 73 76 length 0.50 gain 0.080 pan -0.25 send 0.70 spread 0.050
+@51.56  pluck  76 73 69 57 length 0.50 gain 0.080 pan 0.25 send 0.70 spread 0.050
+@45.00  piano  74 length 0.44 gain 0.220 send 0.55
+@45.44  piano  76 length 0.44 gain 0.220 send 0.55
+@45.88  piano  78 length 0.88 gain 0.220 send 0.55
+@46.75  piano  79 length 0.44 gain 0.220 send 0.55
+@47.19  piano  78 length 0.44 gain 0.220 send 0.55
+@47.62  piano  76 length 0.88 gain 0.220 send 0.55
+@48.50  piano  74 length 0.44 gain 0.220 send 0.55
+@48.94  piano  76 length 0.44 gain 0.220 send 0.55
+@49.38  piano  73 length 0.88 gain 0.220 send 0.55
+@50.25  piano  69 length 0.88 gain 0.220 send 0.55
+@45.88  mallet  86 length 0.44 gain 0.100 send 0.80
+@47.62  mallet  83 length 0.44 gain 0.100 send 0.80
+@49.38  mallet  85 length 0.44 gain 0.100 send 0.80
+@50.20  swell  length 1.80 gain 0.220 send 0.85
+@50.40  timpani  45 length 0.50 gain 0.024 pan -0.12 send 0.50
+@50.48  timpani  45 length 0.50 gain 0.024 pan 0.12 send 0.50
+@50.57  timpani  45 length 0.50 gain 0.026 pan -0.12 send 0.50
+@50.66  timpani  45 length 0.50 gain 0.028 pan 0.12 send 0.50
+@50.74  timpani  45 length 0.50 gain 0.032 pan -0.12 send 0.50
+@50.83  timpani  45 length 0.50 gain 0.036 pan 0.12 send 0.50
+@50.91  timpani  45 length 0.50 gain 0.042 pan -0.12 send 0.50
+@51.00  timpani  45 length 0.50 gain 0.048 pan 0.12 send 0.50
+@51.08  timpani  45 length 0.50 gain 0.056 pan -0.12 send 0.50
+@51.17  timpani  45 length 0.50 gain 0.064 pan 0.12 send 0.50
+@51.25  timpani  45 length 0.50 gain 0.074 pan -0.12 send 0.50
+@51.34  timpani  45 length 0.50 gain 0.084 pan 0.12 send 0.50
+@51.42  timpani  45 length 0.50 gain 0.096 pan -0.12 send 0.50
+@51.51  timpani  45 length 0.50 gain 0.108 pan 0.12 send 0.50
+@51.59  timpani  45 length 0.50 gain 0.121 pan -0.12 send 0.50
+@51.68  timpani  45 length 0.50 gain 0.136 pan 0.12 send 0.50
+@51.76  timpani  45 length 0.50 gain 0.151 pan -0.12 send 0.50
+@51.85  timpani  45 length 0.50 gain 0.168 pan 0.12 send 0.50
+@51.93  timpani  45 length 0.50 gain 0.185 pan -0.12 send 0.50
 
-# --- The breach (52-60): the strings climb, the whale leaps (54.5, slowed), the theme rises over it and lands with the crash (58.8)
-@52.00  strings  38 50 57 62 length 2.80 gain 0.050 send 0.85
-@52.00  strings  66 69 length 2.80 gain 0.030 send 0.85
-@52.00  knock  38 gain 0.030 send 0.30
-@52.39  knock  38 gain 0.020 send 0.30
-@52.79  knock  38 gain 0.030 send 0.30
-@53.18  knock  38 gain 0.020 send 0.30
-@53.58  knock  38 gain 0.030 send 0.30
-@53.97  knock  38 gain 0.020 send 0.30
-@54.37  knock  38 gain 0.030 send 0.30
-@53.40  swell  length 1.20 gain 0.070 send 0.85
-@54.50  strings  38 50 57 62 66 69 74 length 5.60 gain 0.050 send 0.95
-@54.60  bell  74 78 81 86 90 length 3.50 gain 0.026 send 0.95 spread 0.160
-@55.00  piano  81 length 0.79 gain 0.060 send 0.60
-@55.79  piano  83 length 0.79 gain 0.060 send 0.60
-@56.58  piano  86 length 1.97 gain 0.060 send 0.60
-@58.80  impact  0.8 gain 0.045 send 0.90
-@58.80  pad  50 57 62 66 69 76 length 2.00 gain 0.040 send 0.95
+# --- The breach (52-60): held breath under the surface, the strings climbing; the whale leaps (54) - the theme's answer at full height, everything at once; the last chord rings out
+@52.00  drone  38 length 2.20 gain 0.200 send 0.90
+@52.00  strings  45 57 62 64 length 2.10 gain 0.180 send 0.90
+@52.00  choir  57 62 64 length 2.00 gain 0.112 send 0.95
+@52.00  bowed  69 length 0.50 gain 0.180 send 0.80
+@52.50  bowed  71 length 0.50 gain 0.180 send 0.80
+@53.00  bowed  73 length 0.50 gain 0.180 send 0.80
+@53.50  bowed  74 length 0.45 gain 0.180 send 0.80
+@52.60  timpani  45 length 0.50 gain 0.040 pan -0.12 send 0.50
+@52.67  timpani  45 length 0.50 gain 0.041 pan 0.12 send 0.50
+@52.74  timpani  45 length 0.50 gain 0.042 pan -0.12 send 0.50
+@52.81  timpani  45 length 0.50 gain 0.045 pan 0.12 send 0.50
+@52.88  timpani  45 length 0.50 gain 0.050 pan -0.12 send 0.50
+@52.95  timpani  45 length 0.50 gain 0.055 pan 0.12 send 0.50
+@53.02  timpani  45 length 0.50 gain 0.062 pan -0.12 send 0.50
+@53.09  timpani  45 length 0.50 gain 0.069 pan 0.12 send 0.50
+@53.16  timpani  45 length 0.50 gain 0.078 pan -0.12 send 0.50
+@53.23  timpani  45 length 0.50 gain 0.089 pan 0.12 send 0.50
+@53.30  timpani  45 length 0.50 gain 0.100 pan -0.12 send 0.50
+@53.37  timpani  45 length 0.50 gain 0.113 pan 0.12 send 0.50
+@53.44  timpani  45 length 0.50 gain 0.126 pan -0.12 send 0.50
+@53.51  timpani  45 length 0.50 gain 0.141 pan 0.12 send 0.50
+@53.58  timpani  45 length 0.50 gain 0.158 pan -0.12 send 0.50
+@53.65  timpani  45 length 0.50 gain 0.175 pan 0.12 send 0.50
+@53.72  timpani  45 length 0.50 gain 0.194 pan -0.12 send 0.50
+@53.79  timpani  45 length 0.50 gain 0.213 pan 0.12 send 0.50
+@53.86  timpani  45 length 0.50 gain 0.234 pan -0.12 send 0.50
+@53.93  timpani  45 length 0.50 gain 0.257 pan 0.12 send 0.50
+@53.20  swell  length 0.90 gain 0.240 send 0.85
+@54.00  impact  1.0 gain 0.280 send 0.80
+@54.00  timpani  38 length 3.00 gain 0.320 send 0.55
+@54.00  strings  50 57 62 66 length 1.80 gain 0.232 send 0.90
+@54.00  bass  38 length 1.50 gain 0.320 send 0.30
+@55.50  strings  42 58 61 66 length 1.80 gain 0.232 send 0.90
+@55.50  bass  42 length 1.50 gain 0.320 send 0.30
+@57.00  strings  43 59 62 67 length 1.80 gain 0.232 send 0.90
+@57.00  bass  43 length 1.50 gain 0.320 send 0.30
+@58.50  strings  45 57 61 64 length 1.80 gain 0.232 send 0.90
+@58.50  bass  45 length 1.50 gain 0.320 send 0.30
+@54.00  choir  62 66 69 74 length 1.80 gain 0.136 send 0.95
+@55.50  choir  61 66 70 73 length 1.80 gain 0.136 send 0.95
+@57.00  choir  62 67 71 74 length 1.80 gain 0.136 send 0.95
+@58.50  choir  61 64 69 73 length 1.80 gain 0.136 send 0.95
+@54.00  brass  62 length 0.75 gain 0.240 send 0.60
+@54.75  brass  64 length 0.75 gain 0.240 send 0.60
+@55.50  brass  66 length 1.50 gain 0.240 send 0.60
+@57.00  brass  69 length 1.12 gain 0.240 send 0.60
+@58.12  brass  67 length 0.38 gain 0.240 send 0.60
+@58.50  brass  66 length 1.50 gain 0.240 send 0.60
+@54.00  bowed  74 length 0.75 gain 0.160 send 0.80
+@54.75  bowed  76 length 0.75 gain 0.160 send 0.80
+@55.50  bowed  78 length 1.50 gain 0.160 send 0.80
+@57.00  bowed  81 length 1.12 gain 0.160 send 0.80
+@58.12  bowed  79 length 0.38 gain 0.160 send 0.80
+@58.50  bowed  78 length 1.50 gain 0.160 send 0.80
+@55.50  timpani  43 length 1.40 gain 0.200 send 0.50
+@57.00  timpani  45 length 1.40 gain 0.200 send 0.50
+@58.20  timpani  38 length 2.00 gain 0.240 send 0.60
+@58.20  strings  38 50 57 62 66 69 74 length 2.20 gain 0.220 send 0.95
+@58.20  choir  62 66 69 74 length 2.10 gain 0.128 send 0.95
+@58.20  brass  50 57 62 66 length 1.80 gain 0.160 send 0.70
+@58.40  bell  86 length 1.60 gain 0.064 send 0.95
+@59.00  bell  90 length 1.60 gain 0.064 send 0.95
