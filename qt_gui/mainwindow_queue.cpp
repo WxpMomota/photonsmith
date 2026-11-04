@@ -485,10 +485,11 @@ QString MainWindow::describeRenderJob(const RenderJob &job) {
 	// the common (Default) case, same as modeSuffix above being blank
 	// outside Video mode.
 	const QString integratorSuffix = integratorSuffixTag(job.integratorOptions.mode);
-	return tr("%1 — %2×%3 · %4spp · %5%6%7")
+	return tr("%1 — %2×%3 · %4spp · depth %5 · %6%7%8")
 		.arg(job.displayTitle)
 		.arg(job.width).arg(job.height)
 		.arg(job.samples)
+		.arg(job.maxDepth)
 		.arg(renderer, modeSuffix, integratorSuffix);
 }
 

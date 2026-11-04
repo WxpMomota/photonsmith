@@ -132,6 +132,7 @@ QVariant RenderQueueModel::data(const QModelIndex &index, int role) const {
 				case SceneColumn: return e.job.displayTitle;
 				case SizeColumn: return e.job.videoMode ? tr("%1×%2 · video").arg(e.job.width).arg(e.job.height) : QStringLiteral("%1×%2").arg(e.job.width).arg(e.job.height);
 				case SamplesColumn: return e.job.samples;
+				case DepthColumn: return e.job.maxDepth;   // (the max ray depth: how many bounces a path may take)
 				case RendererColumn: return m_renderer ? m_renderer(e.job) : QString();
 				case TimeColumn: return job_queue::isFinished(e.state) ? tr("%1 s").arg(e.seconds, 0, 'f', 1) : QString();
 			}
@@ -163,6 +164,7 @@ QVariant RenderQueueModel::headerData(int section, Qt::Orientation orientation, 
 		case SceneColumn: return tr("Scene");
 		case SizeColumn: return tr("Size");
 		case SamplesColumn: return tr("Samples");
+		case DepthColumn: return tr("Max depth");
 		case RendererColumn: return tr("Renderer");
 		case TimeColumn: return tr("Time");
 	}

@@ -1340,8 +1340,8 @@ Los archivos van en: %1</translation>
     </message>
     <message>
         <location filename="../mainwindow_queue.cpp" line="424"/>
-        <source>%1 — %2×%3 · %4spp · %5%6%7</source>
-        <translation>%1 — %2×%3 · %4spp · %5%6%7</translation>
+        <source>%1 — %2×%3 · %4spp · depth %5 · %6%7%8</source>
+        <translation>%1 — %2×%3 · %4spp · profundidad %5 · %6%7%8</translation>
     </message>
     <message numerus="yes">
         <location filename="../mainwindow_queue.cpp" line="495"/>
@@ -6868,6 +6868,11 @@ Salida:
         <location filename="../render_queue_model.cpp" line="166"/>
         <source>Samples</source>
         <translation>Muestras</translation>
+    </message>
+    <message>
+        <location filename="../render_queue_model.cpp" line="168"/>
+        <source>Max depth</source>
+        <translation>Prof. máx.</translation>
     </message>
     <message>
         <location filename="../render_queue_model.cpp" line="167"/>

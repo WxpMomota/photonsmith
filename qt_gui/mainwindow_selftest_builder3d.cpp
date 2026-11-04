@@ -1067,8 +1067,12 @@ void MainWindow::selfTestRenderQueue(const std::function<void(bool, const QStrin
 	a.displayTitle = "Scene A";
 	b.displayTitle = "Scene B";
 	c.displayTitle = "Scene C";
-	for (RenderJob *j : {&a, &b, &c}) { j->width = 320; j->height = 240; j->samples = 16; }
+	for (RenderJob *j : {&a, &b, &c}) { j->width = 320; j->height = 240; j->samples = 16; j->maxDepth = 12; }
 	const int ida = m_queueModel->add(a), idb = m_queueModel->add(b), idc = m_queueModel->add(c);
+	check(m_queueModel->data(m_queueModel->index(0, RenderQueueModel::DepthColumn)).toInt() == 12 &&
+	          m_queueModel->headerData(RenderQueueModel::DepthColumn, Qt::Horizontal, Qt::DisplayRole).toString() == RenderQueueModel::tr("Max depth") &&
+	          describeRenderJob(a).contains(QStringLiteral(" 12 ")),   // (320x240, 16 spp: only the depth is 12)
+	      "a row shows its max ray depth (a column, and the job's summary)");
 	check(m_queueView->model()->rowCount() == 3 && m_queueModel->waitingCount() == 3, "three queued jobs are three rows of the table");
 	check(m_queueModel->data(m_queueModel->index(0, RenderQueueModel::SceneColumn)).toString() == "Scene A" &&
 	          m_queueModel->data(m_queueModel->index(0, RenderQueueModel::StatusColumn)).toString() == RenderQueueModel::tr("Waiting"),

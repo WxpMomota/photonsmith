@@ -16,7 +16,7 @@
 class RenderQueueModel : public QAbstractTableModel {
 	Q_OBJECT
 public:
-	enum Column { StatusColumn, SceneColumn, SizeColumn, SamplesColumn, RendererColumn, TimeColumn, ColumnCount };
+	enum Column { StatusColumn, SceneColumn, SizeColumn, SamplesColumn, DepthColumn, RendererColumn, TimeColumn, ColumnCount };
 	enum Role { JobStateRole = Qt::UserRole + 1, JobIdRole };
 
 	using Describer = std::function<QString(const RenderJob &)>;
