@@ -430,6 +430,27 @@ TEST(CameraKeyframes, KeysAtTimesAreReachedAtThoseTimes) {
 	EXPECT_LT(half, 70.0);
 }
 
+// Timed keys: the camera carries its speed through a key (it used to take each stretch at its own pace, a lurch at every key), and slowing from far away to close up it
+// never runs past a key and comes back.
+TEST(CameraKeyframes, TimedKeysKeepTheirSpeedThroughAKeyAndNeverOvershoot) {
+	const ParseResult r = parse("ease 0\nkey 0 0 0  0 0 -1  at 0\nkey 0 0 -60  0 0 -61  at 4\nkey 0 0 -100  0 0 -101  at 8\nkey 0 0 -110  0 0 -111  at 12\n");
+	ASSERT_TRUE(r.ok) << r.error;
+	const double duration = 12.0, e = 0.01;
+	const auto z = [&](double s) { return at(r.path, s / duration, duration).pos[2]; };
+	for (const double key : {4.0, 8.0}) {
+		const double before = (z(key) - z(key - e)) / e, after = (z(key + e) - z(key)) / e;
+		EXPECT_NEAR(before, after, 0.05 * std::abs(before) + 0.05) << "the same speed either side of the key at " << key << " s";
+	}
+	double last = z(0.0);
+	for (double s = 0.05; s <= duration; s += 0.05) {
+		const double now = z(s);
+		EXPECT_LE(now, last + 1e-9) << "always on its way, never back, at " << s << " s";
+		last = now;
+	}
+	EXPECT_NEAR(z(8.0), -100.0, 1e-9);
+	EXPECT_NEAR(z(12.0), -110.0, 1e-9);
+}
+
 TEST(CameraKeyframes, AFocusPullWithTheCameraStandingStill) {
 	const ParseResult r = parse("key 0 0 0  0 0 1  40 0.05 3  at 0\nkey 0 0 0  0 0 1  40 0.05 9  at 2\n");
 	ASSERT_TRUE(r.ok) << r.error;

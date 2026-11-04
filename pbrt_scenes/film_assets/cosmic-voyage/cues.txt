@@ -1,0 +1,312 @@
+# Cosmic Voyage: a composed score (written by a script; change it as any cues file). Every time is the film's (@).
+
+# --- The cosmic web (0-7): out of silence, a low drone and the choir rising, a roll into the collision
+@0.00  drone  26 length 7.50 gain 0.060 send 0.90
+@0.30  choir  50 57 length 6.80 gain 0.035 send 0.95
+@2.50  choir  62 65 length 4.60 gain 0.030 send 0.95
+@1.00  bell  81 length 3.00 gain 0.020 send 0.95
+@2.60  bell  77 length 3.00 gain 0.020 send 0.95
+@4.00  bell  74 length 3.00 gain 0.020 send 0.95
+@5.20  bell  76 length 3.00 gain 0.020 send 0.95
+@5.20  swell  length 2.00 gain 0.070 send 0.85
+@5.60  timpani  38 length 0.60 gain 0.010 pan -0.15 send 0.50
+@5.69  timpani  38 length 0.60 gain 0.013 pan 0.15 send 0.50
+@5.78  timpani  38 length 0.60 gain 0.015 pan -0.15 send 0.50
+@5.87  timpani  38 length 0.60 gain 0.018 pan 0.15 send 0.50
+@5.96  timpani  38 length 0.60 gain 0.020 pan -0.15 send 0.50
+@6.05  timpani  38 length 0.60 gain 0.023 pan 0.15 send 0.50
+@6.14  timpani  38 length 0.60 gain 0.025 pan -0.15 send 0.50
+@6.23  timpani  38 length 0.60 gain 0.028 pan 0.15 send 0.50
+@6.32  timpani  38 length 0.60 gain 0.031 pan -0.15 send 0.50
+@6.41  timpani  38 length 0.60 gain 0.033 pan 0.15 send 0.50
+@6.50  timpani  38 length 0.60 gain 0.036 pan -0.15 send 0.50
+@6.59  timpani  38 length 0.60 gain 0.038 pan 0.15 send 0.50
+@6.68  timpani  38 length 0.60 gain 0.041 pan -0.15 send 0.50
+@6.77  timpani  38 length 0.60 gain 0.043 pan 0.15 send 0.50
+@6.86  timpani  38 length 0.60 gain 0.046 pan -0.15 send 0.50
+@6.95  timpani  38 length 0.60 gain 0.049 pan 0.15 send 0.50
+
+# --- Galaxies collide (7-16): the strings drive, timpani on the bars, the horns' call
+@7.00  impact  0.6 gain 0.050 send 0.70
+@7.00  strings  50 57 62 65 length 3.63 gain 0.050 send 0.90
+@7.00  bass  38 length 3.33 gain 0.070 send 0.30
+@10.33  strings  46 58 62 65 length 3.63 gain 0.050 send 0.90
+@10.33  bass  46 length 3.33 gain 0.070 send 0.30
+@13.67  strings  53 57 60 65 length 1.97 gain 0.050 send 0.90
+@13.67  bass  41 length 1.67 gain 0.070 send 0.30
+@15.33  strings  48 55 60 64 length 1.97 gain 0.050 send 0.90
+@15.33  bass  36 length 1.67 gain 0.070 send 0.30
+@7.00  pluck  62 69 74 77 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.060
+@7.42  pluck  77 74 69 62 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.060
+@7.83  pluck  62 69 74 77 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.060
+@8.25  pluck  77 74 69 62 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.060
+@8.67  pluck  62 69 74 77 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.060
+@9.08  pluck  77 74 69 62 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.060
+@9.50  pluck  62 69 74 77 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.060
+@9.92  pluck  77 74 69 62 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.060
+@10.33  pluck  58 70 74 77 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.060
+@10.75  pluck  77 74 70 58 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.060
+@11.17  pluck  58 70 74 77 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.060
+@11.58  pluck  77 74 70 58 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.060
+@12.00  pluck  58 70 74 77 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.060
+@12.42  pluck  77 74 70 58 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.060
+@12.83  pluck  58 70 74 77 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.060
+@13.25  pluck  77 74 70 58 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.060
+@13.67  pluck  65 69 72 77 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.060
+@14.08  pluck  77 72 69 65 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.060
+@14.50  pluck  65 69 72 77 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.060
+@14.92  pluck  77 72 69 65 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.060
+@15.33  pluck  60 67 72 76 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.060
+@15.75  pluck  76 72 67 60 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.060
+@16.17  pluck  60 67 72 76 length 0.50 gain 0.020 pan -0.25 send 0.70 spread 0.060
+@16.58  pluck  76 72 67 60 length 0.50 gain 0.020 pan 0.25 send 0.70 spread 0.060
+@7.00  timpani  38 length 1.20 gain 0.065 send 0.45
+@9.50  timpani  38 length 1.20 gain 0.050 send 0.45
+@10.33  timpani  38 length 1.20 gain 0.065 send 0.45
+@12.83  timpani  38 length 1.20 gain 0.050 send 0.45
+@13.67  timpani  38 length 1.20 gain 0.065 send 0.45
+@15.33  timpani  38 length 1.20 gain 0.050 send 0.45
+@9.50  brass  62 length 1.25 gain 0.050 send 0.60
+@10.75  brass  69 length 0.42 gain 0.050 send 0.60
+@11.17  brass  74 length 2.50 gain 0.050 send 0.60
+@13.67  brass  72 length 0.83 gain 0.050 send 0.60
+@14.50  brass  70 length 0.83 gain 0.050 send 0.60
+@15.33  brass  69 length 2.50 gain 0.050 send 0.60
+
+# --- A spiral galaxy (16-24): the theme in full - horns, choir and strings
+@16.00  strings  50 57 62 65 length 3.63 gain 0.055 send 0.90
+@16.00  bass  38 length 3.33 gain 0.075 send 0.30
+@19.33  strings  43 58 62 67 length 1.97 gain 0.055 send 0.90
+@19.33  bass  43 length 1.67 gain 0.075 send 0.30
+@21.00  strings  46 58 62 65 length 1.97 gain 0.055 send 0.90
+@21.00  bass  46 length 1.67 gain 0.075 send 0.30
+@22.67  strings  53 57 60 65 length 1.97 gain 0.055 send 0.90
+@22.67  bass  41 length 1.67 gain 0.075 send 0.30
+@16.00  choir  62 65 69 length 3.63 gain 0.030 send 0.90
+@19.33  choir  62 67 70 length 1.97 gain 0.030 send 0.90
+@21.00  choir  65 70 74 length 1.97 gain 0.030 send 0.90
+@22.67  choir  65 69 72 length 1.97 gain 0.030 send 0.90
+@16.00  brass  62 length 1.67 gain 0.060 send 0.60
+@17.67  brass  69 length 0.83 gain 0.060 send 0.60
+@18.50  brass  67 length 0.42 gain 0.060 send 0.60
+@18.92  brass  65 length 0.42 gain 0.060 send 0.60
+@19.33  brass  69 length 1.67 gain 0.060 send 0.60
+@21.00  brass  74 length 1.67 gain 0.060 send 0.60
+@22.67  brass  72 length 0.83 gain 0.060 send 0.60
+@23.50  brass  70 length 0.83 gain 0.060 send 0.60
+@24.33  brass  69 length 1.67 gain 0.060 send 0.60
+@16.00  timpani  38 length 1.20 gain 0.072 send 0.45
+@19.33  timpani  38 length 1.20 gain 0.072 send 0.45
+@22.67  timpani  38 length 1.20 gain 0.072 send 0.45
+@22.60  swell  length 1.60 gain 0.060 send 0.85
+@23.00  timpani  45 length 0.60 gain 0.020 pan 0.15 send 0.50
+@23.09  timpani  45 length 0.60 gain 0.024 pan -0.15 send 0.50
+@23.18  timpani  45 length 0.60 gain 0.027 pan 0.15 send 0.50
+@23.27  timpani  45 length 0.60 gain 0.031 pan -0.15 send 0.50
+@23.36  timpani  45 length 0.60 gain 0.034 pan 0.15 send 0.50
+@23.45  timpani  45 length 0.60 gain 0.038 pan -0.15 send 0.50
+@23.54  timpani  45 length 0.60 gain 0.042 pan 0.15 send 0.50
+@23.63  timpani  45 length 0.60 gain 0.045 pan -0.15 send 0.50
+@23.72  timpani  45 length 0.60 gain 0.049 pan 0.15 send 0.50
+@23.81  timpani  45 length 0.60 gain 0.052 pan -0.15 send 0.50
+@23.90  timpani  45 length 0.60 gain 0.056 pan 0.15 send 0.50
+@23.99  timpani  45 length 0.60 gain 0.060 pan -0.15 send 0.50
+
+# --- The pillars (24-32): a hush - the choir alone, a piano turning, bells like stars being born
+@24.00  impact  0.4 gain 0.035 send 0.85
+@24.00  choir  50 57 64 69 length 8.00 gain 0.035 send 0.95
+@24.00  drone  38 length 8.20 gain 0.040 send 0.90
+@24.40  piano  74 77 81 84 length 0.50 gain 0.030 pan -0.25 send 0.70 spread 0.120
+@24.82  piano  84 81 77 74 length 0.50 gain 0.030 pan 0.25 send 0.70 spread 0.120
+@25.23  piano  74 77 81 84 length 0.50 gain 0.030 pan -0.25 send 0.70 spread 0.120
+@25.65  piano  84 81 77 74 length 0.50 gain 0.030 pan 0.25 send 0.70 spread 0.120
+@26.07  piano  74 77 81 84 length 0.50 gain 0.030 pan -0.25 send 0.70 spread 0.120
+@26.48  piano  84 81 77 74 length 0.50 gain 0.030 pan 0.25 send 0.70 spread 0.120
+@26.90  piano  74 77 81 84 length 0.50 gain 0.030 pan -0.25 send 0.70 spread 0.120
+@27.32  piano  84 81 77 74 length 0.50 gain 0.030 pan 0.25 send 0.70 spread 0.120
+@27.73  piano  70 74 77 81 length 0.50 gain 0.030 pan -0.25 send 0.70 spread 0.120
+@28.15  piano  81 77 74 70 length 0.50 gain 0.030 pan 0.25 send 0.70 spread 0.120
+@28.57  piano  70 74 77 81 length 0.50 gain 0.030 pan -0.25 send 0.70 spread 0.120
+@28.98  piano  81 77 74 70 length 0.50 gain 0.030 pan 0.25 send 0.70 spread 0.120
+@29.40  piano  70 74 77 81 length 0.50 gain 0.030 pan -0.25 send 0.70 spread 0.120
+@29.82  piano  81 77 74 70 length 0.50 gain 0.030 pan 0.25 send 0.70 spread 0.120
+@30.23  piano  70 74 77 81 length 0.50 gain 0.030 pan -0.25 send 0.70 spread 0.120
+@30.65  piano  81 77 74 70 length 0.50 gain 0.030 pan 0.25 send 0.70 spread 0.120
+@25.00  bell  86 93 length 1.60 gain 0.014 send 0.95 spread 0.120
+@26.15  bell  83 88 length 1.60 gain 0.014 send 0.95 spread 0.120
+@27.30  bell  80 93 length 1.60 gain 0.014 send 0.95 spread 0.120
+@28.45  bell  86 88 length 1.60 gain 0.014 send 0.95 spread 0.120
+@29.60  bell  83 93 length 1.60 gain 0.014 send 0.95 spread 0.120
+@30.75  bell  80 88 length 1.60 gain 0.014 send 0.95 spread 0.120
+@30.60  swell  length 1.60 gain 0.060 send 0.85
+
+# --- A raging star (32-40): brass stabs and timpani as it sweeps past, fastest in the middle
+@32.00  impact  0.7 gain 0.050 send 0.70
+@32.00  strings  50 57 62 65 length 1.97 gain 0.050 send 0.90
+@32.00  bass  38 length 1.67 gain 0.075 send 0.30
+@33.67  strings  46 58 62 65 length 1.97 gain 0.050 send 0.90
+@33.67  bass  46 length 1.67 gain 0.075 send 0.30
+@35.33  strings  48 55 60 64 length 1.97 gain 0.050 send 0.90
+@35.33  bass  36 length 1.67 gain 0.075 send 0.30
+@37.00  strings  45 57 61 64 length 1.97 gain 0.050 send 0.90
+@37.00  bass  45 length 1.67 gain 0.075 send 0.30
+@38.67  strings  50 57 62 65 length 1.55 gain 0.050 send 0.90
+@38.67  bass  38 length 1.25 gain 0.075 send 0.30
+@32.00  brass  50 57 62 length 0.45 gain 0.050 send 0.50
+@33.67  brass  50 57 62 length 0.45 gain 0.050 send 0.50
+@35.33  brass  50 57 62 length 0.45 gain 0.050 send 0.50
+@36.20  brass  50 57 62 length 0.45 gain 0.050 send 0.50
+@37.00  brass  50 57 62 length 0.45 gain 0.050 send 0.50
+@38.67  brass  50 57 62 length 0.45 gain 0.050 send 0.50
+@32.00  timpani  38 length 1.20 gain 0.052 send 0.45
+@32.83  timpani  38 length 1.20 gain 0.040 send 0.45
+@33.67  timpani  38 length 1.20 gain 0.052 send 0.45
+@34.50  timpani  38 length 1.20 gain 0.040 send 0.45
+@34.92  timpani  38 length 1.20 gain 0.040 send 0.45
+@35.33  timpani  38 length 1.20 gain 0.052 send 0.45
+@36.17  timpani  38 length 1.20 gain 0.040 send 0.45
+@37.00  timpani  38 length 1.20 gain 0.052 send 0.45
+@37.83  timpani  38 length 1.20 gain 0.040 send 0.45
+@38.25  timpani  38 length 1.20 gain 0.040 send 0.45
+@38.67  timpani  38 length 1.20 gain 0.052 send 0.45
+@39.50  timpani  38 length 1.20 gain 0.040 send 0.45
+@35.40  swell  length 1.40 gain 0.060 send 0.80
+@39.00  timpani  45 length 0.60 gain 0.020 pan 0.15 send 0.50
+@39.09  timpani  45 length 0.60 gain 0.024 pan -0.15 send 0.50
+@39.18  timpani  45 length 0.60 gain 0.027 pan 0.15 send 0.50
+@39.27  timpani  45 length 0.60 gain 0.031 pan -0.15 send 0.50
+@39.36  timpani  45 length 0.60 gain 0.034 pan 0.15 send 0.50
+@39.45  timpani  45 length 0.60 gain 0.038 pan -0.15 send 0.50
+@39.54  timpani  45 length 0.60 gain 0.042 pan 0.15 send 0.50
+@39.63  timpani  45 length 0.60 gain 0.045 pan -0.15 send 0.50
+@39.72  timpani  45 length 0.60 gain 0.049 pan 0.15 send 0.50
+@39.81  timpani  45 length 0.60 gain 0.052 pan -0.15 send 0.50
+@39.90  timpani  45 length 0.60 gain 0.056 pan 0.15 send 0.50
+@39.99  timpani  45 length 0.60 gain 0.060 pan -0.15 send 0.50
+
+# --- The ringed giant (40-49): majesty - the theme in F major on the horns, the choir high
+@40.00  impact  0.6 gain 0.045 send 0.80
+@40.00  strings  41 57 60 65 length 3.63 gain 0.055 send 0.90
+@40.00  bass  41 length 3.33 gain 0.075 send 0.30
+@43.33  strings  36 55 60 64 length 1.97 gain 0.055 send 0.90
+@43.33  bass  36 length 1.67 gain 0.075 send 0.30
+@45.00  strings  38 57 62 65 length 1.97 gain 0.055 send 0.90
+@45.00  bass  38 length 1.67 gain 0.075 send 0.30
+@46.67  strings  34 58 62 65 length 2.63 gain 0.055 send 0.90
+@46.67  bass  34 length 2.33 gain 0.075 send 0.30
+@40.00  choir  65 69 72 length 3.63 gain 0.030 send 0.90
+@43.33  choir  64 67 72 length 1.97 gain 0.030 send 0.90
+@45.00  choir  65 69 74 length 1.97 gain 0.030 send 0.90
+@46.67  choir  65 70 74 length 2.63 gain 0.030 send 0.90
+@40.40  brass  65 length 1.67 gain 0.055 send 0.60
+@42.07  brass  72 length 0.83 gain 0.055 send 0.60
+@42.90  brass  70 length 0.42 gain 0.055 send 0.60
+@43.32  brass  69 length 0.42 gain 0.055 send 0.60
+@43.73  brass  72 length 1.67 gain 0.055 send 0.60
+@45.40  brass  77 length 1.67 gain 0.055 send 0.60
+@47.07  brass  76 length 0.83 gain 0.055 send 0.60
+@47.90  brass  74 length 0.83 gain 0.055 send 0.60
+@48.73  brass  72 length 1.67 gain 0.055 send 0.60
+@40.00  timpani  41 length 1.20 gain 0.058 send 0.45
+@43.33  timpani  41 length 1.20 gain 0.058 send 0.45
+@46.67  timpani  41 length 1.20 gain 0.058 send 0.45
+
+# --- The asteroids (49-56): driving - the timpani in eighths, low strings, a horn rising
+@49.00  strings  50 57 62 65 length 1.97 gain 0.045 send 0.90
+@49.00  bass  38 length 1.67 gain 0.080 send 0.30
+@50.67  strings  50 57 62 65 length 1.97 gain 0.045 send 0.90
+@50.67  bass  38 length 1.67 gain 0.080 send 0.30
+@52.33  strings  46 58 62 65 length 1.97 gain 0.045 send 0.90
+@52.33  bass  46 length 1.67 gain 0.080 send 0.30
+@54.00  strings  48 55 60 64 length 2.30 gain 0.045 send 0.90
+@54.00  bass  36 length 2.00 gain 0.080 send 0.30
+@49.00  timpani  38 length 1.20 gain 0.046 send 0.45
+@49.83  timpani  38 length 1.20 gain 0.035 send 0.45
+@50.25  timpani  38 length 1.20 gain 0.035 send 0.45
+@50.67  timpani  38 length 1.20 gain 0.046 send 0.45
+@51.50  timpani  38 length 1.20 gain 0.035 send 0.45
+@51.92  timpani  38 length 1.20 gain 0.035 send 0.45
+@52.33  timpani  38 length 1.20 gain 0.046 send 0.45
+@53.17  timpani  38 length 1.20 gain 0.035 send 0.45
+@53.58  timpani  38 length 1.20 gain 0.035 send 0.45
+@54.00  timpani  38 length 1.20 gain 0.046 send 0.45
+@54.83  timpani  38 length 1.20 gain 0.035 send 0.45
+@55.25  timpani  38 length 1.20 gain 0.035 send 0.45
+@55.67  timpani  38 length 1.20 gain 0.046 send 0.45
+@56.08  timpani  38 length 1.20 gain 0.035 send 0.45
+@56.50  timpani  38 length 1.20 gain 0.035 send 0.45
+@56.92  timpani  38 length 1.20 gain 0.035 send 0.45
+@49.00  bass  38 gain 0.060 send 0.30
+@49.42  bass  38 gain 0.040 send 0.30
+@49.83  bass  38 gain 0.040 send 0.30
+@50.25  bass  38 gain 0.040 send 0.30
+@50.67  bass  38 gain 0.060 send 0.30
+@51.08  bass  38 gain 0.040 send 0.30
+@51.50  bass  38 gain 0.040 send 0.30
+@51.92  bass  38 gain 0.040 send 0.30
+@52.33  bass  38 gain 0.060 send 0.30
+@52.75  bass  38 gain 0.040 send 0.30
+@53.17  bass  38 gain 0.040 send 0.30
+@53.58  bass  38 gain 0.040 send 0.30
+@54.00  bass  38 gain 0.060 send 0.30
+@54.42  bass  38 gain 0.040 send 0.30
+@54.83  bass  38 gain 0.040 send 0.30
+@55.25  bass  38 gain 0.040 send 0.30
+@55.67  bass  38 gain 0.060 send 0.30
+@50.60  brass  57 length 0.83 gain 0.045 send 0.60
+@51.43  brass  60 length 0.83 gain 0.045 send 0.60
+@52.27  brass  62 length 0.83 gain 0.045 send 0.60
+@53.10  brass  65 length 0.83 gain 0.045 send 0.60
+@53.93  brass  67 length 1.67 gain 0.045 send 0.60
+@54.60  swell  length 1.60 gain 0.070 send 0.85
+
+# --- The black hole (56-66): the dark - drone, a choir that will not resolve, low horns, everything slowing as it pulls
+@56.00  impact  0.9 gain 0.055 send 0.90
+@56.00  drone  26 length 10.00 gain 0.070 send 0.90
+@56.00  choir  50 51 57 length 5.00 gain 0.035 send 0.95
+@61.00  choir  49 56 62 length 5.00 gain 0.035 send 0.95
+@57.00  brass  38 length 2.50 gain 0.045 send 0.70
+@59.50  brass  39 length 2.50 gain 0.045 send 0.70
+@62.00  brass  37 length 3.33 gain 0.045 send 0.70
+@57.00  timpani  33 length 2.50 gain 0.050 send 0.70
+@59.50  timpani  33 length 2.50 gain 0.050 send 0.70
+@62.00  timpani  33 length 2.50 gain 0.050 send 0.70
+@64.00  timpani  33 length 2.50 gain 0.050 send 0.70
+@65.20  timpani  33 length 2.50 gain 0.050 send 0.70
+@64.20  swell  length 1.80 gain 0.075 send 0.90
+
+# --- A star dies (66-73): the blast - everything at once, then the shell spreading in the choir
+@66.50  impact  1.0 gain 0.070 send 0.80
+@66.50  flash  gain 0.040 send 0.90
+@66.50  timpani  38 length 3.00 gain 0.080 send 0.60
+@66.50  brass  38 50 57 62 65 length 3.00 gain 0.050 send 0.70
+@66.50  strings  38 50 57 62 65 69 length 6.50 gain 0.050 send 0.90
+@67.50  choir  62 65 69 74 length 5.50 gain 0.040 send 0.95
+@71.20  swell  length 1.80 gain 0.060 send 0.85
+
+# --- A new sun (73-81): D major at last - the theme, gentle on the horns, the choir round it, the last chord held
+@73.00  strings  50 57 62 66 length 1.97 gain 0.050 send 0.90
+@73.00  bass  38 length 1.67 gain 0.065 send 0.30
+@74.67  strings  47 59 62 66 length 1.97 gain 0.050 send 0.90
+@74.67  bass  47 length 1.67 gain 0.065 send 0.30
+@76.33  strings  43 59 62 67 length 1.97 gain 0.050 send 0.90
+@76.33  bass  43 length 1.67 gain 0.065 send 0.30
+@78.00  strings  45 57 61 64 length 1.97 gain 0.050 send 0.90
+@78.00  bass  45 length 1.67 gain 0.065 send 0.30
+@79.67  strings  50 57 62 66 length 2.80 gain 0.050 send 0.90
+@79.67  bass  38 length 2.50 gain 0.065 send 0.30
+@73.00  choir  62 66 69 length 3.63 gain 0.032 send 0.95
+@76.33  choir  62 67 71 length 1.97 gain 0.032 send 0.95
+@78.00  choir  64 69 73 length 1.97 gain 0.032 send 0.95
+@79.67  choir  62 66 69 74 length 2.80 gain 0.032 send 0.95
+@73.40  brass  62 length 1.67 gain 0.045 send 0.70
+@75.07  brass  69 length 0.83 gain 0.045 send 0.70
+@75.90  brass  67 length 0.42 gain 0.045 send 0.70
+@76.32  brass  66 length 0.42 gain 0.045 send 0.70
+@76.73  brass  69 length 1.67 gain 0.045 send 0.70
+@78.40  brass  74 length 3.33 gain 0.045 send 0.70
+@74.00  bell  86 length 3.00 gain 0.018 send 0.95
+@76.00  bell  90 length 3.00 gain 0.018 send 0.95
+@78.00  bell  93 length 3.00 gain 0.018 send 0.95
+@79.00  timpani  38 length 3.00 gain 0.045 send 0.70
+@79.00  strings  38 50 57 62 66 69 74 length 3.50 gain 0.050 send 0.95

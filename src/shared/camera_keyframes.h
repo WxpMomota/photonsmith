@@ -240,6 +240,41 @@ inline Key splineAt(const std::vector<Key>& k, std::size_t seg, double u) {
 
 // The camera at progress t in [0, 1] (clamped) of a video `durationSeconds` long (only needed for holds: they are seconds; 0 or less ignores them). A path with fewer than two
 // keys is its first key (or a camera at the origin looking down +Z if empty).
+// The curve through keys that say when (`at T`), `u` of the way from key `seg` to the next: a Hermite curve whose speed at each key is worked out from the times, so the
+// camera carries its speed through a key instead of jerking to the next stretch's pace (a stretch of 10 km in 3 s and then one of 100 m in 3 s used to be a lurch). The
+// speed at a key is the stretches' speeds either side weighted by their times, and no more than twice the slower of them, so a camera slowing from far away to close up
+// never runs past a key and comes back. At the first and last key it has the speed of its stretch (`ease 1` with two keys eases them instead: at()).
+inline Key timedSplineAt(const std::vector<Key>& k, std::size_t seg, double u) {
+	const std::size_t n = k.size();
+	const auto dt = [&k](std::size_t i) { return std::max(1e-6, k[i + 1].when - k[i].when); };
+	const auto tangent = [&](std::size_t i, auto value) {   // (per second, at key i, of one number of the key)
+		const double before = i > 0 ? (value(k[i]) - value(k[i - 1])) / dt(i - 1) : 0.0, after = i + 1 < n ? (value(k[i + 1]) - value(k[i])) / dt(i) : 0.0;
+		if (i == 0) return after;
+		if (i + 1 == n) return before;
+		if (before * after <= 0.0) return 0.0;   // (it turns back here: still for a moment, no overshoot)
+		const double m = (dt(i) * before + dt(i - 1) * after) / (dt(i - 1) + dt(i));
+		const double limit = 2.0 * std::min(std::abs(before), std::abs(after));
+		return std::max(-limit, std::min(limit, m));
+	};
+	const double h = dt(seg), u2 = u * u, u3 = u2 * u;
+	const double h00 = 2.0 * u3 - 3.0 * u2 + 1.0, h10 = u3 - 2.0 * u2 + u, h01 = -2.0 * u3 + 3.0 * u2, h11 = u3 - u2;
+	const auto curve = [&](auto value) { return h00 * value(k[seg]) + h10 * h * tangent(seg, value) + h01 * value(k[seg + 1]) + h11 * h * tangent(seg + 1, value); };
+	Key out;
+	for (int a = 0; a < 3; ++a) {
+		out.pos[a] = curve([a](const Key& key) { return key.pos[a]; });
+		out.target[a] = curve([a](const Key& key) { return key.target[a]; });
+	}
+	const auto all = [&k](auto given) { return std::all_of(k.begin(), k.end(), given); };
+	if (all([](const Key& key) { return key.fov > 0; })) {
+		out.fov = std::min(170.0, std::max(1.0, curve([](const Key& key) { return key.fov; })));
+		if (all([](const Key& key) { return key.hasLens(); })) {
+			out.lensRadius = std::max(0.0, curve([](const Key& key) { return key.lensRadius; }));
+			out.focus = std::max(1e-3, curve([](const Key& key) { return key.focus; }));
+		}
+	}
+	return out;
+}
+
 inline Key at(const Path& path, double t, double durationSeconds = 0.0) {
 	const std::vector<Key>& k = path.keys;
 	if (k.empty()) return Key{};
@@ -253,7 +288,7 @@ inline Key at(const Path& path, double t, double durationSeconds = 0.0) {
 		while (seg + 2 < k.size() && now >= k[seg + 1].when) ++seg;
 		double u = (now - k[seg].when) / (k[seg + 1].when - k[seg].when);
 		if (path.ease && k.size() == 2) u = ease_curves::at(path.curve, u);
-		return splineAt(k, seg, u);
+		return timedSplineAt(k, seg, u);
 	}
 	const std::size_t n = k.size(), segments = n - 1;
 	std::vector<double> length(segments);

@@ -6,6 +6,13 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **The two space films made again (2026-11-03).** `cosmic-voyage` is one journey, from the cosmic web through two galaxies colliding, a spiral, the pillars, a raging
+  star, a ringed giant and the asteroids to a black hole whose light really bends (its lens), a supernova and a new star being born; `worlds-beyond` goes from a blue
+  world turning into night past its station into hyperspace, to a lava world, a comet, a battle and a landing from orbit on an alien world of crystal spires, vents
+  and striders. The camera never stops: timed keys now carry their speed through each key, so every part is already moving as its dissolve begins. Each has a composed,
+  epic score, and cues files have three new voices for it: `brass`, `choir` and `timpani`. `pbr normal FILE` puts an imported mesh's normal map on a plain piece,
+  which the GPU draws too.
+
 * **Four bundled films put right (2026-11-03).** `the-lantern-below`: Marina no longer snaps back to the reef after her ride (a rider stays where the lane lets it go, until its
   next walk), the lane now reaches the town, and Pip's bubble sub really races her (subs can `wait T0 T1` and then go on). `nova-and-robo`: silent space - no music, and no
   footsteps where the only sound is the helmet's breath (`ambience breath`); the cockpit's screen and globe are inside the cockpit, and Nova turns round to meet Robo.

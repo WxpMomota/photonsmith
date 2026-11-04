@@ -12,7 +12,7 @@
 //
 // A cue line is `<time> <instrument> [notes...] [length L] [gain G] [pan P] [send S] [spread D]`. Notes are whole MIDI numbers (60 is middle C) or names (C4, F#3, Bb2),
 // and a number with a point after them is the length ("piano D4 3.0"). The
-// instruments are the generic ones (genericInstruments: bell, mallet, pluck, bass, pad, strings, knock, swell, piano, guitar, bowed, drone, and the sound effects
+// instruments are the generic ones (genericInstruments: bell, mallet, pluck, bass, pad, strings, knock, swell, piano, guitar, bowed, drone, brass, choir, timpani, and the sound effects
 // footstep-<surface>, impact, flash, touch) and the film's own (Film::instruments: the Nomai film's banjo, resonance, beep). What the file says wrong is printed once and the line left out.
 //
 // A hit on every cut: `oncuts mallet A2 1.0 gain 0.05` (the rest as a cue's) plays at the start of every shot but the first. And under the characters' lines the cues are
@@ -238,6 +238,9 @@ inline const std::map<std::string, CueInstrument> &genericInstruments() {
 		i["guitar"] = voiced([](double n, double l) { return voices::guitar(n, l); });
 		i["bowed"] = voiced([](double n, double l) { return voices::bowed(n, l); });
 		i["drone"] = voiced([](double n, double l) { return voices::drone(n, l); });
+		i["brass"] = voiced([](double n, double l) { return voices::brass(n, l); });       // (for a score's big moments: horns, a choir, timpani)
+		i["choir"] = voiced([](double n, double l) { return voices::choir(n, l); });
+		i["timpani"] = voiced([](double n, double l) { return voices::timpani(n, l); });
 		i["knock"] = [](audio::Mix &mix, double t, const std::vector<double> &notes, double, double gain, double pan, double send) {
 			mix.put(t, audio::knock(notes.empty() ? 160.0 : hz(notes[0])), gain, pan, send);
 		};

@@ -1,0 +1,326 @@
+# Worlds Beyond: a composed score (written by a script; change it as any cues file). Every time is the film's (@).
+
+# --- Home (0-14): wonder - strings, a piano turning, the choir; the horns' theme as the station comes up (10.5)
+@0.00  drone  36 length 14.00 gain 0.050 send 0.90
+@0.00  strings  48 55 60 63 length 3.16 gain 0.042 send 0.90
+@0.00  bass  36 length 2.86 gain 0.055 send 0.30
+@2.86  strings  44 56 60 63 length 3.16 gain 0.042 send 0.90
+@2.86  bass  44 length 2.86 gain 0.055 send 0.30
+@5.71  strings  51 55 58 63 length 3.16 gain 0.042 send 0.90
+@5.71  bass  39 length 2.86 gain 0.055 send 0.30
+@8.57  strings  46 58 62 65 length 3.16 gain 0.042 send 0.90
+@8.57  bass  46 length 2.86 gain 0.055 send 0.30
+@11.43  strings  48 55 60 63 length 3.16 gain 0.042 send 0.90
+@11.43  bass  36 length 2.86 gain 0.055 send 0.30
+@14.29  strings  44 56 60 63 length 3.51 gain 0.042 send 0.90
+@14.29  bass  44 length 3.21 gain 0.055 send 0.30
+@1.00  piano  60 67 72 75 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@1.36  piano  75 72 67 60 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@1.71  piano  60 67 72 75 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@2.07  piano  75 72 67 60 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@2.43  piano  60 67 72 75 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@2.79  piano  75 72 67 60 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@3.14  piano  60 67 72 75 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@3.50  piano  75 72 67 60 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@3.86  piano  56 68 72 75 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@4.21  piano  75 72 68 56 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@4.57  piano  56 68 72 75 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@4.93  piano  75 72 68 56 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@5.29  piano  56 68 72 75 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@5.64  piano  75 72 68 56 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@6.00  piano  56 68 72 75 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@6.36  piano  75 72 68 56 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@6.71  piano  63 67 70 75 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@7.07  piano  75 70 67 63 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@7.43  piano  63 67 70 75 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@7.79  piano  75 70 67 63 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@8.14  piano  63 67 70 75 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@8.50  piano  75 70 67 63 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@8.86  piano  63 67 70 75 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@9.21  piano  75 70 67 63 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@9.57  piano  58 70 74 77 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@9.93  piano  77 74 70 58 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@10.29  piano  58 70 74 77 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@10.64  piano  77 74 70 58 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@11.00  piano  58 70 74 77 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@11.36  piano  77 74 70 58 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@11.71  piano  58 70 74 77 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@12.07  piano  77 74 70 58 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@12.43  piano  60 67 72 75 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@12.79  piano  75 72 67 60 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@13.14  piano  60 67 72 75 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@13.50  piano  75 72 67 60 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@13.86  piano  60 67 72 75 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@14.21  piano  75 72 67 60 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@14.57  piano  60 67 72 75 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@14.93  piano  75 72 67 60 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@15.29  piano  56 68 72 75 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@15.64  piano  75 72 68 56 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@16.00  piano  56 68 72 75 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@16.36  piano  75 72 68 56 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@16.71  piano  56 68 72 75 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@17.07  piano  75 72 68 56 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@17.43  piano  56 68 72 75 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@17.79  piano  75 72 68 56 length 0.50 gain 0.028 pan 0.25 send 0.70 spread 0.100
+@18.14  piano  56 68 72 75 length 0.50 gain 0.028 pan -0.25 send 0.70 spread 0.100
+@3.00  choir  60 63 67 length 7.00 gain 0.028 send 0.95
+@10.30  brass  60 length 1.07 gain 0.050 send 0.60
+@11.37  brass  67 length 0.36 gain 0.050 send 0.60
+@11.73  brass  72 length 1.43 gain 0.050 send 0.60
+@13.16  brass  70 length 0.71 gain 0.050 send 0.60
+@13.87  brass  67 length 0.71 gain 0.050 send 0.60
+@14.59  brass  68 length 1.43 gain 0.050 send 0.60
+
+# --- The jump (14-18): the rush building, the flash at 16, out of it at the next world
+@14.00  swell  length 2.10 gain 0.080 send 0.85
+@14.20  timpani  36 length 0.60 gain 0.010 pan -0.15 send 0.50
+@14.27  timpani  36 length 0.60 gain 0.012 pan 0.15 send 0.50
+@14.34  timpani  36 length 0.60 gain 0.015 pan -0.15 send 0.50
+@14.41  timpani  36 length 0.60 gain 0.017 pan 0.15 send 0.50
+@14.48  timpani  36 length 0.60 gain 0.019 pan -0.15 send 0.50
+@14.55  timpani  36 length 0.60 gain 0.022 pan 0.15 send 0.50
+@14.62  timpani  36 length 0.60 gain 0.024 pan -0.15 send 0.50
+@14.69  timpani  36 length 0.60 gain 0.026 pan 0.15 send 0.50
+@14.76  timpani  36 length 0.60 gain 0.029 pan -0.15 send 0.50
+@14.83  timpani  36 length 0.60 gain 0.031 pan 0.15 send 0.50
+@14.90  timpani  36 length 0.60 gain 0.033 pan -0.15 send 0.50
+@14.97  timpani  36 length 0.60 gain 0.036 pan 0.15 send 0.50
+@15.04  timpani  36 length 0.60 gain 0.038 pan -0.15 send 0.50
+@15.11  timpani  36 length 0.60 gain 0.040 pan 0.15 send 0.50
+@15.18  timpani  36 length 0.60 gain 0.043 pan -0.15 send 0.50
+@15.25  timpani  36 length 0.60 gain 0.045 pan 0.15 send 0.50
+@15.32  timpani  36 length 0.60 gain 0.047 pan -0.15 send 0.50
+@15.39  timpani  36 length 0.60 gain 0.050 pan 0.15 send 0.50
+@15.46  timpani  36 length 0.60 gain 0.052 pan -0.15 send 0.50
+@15.53  timpani  36 length 0.60 gain 0.054 pan 0.15 send 0.50
+@15.60  timpani  36 length 0.60 gain 0.057 pan -0.15 send 0.50
+@15.67  timpani  36 length 0.60 gain 0.059 pan 0.15 send 0.50
+@15.74  timpani  36 length 0.60 gain 0.061 pan -0.15 send 0.50
+@15.81  timpani  36 length 0.60 gain 0.064 pan 0.15 send 0.50
+@15.88  timpani  36 length 0.60 gain 0.066 pan -0.15 send 0.50
+@15.95  timpani  36 length 0.60 gain 0.068 pan 0.15 send 0.50
+@14.00  strings  48 55 60 63 67 length 2.00 gain 0.040 send 0.90
+@16.00  impact  0.9 gain 0.065 send 0.90
+@16.00  flash  gain 0.045 send 0.90
+@16.00  brass  36 48 55 60 63 length 1.80 gain 0.050 send 0.70
+@16.00  choir  60 67 72 75 length 2.40 gain 0.035 send 0.95
+
+# --- A world of fire (18-27): menace - low strings driving, the horns low, timpani
+@18.00  strings  41 56 60 65 length 1.73 gain 0.045 send 0.90
+@18.00  bass  41 length 1.43 gain 0.075 send 0.30
+@19.43  strings  48 55 60 63 length 1.73 gain 0.045 send 0.90
+@19.43  bass  36 length 1.43 gain 0.075 send 0.30
+@20.86  strings  44 56 60 63 length 1.73 gain 0.045 send 0.90
+@20.86  bass  44 length 1.43 gain 0.075 send 0.30
+@22.29  strings  43 55 59 62 length 1.73 gain 0.045 send 0.90
+@22.29  bass  43 length 1.43 gain 0.075 send 0.30
+@23.71  strings  41 56 60 65 length 1.73 gain 0.045 send 0.90
+@23.71  bass  41 length 1.43 gain 0.075 send 0.30
+@25.14  strings  48 55 60 63 length 1.73 gain 0.045 send 0.90
+@25.14  bass  36 length 1.43 gain 0.075 send 0.30
+@26.57  strings  44 56 60 63 length 1.37 gain 0.045 send 0.90
+@26.57  bass  44 length 1.07 gain 0.075 send 0.30
+@18.00  bass  36 gain 0.053 send 0.30
+@18.36  bass  36 gain 0.035 send 0.30
+@18.71  bass  36 gain 0.035 send 0.30
+@19.07  bass  36 gain 0.035 send 0.30
+@19.43  bass  36 gain 0.053 send 0.30
+@19.79  bass  36 gain 0.035 send 0.30
+@20.14  bass  36 gain 0.035 send 0.30
+@20.50  bass  36 gain 0.035 send 0.30
+@20.86  bass  36 gain 0.053 send 0.30
+@21.21  bass  36 gain 0.035 send 0.30
+@21.57  bass  36 gain 0.035 send 0.30
+@21.93  bass  36 gain 0.035 send 0.30
+@22.29  bass  36 gain 0.053 send 0.30
+@22.64  bass  36 gain 0.035 send 0.30
+@23.00  bass  36 gain 0.035 send 0.30
+@23.36  bass  36 gain 0.035 send 0.30
+@23.71  bass  36 gain 0.053 send 0.30
+@24.07  bass  36 gain 0.035 send 0.30
+@24.43  bass  36 gain 0.035 send 0.30
+@24.79  bass  36 gain 0.035 send 0.30
+@25.14  bass  36 gain 0.053 send 0.30
+@25.50  bass  36 gain 0.035 send 0.30
+@25.86  bass  36 gain 0.035 send 0.30
+@26.21  bass  36 gain 0.035 send 0.30
+@26.57  bass  36 gain 0.053 send 0.30
+@26.93  bass  36 gain 0.035 send 0.30
+@18.00  timpani  36 length 1.20 gain 0.058 send 0.45
+@20.14  timpani  36 length 1.20 gain 0.045 send 0.45
+@22.29  timpani  36 length 1.20 gain 0.045 send 0.45
+@23.71  timpani  36 length 1.20 gain 0.058 send 0.45
+@25.86  timpani  36 length 1.20 gain 0.045 send 0.45
+@28.00  timpani  36 length 1.20 gain 0.045 send 0.45
+@19.00  brass  48 length 1.43 gain 0.050 send 0.55
+@20.43  brass  51 length 0.71 gain 0.050 send 0.55
+@21.14  brass  50 length 0.71 gain 0.050 send 0.55
+@21.86  brass  48 length 1.43 gain 0.050 send 0.55
+@23.29  brass  55 length 1.43 gain 0.050 send 0.55
+@24.71  brass  53 length 2.86 gain 0.050 send 0.55
+@25.60  swell  length 1.40 gain 0.060 send 0.85
+
+# --- The comet (27-35): beauty - the choir and high strings, bells like ice
+@27.00  impact  0.4 gain 0.030 send 0.90
+@27.00  strings  51 55 58 63 length 3.16 gain 0.042 send 0.90
+@27.00  bass  39 length 2.86 gain 0.050 send 0.30
+@29.86  strings  44 56 60 63 length 3.16 gain 0.042 send 0.90
+@29.86  bass  44 length 2.86 gain 0.050 send 0.30
+@32.71  strings  41 56 60 65 length 1.73 gain 0.042 send 0.90
+@32.71  bass  41 length 1.43 gain 0.050 send 0.30
+@34.14  strings  46 58 62 65 length 2.66 gain 0.042 send 0.90
+@34.14  bass  46 length 2.36 gain 0.050 send 0.30
+@27.00  choir  63 67 70 length 3.16 gain 0.030 send 0.95
+@29.86  choir  63 68 72 length 3.16 gain 0.030 send 0.95
+@32.71  choir  65 68 72 length 1.73 gain 0.030 send 0.95
+@34.14  choir  62 65 70 length 2.66 gain 0.030 send 0.95
+@27.40  bell  84 length 1.40 gain 0.016 pan -0.40 send 0.95
+@28.25  bell  87 length 1.40 gain 0.016 pan 0.40 send 0.95
+@29.10  bell  91 length 1.40 gain 0.016 pan -0.40 send 0.95
+@29.95  bell  94 length 1.40 gain 0.016 pan 0.40 send 0.95
+@30.80  bell  91 length 1.40 gain 0.016 pan -0.40 send 0.95
+@31.65  bell  87 length 1.40 gain 0.016 pan 0.40 send 0.95
+@32.50  bell  96 length 1.40 gain 0.016 pan -0.40 send 0.95
+@33.35  bell  94 length 1.40 gain 0.016 pan 0.40 send 0.95
+@34.20  bell  91 length 1.40 gain 0.016 pan -0.40 send 0.95
+
+# --- Battle in orbit (35-45): action - timpani and bass in eighths, brass stabs, the blast (40.4)
+@35.00  impact  0.7 gain 0.050 send 0.70
+@35.00  strings  48 55 60 63 length 1.73 gain 0.050 send 0.90
+@35.00  bass  36 length 1.43 gain 0.080 send 0.30
+@36.43  strings  48 55 60 63 length 1.73 gain 0.050 send 0.90
+@36.43  bass  36 length 1.43 gain 0.080 send 0.30
+@37.86  strings  44 56 60 63 length 1.73 gain 0.050 send 0.90
+@37.86  bass  44 length 1.43 gain 0.080 send 0.30
+@39.29  strings  46 58 62 65 length 1.73 gain 0.050 send 0.90
+@39.29  bass  46 length 1.43 gain 0.080 send 0.30
+@40.71  strings  48 55 60 63 length 1.73 gain 0.050 send 0.90
+@40.71  bass  36 length 1.43 gain 0.080 send 0.30
+@42.14  strings  41 56 60 65 length 1.73 gain 0.050 send 0.90
+@42.14  bass  41 length 1.43 gain 0.080 send 0.30
+@43.57  strings  43 55 59 62 length 2.30 gain 0.050 send 0.90
+@43.57  bass  43 length 2.00 gain 0.080 send 0.30
+@35.00  bass  36 gain 0.060 send 0.30
+@35.36  bass  36 gain 0.040 send 0.30
+@35.71  bass  36 gain 0.060 send 0.30
+@36.07  bass  36 gain 0.040 send 0.30
+@36.43  bass  36 gain 0.060 send 0.30
+@36.79  bass  36 gain 0.040 send 0.30
+@37.14  bass  36 gain 0.060 send 0.30
+@37.50  bass  36 gain 0.040 send 0.30
+@37.86  bass  36 gain 0.060 send 0.30
+@38.21  bass  36 gain 0.040 send 0.30
+@38.57  bass  36 gain 0.060 send 0.30
+@38.93  bass  36 gain 0.040 send 0.30
+@39.29  bass  36 gain 0.060 send 0.30
+@39.64  bass  36 gain 0.040 send 0.30
+@40.00  bass  36 gain 0.060 send 0.30
+@40.36  bass  36 gain 0.040 send 0.30
+@40.71  bass  36 gain 0.060 send 0.30
+@41.07  bass  36 gain 0.040 send 0.30
+@41.43  bass  36 gain 0.060 send 0.30
+@41.79  bass  36 gain 0.040 send 0.30
+@42.14  bass  36 gain 0.060 send 0.30
+@42.50  bass  36 gain 0.040 send 0.30
+@42.86  bass  36 gain 0.060 send 0.30
+@43.21  bass  36 gain 0.040 send 0.30
+@43.57  bass  36 gain 0.060 send 0.30
+@43.93  bass  36 gain 0.040 send 0.30
+@44.29  bass  36 gain 0.060 send 0.30
+@44.64  bass  36 gain 0.040 send 0.30
+@35.00  timpani  36 length 1.20 gain 0.046 send 0.45
+@35.71  timpani  36 length 1.20 gain 0.035 send 0.45
+@36.07  timpani  36 length 1.20 gain 0.035 send 0.45
+@36.43  timpani  36 length 1.20 gain 0.046 send 0.45
+@37.14  timpani  36 length 1.20 gain 0.035 send 0.45
+@37.50  timpani  36 length 1.20 gain 0.035 send 0.45
+@37.86  timpani  36 length 1.20 gain 0.046 send 0.45
+@38.57  timpani  36 length 1.20 gain 0.035 send 0.45
+@38.93  timpani  36 length 1.20 gain 0.035 send 0.45
+@39.29  timpani  36 length 1.20 gain 0.046 send 0.45
+@40.00  timpani  36 length 1.20 gain 0.035 send 0.45
+@40.36  timpani  36 length 1.20 gain 0.035 send 0.45
+@40.71  timpani  36 length 1.20 gain 0.046 send 0.45
+@41.43  timpani  36 length 1.20 gain 0.035 send 0.45
+@41.79  timpani  36 length 1.20 gain 0.035 send 0.45
+@42.14  timpani  36 length 1.20 gain 0.046 send 0.45
+@42.86  timpani  36 length 1.20 gain 0.035 send 0.45
+@43.21  timpani  36 length 1.20 gain 0.035 send 0.45
+@43.57  timpani  36 length 1.20 gain 0.046 send 0.45
+@44.29  timpani  36 length 1.20 gain 0.035 send 0.45
+@44.64  timpani  36 length 1.20 gain 0.035 send 0.45
+@35.00  brass  48 55 60 length 0.35 gain 0.050 send 0.50
+@36.43  brass  48 55 60 length 0.35 gain 0.050 send 0.50
+@37.86  brass  48 55 60 length 0.35 gain 0.050 send 0.50
+@38.57  brass  48 55 60 length 0.35 gain 0.050 send 0.50
+@39.29  brass  48 55 60 length 0.35 gain 0.050 send 0.50
+@40.40  impact  1.0 gain 0.070 send 0.80
+@40.40  brass  36 48 55 60 63 length 1.40 gain 0.055 send 0.70
+@41.20  brass  60 length 0.71 gain 0.050 send 0.60
+@41.91  brass  63 length 0.71 gain 0.050 send 0.60
+@42.63  brass  67 length 0.71 gain 0.050 send 0.60
+@43.34  brass  72 length 1.43 gain 0.050 send 0.60
+@44.77  brass  70 length 0.71 gain 0.050 send 0.60
+@45.49  brass  67 length 0.71 gain 0.050 send 0.60
+@43.60  swell  length 1.60 gain 0.070 send 0.85
+@44.00  timpani  43 length 0.60 gain 0.020 pan -0.15 send 0.50
+@44.09  timpani  43 length 0.60 gain 0.024 pan 0.15 send 0.50
+@44.18  timpani  43 length 0.60 gain 0.027 pan -0.15 send 0.50
+@44.27  timpani  43 length 0.60 gain 0.031 pan 0.15 send 0.50
+@44.36  timpani  43 length 0.60 gain 0.034 pan -0.15 send 0.50
+@44.45  timpani  43 length 0.60 gain 0.038 pan 0.15 send 0.50
+@44.54  timpani  43 length 0.60 gain 0.042 pan -0.15 send 0.50
+@44.63  timpani  43 length 0.60 gain 0.045 pan 0.15 send 0.50
+@44.72  timpani  43 length 0.60 gain 0.049 pan -0.15 send 0.50
+@44.81  timpani  43 length 0.60 gain 0.052 pan 0.15 send 0.50
+@44.90  timpani  43 length 0.60 gain 0.056 pan -0.15 send 0.50
+@44.99  timpani  43 length 0.60 gain 0.060 pan 0.15 send 0.50
+
+# --- Another world (45-59): the landing - from orbit down through its air, the theme growing in E flat major, everything as it comes down (56.5)
+@45.00  drone  39 length 14.00 gain 0.050 send 0.90
+@45.00  strings  51 58 63 67 length 3.16 gain 0.050 send 0.90
+@45.00  bass  39 length 2.86 gain 0.065 send 0.30
+@47.86  strings  46 58 62 65 length 3.16 gain 0.050 send 0.90
+@47.86  bass  46 length 2.86 gain 0.065 send 0.30
+@50.71  strings  48 60 63 67 length 3.16 gain 0.050 send 0.90
+@50.71  bass  36 length 2.86 gain 0.065 send 0.30
+@53.57  strings  44 60 63 68 length 3.16 gain 0.050 send 0.90
+@53.57  bass  44 length 2.86 gain 0.065 send 0.30
+@56.43  strings  51 58 63 67 length 3.16 gain 0.050 send 0.90
+@56.43  bass  39 length 2.86 gain 0.065 send 0.30
+@46.50  choir  63 67 70 length 3.16 gain 0.030 send 0.95
+@49.36  choir  62 65 70 length 3.16 gain 0.030 send 0.95
+@52.21  choir  63 67 72 length 3.16 gain 0.030 send 0.95
+@55.07  choir  63 68 72 length 3.16 gain 0.030 send 0.95
+@47.00  brass  63 length 1.43 gain 0.055 send 0.60
+@48.43  brass  70 length 0.71 gain 0.055 send 0.60
+@49.14  brass  68 length 0.36 gain 0.055 send 0.60
+@49.50  brass  67 length 0.36 gain 0.055 send 0.60
+@49.86  brass  70 length 1.43 gain 0.055 send 0.60
+@51.29  brass  75 length 1.43 gain 0.055 send 0.60
+@52.71  brass  74 length 0.71 gain 0.055 send 0.60
+@53.43  brass  72 length 0.71 gain 0.055 send 0.60
+@54.14  brass  70 length 1.43 gain 0.055 send 0.60
+@55.57  brass  75 length 2.86 gain 0.055 send 0.60
+@47.00  timpani  39 length 1.20 gain 0.052 send 0.45
+@49.86  timpani  39 length 1.20 gain 0.052 send 0.45
+@52.71  timpani  39 length 1.20 gain 0.052 send 0.45
+@55.00  swell  length 1.60 gain 0.070 send 0.85
+@55.40  timpani  39 length 0.60 gain 0.020 pan 0.15 send 0.50
+@55.49  timpani  39 length 0.60 gain 0.024 pan -0.15 send 0.50
+@55.58  timpani  39 length 0.60 gain 0.028 pan 0.15 send 0.50
+@55.67  timpani  39 length 0.60 gain 0.032 pan -0.15 send 0.50
+@55.76  timpani  39 length 0.60 gain 0.036 pan 0.15 send 0.50
+@55.85  timpani  39 length 0.60 gain 0.040 pan -0.15 send 0.50
+@55.94  timpani  39 length 0.60 gain 0.045 pan 0.15 send 0.50
+@56.03  timpani  39 length 0.60 gain 0.049 pan -0.15 send 0.50
+@56.12  timpani  39 length 0.60 gain 0.053 pan 0.15 send 0.50
+@56.21  timpani  39 length 0.60 gain 0.057 pan -0.15 send 0.50
+@56.30  timpani  39 length 0.60 gain 0.061 pan 0.15 send 0.50
+@56.39  timpani  39 length 0.60 gain 0.065 pan -0.15 send 0.50
+@56.48  timpani  39 length 0.60 gain 0.069 pan 0.15 send 0.50
+@56.50  impact  0.7 gain 0.055 send 0.85
+@56.50  timpani  39 length 3.00 gain 0.075 send 0.60
+@56.50  brass  39 51 58 63 67 length 3.00 gain 0.050 send 0.70
+@56.50  strings  39 51 58 63 67 70 75 length 4.00 gain 0.050 send 0.95
+@56.50  choir  63 67 70 75 length 3.60 gain 0.040 send 0.95

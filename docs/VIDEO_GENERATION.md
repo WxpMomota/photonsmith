@@ -433,7 +433,7 @@ with the shot when it is retimed:
     6.5   pluck A4 C5 E5  spread 0.25  # an arpeggio
     @77.2 bell 86                      # @: a film time
 
-The instruments are the generic ones (bell, mallet, pluck, bass, pad, strings, knock, swell, and the sound effects footstep-<surface>, impact, flash, touch) and the film's
+The instruments are the generic ones (bell, mallet, pluck, bass, pad, strings, knock, swell, piano, guitar, bowed, drone, brass, choir, timpani, and the sound effects footstep-<surface>, impact, flash, touch) and the film's
 own (its row's `instruments`: the Nomai film's guitar, banjo, piano, resonance, drone and beep). `ray_tracer --film-cues <key>` prints each cue at its film time and what
 cannot be played. The Nomai film's three banjo notes on the ridge and the third eye's tone moved from the score's code into its cues file; the mix is the same (46 of its
 26 million samples differ by one step, from the order of the sums).
@@ -2596,7 +2596,9 @@ through the piece; the piece made again as one clean closed surface; its holes f
 
 **Materials by region: `region NAME above Y|below Y|facing up|down|front|back|left|right|near X Y Z R [colour R G B] [rough R] [finish]`, finish `skin`, `pbr base FILE [rough
 FILE] [normal FILE]`.** Parts of a piece in materials of their own (a red roof, a white frame); the `skin` finish lets light into the surface (a cartoon skin, wax, a gummy
-sweet); an imported mesh's colour, roughness and normal pictures on its own uvs.
+sweet); an imported mesh's colour, roughness and normal pictures on its own uvs. `pbr normal FILE` alone puts a normal map on the piece's own colour and finish: on a
+`matte` piece it is drawn by the GPU too, whose normal maps want a plain diffuse surface (a glTF with a picture of its own brings that picture with it, so export it without
+materials for this).
 
 **Lettering and proper uvs: `text "WORDS" [size H] [depth D] [font FILE] [at X Y Z] [turn ...]`, `unwrap`.** (model_text.h) Words pulled out into a solid from a TrueType
 font (Arial unless named; film_assets/fonts, the system's fonts or a path), a capital H metres tall - a shop sign, a title, a name on a door. `unwrap` gives a piece chart
@@ -2620,7 +2622,9 @@ uvs (its surface cut into near-flat charts along its creases, each laid flat and
 
 **Matching a reference: `tools/blender_import/match_lights.py SCENE.pbrt REFERENCE.png [--view filmic|srgb] [--exe PATH]`.** Eevee and a path tracer spread light differently, so an imported scene rarely balances by itself. This groups the scene's lights by kind and colour, renders once per group with the others off and once with all off, and solves for the gains that best add up to the reference: non-negative least squares, weighted so a dark sky counts as much as a bright fire, leaving out pixels that clipped. It prints the gains and writes `SCENE_matched.pbrt`. On the production scene it was tried on, it beat a careful hand balance (mean difference from the Eevee frame 11.5 against 13.2 out of 255).
 
-**Camera keys by time: `key ... at T`.** Keys are normally paced by how far the camera travels, which is wrong for a focus pull or a turn on the spot, where it travels nowhere. Give every key of a path `at T` (seconds into the shot, going up) and each one is reached then, whatever the distance: `key 0 2 9  0 1 0  35  at 0` ... `key 0 2 9  0 1 0  50  at 1.5`. It is all the keys or none, and `hold` is not used with it (two keys at different times with the same place already hold).
+**Camera keys by time: `key ... at T`.** Keys are normally paced by how far the camera travels, which is wrong for a focus pull or a turn on the spot, where it travels nowhere. Give every key of a path `at T` (seconds into the shot, going up) and each one is reached then, whatever the distance: `key 0 2 9  0 1 0  35  at 0` ... `key 0 2 9  0 1 0  50  at 1.5`. It is all the keys or none, and `hold` is not used with it (two keys at different times with the same place already hold). Between timed keys the camera keeps its speed
+through each key (the speed there is worked out from the stretches either side, and kept to twice the slower, so slowing from far away to close up it never runs past a key),
+and with `ease camera 0` it is already moving at a shot's start and still moving at its end: a film of parts can fly on through every dissolve.
 
 **Any block as a subject: `subject NAME at X Y Z`.** In a shot, a block, group or placement can be what the film doctor checks, not only a character: `at` is a point on it where it rests, in pbrt coordinates, and the doctor follows it wherever `move`, `parent` and the rest take it. Later shots can just say `subject NAME`. A hidden one (`show`) is not checked.
 

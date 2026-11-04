@@ -1,29 +1,47 @@
-# Worlds Beyond: a minute among other worlds, with no one in it - a showcase of the renderer's planets, air, cities, aurora, a lava world, a comet, a spinning
-# station, a dogfight and a jump to hyperspace (src/shared/cartoon/film_planets.h, film_cosmos.h, film_voyage.h, film_battle.h). Seven parts on the empty stage.
+# Worlds Beyond: one voyage among other worlds - a showcase of the renderer's planets, air, cities, aurora, stations and ships, a lava world, a comet, a battle and,
+# at the end, a landing from orbit on the ground of another world in one shot (src/shared/cartoon/film_planets.h, film_cosmos.h, film_voyage.h, film_battle.h,
+# film_planetfall.h, film_alien.h). The camera never stops: every part's keys say when (`at`), so it is on its way through every dissolve, and the voyage is joined
+# the way a ship would make it - out of the station after a departing shuttle, into hyperspace, out of its flash at the next world. Its score is composed
+# (film_assets/worlds-beyond/cues.txt).
 film    worlds-beyond
 name    Worlds Beyond
-about   A minute among other worlds: a blue planet turning into night with its cities and aurora, a lava world, a comet, a station, a dogfight and a jump to hyperspace.
+about   One voyage among other worlds: night falling on a blue planet with its cities and aurora, a turning station, the jump to hyperspace, a world of fire, a comet, a battle in orbit, and a landing on an alien world.
 tags    emissive, night
-still   6
-title   at 0.5 for 3
+still   12
+title   at 1 for 3.5
 
-part "Blue world" 
+part "Home"
 set     void
-length  10
-space   stars 1  milkyway 1  sun 70 8  flare 0.35  bloom 0.12
-planet  home  ocean  at 0 0 -30000  radius 6000  tilt 23  air 1  cities 1.5  aurora 1.5
-moon    luna  rocky  of home  radius 1300  orbit 16000  period 300  phase 100  incline 6
-shot 0 Into the night
-  spacecam orbit  0 0 -30000  radius 15500  degrees 130  from 60  elevation 12
+length  14
+space   stars 1  milkyway 1  sun 60 10  flare 0.3  bloom 0.12  planetshine 1.5
+planet  below  ocean  at 0 -9000 -6000  radius 7000  tilt 23  air 1  cities 1.5  aurora 1.5
+moon    luna   rocky  of below  radius 1300  orbit 21000  period 300  phase 120  incline 6
+ship    spindle  at 0 0 -1500  kind wheel  size 500  spin 1.5
+ship    haven    at 300 -60 -1900  kind station  size 180  heading 30
+ship    mule     at -900 100 -1200  kind freighter  size 220  move 30 0 -8
+ship    ark      at 60 90 -1250  kind shuttle  size 40  move 0 4 -70
+shot 0 Night falls on the blue world
+  ease camera 0
+  key   -9000 6000 16000    0 -9000 -6000    45  at 0
+  key   -3000 1800 3500     0 -3000 -3500    45  at 6
+  key   900 320 -500        0 0 -1500        45  at 10.5
+  key   350 220 -1500       60 120 -2600     45  at 14
 
-part "Fire world" dissolve 1.2
+part "The jump" dissolve 0.8
 set     void
-length  8
+length  4
+space   stars 1  milkyway 1  sun off
+shot 0 Hyperspace
+  spacecam hyperspace  0 0 0  to 500000 0 0  bearing 180  elevation 0
+
+part "A world of fire" dissolve 0.6
+set     void
+length  9
 space   stars 1  milkyway 1  sun 200 5  bloom 0.2
 planet  hell  lava  at 0 0 -30000  radius 6000  tilt 10  air 0.6  colour orange
 moon    ash   rocky  of hell  radius 700  orbit 11000  period 120  phase 300
 shot 0 Past the fire
-  spacecam orbit  0 0 -30000  radius 15000  degrees 55  from 320  elevation 8
+  spacecam orbit  0 0 -30000  radius 15000  degrees 60  from 320  elevation 8
 
 part "The comet" dissolve 1.2
 set     void
@@ -32,25 +50,14 @@ space   stars 1  milkyway 1  sun 90 0  flare 0.4  bloom 0.15
 comet   wanderer  at -6000 0 -26000  move 700 0 60  size 450  tail 26000  brightness 0.6
 planet  blue  ice  at 22000 -9000 -60000  radius 5000  rings 1.4 2.2
 shot 0 The comet goes by
-  key   -11000 2500 -8000    -2000 0 -30000   50
-  key   -3000 2000 -7000     3000 0 -30000   50
+  ease camera 0
+  key   -12000 2600 -8500    -3000 0 -30000   50  at 0
+  key   -6500 2300 -7800     0 0 -30000       50  at 4
+  key   -2000 2000 -7000     3000 0 -30000    50  at 8
 
-part "The station" dissolve 1.2
+part "Battle in orbit" dissolve 1.2
 set     void
 length  10
-space   stars 1  milkyway 1  sun 300 15  flare 0.25  bloom 0.1  planetshine 1.5
-planet  below  ocean  at 0 -9000 -6000  radius 7000  air 1
-ship    spindle  at 0 0 -1500  kind wheel  size 500  spin 1.5
-ship    haven    at 300 -60 -1900  kind station  size 180  heading 30
-ship    mule     at -900 100 -1200  kind freighter  size 220  move 30 0 -8
-ship    ark      at -40 60 -400  kind shuttle  size 40  move 4 -1 -95
-shot 0 The station turns
-  key   650 180 -700    0 0 -1500   45
-  key   250 260 -650    0 0 -1500   45
-
-part "The dogfight" dissolve 1
-set     void
-length  9
 space   stars 1  milkyway 1  sun 40 20  flare 0.3  bloom 0.15
 planet  rust  desert  at -20000 -12000 -40000  radius 9000  air 1  colour orange
 ship    red1  at 0 0 -300     kind fighter  size 14  move 6 2 -80  seed 1  colour 0.75 0.15 0.1
@@ -60,28 +67,26 @@ ship    cruiser at 150 -80 -1500  kind freighter  size 400  move 0 0 -5  colour 
 shield  cruiser  radius 300  colour 0.35 0.7 1
 laser   blue1  at 1  to red1  count 4 every 0.4  speed 400  colour 0.3 0.85 1
 laser   red2   at 2.5  to blue1  count 6 every 0.3  speed 400  colour red
-laser   red1   at 3.5  to cruiser  count 6 every 0.35  speed 400  colour red
+laser   red1   at 4  to cruiser  count 8 every 0.35  speed 400  colour red
 explode blue1  at 5.4  size 30
-shot 0 On his tail
-  key   8 4 -275     0 0 -300   50
-  key   34 12 -630   27 9 -660   50
-shot 4.6 The cruiser
-  key   10 5 -560    0 0 -700   40
-  key   25 9 -600   10 0 -760   40
+shot 0 The battle
+  ease camera 0
+  key   8 4 -255       0 0 -300      50  at 0
+  key   26 12 -500     12 2 -620     50  at 3.5
+  key   -40 40 -720    40 6 -880     48  at 6.5
+  key   -10 60 -920    130 -60 -1500  44  at 10
 
-part "The jump" dissolve 0.8
-set     void
-length  7
-space   stars 1  milkyway 1  sun off
-shot 0 Hyperspace
-  spacecam hyperspace  0 0 0  to 500000 0 0  bearing 90  elevation 0
-
-part "Home" dissolve 1
-set     void
-length  8
-space   stars 1  milkyway 1  sun 75 10  flare 0.3  bloom 0.15
-planet  terra  ocean  at 0 0 -30000  radius 6000  tilt 23  air 1  cities 1  seed 7
-moon    selene  rocky  of terra  radius 1500  orbit 12000  period 200  phase 160  incline 5
-galaxy  sister  at 90000 40000 -250000  size 60000  tilt 40  turn 30  brightness 1.5
-shot 0 Home at last
-  spacecam zoom  0 0 -30000  from 13000  to 60000  bearing 30  elevation 15
+part "Another world" dissolve 1.2
+scene   film_assets/wild/set.pbrt
+terrain hills  size 3000  height 30  seed 7
+biome   rust
+sky     08:30 08:40  physical  altitude 200
+mute    birds
+spires  60  in -70 -70 70 70  height 9  colour 0.55 0.75 0.9
+spires  24  in -40 20 40 90  height 16  colour 0.62 0.45 0.95  seed 5
+plumes  5  in -260 160 260 420  height 90
+herd    striders 7  from -25 30  to 60 42  speed 1.4
+length  14
+planetfall desert  from 300000  to 4  at 0.5  over 11
+shot 0 Landing
+  descend

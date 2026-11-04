@@ -716,6 +716,36 @@ TEST(MusicCues, TheFileIsReadAndEachCueIsPlacedByItsShot) {
 	EXPECT_NE(why.find("Third"), std::string::npos);
 }
 
+// The score's big voices: brass that brightens as it is blown (more of its sound in the upper partials once it has swelled), a choir, and timpani that ring and die
+// away; each a generic instrument a cues file can name, its notes held for their length and then let go.
+TEST(MusicCues, BrassChoirAndTimpaniForTheBigMoments) {
+	namespace v = cartoon::voices;
+	const auto energy = [](const std::vector<float> &s, double t0, double t1, bool edges) {   // (edges: of the first difference - how bright it is)
+		const std::size_t i0 = static_cast<std::size_t>(t0 * cartoon::audio::kRate), i1 = std::min(s.size(), static_cast<std::size_t>(t1 * cartoon::audio::kRate));
+		double e = 0.0;
+		for (std::size_t i = i0 + 1; i < i1; ++i) {
+			const double x = edges ? s[i] - s[i - 1] : s[i];
+			e += x * x;
+		}
+		return e / std::max<std::size_t>(1, i1 - i0);
+	};
+	for (const auto &[name, sound] : std::vector<std::pair<std::string, std::vector<float>>>{{"brass", v::brass(55.0, 2.0)}, {"choir", v::choir(64.0, 2.0)}, {"timpani", v::timpani(43.0, 2.0)}}) {
+		ASSERT_GT(sound.size(), static_cast<std::size_t>(1.9 * cartoon::audio::kRate)) << name;
+		float peak = 0.0f;
+		for (float x : sound) {
+			ASSERT_TRUE(std::isfinite(x)) << name;
+			peak = std::max(peak, std::abs(x));
+		}
+		EXPECT_GT(peak, 0.05f) << name << " is heard";
+		EXPECT_LT(peak, 1.5f) << name << " is not out of all proportion";
+		EXPECT_TRUE(cartoon::music_cues::genericInstruments().count(name)) << name << " is a cue's instrument";
+	}
+	const std::vector<float> horn = v::brass(55.0, 2.0);
+	EXPECT_GT(energy(horn, 1.0, 1.5, true) / energy(horn, 1.0, 1.5, false), 1.5 * energy(horn, 0.02, 0.06, true) / energy(horn, 0.02, 0.06, false)) << "brighter once blown";
+	const std::vector<float> drum = v::timpani(43.0, 2.0);
+	EXPECT_GT(energy(drum, 0.0, 0.2, false), 10.0 * energy(drum, 1.6, 1.9, false)) << "a stroke that dies away";
+}
+
 // The cues go on the soundtrack at their times, with the film's own instruments or the generic ones; a film with a cues file and no score of its own gets a soundtrack
 // from the cues, read when it is made.
 // Working on a recording: what `trim`, `fade`, `loop`, `curve` and `follow` do to the sound itself.

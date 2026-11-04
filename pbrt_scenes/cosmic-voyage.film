@@ -1,76 +1,121 @@
-# Cosmic Voyage: a minute's journey through the universe, with no one in it - a showcase of what the renderer draws in space (src/shared/cartoon/film_cosmos.h,
-# film_planets.h, film_voyage.h). Seven parts, each its own stretch of space on the empty stage (`set void`), joined by dissolves.
+# Cosmic Voyage: one journey through the universe, from the web of galaxies down to a single star that dies and a new one being born - a showcase of what the renderer
+# draws in space (src/shared/cartoon/film_cosmos.h, film_planets.h, film_voyage.h; the great events worked out on the finished picture, src/shared/cosmic_event.h; the black
+# hole's true lens, black_hole_lens.h). Each stretch of the way is a part at its own scale on the empty stage (`set void`), but the camera never stops: every part's keys say
+# when (`at`), so it is already on its way as a dissolve begins and still going as it ends, flying on into the next - forward, always forward, each dissolve over something
+# that fills the picture on both sides of it (the glow of a knot of galaxies, a galaxy's heart, a blue star's glare, the dark ahead). Its score is composed
+# (film_assets/cosmic-voyage/cues.txt).
 film    cosmic-voyage
 name    Cosmic Voyage
-about   A minute's journey through the universe: a spiral galaxy, the pillars of a nebula, a raging star, a ringed giant, an asteroid field, a black hole and a supernova.
+about   One journey through the universe: the web of galaxies, two galaxies colliding, a spiral, the pillars of a nebula, a raging star, a ringed giant, the asteroids, a black hole bending the light round it, a star that dies and a new one being born.
 tags    emissive, night
-still   33
-title   at 0.5 for 3
+still   48
+title   at 1 for 3.5
 
-part "The galaxy"
+part "The cosmic web"
+set     void
+length  7
+space   stars 0  milkyway 0  sun off  bloom 0.15
+event   web  at 0 0 0  size 6000  count 40000  tilt 15
+shot 0 The web
+  ease camera 0
+  key   0 1100 9500    0 0 0   50  at 0
+  key   0 600 5600     0 0 0   50  at 3.5
+  key   0 260 2700     0 0 0   50  at 7
+
+part "Galaxies collide" dissolve 1.5
 set     void
 length  9
+space   stars 1  milkyway 0  sun off  bloom 0.15
+event   collision  at 0 0 -9000  size 6000  from 0  over 9  tilt 20
+shot 0 Two galaxies
+  ease camera 0
+  key   1900 2100 -1800   0 0 -9000   50  at 0
+  key   900 1400 -4600    0 0 -9000   50  at 5
+  key   350 1000 -6200    0 0 -9000   50  at 9
+
+part "A spiral galaxy" dissolve 1.5
+set     void
+length  8
 space   stars 1  milkyway 0.6  sun off
 galaxy  swirl  at 0 0 -60000  size 50000  tilt 30  turn 20  brightness 2
 galaxy  far1   at 160000 30000 -140000  size 20000  kind elliptical  tilt 40
 galaxy  far2   at -150000 -40000 -120000  size 25000  kind barred  tilt 30  turn 70
 shot 0 Falling into the galaxy
-  spacecam zoom  0 0 -60000  from 300000  to 42000  bearing 0  elevation 30
+  spacecam zoom  0 0 -60000  from 100000  to 28000  bearing 0  elevation 30  steady
 
-part "The pillars" dissolve 1.2
+part "The pillars" dissolve 1.5
 set     void
-length  9
+length  8
 space   stars 1  milkyway 1  sun off
 nebula  towers  at 0 0 -30000  size 20000  kind pillars  brightness 3
 nebula  veil    at 0 4000 -75000  size 70000  kind emission  brightness 0.7  seed 4
 star    blue    at -6000 9000 -36000  radius 600  temperature 26000  brightness 3
 shot 0 Through the pillars
-  key   0 2000 8000     0 0 -30000   45
-  key   0 1000 -6000    0 0 -30000   45
+  ease camera 0
+  key   -2500 3500 13000   0 0 -30000        45  at 0
+  key   0 2000 1000        0 600 -30000      45  at 4.5
+  key   1500 1400 -8000    -6000 9000 -36000  45  at 8
 
-part "The star" dissolve 1.2
+part "A raging star" dissolve 1.5
 set     void
-length  9
+length  8
 space   stars 1  milkyway 1  sun off  flare 0.3  bloom 0.2
 star    sol  at 0 0 -30000  radius 5000  kind sun  temperature 4300  prominences 22  flare 2.5  brightness 0.7
-shot 0 Round the star
-  spacecam orbit  0 0 -30000  radius 19000  degrees 40  from 0  elevation 10
+shot 0 Past the star
+  spacecam orbit  0 0 -30000  radius 15000  degrees 70  from 330  elevation 8
 
-part "The ringed giant" dissolve 1.2
+part "The ringed giant" dissolve 1.5
 set     void
-length  10
+length  9
 space   stars 1  milkyway 1  sun 230 12  flare 0.25  bloom 0.12  planetshine 1.5
 planet  giant  gas  at 0 0 -40000  radius 8000  tilt 24  rings 1.3 2.5  flow 1  storms 3
 moon    io     lava  of giant  radius 600   orbit 22000  period 90  phase 200
 moon    europa ice   of giant  radius 500   orbit 30000  period 140 phase 150
 shot 0 Round the giant
-  spacecam orbit  0 0 -40000  radius 34000  degrees 55  from 300  elevation 9
+  spacecam orbit  0 0 -40000  radius 34000  degrees 60  from 300  elevation 9
 
-part "The asteroid field" dissolve 1
+part "The asteroids" dissolve 1.2
 set     void
-length  8
+length  7
 space   stars 1  milkyway 1  sun 100 20  flare 0.3  bloom 0.1
-asteroids  chase  at 0 0 -3000  kind field  radius 2500  count 1800  size 120
+asteroids  field  at 0 0 -3000  kind field  radius 2500  count 1800  size 120
 planet  rust  desert  at 30000 6000 -60000  radius 7000  air 1  colour orange
 shot 0 Through the rocks
-  key   0 60 3000     0 0 -3000   50
-  key   40 -20 -500   60 10 -8000  50
-  key   -30 0 -5000   200 300 -12000  50
+  ease camera 0
+  key   0 60 3000      0 0 -3000         50  at 0
+  key   40 -20 -500    60 10 -8000       50  at 3.5
+  key   -30 0 -5000    200 300 -12000    50  at 7
 
-part "The black hole" dissolve 1.2
+part "The black hole" dissolve 1.5
 set     void
-length  9
+length  10
 space   stars 1  milkyway 1  sun off  bloom 0.25
-blackhole  maw  at 0 0 -30000  radius 2000  tilt 9  jets 18  disc 12  brightness 2
-shot 0 Round the black hole
-  spacecam orbit  0 0 -30000  radius 26000  degrees 35  from 330  elevation 11
+blackhole  maw  at 0 0 -30000  radius 2000  tilt 9  jets 18  disc 12  brightness 2  lens 1
+shot 0 Into the dark
+  ease camera 0
+  key   26000 8000 -14000    0 0 -30000   50  at 0
+  key   12000 4500 -42000    0 0 -30000   50  at 5
+  key   -5000 3000 -42000    0 0 -30000   50  at 8
+  key   -7000 2200 -34500    0 0 -30000   50  at 10
 
-part "The supernova" dissolve 1
+part "A star dies" dissolve 1.5
 set     void
-length  6
+length  7
 space   stars 1  milkyway 1  sun off  bloom 0.3  flare 0.4
 timelapse 3
-remnant  crab  at 0 0 -40000  size 20000  kind supernova  blast 3
+remnant  crab  at 0 0 -40000  size 20000  kind supernova  blast 1.5
 shot 0 The star dies
-  key   0 0 -16000   0 0 -40000   55
-  key   0 3000 -6000   0 0 -40000   55
+  ease camera 0
+  key   0 0 -24000     0 0 -40000   55  at 0
+  key   0 1500 -14000  0 0 -40000   55  at 3.5
+  key   0 3000 -5000   0 0 -40000   55  at 7
+
+part "A new sun" dissolve 2
+set     void
+length  8
+space   stars 1  milkyway 0.8  sun off  bloom 0.2
+event   disc  at 0 0 -9000  size 5000  from 0  over 8  tilt 35
+shot 0 Born again
+  ease camera 0
+  key   0 2600 -1500    0 0 -9000   50  at 0
+  key   600 2000 -4000  0 0 -9000   50  at 8

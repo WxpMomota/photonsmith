@@ -117,6 +117,25 @@ TEST(FilmModel3, PoseInAFilmKeepsAnImportedMeshsPicture) {
 	EXPECT_NE(bent.find("point2 uv"), std::string::npos) << "and its uvs";
 	EXPECT_NE(problemWith(text.substr(0, text.find("pose s")) + "pose s nobone 1 0  2 70\n"), "");
 }
+// `pbr normal FILE` alone: an imported mesh's normal map on the piece's own colour and finish (a `matte` piece: a diffuse surface with no picture, the kind the GPU's normal maps
+// are drawn on); `pbr rough` needs a base picture, and a glowing piece is left as it is.
+TEST(FilmModel3, ANormalMapAloneGoesOnThePiecesOwnColour) {
+	const std::filesystem::path d = std::filesystem::temp_directory_path() / "photonsmith_model3_test_normalmap";
+	std::filesystem::create_directories(d);
+	std::ofstream(d / "quad.obj", std::ios::binary) << "v 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nvt 0 0\nvt 1 0\nvt 1 1\nvt 0 1\nf 1/1 2/2 3/3\nf 1/1 3/3 4/4\n";
+	std::ofstream(d / "bumps.png", std::ios::binary) << "x";
+	const std::string text = "model boulder\n  piece stone  matte  colour 0.6 0.5 0.4\n    mesh " + (d / "quad.obj").generic_string() + "\n    pbr normal " + (d / "bumps.png").generic_string() + "\nend\nplace boulder at 0 0 0\n";
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("normalmap", kHead + text + kShot, film), "");
+	const std::string scene = film.sceneAt(0.5);
+	const std::size_t at = scene.find("bumps.png");
+	ASSERT_NE(at, std::string::npos) << "the normal map is on it";
+	const std::size_t line = scene.rfind("Material", at);
+	ASSERT_NE(line, std::string::npos);
+	EXPECT_EQ(scene.compare(line, 18, "Material \"diffuse\""), 0) << scene.substr(line, at - line) << " - its own matte colour, no picture";
+	EXPECT_NE(scene.find("\"string normalmap\""), std::string::npos);
+	EXPECT_NE(problemWith("model boulder\n  piece stone\n    mesh " + (d / "quad.obj").generic_string() + "\n    pbr rough " + (d / "bumps.png").generic_string() + "\nend\n"), "") << "a roughness picture wants its base picture";
+}
 // Fur groomed outside the film goes where the skin goes: a strand on the bent part of a piece bends with it, one on the rest stays put, and a piece's own `fur` is not lost when it is posed.
 TEST(FilmModel3, GroomedStrandsFollowThePiecesBones) {
 	const std::filesystem::path d = std::filesystem::temp_directory_path() / "photonsmith_model3_test_strands";

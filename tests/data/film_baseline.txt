@@ -24,13 +24,16 @@ ball-parade|1|be82b9a4eec4a8ce|The row of balls
 candle|1|8782ad171cbdf69c|Portrait of the flame
 candle|2|ff22690a18254670|Macro on the wax and drips
 candle|3|cf24a271002c7d81|Pull back as it dies
-cosmic-voyage|1|364aeb65ef109b6f|Falling into the galaxy
-cosmic-voyage|2|d24c7fc80e6a753a|Through the pillars
-cosmic-voyage|3|92440dfa6155b2f7|Round the star
-cosmic-voyage|4|6930187b8e8516d8|Round the giant
-cosmic-voyage|5|13601d6bac40c899|Through the rocks
-cosmic-voyage|6|84daf6d7d9652aa2|Round the black hole
-cosmic-voyage|7|1b2bc100a10fb0d2|The star dies
+cosmic-voyage|1|a9be49a73ee44912|The web
+cosmic-voyage|2|7cb8d8ca72eb9391|Two galaxies
+cosmic-voyage|3|5146d0bc7b144884|Falling into the galaxy
+cosmic-voyage|4|c197fa5829b80e71|Through the pillars
+cosmic-voyage|5|f5603d5e094b24f5|Past the star
+cosmic-voyage|6|51ea7cee43ef94c6|Round the giant
+cosmic-voyage|7|c05de121955649d0|Through the rocks
+cosmic-voyage|8|ce059e4e41a28c44|Into the dark
+cosmic-voyage|9|be9e417935673fc6|The star dies
+cosmic-voyage|10|cc9b07b512582cf6|Born again
 crystal-heart|1|94d37b9df886c275|The still lake
 crystal-heart|2|df4de173c36571d2|Among the spires
 crystal-heart|3|61d19d2019afef5d|First light
@@ -334,11 +337,9 @@ valley-of-mists|3|9e216e2bb66fbf23|Geese
 valley-of-mists|4|ac0a8b19ce0ea00d|The mists lift
 valley-of-mists|5|10d7a9a120237bbc|The valley floor
 valley-of-mists|6|d702d56f0e7ef40b|Morning
-worlds-beyond|1|9f2e49ebbcd613c6|Into the night
-worlds-beyond|2|c4496f48cb100f81|Past the fire
-worlds-beyond|3|ca9dd28c22e01e3d|The comet goes by
-worlds-beyond|4|1116a0542a3cbb47|The station turns
-worlds-beyond|5|df69ebeed554074d|On his tail
-worlds-beyond|6|e796f9f9c8f08794|The cruiser
-worlds-beyond|7|f31e72b1a3d2e26e|Hyperspace
-worlds-beyond|8|2d77a01c90033514|Home at last
+worlds-beyond|1|d9dda738fe1027b4|Night falls on the blue world
+worlds-beyond|2|429a3541588925dc|Hyperspace
+worlds-beyond|3|658ff8e397d87db8|Past the fire
+worlds-beyond|4|852aa16e5ff9b895|The comet goes by
+worlds-beyond|5|44af4244152a5913|The battle
+worlds-beyond|6|85b746e8dfda3158|Landing

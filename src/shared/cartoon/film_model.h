@@ -828,14 +828,14 @@ inline std::string round3Line(Part &p, const std::vector<std::string> &t, bool &
 		return std::string();
 	}
 	if (verb == "pbr") {
-		const char *usage = "`pbr base FILE [rough FILE] [normal FILE]`: an imported mesh's pictures on its own uvs";
+		const char *usage = "`pbr base FILE [rough FILE] [normal FILE]` or `pbr normal FILE`: an imported mesh's pictures on its own uvs (a normal map alone: on the piece's own colour and finish)";
 		for (i = 1; i + 1 < t.size(); i += 2) {
 			if (t[i] == "base") p.texture = t[i + 1];
 			else if (t[i] == "rough") p.roughMap = t[i + 1];
 			else if (t[i] == "normal") p.normalMap = t[i + 1];
 			else return usage;
 		}
-		if (i != t.size() || p.texture.empty()) return usage;
+		if (i != t.size() || (p.texture.empty() && (p.normalMap.empty() || !p.roughMap.empty()))) return usage;
 		return std::string();
 	}
 	mine = false;
@@ -1104,6 +1104,10 @@ inline std::string pieceText(const std::string &film, const Model &m, const Part
 	}
 	std::string material = materialOf(p, name + "_tex", picture);
 	if (!normals.empty()) material += " \"string normalmap\" [ \"" + normals + "\" ]";
+	else if (!p.normalMap.empty() && material.find("AreaLightSource") == std::string::npos) {   // (`pbr normal FILE` alone: on a `matte` piece's plain colour it is drawn on the GPU too,
+		const std::string a = film_cache::asset(p.normalMap);                                     // whose normal maps want a diffuse surface with no picture of its own)
+		material += " \"string normalmap\" [ \"" + (a.empty() ? p.normalMap : a) + "\" ]";
+	}
 	return attr(material, film_cache::plyShape(file)) + extra;
 }
 // The model's drawn pieces at level `lod`, as scene text (in the model's own space: placed by whatever transform is round it).
