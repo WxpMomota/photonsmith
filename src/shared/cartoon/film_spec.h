@@ -661,6 +661,7 @@ struct Spec {
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;
 	bool muteBirds = false;   // (`mute birds`: no birdsong, no eagles' cries, no geese - whatever flies in the picture)
+	bool musicOnly = false;   // (`mute sounds`: the film's soundtrack is its music alone - no ambience, nature, events, weather, rooms or voices)
 	bool draftMusic = true;   // (`music none`: no drafted score when there is no cues file)
 	bool clearMusic = false;  // (`music clear`: the score is not muffled while the camera is under the water - the voices and the sea's sounds still are)
 	toon_look::Style toon;    // the toon look (`toon`): written into every frame's header as its `# @rt-toon` line

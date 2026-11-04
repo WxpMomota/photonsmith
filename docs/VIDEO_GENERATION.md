@@ -1693,7 +1693,7 @@ on, with more of the reverb the further off. Nothing in the film file asks for i
   wolf standing howls now and then; eagles cry from the sky;
 - birds sing from the trees near the camera, by day.
 
-`mute birds` takes every bird out of the soundtrack (the trees' and an ambience's songs, the eagles' cries, the geese, the night's owl), though they are still seen.
+`mute birds` takes every bird out of the soundtrack (the trees' and an ambience's songs, the eagles' cries, the geese, the night's owl), though they are still seen. `mute sounds` leaves the music alone - the film's cues file, drafted score and theme - with no ambience, nature, steps, touches, weather or voices (The Great Blue uses it).
 
 A continuous sound is laid as overlapping grains a fraction of a second apart, each placed from where the camera is when it is heard; an event is placed once. They are
 mixed under the film's ambiences (which stay round the camera as before), its weather, footsteps, thunder, lines and music. `ray_tracer --film-sound <key> OUT.wav` writes

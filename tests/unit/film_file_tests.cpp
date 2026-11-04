@@ -354,6 +354,34 @@ TEST(FilmFile, FootstepsAreNotHeardInAVacuum) {
 	EXPECT_EQ(heard["moonstill"], heard["moonwalk"]) << "none in a vacuum";
 }
 
+// `mute sounds`: a film's soundtrack is its music alone - its wind, its rain and its footsteps are not heard, its score is.
+TEST(FilmFile, MuteSoundsLeavesTheMusicAlone) {
+	const std::filesystem::path d = tempDir("musiconly");
+	write(d / "s.pbrt", kScene);
+	const std::string shots = "scene s.pbrt\nlength 6\ncharacter sam pip at 0 0 0\nshot 0 A\n key 0 1 6  0 0 0\n";
+	const std::string busy = "ambience wind 0.8\nwalk sam 0.5 0.9  0 -3\n";
+	write(d / "bare.film", shots + "mute sounds\n");
+	write(d / "busy.film", shots + busy + "mute sounds\n");
+	write(d / "heard.film", shots + busy);
+	write(d / "silent.film", shots + busy + "music none\nmute sounds\n");
+	cartoon::detail::Registry r;
+	for (const char *file : {"bare.film", "busy.film", "heard.film", "silent.film"}) cartoon::detail::addFilmFile(r, (d / file).string());
+	ASSERT_EQ(r.all.size(), 4u) << (r.problems.empty() ? std::string() : r.problems[0]);
+	std::map<std::string, std::vector<std::int16_t>> heard;
+	for (const cartoon::Film *f : r.all) {
+		cartoon::audio::Mix m(f->duration);
+		f->soundtrack(m);
+		heard[f->key] = m.finish();
+	}
+	EXPECT_NE(heard["heard"], heard["busy"]) << "without it the wind and the steps are heard";
+	const auto loud = [](const std::vector<std::int16_t> &pcm) { return std::any_of(pcm.begin(), pcm.end(), [](std::int16_t v) { return v != 0; }); };
+	EXPECT_TRUE(loud(heard["busy"])) << "the drafted score is still heard";
+	EXPECT_FALSE(loud(heard["silent"])) << "with no music, nothing";
+	const cartoon::film_file::Parsed bad = cartoon::film_file::parse(shots + "mute everything\n", "bad.film");
+	EXPECT_FALSE(bad.ok) << "only birds or sounds";
+	EXPECT_NE(bad.error.find("mute sounds"), std::string::npos) << bad.error;
+}
+
 // A video of a film at another length gets its soundtrack stretched to fit at the same pitch: exactly the video's length, a tone still the same tone, as loud, and a click at a
 // moment of the film still at that moment of the video.
 TEST(CartoonAudioStretch, ASoundtrackStretchedToAnotherLengthKeepsItsPitchLoudnessAndTiming) {

@@ -222,7 +222,7 @@ Film filmOf(Registry &r, const film_file::DataFilm &d, bool drafted, int id, con
 		f.feetAt = [p](double t) { return p->feetAt(t); };
 	}
 	// how loud its characters speak (its music is ducked under it)
-	if (!d.spec.lines.empty() || !d.spec.characters.empty()) f.speechAt = [p](double t) { return p->speechAt(t); };
+	if ((!d.spec.lines.empty() || !d.spec.characters.empty()) && !d.spec.musicOnly) f.speechAt = [p](double t) { return p->speechAt(t); };
 	f.trackAt = [p](const std::string &name, double t) { return p->lightLevel(name, t); };
 	if (d.spec.hasUnderwater && !d.spec.clearMusic) f.musicCutoffs = [p]() { return p->musicCutoffs(); };   // (round 17: its music muffled while the camera is under the water)
 	// every film file has a soundtrack: its set's sound and its rain, its footsteps, touches and lines, and its music - its cues file's (withFilmFiles) or, when it has none,
@@ -230,18 +230,20 @@ Film filmOf(Registry &r, const film_file::DataFilm &d, bool drafted, int id, con
 	// else to hear has a soft wind: a video of a film is never silent.)
 	const bool quiet = !drafted && music_cues::fileOf(d.spec.key).empty() && !d.hasEvents() && d.spec.ambience.empty() && d.spec.weather.empty() && d.spec.lightnings.empty();
 	f.soundtrack = [p, drafted, quiet, names = d.shotNameList(), speech = f.speechAt](audio::Mix &m) {
-		std::vector<dressing::Ambience> beds = quiet ? std::vector<dressing::Ambience>{{"wind", 0.6}} : p->spec.ambience;
-		if (p->spec.hasUnderwater)   // (an underwater film's reef and sea beds follow the camera across the waterline: the soundscape plays them, film_world.cpp)
-			beds.erase(std::remove_if(beds.begin(), beds.end(), [](const dressing::Ambience &a) { return a.kind == "reef" || a.kind == "sea" || a.kind == "seawash"; }), beds.end());
-		dressing::play(m, beds);
-		for (const particles::Weather &w : p->spec.weather)
-			if (w.kind == "rain") particles::rainSound(m, w);
-		const bool inHelmet = std::any_of(p->spec.ambience.begin(), p->spec.ambience.end(), [](const dressing::Ambience &a) { return a.kind == "breath"; });
-		if (!inHelmet) sfx::play(m, p->events());   // (`ambience breath`: a vacuum - the breath in the helmet is all there is to hear, not the steps, touches or landings)
-		p->soundscape(m);   // (its nature placed where it is heard from: film_soundscape.h)
-		if (p->spec.indoors.any()) p->roomSounds(m);   // (its rooms': film_roomworld.cpp)
-		p->thunder(m);
-		p->speak(m);
+		if (!p->spec.musicOnly) {   // (`mute sounds`: the music alone - its cues file's, its drafted score and its theme)
+			std::vector<dressing::Ambience> beds = quiet ? std::vector<dressing::Ambience>{{"wind", 0.6}} : p->spec.ambience;
+			if (p->spec.hasUnderwater)   // (an underwater film's reef and sea beds follow the camera across the waterline: the soundscape plays them, film_world.cpp)
+				beds.erase(std::remove_if(beds.begin(), beds.end(), [](const dressing::Ambience &a) { return a.kind == "reef" || a.kind == "sea" || a.kind == "seawash"; }), beds.end());
+			dressing::play(m, beds);
+			for (const particles::Weather &w : p->spec.weather)
+				if (w.kind == "rain") particles::rainSound(m, w);
+			const bool inHelmet = std::any_of(p->spec.ambience.begin(), p->spec.ambience.end(), [](const dressing::Ambience &a) { return a.kind == "breath"; });
+			if (!inHelmet) sfx::play(m, p->events());   // (`ambience breath`: a vacuum - the breath in the helmet is all there is to hear, not the steps, touches or landings)
+			p->soundscape(m);   // (its nature placed where it is heard from: film_soundscape.h)
+			if (p->spec.indoors.any()) p->roomSounds(m);   // (its rooms': film_roomworld.cpp)
+			p->thunder(m);
+			p->speak(m);
+		}
 		p->playTheme(m);
 		if (!drafted) return;
 		const music_cues::Sheet sheet = music_cues::parse(score::draft(*p));

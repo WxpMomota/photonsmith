@@ -1083,8 +1083,11 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		s.emitters.push_back(e);
 	} else if (verb == "mute") {
 		const std::vector<std::string> t = detail::tokens(line);
-		if (t.size() != 2 || t[1] != "birds") return fail("`mute birds`: no birds heard (their songs in the trees, eagles' cries, geese, the night's owl), though they are seen");
-		s.muteBirds = true;
+		if (t.size() != 2 || (t[1] != "birds" && t[1] != "sounds"))
+			return fail("`mute birds` (no birds heard: their songs in the trees, eagles' cries, geese, the night's owl, though they are seen) or `mute sounds` (the music alone: "
+						"no ambience, nature, steps, touches, weather or voices)");
+		if (t[1] == "birds") s.muteBirds = true;
+		else s.musicOnly = true;
 	} else if (verb == "ambience") {
 		const std::vector<std::string> t = detail::tokens(line);
 		dressing::Ambience a;
