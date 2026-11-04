@@ -53,6 +53,8 @@
 #include "../../src/shared/noise.h"
 #include "../../src/shared/ray_hash.h"   // pbrt-v4 stochastic alpha test hash - see wf_passes_alpha_cutout()
 #include "gpu_bump_map.h"                // grayscale "texture displacement" bump - see __closesthit__wf_triangle
+#include "wavefront_texture_sample.h"    // wf_sample_texture: an RGB normal map on any material - see __closesthit__wf_triangle
+#include "../../src/shared/normal_map.h" // apply_normal_map
 #include "../../src/shared/shadow_terminator.h"   // the shadow terminator offset - see __closesthit__wf_triangle
 #include "proxy_normal_device.h"                  // a proxy sphere's shading normals - see __raygen__wf_trace
 

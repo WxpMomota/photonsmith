@@ -2596,9 +2596,9 @@ through the piece; the piece made again as one clean closed surface; its holes f
 
 **Materials by region: `region NAME above Y|below Y|facing up|down|front|back|left|right|near X Y Z R [colour R G B] [rough R] [finish]`, finish `skin`, `pbr base FILE [rough
 FILE] [normal FILE]`.** Parts of a piece in materials of their own (a red roof, a white frame); the `skin` finish lets light into the surface (a cartoon skin, wax, a gummy
-sweet); an imported mesh's colour, roughness and normal pictures on its own uvs. `pbr normal FILE` alone puts a normal map on the piece's own colour and finish: on a
-`matte` piece it is drawn by the GPU too, whose normal maps want a plain diffuse surface (a glTF with a picture of its own brings that picture with it, so export it without
-materials for this).
+sweet); an imported mesh's colour, roughness and normal pictures on its own uvs. `pbr normal FILE` alone puts a normal map on the piece's own colour and finish (and
+on each of its regions). The GPU draws a normal map on any material's triangles, as the CPU does (it used to draw one only on a plain diffuse surface, and dropped it
+without a word otherwise).
 
 **Lettering and proper uvs: `text "WORDS" [size H] [depth D] [font FILE] [at X Y Z] [turn ...]`, `unwrap`.** (model_text.h) Words pulled out into a solid from a TrueType
 font (Arial unless named; film_assets/fonts, the system's fonts or a path), a capital H metres tall - a shop sign, a title, a name on a door. `unwrap` gives a piece chart

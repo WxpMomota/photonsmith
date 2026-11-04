@@ -79,15 +79,21 @@ inline Place placeAt(const Lane &l, double s) {
 	p.up = cross(p.way, p.side);
 	return p;
 }
-// Where a rider is at t (pbrt's) and its way: in from where it was over the first second, then along the lane at its speed (a little faster in its middle). Let go, it coasts
-// on for a second and a half and stays there until `holdTo` (its next walk's start: DataFilm::deepMoment) - it used to snap back to where it was before the ride. `going`:
-// 1 while it is carried, easing to 0 as it comes to rest.
-inline bool riderAt(const Lane &l, const Ride &r, double t, const Vec3 &was, Vec3 &at, Vec3 &way, double holdTo = 1e30, double *going = nullptr) {
-	if (t < r.from || l.line.size() < 2) return false;
-	double joinAt = 0.0, best = 1e30;   // (where it joins: the lane's point nearest where it was)
+// How far along the lane a rider joins it coming from `from` (pbrt's: the lane's point nearest), and when it lets go (`to`, or the lane's end at its speed).
+inline double joinAlong(const Lane &l, const Vec3 &from) {
+	double joinAt = 0.0, best = 1e30;
 	for (std::size_t i = 0; i < l.line.size(); ++i)
-		if (const double d = length(l.line[i] - was); d < best) best = d, joinAt = l.along[i];
-	const double end = std::min(r.to, r.from + (l.total() - joinAt) / l.speed);
+		if (const double d = length(l.line[i] - from); d < best) best = d, joinAt = l.along[i];
+	return joinAt;
+}
+inline double rideEnd(const Lane &l, const Ride &r, const Vec3 &from) { return std::min(r.to, r.from + (l.total() - joinAlong(l, from)) / std::max(1e-6, l.speed)); }
+// Where a rider is at t (pbrt's) and its way: in from where it was (`was`, now) over the first second, then along the lane at its speed (a little faster in its middle) from
+// where it joins it coming from `from` (where it was when the ride began: DataFilm::rideJoinFrom). Let go, it coasts on for a second and a half and stays there until
+// `holdTo` (its next walk or ride: DataFilm::rideHeld; a chase after it eases in from there) - it used to snap back to where it was before the ride. `going`: 1 while it is carried, easing to 0 as it
+// comes to rest.
+inline bool riderAt(const Lane &l, const Ride &r, double t, const Vec3 &from, const Vec3 &was, Vec3 &at, Vec3 &way, double holdTo = 1e30, double *going = nullptr) {
+	if (t < r.from || l.line.size() < 2) return false;
+	const double joinAt = joinAlong(l, from), end = rideEnd(l, r, from);
 	if (t > std::max(end + 1.5, holdTo)) return false;
 	const double ride = std::min(t, end) - r.from;
 	const Place p = placeAt(l, joinAt + ride * l.speed * 1.1);

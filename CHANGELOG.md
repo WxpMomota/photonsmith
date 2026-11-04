@@ -6,6 +6,12 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **A review of the day's work: eight findings (2026-11-03).** A walk after a fast-lane ride now sets off from where the ride let go (it walked from where it was
+  before the ride, so a rider still snapped back as its next walk began), a chase after a ride eases in from there, and a walk that starts while its walker is still riding
+  is refused with the time it lets go. A pet at `heel` follows a walk along points as well as one to places. The video's "a frame every N s" counts from the first frame
+  out (a cold start's shader compile no longer inflates it). The GPU draws a normal map on any material's triangles (it drew one only on a plain diffuse surface and dropped
+  it silently otherwise); `pbr normal` goes on every region of a piece. The choir and brass voices work out their partials once a note (much less work a sample).
+
 * **The two space films made again (2026-11-03).** `cosmic-voyage` is one journey, from the cosmic web through two galaxies colliding, a spiral, the pillars, a raging
   star, a ringed giant and the asteroids to a black hole whose light really bends (its lens), a supernova and a new star being born; `worlds-beyond` goes from a blue
   world turning into night past its station into hyperspace, to a lava world, a comet, a battle and a landing from orbit on an alien world of crystal spires, vents

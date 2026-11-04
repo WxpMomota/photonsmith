@@ -199,6 +199,22 @@ TEST(FilmHomePets, CatNapsDogWaitsAndHeels) {
 	EXPECT_NE(drawn, "");
 }
 
+// A pet at heel follows a walk along points as it follows one to a place (it was left behind: only walks with `to` places were followed).
+TEST(FilmHomePets, AHeelingPetFollowsAWalkAlongPoints) {
+	kinds();
+	const std::vector<rm::Room> rs = roomsOf("house home at 0 0 rooms living\n");
+	const V3 there = rm::clearSpot(rs[0], rm::toPbrt(rs[0], {1.2, 0.0, 0.9}));
+	char walk[120];
+	std::snprintf(walk, sizeof walk, "walk ada 3 0.8  %.3f %.3f\n", there.x, there.z);
+	ff::DataFilm film;
+	ASSERT_EQ(film.load(filmOf("heelpoints", "house home at 0 0 rooms living\n" + castIn("rex", "dog", rs[0], -1.2, -1.0) + castIn("ada", "person", rs[0], -0.8, -1.2) + "heel rex ada at 1\n" + walk + kShot).string()), "");
+	const ff::Character &rex = film.spec.characters[0], &ada = film.spec.characters[1];
+	ASSERT_GE(rex.walks.size(), 1u) << "the dog has a walk after her";
+	V3 a, b;
+	film.momentOf(ada, 30.0, &a), film.momentOf(rex, 30.0, &b);
+	EXPECT_LT(std::hypot(a.x - b.x, a.z - b.z), 1.6) << "close behind her where she stopped";
+}
+
 TEST(FilmHomeSlapstick, KnockFallBreakSpillSlipBumpAndPile) {
 	const std::vector<rm::Room> rs = roomsOf("room living l at 0 0\n");
 	const rm::Room &r = rs[0];

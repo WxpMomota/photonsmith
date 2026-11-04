@@ -276,6 +276,7 @@ std::string DataFilm::loadFile(const std::string &filePath) {
 	}
 	heightsOfWalks();
 	if (const std::string e = walksInTurn(); !e.empty()) return filePath + ":" + e;
+	if (const std::string e = walksBesideRides(); !e.empty()) return filePath + ":" + e;
 	if (const std::string e = crowding(); !e.empty()) return filePath + ": " + e;
 	if (const std::string e = holdingTimeline(); !e.empty()) return filePath + ":" + e;
 	for (const Spec::Contact &k : spec.contacts)
@@ -405,10 +406,11 @@ std::string DataFilm::crowding() const {
 		}
 		return std::any_of(spec.chases.begin(), spec.chases.end(), [&](const fastlane::Chase &x) { return x.who == c.name && t >= x.from - 1.0 && t <= x.to + 1.0; }) ||
 			   std::any_of(spec.rides.begin(), spec.rides.end(), [&](const fastlane::Ride &x) {
-				   double end = x.to;   // (a ride without `to` lets go at its lane's end: it was left out for the rest of the film)
-				   for (const fastlane::Lane &l : spec.lanes)
-					   if (l.name == x.lane && l.total() > 0.0) end = std::min(end, x.from + l.total() / std::max(0.1, l.speed));
-				   return x.who == c.name && t >= x.from && t <= end + 1.5;
+				   if (x.who != c.name || t < x.from) return false;
+				   double letGo = x.to + 1.5;   // (let go, it is held where it came to rest until its next walk, chase or ride: DataFilm::rideHeld)
+				   Vec3 at;
+				   if (!rideLetGo(c, x, letGo, at)) return t <= letGo;
+				   return t <= std::max(letGo, rideHeld(c, x));
 			   });
 	};
 	std::vector<std::pair<const Character *, const Character *>> pairs;
@@ -833,6 +835,7 @@ rig::PathWalk DataFilm::pathOf(const Character &c, std::size_t walk) const {
 	const CharacterKind &kind = characterKinds().at(c.kind);
 	Vec3 from = story(c.start[0], c.start[1], c.start[2]);
 	for (std::size_t i = 0; i < walk; ++i) from = endOf(c, i);
+	if (Vec3 letGo; startAfterRide(c, walk, letGo)) from = letGo;   // (round 18: a ride since the walk before let it go somewhere else: it walks on from there)
 	rig::PathWalk w;
 	w.points.push_back(from);
 	const WalkLine &wl = c.walks[walk];

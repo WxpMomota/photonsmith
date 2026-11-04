@@ -1039,6 +1039,12 @@ inline Mesh uvMeshOf(const Part &p, const Mesh &mesh, std::vector<double> *curva
 	}
 	return uv;
 }
+// `pbr normal FILE` alone (no base picture) as a material's words: on any material but a glowing one, whose light has no surface to bend. "" when it has none.
+inline std::string normalMapWords(const Part &p, const std::string &material) {
+	if (p.normalMap.empty() || material.find("AreaLightSource") != std::string::npos) return std::string();
+	const std::string a = film_cache::asset(p.normalMap);
+	return " \"string normalmap\" [ \"" + (a.empty() ? p.normalMap : a) + "\" ]";
+}
 // The piece's regions (model_surface.h), each its own mesh in the cache and its own material: "" when it has none.
 inline std::string regionsText(const std::string &film, const Model &m, const Part &p, int lod, const std::string &name) {
 	if (p.regions.empty()) return std::string();
@@ -1052,7 +1058,8 @@ inline std::string regionsText(const std::string &film, const Model &m, const Pa
 			const Region &r = p.regions[k - 1];
 			look.finish = r.finish, look.colour = r.colour, look.rough = r.rough, look.glow = r.glow;
 		}
-		out += attr(materialOf(look), film_cache::plyShape(file));
+		const std::string material = materialOf(look);
+		out += attr(material + normalMapWords(p, material), film_cache::plyShape(file));   // (a `pbr normal` map on every region)
 	}
 	return out;
 }
@@ -1104,10 +1111,7 @@ inline std::string pieceText(const std::string &film, const Model &m, const Part
 	}
 	std::string material = materialOf(p, name + "_tex", picture);
 	if (!normals.empty()) material += " \"string normalmap\" [ \"" + normals + "\" ]";
-	else if (!p.normalMap.empty() && material.find("AreaLightSource") == std::string::npos) {   // (`pbr normal FILE` alone: on a `matte` piece's plain colour it is drawn on the GPU too,
-		const std::string a = film_cache::asset(p.normalMap);                                     // whose normal maps want a diffuse surface with no picture of its own)
-		material += " \"string normalmap\" [ \"" + (a.empty() ? p.normalMap : a) + "\" ]";
-	}
+	else material += normalMapWords(p, material);   // (`pbr normal FILE` alone, on the piece's own colour and finish)
 	return attr(material, film_cache::plyShape(file)) + extra;
 }
 // The model's drawn pieces at level `lod`, as scene text (in the model's own space: placed by whatever transform is round it).

@@ -131,8 +131,23 @@ void DataFilm::deepMoment(const Character &c, double t, Vec3 &where, double &hea
 						where = subs::seatOf(b, nt, a.seat), heading = rig::headingOf(pbrtOf(f)), airborne = true, swim = 0.0, going = 0.0;
 						return;
 					}
+	bool carried = false;   // (rides first: a ride carrying it wins over a chase, and a chase after a ride eases in from where the ride let it go)
+	for (const fastlane::Ride &r : spec.rides) {   // carried along a fast lane (and where it was let go, until its next walk or ride)
+		if (r.who != c.name || t < r.from) continue;
+		const double holdTo = rideHeld(c, r);
+		const Vec3 from = rideJoinFrom(c, r);
+		for (const fastlane::Lane &l : spec.lanes) {
+			if (l.name != r.lane) continue;
+			Vec3 at, way;
+			double moving = 1.0;
+			if (!fastlane::riderAt(l, r, t, from, pbrtOf(where), at, way, holdTo, &moving)) continue;
+			where = pbrtOf(at), heading = rig::headingOf(pbrtOf(way)), going = moving, airborne = true;
+			carried = carried || moving > 0.0;
+			if (swimming(c)) swim = 1.0;
+		}
+	}
 	for (const fastlane::Chase &ch : spec.chases) {   // following another's way, a little behind it
-		if (ch.who != c.name || t < ch.from - 1.0 || t > ch.to + 1.0) continue;
+		if (carried || ch.who != c.name || t < ch.from - 1.0 || t > ch.to + 1.0) continue;
 		const Character *other = character(ch.after);
 		if (!other) continue;
 		Vec3 at, before;
@@ -143,20 +158,75 @@ void DataFilm::deepMoment(const Character &c, double t, Vec3 &where, double &hea
 		if (w > 0.5 && std::hypot(at.x - before.x, at.z - before.z) > 1e-4) heading = rig::headingOf(at - before);
 		going = lerp(going, om.going, w), swim = std::max(swim, om.swim * w), airborne = airborne || (w > 0.5 && om.airborne);
 	}
-	for (const fastlane::Ride &r : spec.rides) {   // carried along a fast lane (and where it was let go, until its next walk)
-		if (r.who != c.name || t < r.from) continue;
-		double holdTo = 1e30;
-		for (const WalkLine &w : c.walks)
-			if (w.t0 > r.from) holdTo = std::min(holdTo, w.t0);
-		for (const fastlane::Lane &l : spec.lanes) {
-			if (l.name != r.lane) continue;
-			Vec3 at, way;
-			double carried = 1.0;
-			if (!fastlane::riderAt(l, r, t, pbrtOf(where), at, way, holdTo, &carried)) continue;
-			where = pbrtOf(at), heading = rig::headingOf(pbrtOf(way)), going = carried, airborne = true;
-			if (swimming(c)) swim = 1.0;
+}
+
+Vec3 DataFilm::rideJoinFrom(const Character &c, const fastlane::Ride &r) const {
+	Vec3 from{c.start[0], c.start[1], c.start[2]};
+	for (std::size_t i = 0; i < c.walks.size(); ++i)   // (where its last walk before the ride ended)
+		if (c.walks[i].t0 < r.from && !c.walks[i].points.empty()) from = pbrtOf(endOf(c, i));
+	for (const fastlane::Ride &o : spec.rides)   // (an earlier ride that let it go since, with no walk after it: from there)
+		if (&o != &r && o.who == c.name && o.from < r.from) {
+			double when;
+			Vec3 at;
+			bool afterWalks = true;
+			for (const WalkLine &w : c.walks) afterWalks = afterWalks && !(w.t0 > o.from && w.t0 < r.from);
+			if (afterWalks && rideLetGo(c, o, when, at) && when <= r.from) from = pbrtOf(at);
 		}
+	return from;
+}
+
+bool DataFilm::rideLetGo(const Character &c, const fastlane::Ride &r, double &when, Vec3 &at) const {
+	for (const fastlane::Lane &l : spec.lanes) {
+		if (l.name != r.lane || l.line.size() < 2) continue;
+		const Vec3 from = rideJoinFrom(c, r);
+		when = fastlane::rideEnd(l, r, from) + 1.5;
+		Vec3 p, way;
+		if (!fastlane::riderAt(l, r, when, from, from, p, way)) return false;
+		at = pbrtOf(p);
+		return true;
 	}
+	return false;
+}
+
+double DataFilm::rideHeld(const Character &c, const fastlane::Ride &r) const {
+	double until = 1e30;
+	for (const WalkLine &w : c.walks)
+		if (w.t0 > r.from) until = std::min(until, w.t0);
+	for (const fastlane::Ride &o : spec.rides)
+		if (&o != &r && o.who == c.name && o.from > r.from) until = std::min(until, o.from);
+	return until;
+}
+
+bool DataFilm::startAfterRide(const Character &c, std::size_t walk, Vec3 &from) const {
+	if (walk >= c.walks.size()) return false;
+	const double before = walk > 0 ? c.walks[walk - 1].t0 : -1e30, start = c.walks[walk].t0;
+	double latest = -1e30;
+	bool found = false;
+	for (const fastlane::Ride &r : spec.rides) {
+		if (r.who != c.name || r.from <= before || r.from >= start) continue;
+		double when;
+		Vec3 at;
+		if (rideLetGo(c, r, when, at) && when <= start + 1e-6 && r.from > latest) latest = r.from, from = at, found = true;
+	}
+	return found;
+}
+
+std::string DataFilm::walksBesideRides() const {
+	for (const Character &c : spec.characters)
+		for (const fastlane::Ride &r : spec.rides) {
+			if (r.who != c.name) continue;
+			double when;
+			Vec3 at;
+			if (!rideLetGo(c, r, when, at)) continue;
+			for (const WalkLine &w : c.walks)
+				if (w.t0 > r.from && w.t0 < when - 1e-6) {
+					char b[260];
+					std::snprintf(b, sizeof b, "%d: %s's walk starts at %.2f s while it rides the lane %s (from %.2f s until it lets go at %.2f s): start the walk then, or give the ride a `to`",
+								  w.line, c.name.c_str(), w.t0, r.lane.c_str(), r.from, when);
+					return b;
+				}
+		}
+	return std::string();
 }
 
 void DataFilm::flowInto(const Character &c, double t, CharacterMoment &m) const {

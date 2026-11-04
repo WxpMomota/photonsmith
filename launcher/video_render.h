@@ -471,8 +471,9 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
         return kept.count(frame) > 0;
     };
     // (the pace a frame comes out at: with several workers on one graphics card each frame takes them as long as they all do, so a frame's own seconds read as if a minute a
-    // frame when frames were in fact coming every half minute - the user, 2026-11-03)
-    const auto runStart = std::chrono::steady_clock::now();
+    // frame when frames were in fact coming every half minute - the user, 2026-11-03). Counted from the first frame out, not the start: a cold start's first frame can take
+    // 25 minutes compiling the shaders alone, and averaged in it overstated the pace for hundreds of frames.
+    std::chrono::steady_clock::time_point firstOut;
     int renderedNow = 0;
     auto completed = [&](int frame, int rc, double seconds) {   // as each frame finishes: one line, the count being how many are done
         if (already[static_cast<std::size_t>(frame)]) return;
@@ -495,9 +496,10 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
         else if (rc == 0) {
             line << " \u2713 (" << std::setprecision(1) << seconds << "s";
             if (sceneSeconds >= 0.05) line << "; its scene " << std::setprecision(2) << sceneSeconds << "s";
-            if (workers > 1 && ++renderedNow >= 2) {   // (from the second on: the first came out alone)
-                const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - runStart).count();
-                line << "; a frame every " << std::setprecision(1) << elapsed / renderedNow << "s with " << workers << " workers";
+            if (workers > 1) {   // (from the second frame out on: the frames since the first over the time since it)
+                const auto now = std::chrono::steady_clock::now();
+                if (++renderedNow == 1) firstOut = now;
+                else line << "; a frame every " << std::setprecision(1) << std::chrono::duration<double>(now - firstOut).count() / (renderedNow - 1) << "s with " << workers << " workers";
             }
             line << ")";
         }

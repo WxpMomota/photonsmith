@@ -328,6 +328,14 @@ class DataFilm {
 	// `turn` the swimmer's laying level); the round's sounds; the schools' shows and hauls; a sub or a serpent as a shot's subject
 	std::string deepAt(const std::string &header, double t, double nt) const;
 	void deepMoment(const Character &c, double t, Vec3 &where, double &heading, double &going, double &swim, bool &airborne) const;
+	// A ride (fastlane::Ride) of c: where it takes c from (pbrt's: the end of c's last walk before it, else where c stands), when and where it lets go (story space), until when
+	// c is held there (its next walk or ride; a chase eases in from there), and - for a walk - where that walk starts when a ride let c go after the walk before it (story space; false: none did).
+	Vec3 rideJoinFrom(const Character &c, const fastlane::Ride &r) const;
+	bool rideLetGo(const Character &c, const fastlane::Ride &r, double &when, Vec3 &at) const;
+	double rideHeld(const Character &c, const fastlane::Ride &r) const;
+	bool startAfterRide(const Character &c, std::size_t walk, Vec3 &from) const;
+	// A walk that starts while its walker is still riding (it would be lost under the ride, then jump to where it had got to): "" or what is wrong.
+	std::string walksBesideRides() const;
 	void flowInto(const Character &c, double t, CharacterMoment &m) const;
 	std::string wornAt(const Character &c, const CharacterKind &kind, double t, const CharacterMoment &m, const Mat4 &turn) const;
 	void deepSounds(audio::Mix &m) const;

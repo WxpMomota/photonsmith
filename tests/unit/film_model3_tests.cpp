@@ -117,8 +117,8 @@ TEST(FilmModel3, PoseInAFilmKeepsAnImportedMeshsPicture) {
 	EXPECT_NE(bent.find("point2 uv"), std::string::npos) << "and its uvs";
 	EXPECT_NE(problemWith(text.substr(0, text.find("pose s")) + "pose s nobone 1 0  2 70\n"), "");
 }
-// `pbr normal FILE` alone: an imported mesh's normal map on the piece's own colour and finish (a `matte` piece: a diffuse surface with no picture, the kind the GPU's normal maps
-// are drawn on); `pbr rough` needs a base picture, and a glowing piece is left as it is.
+// `pbr normal FILE` alone: an imported mesh's normal map on the piece's own colour and finish (a `matte` piece: a diffuse surface with no picture); `pbr rough` needs a base
+// picture.
 TEST(FilmModel3, ANormalMapAloneGoesOnThePiecesOwnColour) {
 	const std::filesystem::path d = std::filesystem::temp_directory_path() / "photonsmith_model3_test_normalmap";
 	std::filesystem::create_directories(d);

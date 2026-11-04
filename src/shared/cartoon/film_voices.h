@@ -69,14 +69,24 @@ inline std::vector<float> brass(double midi, double length, double attack = 0.18
 	std::vector<float> v(audio::samplesFor(length + release), 0.0f);
 	const double f = hz(midi);
 	double phase[2] = {0.0, 1.3};
+	int partials = 0;   // (the partials under 9 kHz, at most 18, and each one's 1/sqrt(k): worked out once, not every sample)
+	double root[18];
+	for (int k = 1; k <= 18 && k * f < 9000.0; ++k) root[partials++] = 1.0 / std::sqrt(static_cast<double>(k));
 	for (std::size_t i = 0; i < v.size(); ++i) {
 		const double t = static_cast<double>(i) / audio::kRate;
 		const double env = smoothstep(0.0, attack, t) * (t < length ? 1.0 : std::max(0.0, 1.0 - (t - length) / release));
 		const double bright = 1.5 + 7.0 * env * (0.85 + 0.15 * smoothstep(attack, attack + 0.6, t));   // (how many partials sound: more the harder it is blown)
+		const double fall = std::exp(-1.0 / bright);   // (each partial this much softer than the one below it: exp(-(k - 1) / bright))
 		double s = 0.0;
 		for (int p = 0; p < 2; ++p) {
 			phase[p] += audio::kTau * f * (p ? 1.0017 : 0.9983) * (1.0 + 0.003 * std::sin(audio::kTau * 4.8 * t + p) * smoothstep(0.4, 1.2, t)) / audio::kRate;
-			for (int k = 1; k <= 18 && k * f < 9000.0; ++k) s += std::sin(k * phase[p]) * std::exp(-(k - 1) / bright) / std::sqrt(static_cast<double>(k));
+			const double c2 = 2.0 * std::cos(phase[p]);   // (sin(k x) by the recurrence sin((k+1)x) = 2 cos x sin(kx) - sin((k-1)x))
+			double before = 0.0, now = std::sin(phase[p]), w = 1.0;
+			for (int k = 0; k < partials; ++k) {
+				s += now * w * root[k];
+				const double next = c2 * now - before;
+				before = now, now = next, w *= fall;
+			}
 		}
 		v[i] = static_cast<float>(env * s * 0.16);
 	}
@@ -92,6 +102,10 @@ inline std::vector<float> choir(double midi, double length, double attack = 0.7,
 	};
 	double phase[3] = {0.0, 2.1, 4.2};
 	const double detune[3] = {1.0, 1.0035, 0.9968};
+	int partials[3] = {0, 0, 0};   // (each voice's partials under 5 kHz, at most 24, with the vowel's weight on each: worked out once from the note, not every sample - the
+	double gain[3][24];            // vibrato moves them by a fraction of a percent)
+	for (int p = 0; p < 3; ++p)
+		for (int k = 1; k <= 24 && k * f * detune[p] < 5000.0; ++k) gain[p][partials[p]++] = formant(k * f * detune[p]) / k;
 	for (std::size_t i = 0; i < v.size(); ++i) {
 		const double t = static_cast<double>(i) / audio::kRate;
 		const double env = smoothstep(0.0, attack, t) * (t < length ? 1.0 : std::max(0.0, 1.0 - (t - length) / release));
@@ -99,7 +113,13 @@ inline std::vector<float> choir(double midi, double length, double attack = 0.7,
 		for (int p = 0; p < 3; ++p) {
 			const double fp = f * detune[p] * (1.0 + 0.004 * std::sin(audio::kTau * (4.6 + 0.4 * p) * t + p) * smoothstep(0.3, 1.2, t));
 			phase[p] += audio::kTau * fp / audio::kRate;
-			for (int k = 1; k <= 24 && k * fp < 5000.0; ++k) s += std::sin(k * phase[p]) * formant(k * fp) / k;
+			const double c2 = 2.0 * std::cos(phase[p]);   // (sin(k x) by recurrence, as brass())
+			double before = 0.0, now = std::sin(phase[p]);
+			for (int k = 0; k < partials[p]; ++k) {
+				s += now * gain[p][k];
+				const double next = c2 * now - before;
+				before = now, now = next;
+			}
 		}
 		v[i] = static_cast<float>(env * s * 0.22);
 	}

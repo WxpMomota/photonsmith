@@ -287,6 +287,19 @@ extern "C" __global__ void __closesthit__triangle() {
 		// (pbrt's BSDF is two-sided about the shading normal: it is turned toward the viewer, as the CPU's bump_map_material does)
 		shade_normal = dot(bumped, ray_dir) > 0.0f ? -bumped : bumped;
 	}
+	// pbrt "string normalmap" on any other material (MaterialData::normalMapTexIdx): the shading normal perturbed by the RGB tangent-space map in the frame of the shading
+	// normal as authored and the uv tangent, as NormalMappedLambertian below and the CPU's normal_map_material do. Skipped for emitters.
+	if (mat.normalMapTexIdx >= 0 && mat.type != MaterialType::DiffuseLight) {
+		const float3 packed = sample_texture(mat.normalMapTexIdx, uv_u, uv_v, hit_point);
+		float ns_x = 2.0f * packed.x - 1.0f, ns_y = 2.0f * packed.y - 1.0f, ns_z = 2.0f * packed.z - 1.0f;
+		const float ns_len = sqrtf(ns_x * ns_x + ns_y * ns_y + ns_z * ns_z);
+		if (ns_len > 1e-8f) { ns_x /= ns_len; ns_y /= ns_len; ns_z /= ns_len; }
+		else                { ns_x = 0.0f; ns_y = 0.0f; ns_z = 1.0f; }
+		float out_nx, out_ny, out_nz;
+		apply_normal_map(ns_x, ns_y, ns_z, shading_normal.x, shading_normal.y, shading_normal.z, tri_dpdu.x, tri_dpdu.y, tri_dpdu.z, out_nx, out_ny, out_nz);
+		shade_normal = make_float3(out_nx, out_ny, out_nz);
+		if (dot(shade_normal, ray_dir) > 0.0f) shade_normal = -shade_normal;   // (two-sided about the shading normal)
+	}
 	if (mat.type == MaterialType::NormalMappedLambertian) {
 		const float3& dpdu = tri_dpdu;
 		const float3 packed = sample_texture(mat.textureIdx, uv_u, uv_v, hit_point);

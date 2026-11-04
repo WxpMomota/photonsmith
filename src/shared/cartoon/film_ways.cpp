@@ -38,6 +38,7 @@ std::string DataFilm::findWays() {
 			const Vec3 last = endOf(*c, i - 1);
 			fx = -last.x, fy = last.y, fz = last.z;
 		}
+		if (Vec3 letGo; startAfterRide(*c, i, letGo)) fx = -letGo.x, fy = letGo.y, fz = letGo.z;   // (a ride let it go since: from there)
 		const std::string set = setAt(w.t0);
 		if (!flattened.count(set)) flattened[set] = film_paths::flattenText(set + roomsText, meshes);
 		const pbrt_flatten::FlatScene &flat = flattened[set];

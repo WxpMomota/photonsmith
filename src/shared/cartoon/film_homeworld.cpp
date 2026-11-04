@@ -63,12 +63,14 @@ void DataFilm::placeHome() {
 		std::pair<double, double> before{owner->start[0], owner->start[2]};
 		std::vector<WalkLine> mine;
 		for (const WalkLine &w : owner->walks) {
-			if (w.targets.empty()) continue;
-			const std::pair<double, double> last = w.targets.back();
+			const bool byPoints = w.targets.empty();   // (a walk to places, or along points it was given: both followed)
+			const std::vector<std::pair<double, double>> &dest = byPoints ? w.points : w.targets;
+			if (dest.empty()) continue;
+			const std::pair<double, double> last = dest.back();
 			if (w.t0 >= a.t0 && w.t0 < a.t1) {
 				WalkLine d = w;
 				d.t0 = w.t0 + 0.9, d.follows = true, d.line = a.line;
-				const double prevX = w.targets.size() > 1 ? w.targets[w.targets.size() - 2].first : before.first, prevZ = w.targets.size() > 1 ? w.targets[w.targets.size() - 2].second : before.second;
+				const double prevX = dest.size() > 1 ? dest[dest.size() - 2].first : before.first, prevZ = dest.size() > 1 ? dest[dest.size() - 2].second : before.second;
 				const double dx = prevX - last.first, dz = prevZ - last.second, l = std::max(1e-6, std::hypot(dx, dz)), y = w.floors.empty() || std::isnan(w.floors.back()) ? owner->start[1] : w.floors.back();
 				// (0.8 m from where the owner ends up: behind it, back the way it came, else round it - somewhere clear; the nearest clear place to a spot in the furniture
 				// may be right where the owner stands)
@@ -83,7 +85,7 @@ void DataFilm::placeHome() {
 						break;
 					}
 				}
-				d.targets.back() = {spot.x, spot.z};
+				(byPoints ? d.points : d.targets).back() = {spot.x, spot.z};
 				mine.push_back(d);
 			}
 			before = last;

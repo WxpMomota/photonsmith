@@ -272,6 +272,19 @@ extern "C" __global__ void __closesthit__wf_triangle() {
 											 hitMat.bumpScale, uv_u, uv_v, geom_normal, tri.hasNormals, bump_dpdu, bump_dpdv, bump_dndu, bump_dndv, bump_diff);
 			normal = dot(bumped, ray_dir) > 0.0f ? -bumped : bumped;   // (pbrt's BSDF is two-sided about the shading normal: turned toward the viewer, as the CPU's bump_map_material does)
 		}
+		// pbrt "string normalmap" on any other material (MaterialData::normalMapTexIdx): the shading normal perturbed by the RGB tangent-space map in the frame of the
+		// shading normal as authored (geom_normal here) and the uv tangent, as the recursive backend's triangle and the CPU's normal_map_material do. Skipped for emitters.
+		if (hitMat.normalMapTexIdx >= 0 && hitMat.type != MaterialType::DiffuseLight) {
+			const float3 packed = wf_sample_texture(wf_params.textures, wf_params.texturePixels, hitMat.normalMapTexIdx, uv_u, uv_v, hit_point);
+			float ns_x = 2.0f * packed.x - 1.0f, ns_y = 2.0f * packed.y - 1.0f, ns_z = 2.0f * packed.z - 1.0f;
+			const float ns_len = sqrtf(ns_x * ns_x + ns_y * ns_y + ns_z * ns_z);
+			if (ns_len > 1e-8f) { ns_x /= ns_len; ns_y /= ns_len; ns_z /= ns_len; }
+			else                { ns_x = 0.0f; ns_y = 0.0f; ns_z = 1.0f; }
+			float out_nx, out_ny, out_nz;
+			apply_normal_map(ns_x, ns_y, ns_z, geom_normal.x, geom_normal.y, geom_normal.z, tri_dpdu.x, tri_dpdu.y, tri_dpdu.z, out_nx, out_ny, out_nz);
+			const float3 mapped = make_float3(out_nx, out_ny, out_nz);
+			normal = dot(mapped, ray_dir) > 0.0f ? -mapped : mapped;   // (two-sided about the shading normal)
+		}
 	}
 
 	payload->hitPoint    = hit_point;

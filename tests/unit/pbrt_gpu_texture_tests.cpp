@@ -228,6 +228,32 @@ TEST_F(GpuTextureTempTree, DisplacementWithARealNormalMapBecomesNormalMappedLamb
 	EXPECT_EQ(tex.kind, TextureKind::Image);
 }
 
+// A normal map on a material that cannot be NormalMappedLambertian (here a coated diffuse with a picture of its own) is kept as normalMapTexIdx for the triangle
+// closest-hit programs, read linear; it used to be dropped without a word, so the GPU drew the surface smooth where the CPU drew it bumped.
+TEST_F(GpuTextureTempTree, ANormalMapOnAnyOtherMaterialIsKeptForTheTriangles) {
+	write("normal.bmp", solidBmp1x1(128, 128, 255));
+	write("colour.bmp", solidBmp1x1(200, 150, 100));
+	pbrt_flatten::Material m;
+	m.kind = pbrt_flatten::MaterialKind::CoatedDiffuse;
+	m.textureFilename = path("colour.bmp");
+	m.displacementTextureFilename = path("normal.bmp");
+	pbrt_flatten::FlatScene flat;
+	flat.materials.push_back(m);
+	pbrt_flatten::Triangle tri{};
+	tri.material = 0;
+	tri.areaLight = -1;
+	flat.triangles.push_back(tri);
+
+	SceneData scene;
+	pbrt_gpu::build(flat, scene);
+	ASSERT_EQ(scene.materials.size(), 1u);
+	EXPECT_NE(scene.materials[0].type, MaterialType::NormalMappedLambertian) << "its own kind stays";
+	ASSERT_GE(scene.materials[0].normalMapTexIdx, 0) << "the normal map is kept";
+	EXPECT_NE(scene.materials[0].normalMapTexIdx, scene.materials[0].textureIdx) << "beside its own picture";
+	EXPECT_EQ(scene.textures[static_cast<std::size_t>(scene.materials[0].normalMapTexIdx)].kind, TextureKind::Image);
+	EXPECT_EQ(scene.materials[0].bumpTexIdx, -1) << "not a height map";
+}
+
 TEST_F(GpuTextureTempTree, DisplacementWithARealGrayscaleBumpMapStaysPlainLambertianButCarriesTheBump) {
 	// The scalar/grayscale case: a real grayscale displacement image is a height map, not a tangent-space
 	// normal map, so the material stays plain Lambertian (the normal-map unpack path would decode a flat

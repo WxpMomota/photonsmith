@@ -273,6 +273,12 @@ struct MaterialData {
 	int   bumpTexIdx = -1;
 	float bumpScale  = 1.0f;
 
+	// pbrt "string normalmap" (an RGB tangent-space normal map, read linear) on a material that cannot host it as NormalMappedLambertian (any kind but a Lambertian with no
+	// picture of its own: coated, textured, metal...): index into LaunchParams::textures (-1 = none). The triangle closest-hit programs perturb the shading normal with it,
+	// as the CPU does for every material; other shapes ignore it. It used to be dropped without a word (2026-11-03: a textured, coated asteroid smooth on the GPU, cratered
+	// on the CPU).
+	int   normalMapTexIdx = -1;
+
 	// DiffuseTransmission only: index into LaunchParams::textures for a
 	// texture-bound "transmittance", or -1 to use the `transmittance` union
 	// field directly - independent of textureIdx above, which this same

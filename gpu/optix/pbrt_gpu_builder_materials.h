@@ -1305,14 +1305,16 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 														  kGpuImagemapDefaultGamma, GpuWrapMode::Repeat, false, m.displacementMapping);
 		if (dispTexIdx >= 0) {
 			if (!isPbrtTextureGrayscale(out, dispTexIdx)) {
-				if (d.type == MaterialType::Lambertian && d.textureIdx < 0) {
-					// A tangent-space normal map is read LINEAR (pbrt scene.cpp: Image::Read(..., ColorEncoding::Linear)); the
-					// default build above keeps the file's sRGB bytes, which the lookup would decode and tilt every texel.
-					const int linearIdx = getOrBuildPbrtImageTexture(m.displacementTextureFilename, out, imageTextureCache,
-																	 1.0f, GpuWrapMode::Repeat, false, m.displacementMapping);
-					if (linearIdx >= 0) {
+				// A tangent-space normal map is read LINEAR (pbrt scene.cpp: Image::Read(..., ColorEncoding::Linear)); the
+				// default build above keeps the file's sRGB bytes, which the lookup would decode and tilt every texel.
+				const int linearIdx = getOrBuildPbrtImageTexture(m.displacementTextureFilename, out, imageTextureCache,
+																 1.0f, GpuWrapMode::Repeat, false, m.displacementMapping);
+				if (linearIdx >= 0) {
+					if (d.type == MaterialType::Lambertian && d.textureIdx < 0) {
 						d.type = MaterialType::NormalMappedLambertian;
 						d.textureIdx = linearIdx;
+					} else {
+						d.normalMapTexIdx = linearIdx;   // (any other material: the triangle closest-hit programs perturb its shading normal - MaterialData::normalMapTexIdx)
 					}
 				}
 			} else {

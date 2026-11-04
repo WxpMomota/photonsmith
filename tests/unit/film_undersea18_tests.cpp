@@ -254,9 +254,24 @@ TEST(FilmUndersea18, ARiderStaysWhereTheLaneLetsItGo) {
 	EXPECT_LT(cartoon::length(rest - later), 0.05) << "and still there";
 	EXPECT_LT(film.momentOf(film.spec.characters[0], 20.0).going, 0.05) << "at rest";
 	film.momentOf(film.spec.characters[1], 19.0, &rest);
-	film.momentOf(film.spec.characters[1], 20.5, &back);
+	film.momentOf(film.spec.characters[1], 20.3, &back);
 	EXPECT_GT(-rest.x, 5.0);
-	EXPECT_LT(-back.x, -10.0) << "its next walk takes it on from its own way";
+	EXPECT_LT(cartoon::length(back - rest), 1.0) << "its next walk sets off from where the lane let it go (it used to start from where it was before the ride)";
+	film.momentOf(film.spec.characters[1], 60.0, &back);
+	EXPECT_NEAR(-back.x, -18.0, 0.3) << "and gets where it was going";
+	// a chase after a ride eases in from where the ride let it go, and a walk while riding is refused
+	ff::DataFilm chased;
+	ASSERT_EQ(loadFilm("lanechase", std::string(kSea) + "fastlane eac at -20 3 -8 to 0 3 -8 to 20 3 -8 speed 3\ncharacter mira mermaid at -18 -12 -8\nride mira eac from 2 to 9\n"
+														"character finn fish at -10 -12 4\nwalk finn 1 1.0  -10 10\nchase mira after finn from 20 lag 1\n" + kShot, chased), "");
+	V3 held, easing, chasing, quarry;
+	chased.momentOf(chased.spec.characters[0], 18.5, &held);
+	chased.momentOf(chased.spec.characters[0], 19.2, &easing);
+	EXPECT_GT(-held.x, 5.0) << "held where the lane let it go";
+	EXPECT_LT(cartoon::length(easing - held), cartoon::length(held - V3{18.0, held.y, -8.0})) << "the chase eases in from there, not from where it was before the ride";
+	chased.momentOf(chased.spec.characters[0], 25.0, &chasing);
+	chased.momentOf(chased.spec.characters[1], 24.0, &quarry);
+	EXPECT_LT(cartoon::length(chasing - quarry), 1e-6) << "then chases";
+	EXPECT_NE(problemWith("fastlane eac at -20 3 -8 to 0 3 -8 to 20 3 -8 speed 3\ncharacter mira mermaid at -18 -12 -8\nride mira eac from 2\nwalk mira 6 1.0  -18 -2").find("while it rides"), std::string::npos);
 }
 
 TEST(FilmUndersea18, AChaseEndsWhenItsLineSays) {   // (`to T` is a time, not a place as a lane's is)
