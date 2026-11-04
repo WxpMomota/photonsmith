@@ -331,6 +331,29 @@ TEST(FilmFile, EveryFilmFileHasASoundtrackEvenWithNothingInItToHear) {
 	EXPECT_NE(heard["brook"], heard["both"]) << "the score over the set's sound";
 }
 
+// In a vacuum (`ambience breath`: inside a helmet) the steps are not heard - the breath is all there is; anywhere else they are.
+TEST(FilmFile, FootstepsAreNotHeardInAVacuum) {
+	const std::filesystem::path d = tempDir("vacuum");
+	write(d / "s.pbrt", kScene);
+	const std::string shots = "scene s.pbrt\nlength 6\nmusic none\ncharacter sam pip at 0 0 0\nshot 0 A\n key 0 1 6  0 0 0\n";
+	const std::string walk = "walk sam 0.5 0.9  0 -3\n";
+	write(d / "moonstill.film", shots + "ambience breath 1\n");
+	write(d / "moonwalk.film", shots + "ambience breath 1\n" + walk);
+	write(d / "earthstill.film", shots + "ambience wind 0.5\n");
+	write(d / "earthwalk.film", shots + "ambience wind 0.5\n" + walk);
+	cartoon::detail::Registry r;
+	for (const char *file : {"moonstill.film", "moonwalk.film", "earthstill.film", "earthwalk.film"}) cartoon::detail::addFilmFile(r, (d / file).string());
+	ASSERT_EQ(r.all.size(), 4u) << (r.problems.empty() ? std::string() : r.problems[0]);
+	std::map<std::string, std::vector<std::int16_t>> heard;
+	for (const cartoon::Film *f : r.all) {
+		cartoon::audio::Mix m(f->duration);
+		f->soundtrack(m);
+		heard[f->key] = m.finish();
+	}
+	EXPECT_NE(heard["earthstill"], heard["earthwalk"]) << "footsteps where there is air";
+	EXPECT_EQ(heard["moonstill"], heard["moonwalk"]) << "none in a vacuum";
+}
+
 // A video of a film at another length gets its soundtrack stretched to fit at the same pitch: exactly the video's length, a tone still the same tone, as loud, and a click at a
 // moment of the film still at that moment of the video.
 TEST(CartoonAudioStretch, ASoundtrackStretchedToAnotherLengthKeepsItsPitchLoudnessAndTiming) {

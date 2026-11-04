@@ -15,7 +15,8 @@ cast's look is reported at the `cast` line that brought it in.
 
 Here: casts pip, pip-child, kai, ann, sam, shelly, robot and nova (a child astronaut); sets dusk-path, meadow, valley, void (an empty stage for a film in space, void.pbrt) and moonbase (a small moon).
 
-animals/ holds the films' rigged animals (glTF models with their clips: deer, horse, wolf, eagle, goose, bear, elephant, fox, giraffe, lion, penguin, rabbit, snake, zebra;
+animals/ holds the films' rigged animals (glTF models with their clips: deer, horse, wolf, eagle, goose, bear, elephant, fox, giraffe, lion, penguin, rabbit, snake, zebra,
+and two alien beasts, strider and crawler;
 made by scripts/make_rigged_animals.py), which `herd` and `flock` lines bring in (src/shared/cartoon/film_animals.h). robot.glb is a rigged character a `rigged` line can
 make a kind of (scripts/make_rigged_robot.py; robot.cast names it), nova.glb another (scripts/make_rigged_astronaut.py), and mira.glb one with a face of morph targets (scripts/make_rigged_face.py). stars/ is the star
 catalogue and constellation lines of the real night sky (d3-celestial; its licence is beside them).

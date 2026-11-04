@@ -5,6 +5,6 @@ water    sea  level 0  waves 0.2  wind 40
 harbour  18 -30  facing 200
 pier     -8 -16  toward 80  length 16
 lighthouse -30 -60  height 24
-boat     fishing tern  at 10 -18
+boat     fishing tern  at 11 -14  facing 110
 boat     sailboat gull  at -60 -70  to 50 -80  speed 2
 boat     rowboat dory  at 2 -12  facing 60

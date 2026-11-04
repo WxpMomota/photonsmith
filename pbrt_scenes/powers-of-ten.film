@@ -30,20 +30,21 @@ shot 0 Up
 
 part "The Earth" dissolve 1
 set     void
-length  3.37
+length  5.64
 space   stars 1  milkyway 0.6  sun 60 12  bloom 0.08
 planet  home  ocean  at 0 0 0  radius 6371  tilt 23  air 1  clouds 0.6
 moon    moon  rocky  of home  radius 1737  orbit 384400  period 2000  phase 40
 orbitline moon  colour 0.55 0.65 0.8  dashed
-hud     "10,000 km"  at -0.86 -0.84  size 0.04  from 0.07  to 1.57
-hud     "100,000 km"  at -0.86 -0.84  size 0.04  from 1.57  to 3.07
-hud     "1 million km"  at -0.86 -0.84  size 0.04  from 3.07  to 3.37
+hud     "10,000 km"  at -0.86 -0.84  size 0.04  from 0.27  to 1.82
+hud     "100,000 km"  at -0.86 -0.84  size 0.04  from 1.82  to 3.36
+hud     "1 million km"  at -0.86 -0.84  size 0.04  from 3.36  to 4.91
+hud     "10 million km"  at -0.86 -0.84  size 0.04  from 4.91  to 5.64
 shot 0 Out
-  spacecam zoom  0 0 0  from 9000  to 1.6e+06  bearing 20  elevation 28  fov 40  steady
+  spacecam zoom  0 0 0  from 6700  to 3e+07  bearing 20  elevation 28  fov 40  steady
 
 part "The planets" dissolve 1
 set     void
-length  3.45
+length  3.72
 space   stars 1  milkyway 0.6  sun off  bloom 0.1
 star    sol  at 0 0 0  radius 696  kind sun  brightness 2
 planet  hub  rocky  at 0 0 0  radius 1
@@ -63,21 +64,22 @@ orbitline jupiter  colour 0.5 0.55 0.7
 orbitline saturn   colour 0.5 0.55 0.7
 orbitline uranus   colour 0.5 0.55 0.7
 orbitline neptune  colour 0.5 0.55 0.7
-hud     "7 times Earth to Sun"  at -0.86 -0.84  size 0.04  from 0.78  to 2.28
-hud     "67 times Earth to Sun"  at -0.86 -0.84  size 0.04  from 2.28  to 3.45
+hud     "100 million km"  at -0.86 -0.84  size 0.04  from 0.81  to 2.35
+hud     "7 times Earth to Sun"  at -0.86 -0.84  size 0.04  from 2.35  to 3.72
 shot 0 Out
-  spacecam zoom  0 0 0  from 300000  to 6e+07  bearing 20  elevation 28  fov 40  steady
+  spacecam zoom  0 0 0  from 30000  to 7.6e+06  bearing 20  elevation 28  fov 40  steady
 
 part "The nearest stars" dissolve 1
 set     void
-length  4.58
+length  6.08
 space   stars 0  milkyway 0.5  sun off  bloom 0.12
 event   stars  at 0 0 0  size 600  count 16000
 hud     "1 light year"  at -0.86 -0.84  size 0.04  from 0.18  to 1.68
 hud     "10 light years"  at -0.86 -0.84  size 0.04  from 1.68  to 3.18
-hud     "100 light years"  at -0.86 -0.84  size 0.04  from 3.18  to 4.58
+hud     "100 light years"  at -0.86 -0.84  size 0.04  from 3.18  to 4.68
+hud     "1,000 light years"  at -0.86 -0.84  size 0.04  from 4.68  to 6.08
 shot 0 Out
-  spacecam zoom  0 0 0  from 0.8  to 900  bearing 20  elevation 28  fov 40  steady
+  spacecam zoom  0 0 0  from 0.8  to 9000  bearing 20  elevation 28  fov 40  steady
 
 part "The Milky Way" dissolve 1
 set     void
@@ -91,7 +93,7 @@ shot 0 Out
 
 part "Our neighbours" dissolve 1
 set     void
-length  1.95
+length  2.01
 space   stars 0  milkyway 0  sun off  bloom 0.1
 galaxy  ours  at 0 0 0  size 100000  tilt -12  turn 30  brightness 2
 galaxy  andromeda  at -900000 -300000 -1700000  size 320000  tilt -40  turn 50  brightness 3  seed 3
@@ -99,20 +101,21 @@ galaxy  triangle   at -300000 -1100000 -1500000  size 200000  tilt -20  turn 10 
 galaxy  barred     at 500000 200000 -1900000  size 240000  kind barred  tilt -30  turn 70  brightness 3  seed 7
 galaxy  round1     at -1500000 400000 -2300000  size 200000  kind elliptical  tilt 40  brightness 3  seed 2
 galaxy  round2     at 200000 -700000 -2600000  size 160000  kind elliptical  tilt 40  brightness 3  seed 9
-hud     "1 million light years"  at -0.86 -0.84  size 0.04  from 0.27  to 1.77
+hud     "1 million light years"  at -0.86 -0.84  size 0.04  from 0.27  to 1.78
+hud     "10 million light years"  at -0.86 -0.84  size 0.04  from 1.78  to 2.01
 shot 0 Out
   spacecam zoom  0 0 0  from 700000  to 1.4e+07  bearing 20  elevation 28  fov 40  steady
 
 part "The web" dissolve 1
 set     void
-length  4.76
+length  4.53
 space   stars 0  milkyway 0  sun off  bloom 0.15
 event   web  at 0 0 0  size 6000  count 40000  tilt 15
-hud     "10 million light years"  at -0.86 -0.84  size 0.04  from 0.18  to 1.68
-hud     "100 million light years"  at -0.86 -0.84  size 0.04  from 1.68  to 3.18
-hud     "1,000 million light years"  at -0.86 -0.84  size 0.04  from 3.18  to 4.68
+hud     "10 million light years"  at -0.86 -0.84  size 0.04  from 0.00  to 1.32
+hud     "100 million light years"  at -0.86 -0.84  size 0.04  from 1.32  to 2.86
+hud     "1,000 million light years"  at -0.86 -0.84  size 0.04  from 2.86  to 4.45
 shot 0 Out
-  spacecam zoom  0 0 0  from 8  to 12000  bearing 20  elevation 28  fov 40  steady
+  spacecam zoom  0 0 0  from 14  to 12000  bearing 20  elevation 28  fov 40  steady
 
 part "The web, going home" dissolve 0.6
 set     void
@@ -120,7 +123,7 @@ length  2.50
 space   stars 0  milkyway 0  sun off  bloom 0.15
 event   web  at 0 0 0  size 6000  count 40000  tilt 15
 shot 0 Home
-  spacecam zoom  0 0 0  from 12000  to 8  bearing 20  elevation 28  fov 40  steady
+  spacecam zoom  0 0 0  from 12000  to 14  bearing 20  elevation 28  fov 40  steady
 
 part "Our neighbours, going home" dissolve 0.6
 set     void
@@ -149,7 +152,7 @@ length  2.50
 space   stars 0  milkyway 0.5  sun off  bloom 0.12
 event   stars  at 0 0 0  size 600  count 16000
 shot 0 Home
-  spacecam zoom  0 0 0  from 900  to 0.8  bearing 20  elevation 28  fov 40  steady
+  spacecam zoom  0 0 0  from 9000  to 0.8  bearing 20  elevation 28  fov 40  steady
 
 part "The planets, going home" dissolve 0.6
 set     void
@@ -174,7 +177,7 @@ orbitline saturn   colour 0.5 0.55 0.7
 orbitline uranus   colour 0.5 0.55 0.7
 orbitline neptune  colour 0.5 0.55 0.7
 shot 0 Home
-  spacecam zoom  0 0 0  from 6e+07  to 300000  bearing 20  elevation 28  fov 40  steady
+  spacecam zoom  0 0 0  from 7.6e+06  to 30000  bearing 20  elevation 28  fov 40  steady
 
 part "The Earth, going home" dissolve 0.6
 set     void
@@ -184,7 +187,7 @@ planet  home  ocean  at 0 0 0  radius 6371  tilt 23  air 1  clouds 0.6
 moon    moon  rocky  of home  radius 1737  orbit 384400  period 2000  phase 40
 orbitline moon  colour 0.55 0.65 0.8  dashed
 shot 0 Home
-  spacecam zoom  0 0 0  from 1.6e+06  to 9000  bearing 20  elevation 28  fov 40  steady
+  spacecam zoom  0 0 0  from 3e+07  to 6700  bearing 20  elevation 28  fov 40  steady
 
 part "Down to the field" dissolve 0.6
 scene   film_assets/wild/set.pbrt

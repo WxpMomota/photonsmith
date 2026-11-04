@@ -18,7 +18,7 @@ inline bool deepVerb(const std::string &verb) {
 inline std::string deepUsage(const std::string &verb) {
 	static const std::map<std::string, std::string> u = {
 		{"wear", "`wear WHO scarf|cape|veil|ribbon|sash [colour C] [length L] [width W]`"},
-		{"sub", "`sub round|bubble|robot NAME at X Y Z [to X Y Z]... [speed S] [from T] [toward A] [dive T]... [rise T]... [lights off] [colour R G B] [seed K]`"},
+		{"sub", "`sub round|bubble|robot NAME at X Y Z [to X Y Z]... [speed S] [from T] [wait T0 T1]... [toward A] [dive T]... [rise T]... [lights off] [colour R G B] [seed K]`"},
 		{"divingbell", "`divingbell X Y Z [size S] [lamp L] [seed K]` (S 1 to 6 m)"},
 		{"aircave", "`aircave X Y Z [radius R] [lamp L] [seed K]` (R 1 to 30 m)"},
 		{"helmet", "`helmet WHO [size S]`"},
@@ -131,6 +131,11 @@ inline std::string deepOwnWordsLine(Spec &s, const std::string &verb, const std:
 			if (w == "colour" || w == "color") {
 				if (!numbers(3)) return usage;
 				b.colour = {v[0], v[1], v[2]};
+				continue;
+			}
+			if (w == "wait") {   // (held still from T0 to T1; the waits in order, a second apart at least, so their easings do not overlap)
+				if (!numbers(2) || v[1] < v[0] || b.waits.size() >= 16 || (!b.waits.empty() && v[0] < b.waits.back().second + 2.0)) return usage;
+				b.waits.push_back({v[0], v[1]});
 				continue;
 			}
 			if (!numbers(1)) return usage;

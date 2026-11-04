@@ -1,4 +1,4 @@
-# A small moon: grey dust and crater rims under a black sky full of stars, a blue world hanging over the horizon. For cartoons in space (`cast nova`, `cast robot`).
+# A small moon: grey dust and crater rims, spires of rock standing up out of the dust, a black sky full of stars and a blue world hanging over the horizon. For cartoons in space (`cast nova`, `cast robot`).
 scene    void.pbrt
 terrain  hills  size 260  height 5  seed 11
 biome    moonrock

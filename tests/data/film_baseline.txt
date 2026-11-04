@@ -1,17 +1,17 @@
 # Every film, shot by shot: film|shot|fingerprint of the scene at the shot's middle (at preview coarseness)|name. Written by
 # `python scripts/anim/film.py baseline --write` (ray_tracer --film-baseline); a difference is a film that changed - on purpose or not.
 a-busy-evening|1|b419de232ea82796|Birthday tea
-a-busy-evening|2|fc1d28a4f0064a82|Confetti
+a-busy-evening|2|2d1450a32abe809f|Confetti
 a-busy-evening|3|ad9e152feec1251d|Mittens
 a-busy-evening|4|1cca25e28aae7e92|Up to bed
 a-busy-evening|5|0838ced28744f081|Bath time
 a-busy-evening|6|f64366aee364469f|The storm
 a-busy-evening|7|ffa54a1a537c72c7|Shadows
 a-busy-evening|8|154d941d6c994d5f|Good night
-a-day-at-home|1|4620df80a822eab5|Morning
+a-day-at-home|1|ecad665d8d8d9c51|Morning
 a-day-at-home|2|7bc50fc876d78197|The kitchen
 a-day-at-home|3|c11ce5580bacb4f3|The house
-a-day-at-home|4|4ecd71e4b9c6e26a|Rain
+a-day-at-home|4|41f62d83563b1484|Rain
 a-day-at-home|5|925b84a78a4eb288|In the rain
 a-day-at-home|6|413cf57c0af13ace|Evening
 a-day-at-home|7|3b5b57e1e17f287f|Power cut
@@ -44,14 +44,14 @@ domino-run|1|deb045f89c6b796d|The spiral and the marble
 domino-run|2|e9e1e356b423eb5f|The chase
 domino-run|3|9a46243a3518904c|Close-up at the lamp
 domino-run|4|69bb702e81bf3204|Rising pull back
-down-to-the-sea|1|4af82c07e5a71a8e|Pip lets it go
-down-to-the-sea|2|e783f818eda4fb58|The stream takes it
-down-to-the-sea|3|02ef0f1417aab4d1|Rapids
-down-to-the-sea|4|b1c7f147bd9c77cd|A heron and a brood of ducks
-down-to-the-sea|5|2611cde7bd36220f|Under the bridge
-down-to-the-sea|6|d74bd844dde82cb5|The mill
-down-to-the-sea|7|456bd7c64635e68e|The sea
-down-to-the-sea|8|42c5133296c46d1f|Evening
+down-to-the-sea|1|056053356161916a|Pip lets it go
+down-to-the-sea|2|b54d84fa563a5edc|The stream takes it
+down-to-the-sea|3|deeb1a1172a64c9c|Rapids
+down-to-the-sea|4|d8ffc8e357bc50df|A heron and a brood of ducks
+down-to-the-sea|5|c1574bb76f47963a|Under the bridge
+down-to-the-sea|6|3fdecf7078d8073f|The mill
+down-to-the-sea|7|fddd8e2669e48db6|The sea
+down-to-the-sea|8|8d26044416cd57bc|Evening
 fire-and-ice|1|1010bbf9036f269c|Geysers at dusk
 fire-and-ice|2|993ecde36a9a40f6|The fire mountain
 fire-and-ice|3|346ba3cd792dba00|Fire at dusk
@@ -111,10 +111,10 @@ nomai-signal|29|6d012e403f5aae8b|Dawn
 nomai-signal|30|aa74bbe804b47bd3|The campfire
 nomai-signal|31|74a424ee2211f3a2|Pulling away
 nomai-signal|32|da4aefe2b100fae9|The title
-nova-and-robo|1|b69001fe73911a8c|A long way from anywhere
-nova-and-robo|2|2413d7f2064edbf3|The room
-nova-and-robo|3|8d125994e2295bcb|Nova turns
-nova-and-robo|4|4096167bdf5da28d|Two small friends
+nova-and-robo|1|5c26d2f62b133e4a|A long way from anywhere
+nova-and-robo|2|54cb10f2a9ccc20e|The room
+nova-and-robo|3|8231f563c62fe9ef|Nova turns
+nova-and-robo|4|941e603e968cb030|Two small friends
 nova-and-robo|5|6ce978c2db49bf5c|Looking up
 orrery|1|2784ffb350302bc9|Wide orbit
 orrery|2|62cd47bd19dfe413|Close-up on the third planet
@@ -141,18 +141,18 @@ pip-goes-out|3|2b3b1421b9e36ba8|Into the sun
 pip-goes-out|4|a0549e6fb8f1094e|Cheering
 pip-goes-out|5|3c333a32d94cf28f|Credits
 powers-of-ten|1|cee561366556e828|Up
-powers-of-ten|2|f07d967bdee92db7|Out
-powers-of-ten|3|20784b1f2c96b33f|Out
-powers-of-ten|4|8b8e25d38a6f2fd1|Out
+powers-of-ten|2|5a65374ddb72d61e|Out
+powers-of-ten|3|89dd915d275aa701|Out
+powers-of-ten|4|b061714bf0f1a749|Out
 powers-of-ten|5|270d65f02dfb535f|Out
 powers-of-ten|6|a6448195d6082b9b|Out
-powers-of-ten|7|1c459a887334d8b0|Out
-powers-of-ten|8|fde234bdfd1fd2eb|Home
+powers-of-ten|7|0e4eb4d89bb6133f|Out
+powers-of-ten|8|9898a55e4b8a64f5|Home
 powers-of-ten|9|4653f93e7bf5935e|Home
 powers-of-ten|10|5ad9bc0efc6e514f|Home
-powers-of-ten|11|ca1b9ba2b169bf99|Home
-powers-of-ten|12|e875c1bbbdcf0fe1|Home
-powers-of-ten|13|cbf4a2aaba4b8c1a|Home
+powers-of-ten|11|5f13173ea23f3958|Home
+powers-of-ten|12|36129e4764ba6073|Home
+powers-of-ten|13|9236f61a299e6c16|Home
 powers-of-ten|14|9080de43f65a47cf|Down
 seasons-wood|1|6598f4c4aa435bb0|The meadow wakes
 seasons-wood|2|8b06cf13ef9ca6fb|Following the sun
@@ -232,14 +232,14 @@ the-great-blue|5|588f9be4e455fc0d|The bubble net
 the-great-blue|6|2d6c6ed14d0c7f26|Whale shark
 the-great-blue|7|972968e1b078894a|The kelp forest
 the-great-blue|8|795d8b1f9a7ab249|The breach
-the-lantern-below|1|fd490a4788c97fd2|The reef
-the-lantern-below|2|9b6721a2e06dfa09|The hook
-the-lantern-below|3|2e09fbe740b2919d|Pip
-the-lantern-below|4|88772420da5c3e71|The fast lane
-the-lantern-below|5|ecfafe167ba76d5a|Town
-the-lantern-below|6|e73fee9ceac8f12b|The dark
-the-lantern-below|7|fd04bf9e4af3974c|Grandpa Kraken
-the-lantern-below|8|e006779e0d8fe066|Lantern night
+the-lantern-below|1|4793a344063f5bfc|The reef
+the-lantern-below|2|8f3ca98338030330|The hook
+the-lantern-below|3|321edb86381285f8|Pip
+the-lantern-below|4|535990a32d7fc5cb|The fast lane
+the-lantern-below|5|d7c9db0726d34d0e|Town
+the-lantern-below|6|dd9c9820d69b11d8|The dark
+the-lantern-below|7|774b8871160f021b|Grandpa Kraken
+the-lantern-below|8|b9361c40542d39d5|Lantern night
 the-midnight-garden|1|f4b8cef11d0e2d89|Moonlight
 the-midnight-garden|2|d8dc5db2832a3cde|Spawning
 the-midnight-garden|3|a34ef26a026da411|Into the dark
@@ -248,12 +248,12 @@ the-midnight-garden|5|1a9e6e2a501d2950|The angler
 the-midnight-garden|6|ca5fbac289259714|Giant squid
 the-midnight-garden|7|b755b991e8cc4b0f|The vents
 the-midnight-garden|8|b3e20935285bbc5a|The whale fall
-thunder-plains|1|35f1864e597f8a2c|The plain
-thunder-plains|2|2378aed5235e79ad|Wheeling
-thunder-plains|3|0cabadac7e9b2406|The storm comes
-thunder-plains|4|d87555fe11e3590f|The herd
-thunder-plains|5|8e9ca75aaa672225|They bolt
-thunder-plains|6|781da1e76dee6c57|The rain
+thunder-plains|1|0b9390137b4def88|The plain
+thunder-plains|2|0a637385d43902ce|Wheeling
+thunder-plains|3|67f1a9103afcf50c|The storm comes
+thunder-plains|4|3c4ef2185b12b158|The herd
+thunder-plains|5|fab0cc881902571d|They bolt
+thunder-plains|6|778a7132098ec5e6|The rain
 turtle-escape|1|cffe5681acb9d1b4|Wide on the room
 turtle-escape|2|32e0e1985fa12972|The plant
 turtle-escape|3|3b8ffe27735f87dd|The thermometer
@@ -328,12 +328,12 @@ turtle-escape|71|6f2de973fa2e5ff3|Behind the sofa
 turtle-escape|72|38f2667aa655d8db|Turtle?
 turtle-escape|73|36c6346b2f446b99|The tub
 turtle-escape|74|6585bd4d22b77349|Black
-valley-of-mists|1|e1a9cc4ab60a28e2|Above the mists
-valley-of-mists|2|4b4c1b3736649fa1|First light
-valley-of-mists|3|8ab12c7a7fd5e488|Geese
-valley-of-mists|4|a30e14ecdc9a2707|The mists lift
-valley-of-mists|5|7b09d63ffb193eda|The valley floor
-valley-of-mists|6|9981b3e8358692fa|Morning
+valley-of-mists|1|4456f1a31f46c2ff|Above the mists
+valley-of-mists|2|a767edc3d2c091d7|First light
+valley-of-mists|3|9e216e2bb66fbf23|Geese
+valley-of-mists|4|ac0a8b19ce0ea00d|The mists lift
+valley-of-mists|5|10d7a9a120237bbc|The valley floor
+valley-of-mists|6|d702d56f0e7ef40b|Morning
 worlds-beyond|1|9f2e49ebbcd613c6|Into the night
 worlds-beyond|2|c4496f48cb100f81|Past the fire
 worlds-beyond|3|ca9dd28c22e01e3d|The comet goes by

@@ -143,13 +143,17 @@ void DataFilm::deepMoment(const Character &c, double t, Vec3 &where, double &hea
 		if (w > 0.5 && std::hypot(at.x - before.x, at.z - before.z) > 1e-4) heading = rig::headingOf(at - before);
 		going = lerp(going, om.going, w), swim = std::max(swim, om.swim * w), airborne = airborne || (w > 0.5 && om.airborne);
 	}
-	for (const fastlane::Ride &r : spec.rides) {   // carried along a fast lane
+	for (const fastlane::Ride &r : spec.rides) {   // carried along a fast lane (and where it was let go, until its next walk)
 		if (r.who != c.name || t < r.from) continue;
+		double holdTo = 1e30;
+		for (const WalkLine &w : c.walks)
+			if (w.t0 > r.from) holdTo = std::min(holdTo, w.t0);
 		for (const fastlane::Lane &l : spec.lanes) {
 			if (l.name != r.lane) continue;
 			Vec3 at, way;
-			if (!fastlane::riderAt(l, r, t, pbrtOf(where), at, way)) continue;
-			where = pbrtOf(at), heading = rig::headingOf(pbrtOf(way)), going = 1.0, airborne = true;
+			double carried = 1.0;
+			if (!fastlane::riderAt(l, r, t, pbrtOf(where), at, way, holdTo, &carried)) continue;
+			where = pbrtOf(at), heading = rig::headingOf(pbrtOf(way)), going = carried, airborne = true;
 			if (swimming(c)) swim = 1.0;
 		}
 	}

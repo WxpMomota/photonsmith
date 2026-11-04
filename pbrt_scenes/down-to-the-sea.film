@@ -14,29 +14,29 @@ water    sea  level 0  waves 0.22  wind 30  ripples 0.7
 sky      16:20 17:50  south 60
 exposure auto
 
-river    60 149  34 132  6 96  24 62  4 30  8 -2  4 -30  width 8  speed 2.3  clear  rocks 22  rapids 56 76  seed 4
+river    60 149  34 132  6 96  24 62  4 30  8 -2  4 -30  width 8  speed 3.4  clear  rocks 22  rapids 95 118  seed 4
 adrift   paperboat sail  at 24 120  river 0  from 3
 adrift   leaf fall  at 28 120  river 0  from 0  count 10  seed 3
 adrift   bottle note  at 18 76  river 0  from 12
 bankside reeds 0.8  lilies 0.4  duckweed 0.5  willows 2  seed 11
 watermist 0.6  during 0 16
 
-pondlife ducks 1  at 18 72  radius 2.2  young 5
-pondlife heron  at 21 66  toward 300  strike 31  seed 2
-pondlife kingfisher  at 12 40  toward 120  height 2  dive 44
+pondlife ducks 1  at 14.8 47.3  radius 2.2  young 5
+pondlife heron  at 11.6 42.2  toward 300  strike 33  seed 2
+pondlife kingfisher  at 11 8  toward 250  height 2  dive 49
 pondlife trout 3  at 6 28  radius 2.5
 
-bridge      6 48  to 30 48  arches 3  river 0
-watermill   8.5 22  facing 90  river 0
+bridge      -7 24  to 17 24  arches 3  river 0
+watermill   11.25 0  facing 90  river 0
 lighthouse  46 -56  height 24
 pier        -30 -6  toward 200  length 22
 boat sailboat gull  at -120 -90  to 60 -100  speed 2.4
 boat fishing tern  at 70 -46  to -50 -36  speed 2.2
 boat rowboat dory  at -6 -26  to -12 -54  speed 1 from 56
-cast ada as pip  at 0 0 0
+cast ada as pip  at 0 0 0  skin orange
 aboard ada dory rows
 cast pip  at 31 0 116  facing 311
-gesture pip "wave" 6 8
+gesture pip "wave" 4.5 5 7 7.5
 
 shot 0 Pip lets it go
   key   20 8 127   31 0.8 116   34
@@ -46,11 +46,11 @@ shot 7 The stream takes it
 shot 19 Rapids
   follow sail  behind 3.4  up 1.8  side -1  fov 50
 shot 30 A heron and a brood of ducks
-  key   30 2.5 76   19 0.2 66   40
+  key   26 2.5 56   13 0.2 45   40
 shot 37 Under the bridge
   follow sail  behind 2  up 0.7  side 0.5  fov 54
 shot 46 The mill
-  key   24 2.8 34   12 1.2 20   50
+  key   26 3 14   10 1.2 -1   50
 shot 54 The sea
   follow sail  behind 3  up 1.6  fov 56
 shot 63 Evening

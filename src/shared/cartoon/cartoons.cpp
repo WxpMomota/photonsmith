@@ -240,7 +240,8 @@ Film filmOf(Registry &r, const film_file::DataFilm &d, bool drafted, int id, con
 		dressing::play(m, beds);
 		for (const particles::Weather &w : p->spec.weather)
 			if (w.kind == "rain") particles::rainSound(m, w);
-		sfx::play(m, p->events());
+		const bool inHelmet = std::any_of(p->spec.ambience.begin(), p->spec.ambience.end(), [](const dressing::Ambience &a) { return a.kind == "breath"; });
+		if (!inHelmet) sfx::play(m, p->events());   // (`ambience breath`: a vacuum - the breath in the helmet is all there is to hear, not the steps, touches or landings)
 		p->soundscape(m);   // (its nature placed where it is heard from: film_soundscape.h)
 		if (p->spec.indoors.any()) p->roomSounds(m);   // (its rooms': film_roomworld.cpp)
 		p->thunder(m);

@@ -6,6 +6,14 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **Four bundled films put right (2026-11-03).** `the-lantern-below`: Marina no longer snaps back to the reef after her ride (a rider stays where the lane lets it go, until its
+  next walk), the lane now reaches the town, and Pip's bubble sub really races her (subs can `wait T0 T1` and then go on). `nova-and-robo`: silent space - no music, and no
+  footsteps where the only sound is the helmet's breath (`ambience breath`); the cockpit's screen and globe are inside the cockpit, and Nova turns round to meet Robo.
+  `down-to-the-sea`: the river runs faster and its rapids, ducks, heron, bridge and mill are where the paper boat is when their shots play, so it reaches the sea; Pip's wave
+  ends, and the rower is not a second Pip. `powers-of-ten`: each part starts where the last one ended (six powers of ten were skipped at the dissolves). The film library's
+  rigged animals and Nova are made again by the current scripts, Nova's stride matches her model, the harbour's fishing boat is clear of the quay, and the moonbase and
+  library descriptions say what is there.
+
 * **Two films under the sea, shot as wildlife documentaries (2026-11-03).** `the-great-blue`: a day in the open ocean, from a diver over a coral reef past manta rays, a
   sardine bait ball (dolphins, sharks, diving gannets, in slow motion), humpbacks blowing a bubble net, a whale shark and a kelp forest with sea lions, to a humpback breaching
   at sunset seen from the waterline. `the-midnight-garden`: the sea at night, a diver with a torch on a moonlit reef as the corals spawn, then a robot sub into the dark past

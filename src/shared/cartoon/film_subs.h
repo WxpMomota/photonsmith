@@ -1,12 +1,13 @@
 #pragma once
 // film_subs.h -- under the sea, round 18: submarines, a glass-bubble sub and a remote robot.
 //
-//   sub round|bubble|robot NAME at X Y Z [to X Y Z]... [speed S] [from T] [toward A] [dive T]... [rise T]... [lights off] [colour R G B] [seed K]
+//   sub round|bubble|robot NAME at X Y Z [to X Y Z]... [speed S] [from T] [wait T0 T1]... [toward A] [dive T]... [rise T]... [lights off] [colour R G B] [seed K]
 //       round   a little yellow submarine 3.2 m long: a glass dome at its nose with its cabin inside (a seat, a panel of lit buttons, a warm lamp), a conning tower and
 //               periscope, a propeller turning as fast as she goes, her wash of bubbles behind
 //       bubble  a glass sphere two metres across on a frame of thrusters: the cabin all round, seen from everywhere
 //       robot   a remote robot a metre long: a frame, a yellow float, thrusters, a camera eye with a glowing lens, a claw, and its tether up to the surface
-//   Each goes from point to point at S m/s (from film time T; it turns to its way), with two searchlights ahead that light the water (on unless `lights off`); at each `dive T`
+//   Each goes from point to point at S m/s (from film time T; it turns to its way; `wait T0 T1` stops it where it has got to from T0 to T1, slowing over the second before and
+//   setting off over the second after), with two searchlights ahead that light the water (on unless `lights off`); at each `dive T`
 //   and `rise T` it blows its ballast - a burst of big bubbles from its vents. Heights above the seabed, pbrt's x z (film_parse_sea.h). `aboard WHO NAME` seats a
 //   character in its cabin (dry: no bubbles as it talks); a shot can follow it by NAME.
 
@@ -14,6 +15,7 @@
 #include <cmath>
 #include <functional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "film_deepsea.h"
@@ -33,6 +35,7 @@ struct Sub {
 	bool lights = true;
 	Vec3 colour{0.95, 0.74, 0.12};
 	std::vector<double> dives, rises;
+	std::vector<std::pair<double, double>> waits;   // (`wait T0 T1`: held still between them)
 	int seed = 1;
 };
 inline const std::vector<std::string> &kinds() {
@@ -65,13 +68,24 @@ inline Mesh along(const std::vector<std::pair<double, double>> &profile, int sid
 }
 }  // namespace detail
 
-// Where a sub is at nature's time t (pbrt's), and which way it is going (`fwd`, level): along its points at its speed from `from`, easing off at its last.
+// How long it has been on its way at t: the time since `from` less its waits (each eased in over the second before it and out over the second after: smoothsteps, integrated).
+inline double underwayFor(const Sub &s, double t) {
+	if (t <= s.from) return 0.0;
+	const auto ramp = [](double x) { return x <= 0.0 ? 0.0 : x <= 1.0 ? x * x * x - 0.5 * x * x * x * x : x - 0.5; };   // (the integral of smoothstep(0, 1, u) up to x)
+	const auto held = [&](double u) {
+		double h = 0.0;
+		for (const auto &w : s.waits) h += ramp(u - w.first + 1.0) - ramp(u - w.second);
+		return h;
+	};
+	return std::max(0.0, (t - s.from) - (held(t) - held(s.from)));
+}
+// Where a sub is at nature's time t (pbrt's), and which way it is going (`fwd`, level): along its points at its speed from `from` (less its waits), easing off at its last.
 inline Vec3 subAt(const Sub &s, double t, Vec3 *fwd = nullptr) {
 	if (s.path.empty()) return {};
 	std::vector<double> at{0.0};
 	for (std::size_t i = 1; i < s.path.size(); ++i) at.push_back(at.back() + length(s.path[i] - s.path[i - 1]));
 	const double total = at.back();
-	const double raw = std::max(0.0, (t - s.from) * s.speed);
+	const double raw = underwayFor(s, t) * s.speed;
 	const double d = total > 0.0 ? std::min(total, raw < total - 1.5 ? raw : total - 1.5 + 1.5 * (1.0 - std::exp(-(raw - total + 1.5) / 1.5))) : 0.0;   // (it slows to a stop)
 	const auto pointAt = [&](double u) {
 		u = std::clamp(u, 0.0, total);

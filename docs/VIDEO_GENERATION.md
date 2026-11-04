@@ -2776,10 +2776,11 @@ over the last second. Each point of a lock of hair, a tentacle or a cape lies wh
 the character is still it falls back to its rest shape: down in the air, up and back in the water, carried by the `current`, with a slow wave running down it. A garment flutters in `gusts` in
 the air and floats under the water. This works on every kind of character.
 
-**Submarines: `sub round|bubble|robot NAME at X Y Z [to X Y Z]... [speed S] [from T] [toward A] [dive T]... [rise T]... [lights off] [colour R G B]`.** (film_subs.h.) `round` is a little yellow
+**Submarines: `sub round|bubble|robot NAME at X Y Z [to X Y Z]... [speed S] [from T] [wait T0 T1]... [toward A] [dive T]... [rise T]... [lights off] [colour R G B]`.** (film_subs.h.) `round` is a little yellow
 submarine with a glass dome over a cabin you can see into (a seat, a lit panel, a warm lamp), a conning tower and a turning propeller. `bubble` is a glass sphere on a frame of thrusters.
 `robot` is a remote robot with a float, a glowing camera eye, a claw and its tether up to the surface. Two searchlights shine ahead, and the water itself shows their beams. It leaves a wash of
-bubbles, and blows its ballast at each `dive` and `rise`. `aboard WHO NAME [seat N]` seats a character in the cabin, where it talks without bubbles. A shot can `follow` the sub by name. You
+bubbles, and blows its ballast at each `dive` and `rise`. `wait T0 T1` stops it where it has got to from T0 to T1: it slows over the second before and sets off again over the second
+after, so a sub can pull up beside someone, wait through a conversation, then go. `aboard WHO NAME [seat N]` seats a character in the cabin, where it talks without bubbles. A shot can `follow` the sub by name. You
 hear its motor and a sonar ping. A camera inside a sub is still in the water: the cabin's air is not drawn as air.
 
 **Air under the water: `divingbell X Y Z [size S] [lamp L]`, `aircave X Y Z [radius R] [lamp L]`, `helmet WHO [size S]`, `bigbubble X Y Z [radius R] [at T] [rise S] [wobble W]`, `blowring WHO at
@@ -2794,7 +2795,7 @@ seconds, and on red every street fish stops where it is until green. You hear th
 
 **The ocean's fast lanes: `fastlane NAME at X Y Z to X Y Z ... [width W] [speed S] [streaks N] [debris N] [turtles N]`, `ride WHO LANE from T [to T] [across X Y]`, `chase WHO after OTHER [lag S]
 [from T] [to T]`.** (film_fastlane.h.) A fast lane is a smooth tube of fast water. Streaks of light rush along it, fastest in its middle, weed and leaves tumble in it, turtles ride it with
-their flippers out, and you hear it roar. A rider is carried in from where it was over a second, swims as it goes, and coasts to a stop after it lets go. A chaser is where the other one was
+their flippers out, and you hear it roar. A rider is carried in from where it was over a second, swims as it goes, and coasts to a stop after it lets go; it stays where it came to rest until its next walk. A chaser is where the other one was
 `lag` seconds before. A chase cannot follow someone who is chasing too.
 
 **Schools that perform: `schoolshow N heart|ring|ball|spiral|arrow|wall at T [for D] [size S] [toward A] [beat BPM] [centre X Y Z]`, `schoolshow N word TEXT at T ...`, `schoolshow N burst at T`,
@@ -2976,7 +2977,7 @@ S is how wide the whole of it is. They are drawn on the finished picture: each s
 **Telling a mission.**
 
 ```
-ambience breath 1                                       # inside a helmet, the only sound there is
+ambience breath 1                                       # inside a helmet, the only sound there is (no footsteps, touches or landings)
 say     nova  6.5 "Can anyone hear me?" radio           # thin, a little hard, a hiss and a click at each end
 say     kai   2 "We hear you!" radio delay 1.3          # ... from far away: heard 1.3 s later (0 to 600), its caption and the music's dip with it
 hud     "AIR 96%"  at -0.84 0.82  size 0.035  from 2    # words fixed to the frame, X and Y -1 to 1, X the left edge

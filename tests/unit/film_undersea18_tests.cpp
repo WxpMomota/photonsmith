@@ -137,6 +137,21 @@ TEST(FilmUndersea18, SubsGoTheirWayAndCarryTheirCrew) {
 	EXPECT_NEAR(cartoon::subs::subAt(s, 4.0, &f).x, 6.0, 1e-6);
 	EXPECT_NEAR(f.x, 1.0, 1e-6);
 	EXPECT_LT(cartoon::subs::subAt(s, 100.0).x, 20.0 + 1e-6) << "it stops at its last point";
+	cartoon::subs::Sub w = s;   // (`wait 5 8`: slowing over the second before, still, then off again over the second after - half a second's way lost at each end)
+	w.path = {{0.0, -12.0, 0.0}, {40.0, -12.0, 0.0}};
+	w.waits = {{5.0, 8.0}};
+	EXPECT_NEAR(cartoon::subs::subAt(w, 4.0).x, 6.0, 1e-6) << "as before until it slows";
+	EXPECT_NEAR(cartoon::subs::subAt(w, 5.0).x, 7.0, 1e-6);
+	EXPECT_NEAR(cartoon::subs::subAt(w, 6.5).x, 7.0, 1e-6) << "waiting";
+	EXPECT_NEAR(cartoon::subs::subAt(w, 8.0).x, 7.0, 1e-6);
+	EXPECT_NEAR(cartoon::subs::subAt(w, 10.0).x, 10.0, 1e-6) << "on again at its speed";
+	EXPECT_NEAR(cartoon::subs::subAt(w, 12.0).x - cartoon::subs::subAt(w, 11.0).x, 2.0, 1e-6);
+	ff::DataFilm waited;
+	ASSERT_EQ(loadFilm("subwait", std::string(kSea) + "sub bubble orb at 0 3 -8 to 30 3 -8 speed 2 wait 3 6\n" + kShot, waited), "");
+	ASSERT_EQ(waited.spec.subs.size(), 1u);
+	ASSERT_EQ(waited.spec.subs[0].waits.size(), 1u);
+	EXPECT_NE(problemWith("sub bubble orb at 0 3 -8 to 30 3 -8 wait 6 3").find("sub round|bubble|robot"), std::string::npos) << "a wait that ends before it starts";
+	EXPECT_NE(problemWith("sub bubble orb at 0 3 -8 to 30 3 -8 wait 2 4 wait 5 7").find("sub round|bubble|robot"), std::string::npos) << "waits whose easings overlap";
 	ff::DataFilm film;
 	ASSERT_EQ(loadFilm("sub", std::string(kSea) + "sub round nemo at 0 3 -8 to 12 3 -8 speed 1.5 dive 4\ncharacter ann person at 0 -12 -8\naboard ann nemo\nsay ann 2 \"Dive!\"\n" + kShot, film), "");
 	EXPECT_TRUE(film.spec.riders.count("ann") && film.spec.dry.count("ann"));
@@ -211,7 +226,7 @@ TEST(FilmUndersea18, ATownsTrafficWaitsAtTheSignal) {
 TEST(FilmUndersea18, ALaneCarriesItsRiderAndAChaserFollows) {
 	ff::DataFilm film;
 	ASSERT_EQ(loadFilm("lane", std::string(kSea) + "fastlane eac at -20 3 -8 to 0 3 -8 to 20 3 -8 speed 3\ncharacter mira mermaid at -18 -12 -8\nride mira eac from 2 to 9\n"
-												  "character finn fish at 0 -12 -4\nwalk finn 1 1.0  6 -4  6 -10\ncharacter bruce shark at -3 -12 -4\nchase bruce after finn lag 1.5\n" + kShot, film), "");
+												  "character finn fish at 0 -12 -4\nwalk finn 1 1.0  6 -4  6 0\ncharacter bruce shark at -3 -12 -4\nchase bruce after finn lag 1.5\n" + kShot, film), "");
 	ASSERT_EQ(film.spec.lanes.size(), 1u);
 	EXPECT_GT(film.spec.lanes[0].total(), 39.0);
 	V3 a, b;
@@ -225,6 +240,23 @@ TEST(FilmUndersea18, ALaneCarriesItsRiderAndAChaserFollows) {
 	EXPECT_LT(cartoon::length(finn - bruce), 1e-6) << "where its quarry was 1.5 s before";
 	EXPECT_NE(problemWith("character mira mermaid at 0 -12 0\nride mira nowhere from 1").find("no fast lane"), std::string::npos);
 	EXPECT_NE(problemWith("character a fish at 0 -12 0\ncharacter b fish at 1 -12 0\ncharacter c fish at 2 -12 0\nchase a after b\nchase b after c").find("chasing someone too"), std::string::npos);
+}
+
+// Let go at the lane's end, a rider stays where it came to rest (it used to snap back to where it was before the ride 1.5 s after it), until its next walk.
+TEST(FilmUndersea18, ARiderStaysWhereTheLaneLetsItGo) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("laneend", std::string(kSea) + "fastlane eac at -20 3 -8 to 0 3 -8 to 20 3 -8 speed 3\ncharacter mira mermaid at -18 -12 -8\nride mira eac from 2 to 9\n"
+													 "character finn fish at -18 -12 -4\nride finn eac from 2 to 9\nwalk finn 20 1.0  -18 -2\n" + kShot, film), "");
+	V3 rest, later, back;
+	film.momentOf(film.spec.characters[0], 10.6, &rest);
+	film.momentOf(film.spec.characters[0], 20.0, &later);
+	EXPECT_GT(-rest.x, 5.0) << "carried well along the lane";
+	EXPECT_LT(cartoon::length(rest - later), 0.05) << "and still there";
+	EXPECT_LT(film.momentOf(film.spec.characters[0], 20.0).going, 0.05) << "at rest";
+	film.momentOf(film.spec.characters[1], 19.0, &rest);
+	film.momentOf(film.spec.characters[1], 20.5, &back);
+	EXPECT_GT(-rest.x, 5.0);
+	EXPECT_LT(-back.x, -10.0) << "its next walk takes it on from its own way";
 }
 
 TEST(FilmUndersea18, AChaseEndsWhenItsLineSays) {   // (`to T` is a time, not a place as a lane's is)
