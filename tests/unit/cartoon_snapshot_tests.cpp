@@ -39,6 +39,14 @@ std::string lineOf(const cartoon::Film &film, int k) {
 	return line.str();
 }
 
+// A film built only on this computer (private_films.h: a key starting my-): not in the snapshot, which is the same everywhere.
+bool isPrivate(const cartoon::Film &film) { return std::string(film.key).rfind("my-", 0) == 0; }
+std::size_t publicFilms() {
+	std::size_t n = 0;
+	for (const cartoon::Film &film : cartoon::kFilms) n += !isPrivate(film);
+	return n;
+}
+
 // The film a line is of: "meta|<key>|..." or "<key>|...".
 std::string keyOf(const std::string &line) {
 	const std::size_t start = line.compare(0, 5, "meta|") == 0 ? 5 : 0;
@@ -68,7 +76,8 @@ TEST(CartoonFilmSnapshot, TheSnapshotHasEveryFilmInTheTablesOrder) {
 		       "# Regenerate with RT_UPDATE_SNAPSHOT=1 (see tests/unit/cartoon_snapshot_tests.cpp) and review the diff.\n";
 		std::size_t count = 0;
 		for (const cartoon::Film &film : cartoon::kFilms)
-			for (int k = 0; k < kLinesPerFilm; ++k) out << lineOf(film, k) << "\n", ++count;
+			if (!isPrivate(film))
+				for (int k = 0; k < kLinesPerFilm; ++k) out << lineOf(film, k) << "\n", ++count;
 		GTEST_SKIP() << "snapshot rewritten: " << count << " lines";
 	}
 	std::vector<std::string> pinned;
@@ -76,9 +85,10 @@ TEST(CartoonFilmSnapshot, TheSnapshotHasEveryFilmInTheTablesOrder) {
 	std::vector<std::string> keys, table;
 	for (const std::string &l : pinned)
 		if (l.compare(0, 5, "meta|") == 0) keys.push_back(keyOf(l));
-	for (const cartoon::Film &film : cartoon::kFilms) table.push_back(film.key);
+	for (const cartoon::Film &film : cartoon::kFilms)
+		if (!isPrivate(film)) table.push_back(film.key);
 	EXPECT_EQ(keys, table) << "the films changed (RT_UPDATE_SNAPSHOT=1 rewrites the snapshot if that is intended)";
-	EXPECT_EQ(pinned.size(), cartoon::kFilms.size() * kLinesPerFilm) << "the instants changed (RT_UPDATE_SNAPSHOT=1 rewrites the snapshot if that is intended)";
+	EXPECT_EQ(pinned.size(), publicFilms() * kLinesPerFilm) << "the instants changed (RT_UPDATE_SNAPSHOT=1 rewrites the snapshot if that is intended)";
 }
 
 // Each film's lines, one line of one film at a time in test_parts.h's parts (a long film's instant is many seconds of building its frame).
@@ -89,6 +99,7 @@ TEST_P(CartoonFilmSnapshotOfEachFilm, ContainsWhatTheSnapshotFileSays) {
 	if (!pinnedLines(pinned)) RT_SKIP_MISSING_FIXTURE(kSnapshotPath << " is not next to the working directory");
 	for (std::size_t i = 0; i < cartoon::kFilms.size(); ++i) {
 		const cartoon::Film &film = cartoon::kFilms[i];
+		if (isPrivate(film)) continue;
 		std::vector<std::string> theirs;
 		for (const std::string &l : pinned)
 			if (keyOf(l) == film.key) theirs.push_back(l);

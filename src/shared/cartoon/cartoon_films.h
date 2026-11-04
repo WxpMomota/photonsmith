@@ -15,7 +15,9 @@
 #include "turtle_escape_score.h"
 #include "crystal_heart_score.h"
 #include "tengwang_score.h"
-#include "nomai_score.h"
+#if __has_include("private_films.h")   // (films built only on this computer, never committed: RT_PRIVATE_FILMS)
+#include "private_films.h"
+#endif
 #include "lamp_and_ball.h"
 #include "little_robot.h"
 #include "meet_pip.h"

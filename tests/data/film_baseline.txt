@@ -82,38 +82,6 @@ meet-pip|3|b5673143e379c8d6|Side-on walk
 newtons-cradle|1|1e62719550e13359|The whole cradle
 newtons-cradle|2|db6910fdb47fa90b|Close-up of the strike
 newtons-cradle|3|db9eaef071ab74b1|Wide pull back
-nomai-signal|1|dab5fe02ec21807d|Darkness and a pulse
-nomai-signal|2|b3c6359d5732cb55|The giant and its moon
-nomai-signal|3|205f9056f3e6e2a5|The descent
-nomai-signal|4|fe57ba8e5a9f63fe|Three eyes
-nomai-signal|5|cee41facea7a1362|The signal
-nomai-signal|6|69215fc15fd8ad26|The landing
-nomai-signal|7|dac128c79750cf1b|Under the giant
-nomai-signal|8|c6bbe06d3ead6bfd|Footsteps
-nomai-signal|9|d534fcbbce00e24a|The ridge
-nomai-signal|10|d7653fcac3897acc|The canyon
-nomai-signal|11|d0d5d608537a9b82|The third eye
-nomai-signal|12|ac0ffc6568454440|The floating steps
-nomai-signal|13|acc8fdefd51917c0|The corridor wakes
-nomai-signal|14|971ef4e2d62a313a|Writing on the wall
-nomai-signal|15|03fd71bb42e8d2fc|The recording
-nomai-signal|16|22a779eeae17fcb5|The elevator
-nomai-signal|17|1c1b85ac8c426023|Into the dark
-nomai-signal|18|d3f1efe5b7afe240|The observatory
-nomai-signal|19|8a0b73116b255ccf|The staff answers
-nomai-signal|20|79541165e354c027|The hall wakes
-nomai-signal|21|ec6d97d9610bc1a1|The star map
-nomai-signal|22|c9812c7374e0b530|The flashing star
-nomai-signal|23|76eea0ef2cc81a43|Gone
-nomai-signal|24|2030756a933c2885|The transmission rebuilt
-nomai-signal|25|eeb08eea3d36a466|The remote memories
-nomai-signal|26|a57033ff0ff82805|Silence
-nomai-signal|27|b06acdf59de4a03c|Stillness
-nomai-signal|28|908748d95707392a|The answer
-nomai-signal|29|6d012e403f5aae8b|Dawn
-nomai-signal|30|aa74bbe804b47bd3|The campfire
-nomai-signal|31|74a424ee2211f3a2|Pulling away
-nomai-signal|32|da4aefe2b100fae9|The title
 nova-and-robo|1|5c26d2f62b133e4a|A long way from anywhere
 nova-and-robo|2|54cb10f2a9ccc20e|The room
 nova-and-robo|3|8231f563c62fe9ef|Nova turns

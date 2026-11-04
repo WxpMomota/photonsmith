@@ -11,7 +11,7 @@ The films themselves are C++ (src/shared/cartoon/: cartoon_lib.h is the toolkit,
   python scripts/anim/film.py video fireflies                   the finished video (a film is a video preset: --video-preset <key>)
   python scripts/anim/film.py baseline [KEY ...] [--write]     every film (or those named), shot by shot, against tests/data/film_baseline.txt: which films and shots a change
                                                                 to shared code (the rig, the kit, a sky) changed; --write records them as they are now (ray_tracer --film-baseline)
-  python scripts/anim/film.py preview nomai-signal              a quick look at the whole film with its sound: characters built coarser (--preview), 640 x 360, 4 samples, one
+  python scripts/anim/film.py preview crystal-heart             a quick look at the whole film with its sound: characters built coarser (--preview), 640 x 360, 4 samples, one
                                                                 frame in two (--every N), in minutes; run again after an edit and only the frames that changed are rendered
   python scripts/anim/film.py doctor tengwang                   every shot at its start, middle and end, small, with a report of what looks wrong (black, very dark, blown-out
                                                                 and flat frames, jumps in brightness across a cut, slow frames; and, for a film that names its subjects, a subject out of the
@@ -20,7 +20,7 @@ The films themselves are C++ (src/shared/cartoon/: cartoon_lib.h is the toolkit,
                                                                 film's own motion, no render) are checked too, and cuts that reverse a subject's direction across the screen or swap two
                                                                 subjects' sides (ray_tracer --film-cuts); --motion also renders three frames in a row from the middle of each shot,
                                                                 at the samples the video will use, and reports frame-to-frame shimmer (the denoiser's flicker)
-  python scripts/anim/film.py budget nomai-signal --write       how many samples each shot needs: the middle of every shot rendered twice (two seeds) at the film's samples and at
+  python scripts/anim/film.py budget crystal-heart --write      how many samples each shot needs: the middle of every shot rendered twice (two seeds) at the film's samples and at
                                                                 fewer, denoised; a shot may drop to fewer while it is no noisier than the film's median shot at full samples and no
                                                                 blurrier than its own full render. --write puts a `samples` line for each such shot into the film's cameras file
                                                                 (pbrt_scenes/film_assets/<key>/cameras.txt), which the video reads

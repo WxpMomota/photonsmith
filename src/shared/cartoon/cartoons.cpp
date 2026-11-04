@@ -97,13 +97,9 @@ const Film *table(std::size_t &count) {
 		 tengwang::kDuration, tengwang::kFps, &tengwang::sceneAt, &tengwang::headerAt, &tengwang::shotStarts, 219.0,
 		 {22, "character,water,dusk,night,fog", tengwang::shotNamesText(), tengwang::kSamples, 5.0, false, tengwang::kWidth, tengwang::kHeight},
 		 &tengwang::soundtrack, &tengwang::captions},
-		{"nomai-signal", "The Last Nomai Signal",
-		 "An unofficial fan film after Outer Wilds: a lone Nomai explorer follows a faint repeating signal to a small moon of a gas giant, finds the ruins of an expedition that "
-		 "came there long before, wakes their observatory deep under the ground, and learns the signal comes from a star that is already gone. The explorer answers it anyway. "
-		 "With music.",
-		 nomai::kDuration, nomai::kFps, &nomai::sceneAt, &nomai::headerAt, &nomai::shotStarts, 45.0,
-		 {23, "character,emissive,night,dawn,fog", nomai::shotNamesText(), nomai::kSamples, 8.6, false, nomai::kWidth, nomai::kHeight},
-		 &nomai::soundtrack, &nomai::captions, &nomai::subjectsAt, &nomai::events, &nomai::feetAt, &nomai::instruments},
+#ifdef RT_PRIVATE_FILMS   // (films built only where their files are: private_films.h)
+		RT_PRIVATE_FILMS
+#endif
 	};
 	count = sizeof(films) / sizeof(films[0]);
 	return films;

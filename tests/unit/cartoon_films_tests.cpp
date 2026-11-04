@@ -86,6 +86,7 @@ TEST(CartoonMeta, TheDocumentTablesSayWhatTheTableSays) {
 	std::string doc = all.str();
 	doc.erase(std::remove(doc.begin(), doc.end(), '\r'), doc.end());
 	for (const cartoon::Film &film : cartoon::kFilms) {
+		if (std::string(film.key).rfind("my-", 0) == 0) continue;   // (a film built only on this computer, private_films.h: not in the public docs)
 		EXPECT_NE(doc.find(cartoon::markdownRowOf(film) + "\n"), std::string::npos) << film.key << ": the film table of docs/VIDEO_GENERATION.md is out of date; paste the output of `ray_tracer --film-table`";
 		const std::string preset = "| " + cartoon::presetIdOf(film) + " | " + film.key + " | (its own scenes) | " + cartoon::cameraPathOf(film) + " | " + std::to_string(cartoon::frameCountOf(film)) + " | " +
 								   std::to_string(film.fps) + " | 1.0 |\n";

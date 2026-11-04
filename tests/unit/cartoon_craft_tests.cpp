@@ -42,6 +42,9 @@
 #include "../../src/shared/cartoon/cartoons_registry.h"
 #include "../../src/shared/cartoon/cartoon_stills.h"
 #include "../../src/shared/cartoon/film_checks.h"
+#include "../../src/shared/cartoon/film_events.h"
+#include "../../src/shared/cartoon/caption_file.h"
+#include "../../src/shared/cartoon/film_kit.h"
 #include "../../src/shared/cartoon/film_baseline.h"
 #include "../../src/shared/cartoon/prop_physics.h"
 #include "../../src/shared/pbrt_discover.h"
@@ -111,7 +114,7 @@ TEST(FilmSubjects, EveryFilmThatNamesItsSubjectsKeepsThemInTheFrameInTheMiddleOf
 			}
 		}
 	}
-	EXPECT_GT(checked, 20) << "the Nomai film names a subject for most of its shots";
+	EXPECT_GT(checked, 20) << "the films name a subject for most of their shots";
 }
 
 // ---- a film's cameras file (shot_cameras.h) ------------------------------------------------------------------------------------------------------------------
@@ -434,8 +437,8 @@ TEST(FilmEvents, TheSoundLibraryMakesEverySoundAndPlaysEachEventAtItsTime) {
 // The Nomai film's events: in time order, its footfalls only while the explorer walks in the shot on screen (a step every 0.84 m at the walk's speed), the touchdown when the
 // shuttle sets down, and the hands on the stone.
 TEST(FilmEvents, TheNomaiFilmsFootstepsAreTheShotsOwnWalks) {
-	const cartoon::Film *film = cartoon::find("nomai-signal");
-	ASSERT_NE(film, nullptr);
+	const cartoon::Film *film = cartoon::find("my-nomai-signal");
+	if (!film) GTEST_SKIP() << "the Nomai film is private: built only where its files are (private_films.h)";
 	ASSERT_TRUE(static_cast<bool>(film->events));
 	const std::vector<cartoon::FilmEvent> events = film->events();
 	ASSERT_GT(events.size(), 40u);
@@ -577,8 +580,8 @@ TEST(FilmChecks, ACameraInsideSmokeIsFoundButNotInItsOwnMist) {
 // The Nomai explorer's walk: a foot on the ground goes back under the body at the body's own pace, so in every shot it walks in the planted feet stay put (the turning
 // floating steps, a body on a 6 m curve, the most: a little over a tenth of a metre a second). Its old swinging gait skated at 0.55 to 0.92 m/s.
 TEST(FilmChecks, TheNomaiExplorersPlantedFeetStayPut) {
-	const cartoon::Film *film = cartoon::find("nomai-signal");
-	ASSERT_NE(film, nullptr);
+	const cartoon::Film *film = cartoon::find("my-nomai-signal");
+	if (!film) GTEST_SKIP() << "the Nomai film is private: built only where its files are (private_films.h)";
 	const std::vector<cartoon::film_checks::Slide> found = cartoon::film_checks::slidingFeet(*film);
 	ASSERT_GE(found.size(), 8u) << "every shot it walks in";
 	const std::vector<std::string> names = cartoon::shotNamesOf(*film);

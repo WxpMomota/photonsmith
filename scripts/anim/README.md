@@ -12,9 +12,9 @@ python scripts/anim/film.py still fireflies@13.5            # one frame, to look
 python scripts/anim/film.py sheet fireflies --count 16      # the whole film as a contact sheet: stills tiled with their times (needs Pillow)
 python scripts/anim/film.py sheet little-robot --times 2,8,20,30
 python scripts/anim/film.py video fireflies                 # the finished video (--temporal R: temporal denoising)
-python scripts/anim/film.py preview nomai-signal            # a quick, coarse look at the whole film with its sound; only changed frames render again
+python scripts/anim/film.py preview crystal-heart           # a quick, coarse look at the whole film with its sound; only changed frames render again
 python scripts/anim/film.py doctor tengwang                 # every shot checked: dark, blown-out or flat frames, jumps at cuts, framing, sliding feet (exit 1 on a warning)
-python scripts/anim/film.py budget nomai-signal --write     # how many samples each shot needs, written into the film's cameras file
+python scripts/anim/film.py budget crystal-heart --write     # how many samples each shot needs, written into the film's cameras file
 python scripts/anim/film.py baseline [KEY ...] [--write]    # every film, shot by shot, against tests/data/film_baseline.txt
 ```
 
