@@ -9,6 +9,7 @@ length  60
 tags    water, nature, backlight
 
 music      clear
+mute       sounds
 water      sea  level 0  waves 0.45
 sky        10:00 18:40  south 0 physical
 underwater clarity 2.4  colour blue  ripples
