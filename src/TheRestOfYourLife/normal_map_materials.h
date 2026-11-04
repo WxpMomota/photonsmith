@@ -8,6 +8,31 @@
 #include "material.h"
 #include "../shared/normal_map.h"
 
+// What both wrappers hand on to the material they wrap, with the perturbed normal where the answer depends on it. They used to pass on only emitted, scatter and
+// scattering_pdf: the path tracer's light sampling and its BSDF-sampled continuation ask scattering_attenuation for the colour in THEIR direction, and the base
+// class's answer is the colour scatter() stored for the direction it sampled - right for a Lambertian, whose colour never changes with direction, but not for a
+// coated surface's layered BSDF or a conductor's Fresnel, so a normal-mapped coated diffuse read 0.71 of real pbrt-v4 and a conductor 1.07, where both GPU backends
+// agreed with pbrt to 0.7% (2026-11-04). The
+// classification calls (delta, a medium's boundary, a shadow ray passing through) were lost the same way. The overload without the incoming ray takes the viewer to
+// be on the side the hit's normal faces, which is where hit_record turns it.
+#define NORMAL_MAP_WRAPPER_FORWARDS                                                                                                                                  \
+	color scattering_attenuation(const ray& r_in, const hit_record& rec, const ray& scattered, const color& srec_attenuation) const override {                      \
+		return inner->scattering_attenuation(r_in, apply(r_in, rec), scattered, srec_attenuation);                                                               \
+	}                                                                                                                                                              \
+	color scattering_attenuation(const hit_record& rec, const ray& scattered, const color& srec_attenuation) const override {                                      \
+		const ray toward(rec.p + rec.normal, -rec.normal);                                                                                                         \
+		return inner->scattering_attenuation(toward, apply(toward, rec), scattered, srec_attenuation);                                                             \
+	}                                                                                                                                                              \
+	bool is_delta_bsdf() const override { return inner->is_delta_bsdf(); }                                                                                         \
+	bool is_delta_bsdf(const hit_record& rec) const override { return inner->is_delta_bsdf(rec); }                                                                 \
+	bool is_medium_boundary() const override { return inner->is_medium_boundary(); }                                                                               \
+	bool is_medium_scatter() const override { return inner->is_medium_scatter(); }                                                                                 \
+	bool is_shadow_transmissive(const hit_record& rec) const override { return inner->is_shadow_transmissive(rec); }                                               \
+	color shadow_transmittance(const ray& r, double t_max) const override { return inner->shadow_transmittance(r, t_max); }                                        \
+	bool thin_pass_through(const hit_record& rec, const ray& r, color& out) const override { return inner->thin_pass_through(rec, r, out); }                       \
+	const subsurface* as_subsurface(const hit_record& rec) const override { return inner->as_subsurface(rec); }                                                    \
+	const dispersive_material* as_dispersive(const hit_record& rec) const override { return inner->as_dispersive(rec); }
+
 class normal_map_material : public material {
   public:
 	normal_map_material(shared_ptr<texture> normal_tex, shared_ptr<material> inner)
@@ -70,6 +95,7 @@ class normal_map_material : public material {
 						  const ray& scattered) const override {
 		return inner->scattering_pdf(r_in, apply(r_in, rec), scattered);
 	}
+	NORMAL_MAP_WRAPPER_FORWARDS
 
 	shared_ptr<texture>  get_normal_tex() const { return normal_tex; }
 	shared_ptr<material> get_inner()      const { return inner; }
@@ -146,6 +172,7 @@ class bump_map_material : public material {
 						  const ray& scattered) const override {
 		return inner->scattering_pdf(r_in, apply(r_in, rec), scattered);
 	}
+	NORMAL_MAP_WRAPPER_FORWARDS
 
 	shared_ptr<texture>  get_bump_tex() const { return bump_tex; }
 	shared_ptr<material> get_inner()    const { return inner; }

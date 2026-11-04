@@ -6,6 +6,12 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **CPU: normal- and bump-mapped coated and metal surfaces lit right (2026-11-04).** The CPU's normal-map and bump-map wrappers passed only `scatter`,
+  `scattering_pdf` and `emitted` on to the material they wrap. Light sampling asks for the colour in the light's own direction (`scattering_attenuation`) and got the
+  colour of whatever direction `scatter` had sampled: right for a plain diffuse surface, wrong wherever the colour depends on direction. Against real pbrt-v4, a
+  normal-mapped coated diffuse read 0.709 and a conductor 1.067; now 1.007 and 1.000, the same as both GPU backends. The wrappers also pass on the delta,
+  medium, shadow-transmission, subsurface and dispersion questions, which they used to answer with the base class's defaults.
+
 * **GPU normal maps on textured surfaces; the Nomai explorer refined (2026-11-04).** The default GPU renderer drew a normal map on a diffuse surface with a
   picture of its own flat: the uv tangent the map is laid along was worked out only for the material kinds that read it themselves, so the map was applied along a
   zero vector. It now matches the CPU (pbrt_scenes/normal-mapped-textured-plane.pbrt, a new test scene: 0.6/255 apart, it was 25). The explorer's horns carry growth

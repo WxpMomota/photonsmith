@@ -220,6 +220,56 @@ TEST(NormalMapMaterial, PerturbedNormalScatterOnCorrectHemisphere) {
 	EXPECT_TRUE(ok);
 }
 
+// A material whose colour depends on the direction (as a coated surface's layered BSDF and a conductor's Fresnel do): it answers scattering_attenuation with the
+// normal it was asked about, so a test can see which normal reached it. It is also delta and lets shadow rays through, so the classification calls can be told apart
+// from the base class's answers.
+namespace {
+struct DirectionalStub : public material {
+	mutable vec3 asked{0, 0, 0};
+	bool scatter(const ray&, const hit_record&, scatter_record& srec, bool = false) const override {
+		srec.attenuation = color(0.1, 0.1, 0.1);
+		return true;
+	}
+	color scattering_attenuation(const ray&, const hit_record& rec, const ray&, const color&) const override {
+		asked = rec.normal;
+		return color(0.9, 0.5, 0.2);
+	}
+	bool is_delta_bsdf() const override { return true; }
+	bool is_shadow_transmissive(const hit_record&) const override { return true; }
+};
+}  // namespace
+
+// The path tracer's light sampling asks the material for its colour in the light's direction (scattering_attenuation). The wrapper used to leave that to the base
+// class, whose answer is the colour scatter() stored for its own direction: a normal-mapped coated diffuse read 0.71 of pbrt-v4 and a conductor 1.07 (2026-11-04).
+// The call reaches the wrapped material, with the perturbed normal - and so do the classification calls.
+TEST(NormalMapMaterial, TheWrappedMaterialIsAskedForItsColourWithTheMappedNormal) {
+	float v = static_cast<float>((std::sqrt(2.0)/2.0 + 1.0) / 2.0);   // (tilted 45 degrees toward +x)
+	auto tilted_tex = std::make_shared<solid_color>(color(v, 0.5, v));
+	auto inner = std::make_shared<DirectionalStub>();
+	normal_map_material nm_mat(tilted_tex, inner);
+	hit_record rec = make_rec(vec3(0,1,0), vec3(1,0,0));
+	ray r_in(point3(0,2,0), vec3(0,-1,0));
+	ray toward_light(point3(0,0,0), vec3(0.3, 1.0, 0.0));
+	const color c = nm_mat.scattering_attenuation(r_in, rec, toward_light, color(0.1, 0.1, 0.1));
+	EXPECT_NEAR(c.x(), 0.9, 1e-12) << "the wrapped material's own colour for that direction, not the one scatter() stored";
+	const vec3 mapped = nm_mat.apply(r_in, rec).normal;
+	EXPECT_NEAR(inner->asked.x(), mapped.x(), 1e-9);
+	EXPECT_NEAR(inner->asked.y(), mapped.y(), 1e-9);
+	EXPECT_GT(std::abs(inner->asked.x()), 0.5) << "asked with the tilted normal";
+	// (the overload without the incoming ray: the viewer on the side the normal faces)
+	inner->asked = vec3(0, 0, 0);
+	EXPECT_NEAR(nm_mat.scattering_attenuation(rec, toward_light, color(0.1, 0.1, 0.1)).x(), 0.9, 1e-12);
+	EXPECT_NEAR(inner->asked.x(), mapped.x(), 1e-9);
+	EXPECT_TRUE(nm_mat.is_delta_bsdf()) << "a normal-mapped mirror is still a mirror";
+	EXPECT_TRUE(nm_mat.is_delta_bsdf(rec));
+	EXPECT_TRUE(nm_mat.is_shadow_transmissive(rec)) << "normal-mapped glass still lets a shadow ray through";
+	// the bump map's wrapper the same
+	bump_map_material bm_mat(std::make_shared<solid_color>(color(0.0, 0.0, 0.0)), inner, 1.0, 0.001);
+	EXPECT_NEAR(bm_mat.scattering_attenuation(r_in, rec, toward_light, color(0.1, 0.1, 0.1)).x(), 0.9, 1e-12);
+	EXPECT_TRUE(bm_mat.is_delta_bsdf());
+	EXPECT_TRUE(bm_mat.is_shadow_transmissive(rec));
+}
+
 // ---------------------------------------------------------------------------
 // bump_map_material wrapper tests
 // ---------------------------------------------------------------------------
