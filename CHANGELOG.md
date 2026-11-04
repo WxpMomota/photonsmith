@@ -6,6 +6,13 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **GPU normal maps on textured surfaces; the Nomai explorer refined (2026-11-04).** The default GPU renderer drew a normal map on a diffuse surface with a
+  picture of its own flat: the uv tangent the map is laid along was worked out only for the material kinds that read it themselves, so the map was applied along a
+  zero vector. It now matches the CPU (pbrt_scenes/normal-mapped-textured-plane.pbrt, a new test scene: 0.6/255 apart, it was 25). The explorer's horns carry growth
+  rings round each horn (they were shells round the head, running across it), its robe hangs in folds that deepen to the hem, its beard falls in locks, its head has
+  a fur picture (paler muzzle, darker brow) and its eyes amber irises with fibres, and its mask is engraved. `--film-baseline --write` of every film leaves films of
+  your own (`my-...`) out of the committed baseline, as the test does.
+
 * **A review of the day's work: eight findings (2026-11-03).** A walk after a fast-lane ride now sets off from where the ride let go (it walked from where it was
   before the ride, so a rider still snapped back as its next walk began), a chase after a ride eases in from there, and a walk that starts while its walker is still riding
   is refused with the time it lets go. A pet at `heel` follows a walk along points as well as one to places. The video's "a frame every N s" counts from the first frame

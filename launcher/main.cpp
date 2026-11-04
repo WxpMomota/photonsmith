@@ -1112,6 +1112,9 @@ int main(int argc, char** argv) {
 		const auto places = cartoon::film_baseline::places();   // (where the scenes and the film cache are left out: a baseline holds from any folder)
 		for (const cartoon::Film *film : cartoon::films()) {
 			if (!keys.empty() && std::find(keys.begin(), keys.end(), std::string(film->key)) == keys.end()) continue;
+			// (a film of your own - "my-..." - only when it is named: the baseline is committed, and `--write` of every film wrote a private film's key and shot names into it;
+			// the test leaves them out too)
+			if (keys.empty() && std::string(film->key).rfind("my-", 0) == 0) continue;
 			std::cerr << film->key << "..." << std::endl;
 			const std::vector<cartoon::film_baseline::Entry> e = cartoon::film_baseline::entriesOf(*film, [&](const std::string &scene) { return frame_fingerprint::of(scene, places); });
 			now.insert(now.end(), e.begin(), e.end());

@@ -264,9 +264,12 @@ inline double beardSdf(Vec3 q, double length) {
 	const Vec3 top{0.0, -0.045, 0.135}, tip{0.0, -0.045 - L, 0.150 + 0.15 * L};   // (forward of the chest, over the robe)
 	double d = roundCone(q, top, tip, 0.050, 0.010);
 	d = smin(d, ellv(q, {0.0, -0.040, 0.090}, {0.070, 0.035, 0.060}), 0.03);   // (the cheeks' fur)
-	// locks: ripples down its length
+	// locks: grooves down its length that deepen and part towards the tips (each lock twisting a little), and finer strands within them
 	const double along = clamp01((top.y - q.y) / L);
-	return d + 0.004 * std::sin(std::atan2(q.x, q.z - 0.06) * 9.0 + along * 6.0) * along;
+	const double around = std::atan2(q.x, q.z - 0.06);
+	const double lock = std::sin(around * 9.0 + along * 6.0 + 0.6 * std::sin(around * 3.0 + 1.0));
+	const double strand = std::sin(around * 41.0 + along * 23.0 + 2.0 * lock);
+	return d + (0.003 + 0.004 * along) * lock * (0.4 + 0.6 * along) + 0.0009 * strand * along;
 }
 // The horns: the two side horns curl back and round like a ram's (the statue's), the top antler rises and forks into two points.
 inline const std::vector<std::vector<Vec3>> &hornCurves() {
@@ -292,6 +295,15 @@ inline const std::vector<std::vector<Vec3>> &hornCurves() {
 	}();
 	return c;
 }
+// The horns' growth rings: ridges round each horn, closer together towards its tip (a ram's horn adds a ring a year, thinner as it grows out), deepest on the two side
+// horns and faint on the antler; each ring is a little uneven round the horn. `s` is the distance along the horn from its root, `len` its whole length, `around` the
+// angle round it.
+inline double hornRing(double s, double len, double around, bool sideHorn) {
+	const double u = clamp01(s / std::max(1e-6, len));
+	const double phase = (s / 0.011) * (1.0 + 0.9 * u);               // (closer together along the horn)
+	const double ridge = std::pow(0.5 + 0.5 * std::cos(2.0 * kPi * phase + 0.35 * std::sin(around * 2.0 + s * 40.0)), 3.0);
+	return (sideHorn ? 0.0022 : 0.0008) * (1.0 - 0.6 * u) * ridge;
+}
 inline double hornSdf(Vec3 q) {
 	double d = 1e9;
 	for (std::size_t c = 0; c < hornCurves().size(); ++c) {
@@ -299,12 +311,28 @@ inline double hornSdf(Vec3 q) {
 		const int n = static_cast<int>(curve.size());
 		const double base = c < 2 ? 0.024 : (c == 2 ? 0.020 : 0.011);
 		const double end = c < 2 ? 0.006 : (c == 2 ? 0.012 : 0.004);
+		double len = 0.0;
+		for (int i = 0; i + 1 < n; ++i) len += length(curve[static_cast<std::size_t>(i + 1)] - curve[static_cast<std::size_t>(i)]);
+		double along = 0.0;
 		for (int i = 0; i + 1 < n; ++i) {
+			const Vec3 a = curve[static_cast<std::size_t>(i)], b = curve[static_cast<std::size_t>(i + 1)];
 			const double r0 = lerp(base, end, static_cast<double>(i) / (n - 1)), r1 = lerp(base, end, static_cast<double>(i + 1) / (n - 1));
-			d = std::min(d, sdf::roundCone(q, curve[static_cast<std::size_t>(i)], curve[static_cast<std::size_t>(i + 1)], r0, r1));
+			const double seg = length(b - a);
+			const double e = sdf::roundCone(q, a, b, r0, r1);
+			if (e < 0.02) {   // (near the surface: the rings, measured along the horn - they used to be shells round the head's origin, running across the horns)
+				const Vec3 axis = (b - a) * (1.0 / std::max(1e-9, seg));
+				const double t = clamp01(dot(q - a, axis) / std::max(1e-9, seg));
+				const Vec3 off = q - (a + axis * (t * seg));
+				const Vec3 side = normalize(cross(axis, std::abs(axis.y) < 0.9 ? Vec3{0.0, 1.0, 0.0} : Vec3{1.0, 0.0, 0.0}));
+				const double around = std::atan2(dot(off, cross(axis, side)), dot(off, side));
+				d = std::min(d, e - hornRing(along + t * seg, len, around, c < 2));
+			} else {
+				d = std::min(d, e);
+			}
+			along += seg;
 		}
 	}
-	return d + 0.0014 * std::sin(length(q) * 300.0);   // (the rings along a horn)
+	return d;
 }
 
 // ---- the life-support mask ------------------------------------------------------------------------------------------------------------------------------------------
@@ -377,6 +405,20 @@ inline double maskIvorySdf(Vec3 q) {
 	shell = std::max(shell, 0.010 - b.z);
 	shell = std::max(shell, b.y - 0.040);
 	d = std::min(d, shell);
+	// the engraving: fine lines cut into the ivory - diamonds round the face plate's middle, a line inset round each wing, the beak's overlapping segments
+	const auto groove = [](double dist, double w, double depth) { return depth * (1.0 - smoothstep(0.0, w, std::abs(dist))); };
+	double cut = 0.0;
+	const double ring = std::max(std::abs(p.x), std::abs(p.y)) / 0.70710678;   // (a diamond's half-diagonal through p)
+	if (std::abs(p.z) < 0.02) for (const double r : {0.074, 0.098, 0.110}) cut = std::max(cut, groove(ring - r, 0.0016, 0.0012));
+	for (int s = -1; s <= 1; s += 2) {
+		const Vec3 w = transformPoint(invertAffine(mul(translate(0.125 * s, 0.100, 0.132), rotate({0.0, 1.0, 0.0}, 34.0 * s))), q);
+		if (std::abs(w.z) < 0.02) cut = std::max(cut, groove(std::max(std::abs(w.x), std::abs(w.y)) - 0.030, 0.0014, 0.0010));
+	}
+	if (b.z > 0.010 && b.y < 0.040) {
+		const double seg = (0.040 - b.y) / 0.026;
+		cut = std::max(cut, groove((seg - std::floor(seg) - 0.5) * 0.026, 0.0016, 0.0013) * smoothstep(0.0, 0.4, seg));
+	}
+	d += cut;
 	// the windows (through) and the inset (shallow)
 	for (int k = 0; k < 3; ++k) d = std::max(d, -smallDiamond(q, k, 0.0, 1.0));
 	d = std::max(d, -smallDiamond(q, 3, 0.0, 0.006, 0.010));
@@ -434,7 +476,13 @@ inline double skirtSdf(Vec3 q, const ExplorerPose &p, const ExplorerBody &b, dou
 	const Vec3 hemCentre{0.0, b.hemY, 0.035 + 0.05 * p.sit};
 	double d = roundCone(s, b.pelvis + Vec3{0.0, 0.03, 0.0}, hemCentre, 0.185 - inset, 0.32 + 0.14 * p.sit - inset);
 	for (int k = 0; k < 2; ++k) d = smin(d, roundCone(s, b.hip[k], b.knee[k], 0.12 - inset, 0.10 - inset), 0.08);
-	const double hem = b.hemY + 0.012 * std::sin(std::atan2(q.x, q.z) * 7.0);
+	// the cloth's folds: soft vertical pleats from the waist, deeper towards the hem, uneven round the body and swaying a little with the cloth
+	const double below = clamp01((b.pelvis.y - q.y) / std::max(0.2, b.pelvis.y - b.hemY));
+	const double ang = std::atan2(s.x, s.z - hemCentre.z * below);
+	const double sway = 0.35 * std::sin(p.time * 1.1) + 0.6 * p.stride * std::sin(p.walk * kPi);
+	const double folds = 0.65 * std::sin(ang * 9.0 + 1.3 * std::sin(ang * 2.0 + 0.5) + sway) + 0.35 * std::sin(ang * 17.0 + 0.8 - 0.5 * sway);
+	d += 0.010 * std::pow(below, 1.3) * folds;
+	const double hem = b.hemY + 0.012 * std::sin(std::atan2(q.x, q.z) * 7.0) + 0.006 * below * folds;
 	return std::max(d, hem - q.y);
 }
 inline double torsoSdf(Vec3 q, const ExplorerBody &b, double inset) {
@@ -702,6 +750,97 @@ inline std::string staffText(const ExplorerPose &p, const ExplorerBody &b, const
 
 // ---- materials ----------------------------------------------------------------------------------------------------------------------------------------------------
 inline std::string furMaterial() { return "Material \"diffuse\" \"rgb reflectance\" [ 0.80 0.68 0.52 ]"; }
+// The head's fur, as a picture laid round the head from a point inside it (headUV): short tan fur, paler and creamier down the muzzle and under the jaw, a shade darker
+// over the brow, round the eyes and on the crown between the horns, and fine streaks running the way the fur lies (back over the skull, down the cheeks and neck).
+constexpr double kHeadUvCentreY = 0.06, kHeadUvCentreZ = 0.02;
+inline Vec3 headUvDirection(double u, double v) {
+	const double th = u * 2.0 * kPi - kPi, ph = (v - 0.5) * kPi;
+	return {std::sin(th) * std::cos(ph), std::sin(ph), std::cos(th) * std::cos(ph)};
+}
+inline Vec3 headFurColour(double u, double v) {
+	const Vec3 dir = headUvDirection(u, v);
+	Vec3 c{0.80, 0.68, 0.52};
+	const double muzzle = smoothstep(0.80, 0.95, dot(dir, normalize(Vec3{0.0, -0.40, 0.92})));
+	const double chin = smoothstep(0.55, 0.85, dot(dir, normalize(Vec3{0.0, -0.95, 0.30})));
+	c = lerp(c, Vec3{0.90, 0.83, 0.70}, std::max(muzzle, 0.8 * chin));
+	const double brow = smoothstep(0.90, 0.97, dot(dir, normalize(Vec3{0.0, 0.42, 0.91})));
+	const double crown = smoothstep(0.55, 0.85, dir.y);
+	double eyes = 0.0;
+	for (int k = 0; k < 3; ++k) {
+		const Vec3 e = normalize(eyePlace(k).c - Vec3{0.0, kHeadUvCentreY, kHeadUvCentreZ});
+		eyes = std::max(eyes, smoothstep(0.96, 0.995, dot(dir, e)));
+	}
+	c = c * (1.0 - 0.16 * std::max(brow, crown) - 0.10 * eyes);
+	// the streaks: noise drawn out along the way the fur lies (v, down the head), and a finer grain
+	const double streak = nature::fbm2(u * 300.0, v * 26.0, 911), grain = nature::fbm2(u * 900.0, v * 140.0, 912);
+	return c * (0.88 + 0.16 * streak + 0.08 * (grain - 0.5));
+}
+inline std::string headFurMaterial() {
+	const std::string pic = film_sky::picture(kFilmKey, "fur_head", 1024, 512, [](std::vector<float> &rgb) {
+		for (int j = 0; j < 512; ++j)
+			for (int i = 0; i < 1024; ++i) {
+				const Vec3 c = headFurColour((i + 0.5) / 1024.0, 1.0 - (j + 0.5) / 512.0);
+				const std::size_t k = (static_cast<std::size_t>(j) * 1024 + i) * 3;
+				rgb[k] = static_cast<float>(c.x);
+				rgb[k + 1] = static_cast<float>(c.y);
+				rgb[k + 2] = static_cast<float>(c.z);
+			}
+	});
+	return "Texture \"ns_fur\" \"spectrum\" \"imagemap\" \"string filename\" [ \"" + pic + "\" ]\n  Material \"diffuse\" \"texture reflectance\" \"ns_fur\"";
+}
+// The eyes' irises (the goat's: amber, nearly all of the eye that shows): fine fibres running out from the pupil, a paler ring round it, gold flecks, and a darker rim at
+// the edge. Laid flat on the eye from the front (eyeballMesh: u, v across it, the pupil at the middle).
+inline Vec3 irisColour(double u, double v) {
+	const double x = 2.0 * u - 1.0, y = 2.0 * v - 1.0, r = std::sqrt(x * x + y * y), a = std::atan2(y, x);
+	const double fibres = 0.5 + 0.5 * std::sin(a * 70.0 + 3.0 * nature::noise2(a * 6.0, r * 4.0, 921)) * std::sin(a * 23.0 + r * 9.0);
+	Vec3 c = lerp(Vec3{0.62, 0.40, 0.09}, Vec3{0.80, 0.56, 0.16}, fibres * (0.6 + 0.4 * nature::fbm2(a * 10.0, r * 12.0, 922)));
+	c = lerp(c, Vec3{0.86, 0.70, 0.30}, 0.5 * smoothstep(0.30, 0.38, r) * (1.0 - smoothstep(0.42, 0.52, r)));   // (the collar round the pupil)
+	c = c * (1.0 - 0.55 * smoothstep(0.78, 0.97, r));                                                            // (the dark rim)
+	return c;
+}
+inline std::string irisMaterial() {
+	const std::string pic = film_sky::picture(kFilmKey, "iris", 256, 256, [](std::vector<float> &rgb) {
+		for (int j = 0; j < 256; ++j)
+			for (int i = 0; i < 256; ++i) {
+				const Vec3 c = irisColour((i + 0.5) / 256.0, 1.0 - (j + 0.5) / 256.0);
+				const std::size_t k = (static_cast<std::size_t>(j) * 256 + i) * 3;
+				rgb[k] = static_cast<float>(c.x);
+				rgb[k + 1] = static_cast<float>(c.y);
+				rgb[k + 2] = static_cast<float>(c.z);
+			}
+	});
+	return "Texture \"ns_iris\" \"spectrum\" \"imagemap\" \"string filename\" [ \"" + pic + "\" ]\n  Material \"coateddiffuse\" \"texture reflectance\" \"ns_iris\" \"float roughness\" [ 0.02 ]";
+}
+// An eyeball of radius r looking along +z, its picture laid flat across it from the front.
+inline Mesh eyeballMesh(double r) {
+	Mesh m = uvSphere(r, 28, 16);
+	m.uvs.resize(m.verts.size());
+	for (std::size_t i = 0; i < m.verts.size(); ++i) m.uvs[i] = {0.5 + 0.5 * m.verts[i].x / r, 0.5 + 0.5 * m.verts[i].y / r};
+	return m;
+}
+// Coordinates for a mesh in head space, as headFurColour reads them: the direction from a point inside the head (u round it, the seam at the back of the neck, v up). A
+// triangle across the seam gets its own copies of the vertices on the low side, as wrapUV does.
+inline void headUV(Mesh &m) {
+	m.uvs.resize(m.verts.size());
+	for (std::size_t i = 0; i < m.verts.size(); ++i) {
+		const Vec3 d = m.verts[i] - Vec3{0.0, kHeadUvCentreY, kHeadUvCentreZ};
+		const double r = std::max(1e-9, length(d));
+		m.uvs[i] = {(std::atan2(d.x, d.z) + kPi) / (2.0 * kPi), 0.5 + std::asin(std::max(-1.0, std::min(1.0, d.y / r))) / kPi};
+	}
+	for (auto &t : m.tris) {
+		double lo = 1e9, hi = -1e9;
+		for (int q = 0; q < 3; ++q) lo = std::min(lo, m.uvs[static_cast<std::size_t>(t[q])].first), hi = std::max(hi, m.uvs[static_cast<std::size_t>(t[q])].first);
+		if (hi - lo < 0.5) continue;
+		for (int q = 0; q < 3; ++q) {
+			const std::size_t i = static_cast<std::size_t>(t[q]);
+			if (m.uvs[i].first > 0.5) continue;
+			m.verts.push_back(m.verts[i]);
+			m.normals.push_back(m.normals[i]);
+			m.uvs.push_back({m.uvs[i].first + 1.0, m.uvs[i].second});
+			t[q] = static_cast<int>(m.verts.size() - 1);
+		}
+	}
+}
 inline std::string beardMaterial() { return "Material \"diffuse\" \"rgb reflectance\" [ 0.92 0.90 0.84 ]"; }
 inline std::string ivoryMaterial() { return "Material \"coateddiffuse\" \"rgb reflectance\" [ 0.86 0.80 0.66 ] \"float roughness\" [ 0.35 ]"; }
 inline std::string goldMaterial() { return metalMaterial({0.86, 0.66, 0.30}, 0.30); }
@@ -787,7 +926,7 @@ inline Mat4 maskFrame(const ExplorerPose &p, const ExplorerBody &b) {
 	return m;
 }
 inline const Mesh &maskIvoryMesh() {
-	static const Mesh m = sdf::surfaceNets([](Vec3 q) { return maskIvorySdf(q); }, {-0.20, -0.12, 0.02}, {0.20, 0.34, 0.30}, 0.0025);
+	static const Mesh m = sdf::surfaceNets([](Vec3 q) { return maskIvorySdf(q); }, {-0.20, -0.12, 0.02}, {0.20, 0.34, 0.30}, 0.0012);   // (fine: the engraving)
 	return m;
 }
 inline const Mesh &maskGoldMesh() {
@@ -804,7 +943,7 @@ inline const Mesh &maskTealMesh() {
 }
 // The mask on its own (laid on the ground beside the campfire): at `frame` (mask space -> world). Its four meshes never change: made once as PLY parts (film_cache::part).
 inline std::string maskText(const Mat4 &frame, double = 0.0) {
-	return film_cache::part(kFilmKey, "mask_ivory", ivoryMaterial(), frame, [] { return maskIvoryMesh(); }) +
+	return film_cache::part(kFilmKey, "mask_ivory2", ivoryMaterial(), frame, [] { return maskIvoryMesh(); }) +   // ("2": engraved)
 		   film_cache::part(kFilmKey, "mask_gold", goldMaterial(), frame, [] { return maskGoldMesh(); }) +
 		   film_cache::part(kFilmKey, "mask_dark", diffuseMaterial({0.10, 0.07, 0.05}), frame, [] { return maskDarkMesh(); }) +
 		   film_cache::part(kFilmKey, "mask_teal", diffuseMaterial({0.28, 0.55, 0.55}), frame, [] { return maskTealMesh(); });
@@ -825,24 +964,26 @@ inline std::string explorerText(const ExplorerPose &p, const Mat4 &world, double
 	const Mat4 head = mul(world, b.head);
 	const Vec3 hlo{-0.24, -0.30, -0.30}, hhi{0.24, 0.38, 0.30};
 	const double lidClose[3] = {p.lidL, p.lidR, p.lidTop};
-	const Mesh skin = sdf::surfaceNets([&](Vec3 q) {
+	Mesh skin = sdf::surfaceNets([&](Vec3 q) {
 		double d = headSkinSdf(q);
 		for (int k = 0; k < 3; ++k) d = std::min(d, eyelidSdf(q, k, lidClose[k]));
 		return std::min(d, earSdf(q, p.ears));
 	}, {-0.20, -0.22, -0.22}, {0.20, 0.26, 0.27}, fine);
-	out += attr(furMaterial(), meshText(skin, head));
+	headUV(skin);
+	out += attr(headFurMaterial(), meshText(skin, head));
 	const double beardLength = p.maskShown ? smoothstep(0.2, 0.9, p.maskOff) : 1.0;
 	out += attr(beardMaterial(), meshText(sdf::surfaceNets([&](Vec3 q) { return beardSdf(q, beardLength); }, {-0.10, -0.32, 0.02}, {0.10, 0.0, 0.26}, fine), head));
-	out += film_cache::part(kFilmKey, "horns" + grain, "Material \"coateddiffuse\" \"rgb reflectance\" [ 0.55 0.42 0.30 ] \"float roughness\" [ 0.5 ]", head,
-							[&] { return sdf::surfaceNets([](Vec3 q) { return hornSdf(q); }, {-0.22, 0.0, -0.26}, {0.22, 0.38, 0.08}, fine); });
+	// (made once, so finer than the rest of the head: the growth rings are a centimetre apart. "horns2": the rings run round the horns now)
+	out += film_cache::part(kFilmKey, "horns2" + grain, "Material \"coateddiffuse\" \"rgb reflectance\" [ 0.55 0.42 0.30 ] \"float roughness\" [ 0.5 ]", head,
+							[&] { return sdf::surfaceNets([](Vec3 q) { return hornSdf(q); }, {-0.22, 0.0, -0.26}, {0.22, 0.38, 0.08}, fine * 0.6); });
 	std::string eyes, pupils;
 	for (int k = 0; k < 3; ++k) {
 		const EyePlace &e = eyePlace(k);
 		const Mat4 look = mul(translate(e.c), rotate({0.0, 1.0, 0.0}, e.outward * 0.5 + p.gazeYaw), rotate({1.0, 0.0, 0.0}, p.gazePitch));
-		eyes += meshText(uvSphere(e.r, 20, 12), mul(head, look));
+		eyes += meshText(eyeballMesh(e.r), mul(head, look));
 		pupils += meshText(roundedBox(e.r * 1.05, e.r * 0.34, e.r * 0.25, e.r * 0.12, 2), mul(head, look, translate(0.0, 0.0, e.r * 0.90)));
 	}
-	out += attr("Material \"coateddiffuse\" \"rgb reflectance\" [ 0.70 0.48 0.12 ] \"float roughness\" [ 0.02 ]", eyes);
+	out += attr(irisMaterial(), eyes);
 	out += attr("Material \"coateddiffuse\" \"rgb reflectance\" [ 0.008 0.008 0.008 ] \"float roughness\" [ 0.02 ]", pupils);
 	if (p.maskShown) out += maskText(mul(world, maskFrame(p, b)));
 	// the suit

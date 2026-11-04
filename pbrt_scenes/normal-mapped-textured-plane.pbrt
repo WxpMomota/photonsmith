@@ -1,0 +1,28 @@
+# @rt-category Test Scenes
+# @rt-description A plane with a picture for its colour and a tangent-space normal map. Checks normal mapping on a textured surface.
+# @rt-performance Fast
+# @rt-size 11
+# normal-mapped-textured-plane.pbrt -- regression scene for an image normal map on a material with a picture of its own.
+#
+# normal-mapped-plane.pbrt's plane and lamp, but its diffuse colour is an image (images/bump-marble.png) as well, so the GPU cannot fold it into its
+# picture-less NormalMappedLambertian: the map is kept beside the colour (MaterialData::normalMapTexIdx) and the triangle closest-hit perturbs the shading
+# normal along the uv tangent. Until 2026-11-04 the recursive backend worked out that tangent only for the material kinds that read it themselves, so on a
+# Lambertian the map was laid along a zero vector and did nothing: the GPU drew this plane flat, the CPU drew it checkered.
+#
+# Original, not derived from any distributed scene, so it carries no licence constraints.
+
+LookAt 0 4 6  0 0 0  0 1 0
+Camera "perspective" "float fov" [ 40 ]
+Film "rgb" "integer xresolution" [ 100 ] "integer yresolution" [ 100 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+
+WorldBegin
+
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 12 12 12 ]
+  Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ] "point3 P" [ -6 1.5 3   -6 1.5 -3   -6 4.5 -3   -6 4.5 3 ]
+AttributeEnd
+
+Texture "marble" "spectrum" "imagemap" "string filename" [ "../images/bump-marble.png" ]
+Material "diffuse" "texture reflectance" "marble" "string normalmap" [ "../images/normal-checker.png" ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ] "point3 P" [ -5 0 -5   5 0 -5   5 0 5   -5 0 5 ] "point2 uv" [ 0 0  1 0  1 1  0 1 ]

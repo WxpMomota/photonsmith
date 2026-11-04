@@ -226,7 +226,7 @@ extern "C" __global__ void __closesthit__triangle() {
 	// kind (Lambertian, Metal, Dielectric, DiffuseLight, etc. - the
 	// overwhelming common case), which never reads it.
 	float3 tri_dpdu = make_float3(0.0f, 0.0f, 0.0f);
-	if (material_needs_dpdu(mat.type)) {
+	if (material_needs_dpdu(mat.type) || mat.normalMapTexIdx >= 0) {   // (a normal map on any material is laid along the uv tangent: without it a Lambertian's map did nothing)
 		const float3 e1 = tri.p1 - tri.p0;
 		const float3 e2 = tri.p2 - tri.p0;
 		const float du1 = tri.uv1.x - tri.uv0.x, dv1 = tri.uv1.y - tri.uv0.y;
