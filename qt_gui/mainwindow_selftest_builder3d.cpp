@@ -935,7 +935,7 @@ void MainWindow::selfTestLog(SceneBuilderWidget *sb, const std::function<void(bo
 }
 
 // Part of the "builder" mode: a spin box, combo box or slider that does not have focus lets the wheel scroll the page behind it instead of changing its value;
-// once it has focus the wheel changes it.
+// once it has focus the wheel changes a spin box, but never a combo box (a choice made from one leaves it focused).
 void MainWindow::selfTestWheelGuard(const std::function<void(bool, const QString &)> &check) {
 	QScrollArea area;
 	area.resize(300, 200);
@@ -978,6 +978,12 @@ void MainWindow::selfTestWheelGuard(const std::function<void(bool, const QString
 	QApplication::processEvents();
 	wheel(spin, 120);
 	check(spin->hasFocus() ? spin->value() == 51 : true, "once the spin box has focus the wheel changes it");
+	combo->setFocus();
+	QApplication::processEvents();
+	const int scrolled = bar->value();
+	wheel(combo, 120);
+	check(combo->currentIndex() == 0, "the wheel over a combo box with the focus (as after choosing from it) does not change its choice");
+	check(!combo->hasFocus() || bar->value() < scrolled, QString("... and scrolls the page instead (%1 -> %2)").arg(scrolled).arg(bar->value()));
 }
 
 // Part of the "builder" mode: the window's geometry is saved and comes back, but a saved place that is on no screen is refused.
