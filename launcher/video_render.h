@@ -470,6 +470,10 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
         std::lock_guard<std::mutex> hold(keptLock);
         return kept.count(frame) > 0;
     };
+    // (the pace a frame comes out at: with several workers on one graphics card each frame takes them as long as they all do, so a frame's own seconds read as if a minute a
+    // frame when frames were in fact coming every half minute - the user, 2026-11-03)
+    const auto runStart = std::chrono::steady_clock::now();
+    int renderedNow = 0;
     auto completed = [&](int frame, int rc, double seconds) {   // as each frame finishes: one line, the count being how many are done
         if (already[static_cast<std::size_t>(frame)]) return;
         double sceneSeconds = 0.0;
@@ -491,6 +495,10 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
         else if (rc == 0) {
             line << " \u2713 (" << std::setprecision(1) << seconds << "s";
             if (sceneSeconds >= 0.05) line << "; its scene " << std::setprecision(2) << sceneSeconds << "s";
+            if (workers > 1 && ++renderedNow >= 2) {   // (from the second on: the first came out alone)
+                const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - runStart).count();
+                line << "; a frame every " << std::setprecision(1) << elapsed / renderedNow << "s with " << workers << " workers";
+            }
             line << ")";
         }
         else line << " \u2717 FAILED (error code: " << rc << "; what the renderer said is in " << (frames_dir / "work*").string() << "/" << (workers > 0 ? "worker.log" : "frames.log") << ")";
