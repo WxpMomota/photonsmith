@@ -19,7 +19,6 @@ R = 20.0            # the drum's inner radius
 DRUM_H = 18.0       # the drum's height: the dome springs from here
 OCULUS = 5.0        # the oculus's radius
 COL_R, COL_N, COL_H, COL_RAD = 16.8, 16, 12.0, 0.62
-TITLE_ROOM = (0.0, -80.0, 0.0)   # (the closed black box the film's title card is seen in: how-light-bounces.film's first shot)
 
 
 # ---- pictures ------------------------------------------------------------------------------------------------------------------------------------------------
@@ -187,19 +186,38 @@ def column_pictures(n=1024, flutes=20):
 
 
 # ---- meshes --------------------------------------------------------------------------------------------------------------------------------------------------
+MESHES = []   # the meshes written so far: meshes/m000.ply, m001.ply, ...
+
+
 def mesh_text(P, idx, N=None, UV=None):
-    # (the triangles that have no area once their points are written to 4 decimals - the middle of a disc, a lathe's axis - are left out: the loader would drop each
-    # with a warning, and a film's frames are meant to load without one)
-    Q = np.round(np.asarray(P, dtype=np.float64), 4)
-    T = np.asarray(idx).reshape(-1, 3)
-    area = np.linalg.norm(np.cross(Q[T[:, 1]] - Q[T[:, 0]], Q[T[:, 2]] - Q[T[:, 0]]), axis=1)
-    idx = T[area > 1e-9].reshape(-1).tolist()
-    s = 'Shape "trianglemesh"\n  "point3 P" [ ' + " ".join("%.4f %.4f %.4f" % tuple(p) for p in P) + " ]\n"
+    """A mesh as a binary PLY file beside the scene (meshes/mNNN.ply) and the Shape line that reads it. (The set was 13.6 MB of numbers written as text: every frame
+    of the film copied it into its scene and the renderer read it back, seconds a frame.) The triangles that have no area - the middle of a disc, a lathe's axis - are
+    left out: the loader would drop each with a warning, and a film's frames are meant to load without one."""
+    P = np.asarray(P, dtype=np.float32)
+    T = np.asarray(idx, dtype=np.int64).reshape(-1, 3)
+    area = np.linalg.norm(np.cross(P[T[:, 1]] - P[T[:, 0]], P[T[:, 2]] - P[T[:, 0]]), axis=1)
+    T = T[area > 1e-9].astype(np.int32)
+    cols = [P]
+    props = ["x", "y", "z"]
     if N is not None:
-        s += '  "normal N" [ ' + " ".join("%.4f %.4f %.4f" % tuple(q) for q in N) + " ]\n"
+        cols.append(np.asarray(N, dtype=np.float32))
+        props += ["nx", "ny", "nz"]
     if UV is not None:
-        s += '  "point2 uv" [ ' + " ".join("%.4f %.4f" % tuple(q) for q in UV) + " ]\n"
-    return s + '  "integer indices" [ ' + " ".join(str(i) for i in idx) + " ]\n"
+        cols.append(np.asarray(UV, dtype=np.float32))
+        props += ["u", "v"]
+    verts = np.hstack(cols).astype("<f4")
+    name = "meshes/m%03d.ply" % len(MESHES)
+    MESHES.append(name)
+    os.makedirs(os.path.join(OUT, "meshes"), exist_ok=True)
+    head = "ply\nformat binary_little_endian 1.0\nelement vertex %d\n" % len(verts) + "".join("property float %s\n" % p for p in props)
+    head += "element face %d\nproperty list uchar int vertex_indices\nend_header\n" % len(T)
+    faces = np.zeros(len(T), dtype=[("n", "u1"), ("i", "<i4", 3)])
+    faces["n"], faces["i"] = 3, T
+    with open(os.path.join(OUT, name), "wb") as f:
+        f.write(head.encode("ascii"))
+        f.write(verts.tobytes())
+        f.write(faces.tobytes())
+    return 'Shape "plymesh" "string filename" [ "%s" ]\n' % name
 
 
 def grid(nu, nv, f):
@@ -392,12 +410,8 @@ def main():
     ped = lathe([(0.0, 0.0), (1.6, 0.0), (1.6, 0.3), (1.25, 0.45), (1.0, 0.55), (0.9, 1.6), (1.15, 1.75), (1.15, 1.95), (0.0, 1.95)], 96, uscale=3)
     out += ['AttributeBegin', 'Material "coateddiffuse" "texture reflectance" "stone_serpentine" "float roughness" [ 0.06 ]', mesh_text(*ped), 'AttributeEnd']
     out += ['AttributeBegin', GOLD % 0.06, 'Translate 0 3.35 0', 'Shape "sphere" "float radius" [ 1.4 ]', 'AttributeEnd']
-    # the title room: a small closed black box far below the hall, where the film's opening camera sits, so its title card is over black (and costs next to nothing)
-    c, h = np.array(TITLE_ROOM), 2.0
-    corners = np.array([[x, y, z] for x in (-h, h) for y in (-h, h) for z in (-h, h)]) + c
-    faces = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)]
-    box_idx = sum(([a, b, d, b, c2, d] for a, b, c2, d in faces), [])
-    out += ['AttributeBegin', 'Material "diffuse" "rgb reflectance" [ 0.02 0.02 0.02 ]', mesh_text(corners, box_idx), 'AttributeEnd']
+    # (the film's title card is a `black` shot - the credits' empty scene - not a camera in a box below the hall: a box cost a whole frame of the hall to make black,
+    # and its edge showed as a faint line)
     open(os.path.join(OUT, "sun_hall.pbrt"), "w").write("\n".join(out) + "\n")
     print("wrote", os.path.join(OUT, "sun_hall.pbrt"))
 

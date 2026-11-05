@@ -1289,6 +1289,11 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		double v = 0.0;
 		if (!number(rest, v) || v < 1.0 || v > 100000.0) return fail("`timelapse FACTOR`: how many times faster the clouds, the water and the wind go (1 to 100000)");
 		s.timelapse = v;
+	} else if (verb == "genre") {
+		const std::vector<std::string> t = detail::tokens(line);
+		if (t.size() != 2 || (t[1] != "story" && t[1] != "nature" && t[1] != "space" && t[1] != "showcase" && t[1] != "teaching"))
+			return fail("`genre story|nature|space|showcase|teaching`: the film's sub-tab under Cartoons (without it, worked out from its tags)");
+		s.genre = t[1];
 	} else if (verb == "sidebyside") {
 		const std::vector<std::string> t = detail::tokens(line);
 		double v = 0.0, from = 0.0;

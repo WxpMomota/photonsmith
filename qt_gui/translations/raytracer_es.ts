@@ -10915,6 +10915,31 @@ Origen: %3</translation>
         <source>Light &amp; Art</source>
         <translation>Luz y arte</translation>
     </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="292"/>
+        <source>Stories</source>
+        <translation>Historias</translation>
+    </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="292"/>
+        <source>Space</source>
+        <translation>Espacio</translation>
+    </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="292"/>
+        <source>Showcases</source>
+        <translation>Demostraciones</translation>
+    </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="292"/>
+        <source>Teaching</source>
+        <translation>Enseñanza</translation>
+    </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="292"/>
+        <source>My Films</source>
+        <translation>Mis películas</translation>
+    </message>
 </context>
 <context>
     <name>SensorPreset</name>

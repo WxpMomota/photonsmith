@@ -462,7 +462,9 @@ class DataFilm {
 		return toon_look::tagOf(st);
 	}
 
-	std::string sceneAt(double t) const { return inCredits(t) ? creditsScene() : terminated(worldAt(headerAt(t), t)); }
+	std::string sceneAt(double t) const { return inCredits(t) || blackAt(t) ? creditsScene() : terminated(worldAt(headerAt(t), t)); }
+	// True in a `black` shot (a title card over black): the frame is the credits' empty scene, so nothing of the set is made, read or lit.
+	bool blackAt(double t) const { return !spec.shots.empty() && spec.shots[shotAt(t)].black; }
 	// A frame's text with the film's shadow terminator offset (`terminator`, shadow_terminator.h) on every one of its materials; as it is without one.
 	std::string terminated(std::string text) const;
 	// `text` with `words` (pbrt parameters) added to every Material and MakeNamedMaterial statement in it.

@@ -217,6 +217,10 @@ static bool integratorModeForPbrtName(const QString &name, IntegratorMode &outMo
 //   picture size: a film's own (16:9), or the file's Film line - its camera is framed for that shape;
 //   for a film: the GPU renderer it was made for (Recursive or Wavefront: its videos' frames use that one whatever is chosen, cartoon_render::frameFlags), the denoiser
 //     (every film is measured and tuned with it), and in video mode its own length and frame rate (its soundtrack is made for exactly those).
+// What every film is set up with when it is picked (a still of it or its video): full HD, 300 samples a pixel, rays of up to 10 bounces - the same for every film, whatever
+// its own Film and Sampler lines say. In the app only: a film's scene text is unchanged, so the frames of a video half made are not taken to have changed.
+constexpr int kFilmWidth = 1920, kFilmHeight = 1080, kFilmSamples = 300, kFilmMaxDepth = 10;
+
 QList<MainWindow::SceneRecommendation> MainWindow::sceneRecommendations(const QString &sceneId, const SceneMetadataClient::SceneMetadata *preloaded) {
 	QList<SceneRecommendation> out;
 	if (sceneId.isEmpty() || !m_integratorCombo || !m_samplerCombo || !m_lightSamplerCombo || !m_samplesSpinBox || !m_maxDepthSpinBox || !m_widthSpinBox || !m_heightSpinBox)
@@ -244,10 +248,10 @@ QList<MainWindow::SceneRecommendation> MainWindow::sceneRecommendations(const QS
 	}
 
 	// how long a path may bounce, how many samples, how bright
-	const int depth = meta->recommendedMaxDepth;
-	if (depth > 0 && depth != 5 && depth != m_maxDepthSpinBox->value() && depth >= m_maxDepthSpinBox->minimum() && depth <= m_maxDepthSpinBox->maximum())
+	const int depth = film ? kFilmMaxDepth : meta->recommendedMaxDepth;
+	if (depth > 0 && (film || depth != 5) && depth != m_maxDepthSpinBox->value() && depth >= m_maxDepthSpinBox->minimum() && depth <= m_maxDepthSpinBox->maximum())
 		add(tr("max ray depth %1").arg(depth), QString::number(m_maxDepthSpinBox->value()), [this, depth]() { m_maxDepthSpinBox->setValue(depth); });
-	const int spp = film ? film->samples : meta->recommendedSpp;
+	const int spp = film ? kFilmSamples : meta->recommendedSpp;
 	if (spp > 0 && spp != m_samplesSpinBox->value())
 		add(tr("%1 samples per pixel").arg(spp), QString::number(m_samplesSpinBox->value()), [this, spp]() { m_samplesSpinBox->setValue(spp); });
 	if (m_exposureSpin && meta->recommendedExposure > 0.0 && std::abs(meta->recommendedExposure - m_exposureSpin->value()) > 1e-6) {
@@ -256,7 +260,7 @@ QList<MainWindow::SceneRecommendation> MainWindow::sceneRecommendations(const QS
 	}
 
 	// the picture's shape
-	const int w = film ? film->width : meta->filmWidth, h = film ? film->height : meta->filmHeight;
+	const int w = film ? kFilmWidth : meta->filmWidth, h = film ? kFilmHeight : meta->filmHeight;
 	if (w > 0 && h > 0 && (w != m_widthSpinBox->value() || h != m_heightSpinBox->value()) && w <= m_widthSpinBox->maximum() && h <= m_heightSpinBox->maximum() &&
 		w >= m_widthSpinBox->minimum() && h >= m_heightSpinBox->minimum())
 		add(tr("%1 x %2 pixels").arg(w).arg(h), QStringLiteral("%1 x %2").arg(m_widthSpinBox->value()).arg(m_heightSpinBox->value()), [this, w, h]() {
@@ -330,11 +334,11 @@ void MainWindow::syncCartoonVideoSettings(const QString &sceneId) {
 		m_filmTimeRow->setVisible(film && !isVideoMode());
 		if (film && QString::fromStdString(film->key) != m_filmTimeFor) {
 			m_filmTimeFor = QString::fromStdString(film->key);
-			// The film's own picture size (16:9: 1280 x 720, or 1920 x 1080 for the long films), once when it is first picked, so a still or a video of it is
-			// not square; a size typed in afterwards stays.
+			// Every film's picture size (full HD, kFilmWidth x kFilmHeight), once when it is first picked, so a still or a video of it is not square; a size typed in
+			// afterwards stays.
 			if (m_widthSpinBox && m_heightSpinBox) {
-				m_widthSpinBox->setValue(film->width);
-				m_heightSpinBox->setValue(film->height);
+				m_widthSpinBox->setValue(kFilmWidth);
+				m_heightSpinBox->setValue(kFilmHeight);
 			}
 			if (m_filmShotCombo) {
 				m_filmShotCombo->clear();

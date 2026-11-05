@@ -288,6 +288,12 @@ QString displaySubcategory(const QString& subcategory) {
 		QT_TRANSLATE_NOOP("SceneSubcategory", "Vehicles"),
 		QT_TRANSLATE_NOOP("SceneSubcategory", "Objects"),
 		QT_TRANSLATE_NOOP("SceneSubcategory", "Light & Art"),
+		// the Cartoons tab's (a film's genre: cartoon::genreOf)
+		QT_TRANSLATE_NOOP("SceneSubcategory", "Stories"),
+		QT_TRANSLATE_NOOP("SceneSubcategory", "Space"),
+		QT_TRANSLATE_NOOP("SceneSubcategory", "Showcases"),
+		QT_TRANSLATE_NOOP("SceneSubcategory", "Teaching"),
+		QT_TRANSLATE_NOOP("SceneSubcategory", "My Films"),
 	};
 	for (const char *name : kNames)
 		if (subcategory == QLatin1String(name)) return QCoreApplication::translate("SceneSubcategory", name);

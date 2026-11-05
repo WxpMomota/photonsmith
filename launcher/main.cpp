@@ -760,11 +760,20 @@ static bool renderSideBySide(const LaunchArgs &args, const RenderSetup &s, int l
 	right.out_path = side_by_side_frame::halfPath(s.out_path, "right");
 	std::cout << "Side by side (the scene's @rt-sidebyside line): the left half at ray depth " << leftDepth << ", the right at " << s.max_ray_depth << ", each "
 			  << left.image_width << " x " << s.image_height << std::endl;
-	if (!runIntegrator(args, left, cam_x, cam_y, cam_z, render_opts, render_result) || render_result != 0) return false;
-	if (!runIntegrator(args, right, cam_x, cam_y, cam_z, render_opts, render_result) || render_result != 0) return false;
+	const auto dropHalves = [&]() {   // (a half that failed leaves no half-wide picture beside the frames: a retry, or the next run, starts clean)
+		std::error_code ec;
+		std::filesystem::remove(left.out_path, ec);
+		std::filesystem::remove(right.out_path, ec);
+	};
+	if (!runIntegrator(args, left, cam_x, cam_y, cam_z, render_opts, render_result) || render_result != 0 ||
+		!runIntegrator(args, right, cam_x, cam_y, cam_z, render_opts, render_result) || render_result != 0) {
+		dropHalves();
+		return false;
+	}
 	std::string why;
 	if (!side_by_side_frame::join(left.out_path, right.out_path, s.out_path, why)) {
 		std::cerr << "ERROR: the side-by-side picture: " << why << std::endl;
+		dropHalves();
 		render_result = ERR_FILE_WRITE_FAILED;
 		return false;
 	}
@@ -818,7 +827,11 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
 
     // (a scene that asks for two halves side by side gets them: not for an EXR, whose two halves would need joining in linear light, or AOV passes, which are of one view)
     const char *side_scene = cpu_scene_pbrt_path_by_id(scene_id.c_str());
-    const int side_depth = side_scene && !args.aovs && !is_exr_output_path(out_path) ? side_by_side::depthOfFile(side_scene) : -1;
+    const int side_asked = side_scene ? side_by_side::depthOfFile(side_scene) : -1;
+    const int side_depth = !args.aovs && !is_exr_output_path(out_path) ? side_asked : -1;
+    if (side_asked >= 1 && side_depth < 1)
+        std::cout << "Note: the scene asks for two halves side by side (@rt-sidebyside), but " << (args.aovs ? "AOV passes are" : "an EXR is")
+                  << " of one view: rendered as one picture." << std::endl;
     if (side_depth >= 1) {
         if (!renderSideBySide(args, s, side_depth, cam_x, cam_y, cam_z, render_opts, render_result)) return render_result;
     } else if (!runIntegrator(args, s, cam_x, cam_y, cam_z, render_opts, render_result)) {
@@ -846,6 +859,8 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
         if (!problem.empty()) std::cerr << "Warning: the scene's @rt-toon line: " << problem << " (the look is left out)" << std::endl;
         if (toon.on && is_exr_output_path(out_path)) {
             std::cout << "Note: the toon look is for pictures; the EXR stays as rendered." << std::endl;
+        } else if (toon.on && side_depth >= 1) {   // (its passes are rendered again from one camera over the whole width: they would match neither half)
+            std::cout << "Note: the toon look is not made on a side-by-side picture; it stays as rendered." << std::endl;
         } else if (toon.on) {
             std::cout << "\nMaking the toon look (its passes, then the bands and lines)..." << std::endl;
             if (!toon_frame::apply(out_path, image_width, image_height, toon, scene_id, cam_x, cam_y, cam_z, problem))
@@ -853,7 +868,9 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
         }
         // and last, the scene's cartoon marks (`# @rt-mark` lines: a film's `mark`, src/shared/screen_marks.h), drawn over the finished picture
         const std::vector<screen_marks::Mark> marks = scene_file ? screen_marks::fromSceneFile(scene_file) : std::vector<screen_marks::Mark>();
-        if (!marks.empty() && !is_exr_output_path(out_path) && !marks_frame::apply(out_path, marks, problem))
+        if (!marks.empty() && side_depth >= 1)   // (a mark's place is the whole frame's: on two halves it would land in the wrong one)
+            std::cout << "Note: the scene's cartoon marks are not drawn on a side-by-side picture." << std::endl;
+        else if (!marks.empty() && !is_exr_output_path(out_path) && !marks_frame::apply(out_path, marks, problem))
             std::cerr << "WARNING: the cartoon marks could not be drawn (" << problem << ")." << std::endl;
         // and the picture on paper or film (the look's halftone, watercolor, vintage: src/shared/print_look.h), on the finished picture
         // (left for later with --defer-print: a film denoised over time gets it after the denoising, film_temporal.h)

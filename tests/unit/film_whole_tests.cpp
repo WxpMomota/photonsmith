@@ -18,6 +18,7 @@
 #include <vector>
 #include "agreement_test_helpers.h"
 #include "../../src/shared/cartoon/cartoons.h"
+#include "../../src/external/stb_image.h"
 
 namespace {
 
@@ -52,6 +53,47 @@ bool isFilmFile(const cartoon::Film &film) {
 }
 
 }  // namespace
+
+// A scene that asks for two halves side by side (`# @rt-sidebyside depth 1`, src/shared/side_by_side.h) is rendered by the launcher as two half-width renders joined:
+// the picture is as wide as asked, its left half (rays that stop at the first surface) darker than its right (light that bounces off the floor onto the wall), the
+// line between them pale, and no half's file left beside it. On the CPU, small: the Fast tier and CI run it.
+TEST(SideBySideRender, TheLauncherRendersTwoHalvesAndJoinsThem) {
+	const std::string launcher = findRayTracerLauncher();
+	if (launcher.empty()) GTEST_SKIP() << "ray_tracer was not found";
+	const std::filesystem::path d = scratch("sidebyside");
+	{
+		std::ofstream f(d / "s.pbrt");
+		f << "# @rt-sidebyside depth 1\nLookAt 0 1 3  0 0.8 0  0 1 0\nCamera \"perspective\" \"float fov\" [ 70 ]\n"
+			 "Film \"rgb\" \"integer xresolution\" [ 40 ] \"integer yresolution\" [ 20 ]\nSampler \"halton\" \"integer pixelsamples\" [ 16 ]\nWorldBegin\n"
+			 "AttributeBegin\n  AreaLightSource \"diffuse\" \"rgb L\" [ 30 30 30 ] \"bool twosided\" [ true ]\n"
+			 "  Shape \"trianglemesh\" \"integer indices\" [ 0 2 1  0 3 2 ] \"point3 P\" [ -0.2 1.6 0.6  0.2 1.6 0.6  0.2 1.6 1.0  -0.2 1.6 1.0 ]\nAttributeEnd\n"
+			 "Material \"diffuse\" \"rgb reflectance\" [ 0.8 0.8 0.8 ]\n"
+			 "Shape \"trianglemesh\" \"integer indices\" [ 0 1 2  0 2 3 ] \"point3 P\" [ -3 0 -1  3 0 -1  3 0 3  -3 0 3 ]\n"
+			 "Shape \"trianglemesh\" \"integer indices\" [ 0 1 2  0 2 3 ] \"point3 P\" [ -3 0 -1  -3 3 -1  3 3 -1  3 0 -1 ]\n";
+	}
+	const std::filesystem::path out = d / "out.png";
+	const int rc = runLauncher(launcher, "--cpu --seed 1 --height 20 --output \"" + out.string() + "\" 40 16 6 \"" + (d / "s.pbrt").string() + "\"", d / "log.txt");
+	ASSERT_EQ(rc, 0) << slurpFile(d / "log.txt");
+	int w = 0, h = 0, n = 0;
+	unsigned char *px = stbi_load(out.string().c_str(), &w, &h, &n, 3);
+	ASSERT_NE(px, nullptr) << "a picture: " << slurpFile(d / "log.txt");
+	const auto mean = [&](int x0, int x1) {
+		double sum = 0.0;
+		for (int y = 0; y < h; ++y)
+			for (int x = x0; x < x1; ++x)
+				for (int c = 0; c < 3; ++c) sum += px[(y * w + x) * 3 + c];
+		return sum / ((x1 - x0) * h * 3.0);
+	};
+	const double left = mean(0, w / 2 - 2), right = mean(w / 2 + 2, w), line = mean(w / 2 - 1, w / 2 + 1);
+	stbi_image_free(px);
+	EXPECT_EQ(w, 40);
+	EXPECT_EQ(h, 20);
+	EXPECT_LT(left * 1.1, right) << "the left half (depth 1) is darker than the right (bounced light): " << left << " vs " << right;
+	EXPECT_GT(line, 180.0) << "the pale line between the halves";
+	EXPECT_FALSE(std::filesystem::exists(d / "out.left.png") || std::filesystem::exists(d / "out.right.png") || std::filesystem::exists(d / "out.left.ppm"))
+		<< "no half's file is left";
+	EXPECT_NE(slurpFile(d / "log.txt").find("Side by side"), std::string::npos) << "the run says so";
+}
 
 // The films in test_parts.h's parts, so the Render tier's shards share them (one test of every film's baseline took 141 s of a shard, a quarter of the stills 126 s). The suite
 // is in the Render tier by its name (scripts/run_tests_parallel.ps1 $renderSuites). A part without a film passes at once.

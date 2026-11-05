@@ -1434,7 +1434,7 @@ std::string DataFilm::creditsScene() const {
 }
 
 std::string DataFilm::headerAt(double t) const {
-	if (inCredits(t)) return scene.header;   // (the credits one picture, never side by side)
+	if (inCredits(t) || blackAt(t)) return scene.header;   // (the credits, and a `black` shot: one picture, never side by side)
 	if (spec.shots.empty()) return sideBySideLine(t) + toonLine(t) + scene.header;
 	std::string lookAt, camera;
 	cameraAt(t, lookAt, camera);

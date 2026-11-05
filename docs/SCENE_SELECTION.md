@@ -34,6 +34,12 @@ The category letters, in GUI tab order:
 
 **Subcategories.** A category that grows too big to browse as one list has a second level, shown as a row of tabs under the category tabs ("All (45)", "Interiors (16)", ...). Today only Large Scenes has them: **Interiors** (rooms, halls, kitchens), **Buildings & Streets** (atrium, cathedral, pavilion, houses, streets, a power plant), **Voxel Worlds** (Minecraft-style towns), **Nature**, **Vehicles** (cars and a spaceship), **Objects** (statues, product shots, material studies) and **Light & Art** (light-transport test scenes, artists' pieces). A subcategory is part of the scene's registry row (`in_subcategory(SceneSubcategories::Vehicles, ...)`, names in `src/shared/scene_descriptor.h`); it never changes the scene's id, which is the category's letter and a number, so moving a scene between subcategories moves no id. The row shows only when the selected category's scenes have two or more subcategories.
 
+Cartoons has them too, a film's genre: **Stories** (character cartoons), **Nature** (wildlife and landscapes), **Space**, **Showcases** (short pieces about one look or
+one bit of physics), **Teaching** (lessons shown side by side) and **My Films** (your own `my-...` films). A film file says which with `genre story|nature|space|showcase|teaching`;
+without it the film's tags decide (teaching, then space or explainer, then nature, then character or cartoon for a story, else a showcase), and a film of your own is
+always under My Films (`cartoon::genreOf`, src/shared/cartoon/cartoons.h). The still carries it as `# @rt-subcategory NAME` in its header - which any `.pbrt` file may
+use too, with one of the names in `SceneSubcategories` (src/shared/scene_descriptor.h).
+
 A name in a scene's list is what the scene shows ("Cornell Rough Glass"). A scene found on disk is listed under the title the Scene Builder saved in it, or its file name made readable (`bdpt-box-room` is "BDPT Box Room"). A "(pbrt file)" qualifier appears on six names only, where a compiled-in scene already has the plain name.
 
 The full table (id, name, description, performance, recommended samples, GPU compatibility, camera) is `get_builtin_scene_registry()` in `src/TheRestOfYourLife/scene_registry_data.h`; this document does not copy it, because a copy would drift.

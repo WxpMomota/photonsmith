@@ -6,6 +6,13 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **Cartoons in sub-tabs, and every film's defaults 1920 x 1080, 300 samples, depth 10 (2026-11-04).** The Cartoons list now has tabs like the Large Scenes:
+  Stories, Nature, Space, Showcases, Teaching and My Films. A film's tab comes from a `genre` line or else from its tags (a film in parts from its whole), and its
+  still carries `# @rt-subcategory`. A film's recommended settings and Video Settings now default to 1920 x 1080, 300 samples per pixel and max depth 10 (and
+  `film.py` the same) unless the film says otherwise. A film can start a side-by-side part later (`sidebyside depth N from T`), and a `black` shot renders a plain
+  black frame cheaply; How Light Bounces uses both for its bilingual title card, and its set is now 61 binary PLY meshes (the scene file 10 KB, was 13 MB). A
+  side-by-side frame drops both halves when one fails, and says so when it cannot apply (EXR or AOV output; the toon look and marks are skipped there).
+
 * **A film set's normal maps (2026-11-04).** A film's set had its file paths made absolute for each frame (`"string filename"`, `mapname`, `lensfile`) but not a
   material's `"string normalmap"`, which was then looked for beside the frame's own scene and not found: the surface rendered smooth, with a warning. The Sun Hall
   was made richer the same day: a lapis and gold coffered dome with gilded rosettes, columns of three coloured marbles under gilded capitals, porphyry and

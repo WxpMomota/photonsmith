@@ -3,8 +3,8 @@
 # every frame is rendered twice from the same camera, each half the whole view (`sidebyside depth 1 from 7`): on the left the rays stop at the first surface they meet, so
 # a surface is lit only by what reaches it straight from the sun or the sky; on the right the light bounces as many times as the video's ray depth allows.
 # The set is the Sun Hall (film_assets/how-light-bounces/sun_hall.pbrt, written by scripts/lessons/sun_hall.py): an original domed marble rotunda whose only light is the
-# sun through the oculus at its crown - one bright disc on the far wall, and everything else lit by the light that disc gives back. The title card is seen from inside a
-# small closed black box below the hall (the set's "title room"). Its words: film_assets/how-light-bounces/captions.txt. Render it at a ray depth of 8 or more (the app's
+# sun through the oculus at its crown - one bright disc on the far wall, and everything else lit by the light that disc gives back. The title card is a `black` shot
+# (the credits' empty scene, nothing of the hall made). Its words: film_assets/how-light-bounces/captions.txt. Render it at a ray depth of 8 or more (the app's
 # Max depth) to see the right half at its best.
 film    how-light-bounces
 name    How Light Bounces
@@ -16,9 +16,10 @@ tags    teaching, lighting, indoors
 sidebyside depth 1 from 7
 music      clear
 
-# the title card: black, inside the title room
+# the title card: black (the credits' empty scene: nothing of the hall made or lit)
 shot 0 Title
-  key    0 -80 0     0 -80 -1     60
+  key    0 1.8 15     0 7 -12     65
+  black
 
 # one move through the hall: low by the entrance facing the sunlit wall, round to the right past the gold sphere, up past the columns, a look up into the dome and
 # its oculus, and down again to look back across the hall

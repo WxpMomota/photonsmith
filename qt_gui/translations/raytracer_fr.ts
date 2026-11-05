@@ -10967,6 +10967,31 @@ Source : %3</translation>
         <source>Light &amp; Art</source>
         <translation>Lumière et art</translation>
     </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="292"/>
+        <source>Stories</source>
+        <translation>Histoires</translation>
+    </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="292"/>
+        <source>Space</source>
+        <translation>Espace</translation>
+    </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="292"/>
+        <source>Showcases</source>
+        <translation>Démonstrations</translation>
+    </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="292"/>
+        <source>Teaching</source>
+        <translation>Enseignement</translation>
+    </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="292"/>
+        <source>My Films</source>
+        <translation>Mes films</translation>
+    </message>
 </context>
 <context>
     <name>SensorPreset</name>

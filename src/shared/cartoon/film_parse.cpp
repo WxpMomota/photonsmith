@@ -702,6 +702,10 @@ Parsed parse(const std::string &text, const std::string &where, const std::vecto
 			if (w.size() != 2 || !number(w[1], tr.length) || tr.length <= 0.0 || tr.length > 10.0) return fail("`" + verb + " SECONDS`: from more than 0 to 10 seconds");
 			tr.kind = verb == "dissolve" ? Transition::Dissolve : verb == "fade" ? Transition::Fade : Transition::Wipe;
 			if (s.shots.size() == 1 && tr.kind != Transition::Fade) return fail("the first shot can only fade in (`fade`): there is nothing before it to " + verb + " from");
+		} else if (verb == "black") {
+			if (s.shots.empty()) return fail("`black` belongs to a shot: start one with `shot 0 NAME` first");
+			if (w.size() != 1) return fail("`black`: the shot is a black frame, nothing of the set made or lit (a title card's: its words are the captions file's)");
+			s.shots.back().black = true;
 		} else if (verb == "idle") {
 			if (w.size() != 2 || (w[1] != "on" && w[1] != "off")) return fail("`idle on` or `idle off`");
 			s.idle = w[1] == "on";

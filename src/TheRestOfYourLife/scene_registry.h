@@ -1041,6 +1041,13 @@ inline bool appendOne(std::vector<SceneDescriptor>& registry, const pbrt_discove
     // distinction is made.
     s.requires_files = d.nested;
     s.film_key = d.cartoonKey;
+    // The subcategory the file names ("# @rt-subcategory ..."), if it is one of ours: a film's still carries its genre, the Cartoons tab's second row.
+    for (const char* known : SceneSubcategories::kLargeScenes)
+        if (d.subcategory == known) s.subcategory = known;
+    for (const char* known : SceneSubcategories::kCartoons)
+        if (d.subcategory == known) s.subcategory = known;
+    if (!d.subcategory.empty() && d.subcategory != s.subcategory)
+        std::cerr << "warning: " << d.path << ": unknown @rt-subcategory \"" << d.subcategory << "\" - listed under none\n";
     // gpu/optix/pbrt_gpu_builder.h consumes the same FlatScene this does,
     // so both backends render the same file, and they now agree on what
     // they can sample: sphere, parallelogram AND individual-triangle area

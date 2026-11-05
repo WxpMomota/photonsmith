@@ -1108,6 +1108,29 @@ void MainWindow::runSubcategoriesSelfTest(const std::function<void(const QString
 	selectSceneById("H41");   // and back: Veach, Ajar is in Light & Art
 	QApplication::processEvents();
 	check(m_sceneSubcategoryTabs->tabData(m_sceneSubcategoryTabs->currentIndex()).toString() == "Light & Art", "choosing Veach, Ajar selects Light & Art");
+	// Cartoons: a film's genre is its tab, the tabs come in the canonical order, and a tab lists only its own films
+	QString teaching;
+	for (int i = 0, n = SceneMetadataClient::sceneCount(); i < n && teaching.isEmpty(); ++i) {
+		const QString id = SceneMetadataClient::sceneIdAtIndex(i);
+		if (SceneMetadataClient::sceneCategory(id) == "Cartoons" && SceneMetadataClient::sceneSubcategory(id) == "Teaching") teaching = id;
+	}
+	check(!teaching.isEmpty(), "a teaching film is among the cartoons (" + teaching + ")");
+	if (!teaching.isEmpty()) {
+		selectSceneById(teaching);
+		QApplication::processEvents();
+		check(m_sceneSubcategoryTabs->tabData(m_sceneSubcategoryTabs->currentIndex()).toString() == "Teaching", "choosing it selects the Teaching tab");
+		bool onlyTeaching = m_sceneCombo->count() >= 1;
+		for (int i = 0; i < m_sceneCombo->count(); ++i)
+			onlyTeaching = onlyTeaching && SceneMetadataClient::sceneSubcategory(m_sceneCombo->itemData(i).toString()) == "Teaching";
+		check(onlyTeaching, QString("the Teaching tab lists %1 film(s), all teaching").arg(m_sceneCombo->count()));
+		const QStringList order = {"Stories", "Nature", "Space", "Showcases", "Teaching", "My Films"};
+		QStringList tabs;
+		for (int i = 1; i < m_sceneSubcategoryTabs->count(); ++i) tabs << m_sceneSubcategoryTabs->tabData(i).toString();
+		bool inOrder = tabs.size() >= 4;   // (tab 0 is All)
+		for (int i = 1; i < tabs.size(); ++i) inOrder = inOrder && order.indexOf(tabs[i - 1]) >= 0 && order.indexOf(tabs[i - 1]) < order.indexOf(tabs[i]);
+		check(inOrder, "the cartoon tabs come in order: " + tabs.join(", "));
+		shot("subcategories_cartoons");
+	}
 	log(ok ? "RESULT: OK" : "RESULT: FAIL");
 	QApplication::exit(ok ? 0 : 1);
 }
@@ -1729,8 +1752,9 @@ void MainWindow::runRecommendSelfTest(const std::function<void(const QString &)>
 	const QString tip = m_sceneRecommendedSettingsHint->text();
 	log("tip: " + tip);
 	check(m_sceneRecommendedSettingsHint->isVisible() && m_applyRecommendedSettingsButton->isVisible(), "the tip and its Apply button show");
-	check(tip.contains(QStringLiteral("1920 x 1080")) && tip.contains(QStringLiteral("max ray depth 8")) && tip.contains(QStringLiteral("8184 frames at 24 fps")),
-		  "it lists the film's picture size, max depth and length");
+	check(tip.contains(QStringLiteral("1920 x 1080")) && tip.contains(QStringLiteral("max ray depth 10")) && tip.contains(QStringLiteral("300 samples per pixel")) &&
+			  tip.contains(QStringLiteral("8184 frames at 24 fps")),
+		  "it lists every film's picture size, max depth and samples, and the film's length");
 	if (wavefrontOffered) check(tip.contains(QStringLiteral("Wavefront")), "and the GPU renderer it was made for");
 	for (int k = 0; k < 3; ++k) QApplication::processEvents();
 	{
@@ -1742,8 +1766,8 @@ void MainWindow::runRecommendSelfTest(const std::function<void(const QString &)>
 	shot("recommend");
 	applyRecommendedSettings();
 	QApplication::processEvents();
-	check(m_widthSpinBox->value() == film->width && m_heightSpinBox->value() == film->height, QString("Apply: %1 x %2").arg(m_widthSpinBox->value()).arg(m_heightSpinBox->value()));
-	check(m_maxDepthSpinBox->value() == 8 && m_samplesSpinBox->value() == film->samples, QString("max depth %1, %2 samples").arg(m_maxDepthSpinBox->value()).arg(m_samplesSpinBox->value()));
+	check(m_widthSpinBox->value() == 1920 && m_heightSpinBox->value() == 1080, QString("Apply: %1 x %2").arg(m_widthSpinBox->value()).arg(m_heightSpinBox->value()));
+	check(m_maxDepthSpinBox->value() == 10 && m_samplesSpinBox->value() == 300, QString("max depth %1, %2 samples").arg(m_maxDepthSpinBox->value()).arg(m_samplesSpinBox->value()));
 	check(m_videoFramesSpinBox->value() == film_info::frameCountOf(*film) && m_videoFPSSpinBox->value() == film->fps, "the film's own length and frame rate");
 	if (wavefrontOffered) check(m_gpuBackendCombo->currentData().toBool() == film->wavefront, "its GPU renderer: " + m_gpuBackendCombo->currentText());
 	if (m_denoiseCheck->isEnabled()) check(m_denoiseCheck->isChecked(), "the denoiser on");

@@ -43,6 +43,7 @@ inline std::string tags(const cartoon::Film &film) {
 	std::snprintf(at, sizeof(at), "%g", film.stillTime);
 	std::string out = std::string("# @rt-name ") + film.name + "\n";
 	out += "# @rt-category Cartoons\n";
+	out += std::string("# @rt-subcategory ") + cartoon::genreOf(film) + "\n";   // (its genre: the Cartoons tab's second row)
 	out += std::string("# @rt-cartoon ") + film.key + "\n";
 	out += std::string("# @rt-description ") + cartoon::summaryOf(film) + " This picture is the frame at " + at + " seconds; the whole film is a video preset (Video Settings, \"Cartoon: " +
 		   film.name + "\").\n";

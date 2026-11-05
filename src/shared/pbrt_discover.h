@@ -109,6 +109,7 @@ struct Discovered {
 	// What the file says about itself in "# @rt-<key> <value>" comment lines before WorldBegin (see detail::readHeaderTags): the category (one of
 	// SceneCategories), a one-line description, and a performance word. Empty when absent.
 	std::string category;
+	std::string subcategory;   // ("# @rt-subcategory Nature": the second level inside the category, one of SceneSubcategories' names; a film's still carries its genre)
 	std::string description;
 	std::string performance;
 	bool gpuCompatible = true;   // false when the file says "# @rt-gpu no"
@@ -189,7 +190,7 @@ inline std::string headerOf(const std::string &text) {
 // wherever it is copied. Only comment lines before WorldBegin are read; a description given on several lines is joined with spaces; the Scene
 // Builder's own "# @rt-builder-doc" line is not one of these. Unknown keys are ignored.
 struct HeaderTags {
-	std::string category, description, performance, name, cartoon;
+	std::string category, subcategory, description, performance, name, cartoon;
 	bool gpuCompatible = true;   // "# @rt-gpu no": the scene uses something the GPU backends do not support, so it renders on the CPU only
 	// "# @rt-size 555": how big the scene is, as the largest side of its bounding box in the scene's own units (scene_size.h). The interactive camera controls
 	// scale their step by it. 0 = the file does not say.
@@ -210,6 +211,7 @@ inline HeaderTags readHeaderTags(const std::string &text) {
 		while (!value.empty() && value.front() == ' ') value.erase(value.begin());
 		if (value.empty()) continue;
 		if (key == "category") tags.category = value;
+		else if (key == "subcategory") tags.subcategory = value;
 		else if (key == "performance") tags.performance = value;
 		else if (key == "name") tags.name = value;
 		else if (key == "cartoon") tags.cartoon = value;
@@ -332,6 +334,7 @@ inline Discovered describe(const std::string &path, const std::string &text) {
 	{
 		const detail::HeaderTags tags = detail::readHeaderTags(text);
 		d.category = tags.category;
+		d.subcategory = tags.subcategory;
 		d.description = tags.description;
 		d.performance = tags.performance;
 		d.tagName = tags.name;

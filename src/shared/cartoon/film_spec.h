@@ -182,6 +182,7 @@ struct Shot {
 	cosmos::SpaceCam spaceCam;   // (`spacecam`) a journey in space (film_voyage.h)
 	bool descending = false;     // (`descend`) the film's `planetfall`, from orbit to the ground (film_planetfall.h)
 	bool cutaway = false;        // (`cutaway`) the walls between the camera and the room it is looking into not drawn, as a dolls' house's (film_roomworld.cpp)
+	bool black = false;          // (`black`) a black frame - the credits' empty scene, nothing of the set made or lit, so it costs nothing - for a title card over black
 	std::string peek;            // (`peek ROOM`) the camera outside a window of ROOM, looking in
 	int peekWindow = 0;
 	double peekFrom = 1.6;
@@ -664,6 +665,7 @@ struct Spec {
 	bool musicOnly = false;   // (`mute sounds`: the film's soundtrack is its music alone - no ambience, nature, events, weather, rooms or voices)
 	int sideBySideDepth = -1;   // (`sidebyside depth N`: every frame two renders side by side, the left at ray depth N - src/shared/side_by_side.h; -1: one picture)
 	double sideBySideFrom = 0.0;   // (`... from T`: one picture before T - a title card over black - and two halves from T on)
+	std::string genre;   // (`genre story|nature|space|showcase|teaching`: its sub-tab under Cartoons - cartoon::genreOf; empty: from its tags)
 	bool draftMusic = true;   // (`music none`: no drafted score when there is no cues file)
 	bool clearMusic = false;  // (`music clear`: the score is not muffled while the camera is under the water - the voices and the sea's sounds still are)
 	toon_look::Style toon;    // the toon look (`toon`): written into every frame's header as its `# @rt-toon` line

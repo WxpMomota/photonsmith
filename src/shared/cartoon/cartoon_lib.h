@@ -571,6 +571,9 @@ struct FilmMeta {
 	// under the water has 1 - its open water, smooth and still, "boils" from frame to frame (each frame's denoiser leaves blotches of its own), and the neighbours calm it.
 	// (Last: the films' tables fill the fields above by position.)
 	int temporal = 0;
+	// Its genre, the Cartoons tab's second row (cartoon::genreOf): "story", "nature", "space", "showcase" or "teaching" - a film file's `genre` line; null: worked out
+	// from its tags. (After `temporal`, so the built-in tables, filled by position, are unchanged.)
+	const char *genre = nullptr;
 };
 
 // One line of a caption's text and how it is set: a font file (found as launcher/film_captions.h says; `fontIndex` picks a face of a .ttc), its height as a share of the frame's

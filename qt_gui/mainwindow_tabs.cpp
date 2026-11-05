@@ -303,10 +303,13 @@ void MainWindow::rebuildSubcategoryTabs(const QString &category, const QString &
 		const QString sub = SceneMetadataClient::sceneSubcategory(id);
 		if (!sub.isEmpty()) ++counts[sub];
 	}
-	// The canonical order first (SceneSubcategories::kLargeScenes), then any other name in alphabetical order.
+	// The canonical order first (SceneSubcategories::kLargeScenes, or kCartoons on the Cartoons tabs: both have a Nature), then any other name in alphabetical order.
 	QStringList names;
-	for (const char *canonical : SceneSubcategories::kLargeScenes)
-		if (counts.contains(QString::fromUtf8(canonical))) names << QString::fromUtf8(canonical);
+	const bool cartoons = SceneCategories::isFilmCategory(category.toUtf8().constData());
+	const char *const *first = cartoons ? std::begin(SceneSubcategories::kCartoons) : std::begin(SceneSubcategories::kLargeScenes);
+	const char *const *last = cartoons ? std::end(SceneSubcategories::kCartoons) : std::end(SceneSubcategories::kLargeScenes);
+	for (const char *const *canonical = first; canonical != last; ++canonical)
+		if (counts.contains(QString::fromUtf8(*canonical))) names << QString::fromUtf8(*canonical);
 	for (auto it = counts.constBegin(); it != counts.constEnd(); ++it)
 		if (!names.contains(it.key())) names << it.key();
 	if (names.size() < 2) {

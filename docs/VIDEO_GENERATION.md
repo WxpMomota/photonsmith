@@ -478,6 +478,9 @@ caption 9.0 15.5 fade=1 centre=0.86 width=0.583 gap=0.45 | zh: 豫章故郡，�
 `centre=` is how far down the frame the caption's middle is, `across=` how far across (0.5, the middle, when not given: 0.25 and 0.75 put a label over each half of a
 side-by-side film).
 
+**Its sub-tab: `genre story|nature|space|showcase|teaching`.** Under Cartoons in the scene list a film is in one of the sub-tabs Stories, Nature, Space, Showcases,
+Teaching and My Films; the line says which (a film of your own, `my-...`, is always under My Films). Without it the film's tags decide: docs/SCENE_SELECTION.md.
+
 **Teaching films: `sidebyside depth N`.** Every frame is rendered twice from the same camera and the two put side by side, each half the whole view at half the video's
 width (960 x 1080 of a 1920 x 1080 video): the left with the rays stopped after N surfaces - 1 is only the light that reaches a surface straight from a light, with no
 bounces - and the right at the video's own ray depth (the app's Max depth). The scene of each frame carries the line `# @rt-sidebyside depth N` (src/shared/side_by_side.h)

@@ -16,6 +16,7 @@
 #include <string>
 
 #include "../../src/shared/cartoon/cartoon_films.h"   // (the films themselves, which these tests reach into)
+#include "../../src/shared/cartoon/cartoon_stills.h"
 #include "../../src/shared/cartoon/cartoons_registry.h"
 #include "../../src/shared/cartoon/fountain.h"
 #include "../../src/shared/cartoon/film_score.h"
@@ -411,6 +412,60 @@ TEST(FilmFile, SideBySideAsksEveryFrameForTwoHalves) {
 		EXPECT_NE(p.error.find("sidebyside depth N"), std::string::npos) << p.error;
 	}
 	EXPECT_EQ(side_by_side::depthOf("WorldBegin\n# @rt-sidebyside depth 1\n"), -1) << "only in the header";
+}
+
+// A film's genre is its sub-tab under Cartoons (its still's `# @rt-subcategory` line): a film of your own is under My Films, a `genre` line says the rest, and without one
+// the tags decide - teaching, then space, then nature, then a story (a character or a cartoon), else a showcase. Every built-in film has one of the six.
+TEST(FilmFile, AFilmsGenreIsItsSubTabUnderCartoons) {
+	const std::filesystem::path d = tempDir("genre");
+	write(d / "s.pbrt", kScene);
+	const std::string shots = "scene s.pbrt\nlength 4\nshot 0 A\n key 0 1 6  0 0 0\n";
+	const std::map<std::string, std::string> films = {
+		{"lesson", "tags teaching, lighting\n"}, {"voyage", "tags emissive, night\ngenre space\n"}, {"wild", "tags water, nature\n"},
+		{"tale", "tags cartoon, indoors\n"}, {"cradle", "tags metal, physics\n"}, {"my-own", "tags nature\n"}};
+	cartoon::detail::Registry r;
+	for (const auto &[key, lines] : films) {
+		write(d / (key + ".film"), shots + lines);
+		cartoon::detail::addFilmFile(r, (d / (key + ".film")).string());
+	}
+	ASSERT_EQ(r.all.size(), films.size()) << (r.problems.empty() ? std::string() : r.problems[0]);
+	const std::map<std::string, std::string> want = {{"lesson", "Teaching"}, {"voyage", "Space"}, {"wild", "Nature"}, {"tale", "Stories"}, {"cradle", "Showcases"}, {"my-own", "My Films"}};
+	for (const cartoon::Film *f : r.all) {
+		EXPECT_EQ(std::string(cartoon::genreOf(*f)), want.at(f->key)) << f->key;
+		EXPECT_NE(cartoon_stills::tags(*f).find(std::string("# @rt-subcategory ") + want.at(f->key) + "\n"), std::string::npos) << "its still says so";
+	}
+	for (const cartoon::Film &f : cartoon::kFilms) {
+		const std::string g = cartoon::genreOf(f);
+		EXPECT_TRUE(std::any_of(std::begin(SceneSubcategories::kCartoons), std::end(SceneSubcategories::kCartoons), [&](const char *c) { return g == c; })) << f.key << ": " << g;
+	}
+	const cartoon::film_file::Parsed bad = cartoon::film_file::parse(shots + "genre western\n", "bad.film");
+	EXPECT_FALSE(bad.ok);
+	EXPECT_NE(bad.error.find("genre story|nature|space|showcase|teaching"), std::string::npos) << bad.error;
+}
+
+// Every bundled film is in the sub-tab it belongs in (a new film is listed here when it is added; a film of your own is under My Films and not listed).
+TEST(FilmFile, EveryBundledFilmIsInItsSubTab) {
+	const std::map<std::string, std::string> want = {
+		{"lamp-and-ball", "Stories"}, {"ball-parade", "Showcases"}, {"little-robot", "Stories"}, {"fireflies", "Showcases"}, {"newtons-cradle", "Showcases"},
+		{"domino-run", "Showcases"}, {"paper-boat", "Showcases"}, {"orrery", "Showcases"}, {"dandelion", "Showcases"}, {"candle", "Showcases"},
+		{"meet-pip", "Stories"}, {"pip-and-the-moon", "Stories"}, {"forest-dawn", "Nature"}, {"turtle-escape", "Stories"}, {"crystal-heart", "Showcases"},
+		{"tengwang", "Stories"}, {"a-busy-evening", "Stories"}, {"a-day-at-home", "Stories"}, {"a-walk-at-dusk", "Stories"}, {"cosmic-voyage", "Space"},
+		{"down-to-the-sea", "Stories"}, {"fire-and-ice", "Nature"}, {"how-light-bounces", "Teaching"}, {"nova-and-robo", "Space"}, {"pip-goes-out", "Stories"},
+		{"powers-of-ten", "Space"}, {"seasons-wood", "Nature"}, {"swell-breaks", "Nature"}, {"the-great-blue", "Nature"}, {"the-lantern-below", "Stories"},
+		{"the-midnight-garden", "Nature"}, {"thunder-plains", "Nature"}, {"valley-of-mists", "Nature"}, {"worlds-beyond", "Space"}};
+	int seen = 0;
+	for (const cartoon::Film *f : cartoon::films()) {
+		const std::string key = f->key;
+		if (key.rfind("my-", 0) == 0) {
+			EXPECT_STREQ(cartoon::genreOf(*f), "My Films") << key;
+			continue;
+		}
+		const auto it = want.find(key);
+		if (it == want.end()) continue;   // (a film part, or one this list does not know yet)
+		++seen;
+		EXPECT_EQ(std::string(cartoon::genreOf(*f)), it->second) << key;
+	}
+	EXPECT_GE(seen, 30) << "the bundled films were found (run from the repository root)";
 }
 
 // The two halves of a side-by-side picture are joined into one as wide as both, the left's pixels on the left and the right's on the right, a pale line between, and the

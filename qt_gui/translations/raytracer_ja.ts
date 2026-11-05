@@ -10861,6 +10861,31 @@ From: %3</source>
         <source>Light &amp; Art</source>
         <translation>光とアート</translation>
     </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="292"/>
+        <source>Stories</source>
+        <translation>物語</translation>
+    </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="292"/>
+        <source>Space</source>
+        <translation>宇宙</translation>
+    </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="292"/>
+        <source>Showcases</source>
+        <translation>ショーケース</translation>
+    </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="292"/>
+        <source>Teaching</source>
+        <translation>教材</translation>
+    </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="292"/>
+        <source>My Films</source>
+        <translation>マイフィルム</translation>
+    </message>
 </context>
 <context>
     <name>SensorPreset</name>

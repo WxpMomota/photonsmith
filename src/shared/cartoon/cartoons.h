@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "cartoon_lib.h"
+#include "../scene_descriptor.h"   // (SceneSubcategories: a film's genre is the Cartoons tab's second row)
 
 namespace cartoon {
 
@@ -145,6 +146,34 @@ inline std::string summaryOf(const Film &film) {
 	if (!tagsOf(film).empty()) out += " Tags: " + join(tagsOf(film), ", ") + ".";
 	if (!costText(film).empty()) out += " A frame takes " + costText(film) + " (1280 x 720, " + std::to_string(film.meta.samples) + " samples, GPU, denoised).";
 	return out;
+}
+
+// The film's genre - the Cartoons tab's second row (SceneSubcategories::kCartoons), carried by its still's `# @rt-subcategory` line: a film of your own ("my-...") is under My
+// Films; else what its `genre` line says; else from its tags - a lesson (teaching), space (space, explainer), nature, a story (character, cartoon), or a showcase (the rest:
+// short pieces about one look or one bit of physics).
+// The genre word ("teaching", "space", "nature", "story", "showcase") a comma-separated list of tags points to, in that order of precedence. A film file's own tags line is
+// read this way when the film is made (cartoons.cpp: its FilmMeta::tags keep only kTagVocabulary's words, which have no "teaching", "space" or "cartoon").
+inline const char *genreWordOfTags(const char *list) {
+	std::vector<std::string> tags = splitList(list, ',');
+	for (std::string &t : tags) {   // ("cartoon, indoors" keeps its spaces)
+		while (!t.empty() && t.front() == ' ') t.erase(t.begin());
+		while (!t.empty() && t.back() == ' ') t.pop_back();
+	}
+	const auto has = [&](const char *t) { return std::find(tags.begin(), tags.end(), std::string(t)) != tags.end(); };
+	if (has("teaching")) return "teaching";
+	if (has("space") || has("explainer")) return "space";
+	if (has("nature")) return "nature";
+	if (has("character") || has("cartoon")) return "story";
+	return "showcase";
+}
+inline const char *genreOf(const Film &film) {
+	if (std::string(film.key).rfind("my-", 0) == 0) return SceneSubcategories::MyFilms;
+	const std::string g = film.meta.genre ? film.meta.genre : genreWordOfTags(film.meta.tags);
+	if (g == "story") return SceneSubcategories::Stories;
+	if (g == "nature") return SceneSubcategories::Nature;
+	if (g == "space") return SceneSubcategories::Space;
+	if (g == "teaching") return SceneSubcategories::Teaching;
+	return SceneSubcategories::Showcases;
 }
 
 // One row of docs/VIDEO_GENERATION.md's film table (what `ray_tracer --film-table` prints, one per film).

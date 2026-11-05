@@ -31,7 +31,7 @@ The films themselves are C++ (src/shared/cartoon/: cartoon_lib.h is the toolkit,
                                                                 pbrt_scenes/my-reef.film with its key and name filled in, ready to change and render; `new` alone lists the starters
 
 Options (before or after the command): --exe PATH (default: RayTracer_Package/ray_tracer next to this repository), --cpu (default is the GPU, denoised), --height N (picture height,
-default 270 for a sheet and 720 otherwise), --spp N, --out PATH. Plain Python 3; the contact sheet needs Pillow (pip install pillow).
+default 270 for a sheet, 1080 for a video - with 300 samples and a ray depth of 10, every film's defaults as the app has them - and 720 otherwise), --spp N, --out PATH. Plain Python 3; the contact sheet needs Pillow (pip install pillow).
 """
 import argparse
 import os
@@ -699,9 +699,10 @@ def cmd_preview(args):
 
 
 def cmd_video(args):
-    height = args.height or 720
+    # every film's defaults, as the app sets them when a film is picked (qt_gui/mainwindow_scene_info.cpp kFilm*): 1920 x 1080, 300 samples, rays of up to 10 bounces
+    height = args.height or 1080
     width = round(height * 16 / 9)
-    cmd = [find_exe(args.exe)] + renderer_flags(args) + ["--video-preset", args.target, "--height", str(height), str(width), str(args.spp or 128), "8"]
+    cmd = [find_exe(args.exe)] + renderer_flags(args) + ["--video-preset", args.target, "--height", str(height), str(width), str(args.spp or 300), "10"]
     if args.out:
         cmd[1:1] = ["--output", args.out]
     if args.temporal:   # each frame denoised with its neighbours (launcher/film_temporal.h): less flicker, or as smooth with fewer samples

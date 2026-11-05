@@ -29,7 +29,8 @@
 	bool is_medium_scatter() const override { return inner->is_medium_scatter(); }                                                                                 \
 	bool is_shadow_transmissive(const hit_record& rec) const override { return inner->is_shadow_transmissive(rec); }                                               \
 	color shadow_transmittance(const ray& r, double t_max) const override { return inner->shadow_transmittance(r, t_max); }                                        \
-	bool thin_pass_through(const hit_record& rec, const ray& r, color& out) const override { return inner->thin_pass_through(rec, r, out); }                       \
+	bool thin_pass_through(const hit_record& rec, const ray& r, color& out) const override { return inner->thin_pass_through(apply(r, rec), r, out); }             \
+	/* (the wrapped subsurface material itself: the random walk below the surface then starts from the surface's own normal, the map's tilt left out) */          \
 	const subsurface* as_subsurface(const hit_record& rec) const override { return inner->as_subsurface(rec); }                                                    \
 	const dispersive_material* as_dispersive(const hit_record& rec) const override { return inner->as_dispersive(rec); }
 

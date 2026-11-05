@@ -10867,6 +10867,31 @@ From: %3</source>
         <source>Light &amp; Art</source>
         <translation>光影与艺术</translation>
     </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="292"/>
+        <source>Stories</source>
+        <translation>故事</translation>
+    </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="292"/>
+        <source>Space</source>
+        <translation>太空</translation>
+    </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="292"/>
+        <source>Showcases</source>
+        <translation>展示</translation>
+    </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="292"/>
+        <source>Teaching</source>
+        <translation>教学</translation>
+    </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="292"/>
+        <source>My Films</source>
+        <translation>我的影片</translation>
+    </message>
 </context>
 <context>
     <name>SensorPreset</name>

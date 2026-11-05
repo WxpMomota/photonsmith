@@ -153,6 +153,14 @@ namespace SceneSubcategories {
     constexpr const char* LightAndArt = "Light & Art";         // light-transport test scenes and artists' pieces
     constexpr const char* kLargeScenes[] = {Interiors, Buildings, VoxelWorlds, Nature, Vehicles, Objects, LightAndArt};
     constexpr std::size_t kLargeScenesCount = sizeof(kLargeScenes) / sizeof(kLargeScenes[0]);
+    // Cartoons: each film's genre (cartoon::genreOf - a film file's `genre` line, else its tags), carried by its still's `# @rt-subcategory` line
+    constexpr const char* Stories   = "Stories";     // character cartoons: Pip, the turtle, Prince Teng, a day at home
+    constexpr const char* Space     = "Space";       // voyages, planets and explainers of scale
+    constexpr const char* Showcases = "Showcases";   // short pieces about one look or one bit of physics: the cradle, the dominoes, the candle
+    constexpr const char* Teaching  = "Teaching";    // lessons in ray tracing, shown side by side
+    constexpr const char* MyFilms   = "My Films";    // films of your own (a key starting "my-"), never committed
+    constexpr const char* kCartoons[] = {Stories, Nature, Space, Showcases, Teaching, MyFilms};   // (Nature: wildlife and landscapes, the same name as the Large Scenes')
+    constexpr std::size_t kCartoonsCount = sizeof(kCartoons) / sizeof(kCartoons[0]);
 } // namespace SceneSubcategories
 
 #endif // __cplusplus

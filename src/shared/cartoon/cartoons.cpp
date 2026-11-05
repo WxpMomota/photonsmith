@@ -216,6 +216,8 @@ Film filmOf(Registry &r, const film_file::DataFilm &d, bool drafted, int id, con
 		   d.spec.length, d.spec.fps, [p](double t) { return p->sceneAt(t); }, [p](double t) { return p->headerAt(t); }, [p]() { return p->shotStarts(); }, d.spec.still,
 		   {id, r.keep(tags), r.keep(d.shotNames()), d.scene.samples, 0.0}};
 	if (d.spec.hasUnderwater) f.meta.temporal = 1;   // (round 17: the open water calmed over frames: FilmMeta::temporal)
+	// its genre (the Cartoons tab's second row, genreOf): its `genre` line, else its own tags line as written - `tags` here keeps only the vocabulary's words
+	f.meta.genre = r.keep(!d.spec.genre.empty() ? d.spec.genre : std::string(genreWordOfTags(d.spec.tags.c_str())));
 	if (d.hasEvents()) {   // a film with characters or props with physics: what its shots are about, its footsteps, touches and landings, its characters' feet
 		f.subjectsAt = [p](double t) { return p->subjectsAt(t); };
 		f.events = [p]() { return p->events(); };
@@ -330,6 +332,7 @@ void addFilmFile(Registry &r, const std::string &file) {
 	Film whole{r.keep(key), r.keep(parts.name.empty() ? key : parts.name), r.keep(parts.about.empty() ? "A film in " + std::to_string(parts.parts.size()) + " parts." : parts.about),
 			   0.0, first.spec.fps, nullptr, nullptr, nullptr, 0.0, {idFor(r, key), r.keep(tagsIn(parts.tags)), r.keep(shotNames), samples, 0.0}};
 	whole = film_parts::joined(std::move(whole), films, ins);
+	whole.meta.genre = r.keep(std::string(genreWordOfTags(parts.tags.c_str())));   // (its genre from its own tags line as written, as a single film's: filmOf)
 	whole.stillTime = parts.still >= 0.0 && parts.still <= whole.duration ? parts.still : whole.duration * 0.5;
 	whole.captions = captionsOf(key, whole.captions);
 	if (whole.sceneAcross) {   // (the other side of a cut is the other shot's: the whole film's cameras file's changes)
