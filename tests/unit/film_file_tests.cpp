@@ -391,19 +391,21 @@ TEST(FilmFile, SideBySideAsksEveryFrameForTwoHalves) {
 	write(d / "s.pbrt", kScene);
 	const std::string shots = "scene s.pbrt\nlength 6\nshot 0 A\n key 0 1 6  0 0 0\nshot 3 B\n key 2 1 6  0 0 0\n";
 	write(d / "lesson.film", shots + "sidebyside depth 1\n");
+	write(d / "titled.film", shots + "sidebyside depth 2 from 3\n");
 	write(d / "plain.film", shots);
 	cartoon::detail::Registry r;
-	for (const char *file : {"lesson.film", "plain.film"}) cartoon::detail::addFilmFile(r, (d / file).string());
-	ASSERT_EQ(r.all.size(), 2u) << (r.problems.empty() ? std::string() : r.problems[0]);
+	for (const char *file : {"lesson.film", "titled.film", "plain.film"}) cartoon::detail::addFilmFile(r, (d / file).string());
+	ASSERT_EQ(r.all.size(), 3u) << (r.problems.empty() ? std::string() : r.problems[0]);
 	for (const cartoon::Film *f : r.all) {
-		const bool lesson = std::string(f->key) == "lesson";
+		const std::string key = f->key;
 		for (const double t : {0.5, 4.0}) {
 			const std::string scene = f->sceneAt(t);
-			EXPECT_EQ(side_by_side::depthOf(scene), lesson ? 1 : -1) << f->key << " at " << t;
-			if (lesson) EXPECT_LT(scene.find("# @rt-sidebyside depth 1"), scene.find("WorldBegin")) << "in the header";
+			const int want = key == "lesson" ? 1 : (key == "titled" && t >= 3.0 ? 2 : -1);   // (the titled one: one picture over its title, two halves from 3 s)
+			EXPECT_EQ(side_by_side::depthOf(scene), want) << key << " at " << t;
+			if (want > 0) EXPECT_LT(scene.find("# @rt-sidebyside depth"), scene.find("WorldBegin")) << "in the header";
 		}
 	}
-	for (const char *bad : {"sidebyside depth 0\n", "sidebyside depth 1.5\n", "sidebyside 1\n", "sidebyside depth\n"}) {
+	for (const char *bad : {"sidebyside depth 0\n", "sidebyside depth 1.5\n", "sidebyside 1\n", "sidebyside depth\n", "sidebyside depth 1 from\n", "sidebyside depth 1 at 3\n"}) {
 		const cartoon::film_file::Parsed p = cartoon::film_file::parse(shots + bad, "bad.film");
 		EXPECT_FALSE(p.ok) << bad;
 		EXPECT_NE(p.error.find("sidebyside depth N"), std::string::npos) << p.error;

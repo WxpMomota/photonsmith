@@ -482,7 +482,7 @@ side-by-side film).
 width (960 x 1080 of a 1920 x 1080 video): the left with the rays stopped after N surfaces - 1 is only the light that reaches a surface straight from a light, with no
 bounces - and the right at the video's own ray depth (the app's Max depth). The scene of each frame carries the line `# @rt-sidebyside depth N` (src/shared/side_by_side.h)
 and the launcher renders the halves and joins them, with a thin pale line between (launcher/side_by_side_frame.h), on the CPU and both GPU renderers alike; a still of
-such a frame is side by side too. `how-light-bounces.film` is one: global illumination in the Sun Hall, an original domed marble hall lit only by the sun through its
+such a frame is side by side too. `sidebyside depth N from T` keeps the frames before T one picture - a title card over black, with no line down its middle. `how-light-bounces.film` is one: global illumination in the Sun Hall, an original domed marble hall lit only by the sun through its
 oculus (scripts/lessons/sun_hall.py writes it), with a label over each half from its captions file.
 
 The text is set in the font at the frame's own size (sharp at any resolution), centred, with a soft dark halo so it reads over a bright sky; a line wider than the caption's `width`

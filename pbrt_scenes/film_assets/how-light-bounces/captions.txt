@@ -1,11 +1,16 @@
-# How Light Bounces: a label over each half of the side-by-side picture all through, and the lesson's title and its one line at the start (caption_file.h).
-style head   font=segoeuib.ttf size=0.034 colour=1,1,1
-style note   font=segoeui.ttf  size=0.024 colour=0.92,0.92,0.92
-style title  font=segoeuib.ttf size=0.058 colour=1,1,1
-style line   font=segoeui.ttf  size=0.028 colour=0.95,0.95,0.95
+# How Light Bounces: the title card at the start (Chinese above, English below), then a label over each half of the side-by-side picture (caption_file.h).
+style zhtitle  font=msyhbd.ttc size=0.074 colour=1,1,1
+style entitle  font=segoeuib.ttf size=0.044 colour=0.93,0.93,0.93
+style zh       font=msyh.ttc size=0.036 colour=0.97,0.97,0.97
+style en       font=segoeui.ttf size=0.027 colour=0.82,0.82,0.82
+style zhlabel  font=msyhbd.ttc size=0.034 colour=1,1,1
+style enlabel  font=segoeui.ttf size=0.024 colour=0.92,0.92,0.92
 
-caption 0 30 fade=0.8 centre=0.075 across=0.25 width=0.46 gap=0.25 | head: Direct light only | note: each ray stops at the first surface it meets
-caption 0 30 fade=0.8 centre=0.075 across=0.75 width=0.46 gap=0.25 | head: Global illumination | note: light bounces from surface to surface
+# the title card over black, a line at a time
+caption 0.6 6.4 fade=0.8 centre=0.30 width=0.8 gap=0.30 | zhtitle: 全局光照 | entitle: Global Illumination
+caption 2.0 6.4 fade=0.8 centre=0.53 width=0.8 gap=0.40 | zh: 光线在表面之间反复反弹，照亮直射光照不到的地方。 | en: Light bounces from surface to surface, reaching places that direct light cannot.
+caption 3.4 6.4 fade=0.8 centre=0.70 width=0.8 gap=0.40 | zh: 左：只有直射光　　　右：光线反弹 | en: Left: direct light only          Right: light bounces
 
-caption 1.0 7.5 fade=1.0 centre=0.83 width=0.9 gap=0.35 | title: How Light Bounces | line: The only light is the sun through the dome: one bright patch on the far wall.
-caption 8.5 15.0 fade=1.0 centre=0.86 width=0.9 | line: On the right, that patch lights the whole hall - every surface passes light on to the next.
+# a label over each half, from the fade into the hall to the end
+caption 7.4 38 fade=1.0 centre=0.075 across=0.25 width=0.46 gap=0.25 | zhlabel: 只有直射光 | enlabel: Direct light only
+caption 7.4 38 fade=1.0 centre=0.075 across=0.75 width=0.46 gap=0.25 | zhlabel: 全局光照 | enlabel: Global illumination

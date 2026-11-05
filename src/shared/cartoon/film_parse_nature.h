@@ -1291,11 +1291,13 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		s.timelapse = v;
 	} else if (verb == "sidebyside") {
 		const std::vector<std::string> t = detail::tokens(line);
-		double v = 0.0;
-		if (t.size() != 3 || t[1] != "depth" || !number(t[2], v) || v < 1.0 || v > 64.0 || v != std::floor(v))
-			return fail("`sidebyside depth N`: every frame shown twice side by side, each half the whole view - the left with rays stopped after N surfaces (1: only the light "
-						"that comes straight from a light, no bounces), the right as the video is rendered");
+		double v = 0.0, from = 0.0;
+		if ((t.size() != 3 && t.size() != 5) || t[1] != "depth" || !number(t[2], v) || v < 1.0 || v > 64.0 || v != std::floor(v) ||
+			(t.size() == 5 && (t[3] != "from" || !number(t[4], from) || from < 0.0)))
+			return fail("`sidebyside depth N [from T]`: every frame shown twice side by side, each half the whole view - the left with rays stopped after N surfaces (1: only "
+						"the light that comes straight from a light, no bounces), the right as the video is rendered; from T on (one picture before it: a title card)");
 		s.sideBySideDepth = static_cast<int>(v);
+		s.sideBySideFrom = from;
 	} else if (verb == "exposure") {
 		const std::vector<std::string> t = detail::tokens(line);
 		double v = 0.0;

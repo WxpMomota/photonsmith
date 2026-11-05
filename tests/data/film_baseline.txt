@@ -70,7 +70,8 @@ forest-dawn|2|a6e6d787cddf407f|Against the rising sun
 forest-dawn|3|b3881cd2ffaf4400|Dew on the grass
 forest-dawn|4|6e4b3260926b7742|Leaves in the beams
 forest-dawn|5|a9c3642115c78d3c|Crane up as the mist thins
-how-light-bounces|1|50c174d65a12d772|The Sun Hall
+how-light-bounces|1|13cf85ebeaac0e90|Title
+how-light-bounces|2|7910ef78600c3585|The Sun Hall
 lamp-and-ball|1|cb3aa4cd9b44fb6c|The desk
 little-robot|1|381397381a8bad30|Wide establishing
 little-robot|2|89564f3949c008a1|Medium on the waking robot

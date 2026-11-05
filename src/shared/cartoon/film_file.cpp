@@ -1435,11 +1435,11 @@ std::string DataFilm::creditsScene() const {
 
 std::string DataFilm::headerAt(double t) const {
 	if (inCredits(t)) return scene.header;   // (the credits one picture, never side by side)
-	if (spec.shots.empty()) return sideBySideLine() + toonLine(t) + scene.header;
+	if (spec.shots.empty()) return sideBySideLine(t) + toonLine(t) + scene.header;
 	std::string lookAt, camera;
 	cameraAt(t, lookAt, camera);
 	// The scene's lines before its LookAt, then the new LookAt, the lines between, the new Camera, the lines after. A scene with neither statement gets both after all its header lines.
-	const std::string header = sideBySideLine() + toonLine(t) + scene.headerBefore + lookAt + scene.headerBetween + camera + scene.headerAfter + "WorldBegin\n";
+	const std::string header = sideBySideLine(t) + toonLine(t) + scene.headerBefore + lookAt + scene.headerBetween + camera + scene.headerAfter + "WorldBegin\n";
 	return withShotCamera(header, shotAt(t));
 }
 // The change the film's cameras file makes to shot k, made in a header (shot_cameras.h) - a single film's (a part of a film in parts numbers its shots its own way: the whole
@@ -1469,7 +1469,7 @@ std::string DataFilm::sceneAcross(double t) const {
 		std::string lookAt, camera;
 		const std::size_t other = t < cut ? k : k - 1;
 		cameraAt(t, lookAt, camera, static_cast<int>(other));
-		return terminated(worldAt(withShotCamera(sideBySideLine() + toonLine(t) + (spec.shots.empty() ? scene.header : scene.headerBefore + lookAt + scene.headerBetween + camera + scene.headerAfter + "WorldBegin\n"), other), t));
+		return terminated(worldAt(withShotCamera(sideBySideLine(t) + toonLine(t) + (spec.shots.empty() ? scene.header : scene.headerBefore + lookAt + scene.headerBetween + camera + scene.headerAfter + "WorldBegin\n"), other), t));
 	}
 	return sceneAt(t);
 }

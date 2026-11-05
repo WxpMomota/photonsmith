@@ -6,6 +6,10 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **A film set's normal maps (2026-11-04).** A film's set had its file paths made absolute for each frame (`"string filename"`, `mapname`, `lensfile`) but not a
+  material's `"string normalmap"`, which was then looked for beside the frame's own scene and not found: the surface rendered smooth, with a warning. The Sun Hall
+  was made richer the same day: a lapis and gold coffered dome with gilded rosettes, columns of three coloured marbles under gilded capitals, porphyry and
+  serpentine panels in giallo frames, an inlaid floor and a mosaic ring - colours for the bounced light to carry.
 * **Teaching films side by side: `sidebyside depth N`, and How Light Bounces (2026-11-04).** A film line that renders every frame twice from the same camera and
   puts the two side by side, each half the whole view at half the video's width: the left with the rays stopped after N surfaces, the right at the video's own ray
   depth. The scene carries `# @rt-sidebyside depth N` and the launcher renders and joins the halves (CPU and both GPU renderers; a still too). Captions take

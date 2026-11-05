@@ -663,6 +663,7 @@ struct Spec {
 	bool muteBirds = false;   // (`mute birds`: no birdsong, no eagles' cries, no geese - whatever flies in the picture)
 	bool musicOnly = false;   // (`mute sounds`: the film's soundtrack is its music alone - no ambience, nature, events, weather, rooms or voices)
 	int sideBySideDepth = -1;   // (`sidebyside depth N`: every frame two renders side by side, the left at ray depth N - src/shared/side_by_side.h; -1: one picture)
+	double sideBySideFrom = 0.0;   // (`... from T`: one picture before T - a title card over black - and two halves from T on)
 	bool draftMusic = true;   // (`music none`: no drafted score when there is no cues file)
 	bool clearMusic = false;  // (`music clear`: the score is not muffled while the camera is under the water - the voices and the sea's sounds still are)
 	toon_look::Style toon;    // the toon look (`toon`): written into every frame's header as its `# @rt-toon` line
