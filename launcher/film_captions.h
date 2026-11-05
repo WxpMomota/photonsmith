@@ -413,6 +413,9 @@ constexpr const char *kRecord = "captions.done";
 // A frame's picture before its words were laid on (clean_NNNN.png beside enc_NNNN.png), kept so that changed words can be laid again without rendering the frame again.
 constexpr const char *kCleanPrefix = "clean_";
 
+// Where a caption `pw` wide starts across a frame `w` wide: centred (as it always was, to the pixel), or with its middle `across` of the way over.
+inline int leftOf(const cartoon::Caption &c, int w, int pw) { return c.centreX == 0.5 ? (w - pw) / 2 : static_cast<int>(std::lround(c.centreX * w - pw / 2.0)); }
+
 // What is written on a frame: the words, their look and place and how strongly each shows, as a short hash ("none": nothing). Two frames with the same key look the same.
 inline std::string wordsKey(const std::vector<std::pair<const cartoon::Caption *, double>> &here) {
 	if (here.empty()) return "none";
@@ -421,6 +424,10 @@ inline std::string wordsKey(const std::vector<std::pair<const cartoon::Caption *
 	for (const auto &[c, a] : here) {
 		std::snprintf(b, sizeof b, "%s|%.4f|%.6g|%.6g|%.6g|%d\n", c->image.c_str(), a, c->centreY, c->width, c->lineGap, c->bubble ? 1 : 0);
 		s += b;
+		if (c->centreX != 0.5) {   // (only when it is off the middle: every caption laid before `across` keeps its key, and its frames are not laid again)
+			std::snprintf(b, sizeof b, "across %.6g\n", c->centreX);
+			s += b;
+		}
 		for (const cartoon::CaptionLine &l : c->lines) {
 			std::snprintf(b, sizeof b, "|%d|%.6g|%.6g|%.6g|%.6g|%.6g|", l.fontIndex, l.size, l.colour.x, l.colour.y, l.colour.z, l.weight);
 			s += l.text + "|" + l.font + b + "\n";
@@ -517,7 +524,7 @@ inline int apply(const cartoon::Film &film, const std::filesystem::path &dir, in
 				const std::string key = "text|" + std::to_string(c - captions.data()) + "|" + std::to_string(w) + "|" + std::to_string(h);
 				if (!sized.count(key)) sized[key] = c->bubble ? bubbled(textPicture(*c, w, h), h) : textPicture(*c, w, h);
 				const Picture &pic = sized[key];
-				if (pic.w > 0) over(frame, w, h, pic, (w - pic.w) / 2, static_cast<int>(std::lround(c->centreY * h - pic.h / 2.0)), a);
+				if (pic.w > 0) over(frame, w, h, pic, leftOf(*c, w, pic.w), static_cast<int>(std::lround(c->centreY * h - pic.h / 2.0)), a);
 				continue;
 			}
 			if (missing[c->image]) continue;
@@ -535,7 +542,7 @@ inline int apply(const cartoon::Film &film, const std::filesystem::path &dir, in
 			const int ph = (std::max)(1, static_cast<int>(std::lround(static_cast<double>(src.h) * pw / src.w)));
 			const std::string key = c->image + "|" + std::to_string(pw) + "|" + std::to_string(ph);
 			if (!sized.count(key)) sized[key] = scaled(src, pw, ph);
-			over(frame, w, h, sized[key], (w - pw) / 2, static_cast<int>(std::lround(c->centreY * h - ph / 2.0)), a);
+			over(frame, w, h, sized[key], leftOf(*c, w, pw), static_cast<int>(std::lround(c->centreY * h - ph / 2.0)), a);
 		}
 		// (written beside it and renamed over it: a run stopped in the middle of the write must not leave half a frame that a resumed video would keep; a clean file becomes the clean
 		// picture first, and a run stopped between the two renames leaves the frame missing, so a resumed video renders it again)

@@ -1289,6 +1289,13 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		double v = 0.0;
 		if (!number(rest, v) || v < 1.0 || v > 100000.0) return fail("`timelapse FACTOR`: how many times faster the clouds, the water and the wind go (1 to 100000)");
 		s.timelapse = v;
+	} else if (verb == "sidebyside") {
+		const std::vector<std::string> t = detail::tokens(line);
+		double v = 0.0;
+		if (t.size() != 3 || t[1] != "depth" || !number(t[2], v) || v < 1.0 || v > 64.0 || v != std::floor(v))
+			return fail("`sidebyside depth N`: every frame shown twice side by side, each half the whole view - the left with rays stopped after N surfaces (1: only the light "
+						"that comes straight from a light, no bounces), the right as the video is rendered");
+		s.sideBySideDepth = static_cast<int>(v);
 	} else if (verb == "exposure") {
 		const std::vector<std::string> t = detail::tokens(line);
 		double v = 0.0;

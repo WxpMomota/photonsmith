@@ -94,6 +94,8 @@ extern char** environ;
 #include "launcher/cartoon_worker.h"
 #include "launcher/toon_frame.h"
 #include "launcher/marks_frame.h"   // a scene's cartoon marks, drawn over the finished picture
+#include "launcher/side_by_side_frame.h"   // a scene's `# @rt-sidebyside` line: two renders side by side (src/shared/side_by_side.h)
+#include "src/shared/side_by_side.h"
 #include "launcher/onion_frame.h"   // --film-onion: an onion-skin sheet of a stretch of a film
 #include "launcher/colour_script.h"   // --film-colours: a film's colour script
 #include "launcher/video_render.h"   // --video, --assemble-video
@@ -745,6 +747,30 @@ static bool announceRenderedFile(const std::string &out_path, bool use_gpu, bool
         return true;
 }
 
+// A scene whose header asks for two halves (`# @rt-sidebyside depth N`, src/shared/side_by_side.h): the whole view rendered twice at half the picture's width - the left at
+// ray depth N, the right at this render's own - and the two joined into the picture asked for, in the format the renderer writes, before it is finished as any picture is
+// (cut, converted, announced). False, with the render's result, when a half or the join fails.
+static bool renderSideBySide(const LaunchArgs &args, const RenderSetup &s, int leftDepth, double cam_x, double cam_y, double cam_z, const RenderOptions &render_opts,
+							 int &render_result) {
+	RenderSetup left = s, right = s;
+	left.image_width = s.image_width / 2;
+	right.image_width = s.image_width - left.image_width;
+	left.max_ray_depth = leftDepth;
+	left.out_path = side_by_side_frame::halfPath(s.out_path, "left");
+	right.out_path = side_by_side_frame::halfPath(s.out_path, "right");
+	std::cout << "Side by side (the scene's @rt-sidebyside line): the left half at ray depth " << leftDepth << ", the right at " << s.max_ray_depth << ", each "
+			  << left.image_width << " x " << s.image_height << std::endl;
+	if (!runIntegrator(args, left, cam_x, cam_y, cam_z, render_opts, render_result) || render_result != 0) return false;
+	if (!runIntegrator(args, right, cam_x, cam_y, cam_z, render_opts, render_result) || render_result != 0) return false;
+	std::string why;
+	if (!side_by_side_frame::join(left.out_path, right.out_path, s.out_path, why)) {
+		std::cerr << "ERROR: the side-by-side picture: " << why << std::endl;
+		render_result = ERR_FILE_WRITE_FAILED;
+		return false;
+	}
+	return true;
+}
+
 static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
 	const bool use_gpu = s.use_gpu;
 	const int image_width = s.image_width;
@@ -790,7 +816,14 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
         if (!cropped && !cpu_scene_crop_picture_by_id(scene_id.c_str(), sceneCrop)) render_opts.output.write_png = &write_png;
     }
 
-    if (!runIntegrator(args, s, cam_x, cam_y, cam_z, render_opts, render_result)) return render_result;
+    // (a scene that asks for two halves side by side gets them: not for an EXR, whose two halves would need joining in linear light, or AOV passes, which are of one view)
+    const char *side_scene = cpu_scene_pbrt_path_by_id(scene_id.c_str());
+    const int side_depth = side_scene && !args.aovs && !is_exr_output_path(out_path) ? side_by_side::depthOfFile(side_scene) : -1;
+    if (side_depth >= 1) {
+        if (!renderSideBySide(args, s, side_depth, cam_x, cam_y, cam_z, render_opts, render_result)) return render_result;
+    } else if (!runIntegrator(args, s, cam_x, cam_y, cam_z, render_opts, render_result)) {
+        return render_result;
+    }
 
     // ========================================================================
     // Performance Reporting

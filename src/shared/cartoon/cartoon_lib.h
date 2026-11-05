@@ -592,6 +592,7 @@ struct Caption {
 	std::string image;
 	double fade = 0.8;
 	double centreY = 0.84;
+	double centreX = 0.5;   // (its middle that far across the frame: 0.25 over the left half of a side-by-side film, 0.75 over the right)
 	double width = 0.66;
 	std::vector<CaptionLine> lines;
 	double lineGap = 0.3;   // between two lines, as a share of the taller one's height

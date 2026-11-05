@@ -23,6 +23,8 @@
 #include "../../src/shared/gltf_skin.h"
 #include "../../src/shared/pbrt_discover.h"
 #include "../../src/shared/screen_marks.h"
+#include "../../src/shared/side_by_side.h"
+#include "../../launcher/side_by_side_frame.h"
 #include "../../src/shared/camera_keyframes.h"
 #include "../../src/shared/ease_curves.h"
 #include "../../launcher/process.h"   // (a speech engine for the real voices)
@@ -380,6 +382,60 @@ TEST(FilmFile, MuteSoundsLeavesTheMusicAlone) {
 	const cartoon::film_file::Parsed bad = cartoon::film_file::parse(shots + "mute everything\n", "bad.film");
 	EXPECT_FALSE(bad.ok) << "only birds or sounds";
 	EXPECT_NE(bad.error.find("mute sounds"), std::string::npos) << bad.error;
+}
+
+// `sidebyside depth N`: every frame's scene asks for two halves (its header's `# @rt-sidebyside depth N`, before WorldBegin), which the launcher renders and joins; a film
+// without the line asks for one picture, and a depth that is not a whole number from 1 is refused.
+TEST(FilmFile, SideBySideAsksEveryFrameForTwoHalves) {
+	const std::filesystem::path d = tempDir("sidebyside");
+	write(d / "s.pbrt", kScene);
+	const std::string shots = "scene s.pbrt\nlength 6\nshot 0 A\n key 0 1 6  0 0 0\nshot 3 B\n key 2 1 6  0 0 0\n";
+	write(d / "lesson.film", shots + "sidebyside depth 1\n");
+	write(d / "plain.film", shots);
+	cartoon::detail::Registry r;
+	for (const char *file : {"lesson.film", "plain.film"}) cartoon::detail::addFilmFile(r, (d / file).string());
+	ASSERT_EQ(r.all.size(), 2u) << (r.problems.empty() ? std::string() : r.problems[0]);
+	for (const cartoon::Film *f : r.all) {
+		const bool lesson = std::string(f->key) == "lesson";
+		for (const double t : {0.5, 4.0}) {
+			const std::string scene = f->sceneAt(t);
+			EXPECT_EQ(side_by_side::depthOf(scene), lesson ? 1 : -1) << f->key << " at " << t;
+			if (lesson) EXPECT_LT(scene.find("# @rt-sidebyside depth 1"), scene.find("WorldBegin")) << "in the header";
+		}
+	}
+	for (const char *bad : {"sidebyside depth 0\n", "sidebyside depth 1.5\n", "sidebyside 1\n", "sidebyside depth\n"}) {
+		const cartoon::film_file::Parsed p = cartoon::film_file::parse(shots + bad, "bad.film");
+		EXPECT_FALSE(p.ok) << bad;
+		EXPECT_NE(p.error.find("sidebyside depth N"), std::string::npos) << p.error;
+	}
+	EXPECT_EQ(side_by_side::depthOf("WorldBegin\n# @rt-sidebyside depth 1\n"), -1) << "only in the header";
+}
+
+// The two halves of a side-by-side picture are joined into one as wide as both, the left's pixels on the left and the right's on the right, a pale line between, and the
+// halves' files gone.
+TEST(FilmFile, TheTwoHalvesAreJoinedWithALineBetween) {
+	const std::filesystem::path d = tempDir("sidebysidejoin");
+	const int w = 6, h = 3;
+	const std::vector<int> dark(static_cast<std::size_t>(w) * h * 3, 20), light(static_cast<std::size_t>(w) * h * 3, 200);
+	const std::string left = (d / "f.left.ppm").string(), right = (d / "f.right.ppm").string(), out = (d / "f.ppm").string();
+	ASSERT_TRUE(output_crop::writePpm(left, w, h, 255, dark));
+	ASSERT_TRUE(output_crop::writePpm(right, w, h, 255, light));
+	EXPECT_EQ(side_by_side_frame::halfPath(out, "left"), left);
+	std::string why;
+	ASSERT_TRUE(side_by_side_frame::join(left, right, out, why, 2)) << why;
+	int jw = 0, jh = 0, mv = 0;
+	std::vector<int> px;
+	ASSERT_TRUE(output_crop::readPpm(out, jw, jh, mv, px));
+	EXPECT_EQ(jw, 2 * w);
+	EXPECT_EQ(jh, h);
+	const auto at = [&](int x, int y) { return px[(static_cast<std::size_t>(y) * jw + x) * 3]; };
+	EXPECT_EQ(at(0, 1), 20) << "the left half's own";
+	EXPECT_EQ(at(jw - 1, 1), 200) << "the right half's own";
+	EXPECT_GT(at(w - 1, 1), 200) << "the line, just left of the join";
+	EXPECT_GT(at(w, 1), 200) << "and just right of it";
+	EXPECT_EQ(at(w - 2, 1), 20) << "two pixels wide, no more";
+	EXPECT_FALSE(std::filesystem::exists(left));
+	EXPECT_FALSE(std::filesystem::exists(right));
 }
 
 // A video of a film at another length gets its soundtrack stretched to fit at the same pitch: exactly the video's length, a tone still the same tone, as loud, and a click at a

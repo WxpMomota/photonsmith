@@ -471,9 +471,19 @@ its own by returning `caption_file::read(film_cache::asset("<film>/captions.txt"
 # a style: a name and key=value settings (font, index for a .ttc face, size as a share of the frame's height, colour r,g,b from 0 to 1, weight in extra pixels at 1080 lines)
 style zh  font=simsun.ttc size=0.057 colour=1,0.965,0.886 weight=0.67
 style en  font=palai.ttf  size=0.032 colour=0.925,0.894,0.831
-# a caption: start and end in seconds of the film, optional fade= centre= width= gap=, then its lines, each "style: text"
+# a caption: start and end in seconds of the film, optional fade= centre= across= width= gap=, then its lines, each "style: text"
 caption 9.0 15.5 fade=1 centre=0.86 width=0.583 gap=0.45 | zh: 豫章故郡，洪都新府。 | en: The ancient commandery of Yuzhang is now called Hongzhou.
 ```
+
+`centre=` is how far down the frame the caption's middle is, `across=` how far across (0.5, the middle, when not given: 0.25 and 0.75 put a label over each half of a
+side-by-side film).
+
+**Teaching films: `sidebyside depth N`.** Every frame is rendered twice from the same camera and the two put side by side, each half the whole view at half the video's
+width (960 x 1080 of a 1920 x 1080 video): the left with the rays stopped after N surfaces - 1 is only the light that reaches a surface straight from a light, with no
+bounces - and the right at the video's own ray depth (the app's Max depth). The scene of each frame carries the line `# @rt-sidebyside depth N` (src/shared/side_by_side.h)
+and the launcher renders the halves and joins them, with a thin pale line between (launcher/side_by_side_frame.h), on the CPU and both GPU renderers alike; a still of
+such a frame is side by side too. `how-light-bounces.film` is one: global illumination in the Sun Hall, an original domed marble hall lit only by the sun through its
+oculus (scripts/lessons/sun_hall.py writes it), with a label over each half from its captions file.
 
 The text is set in the font at the frame's own size (sharp at any resolution), centred, with a soft dark halo so it reads over a bright sky; a line wider than the caption's `width`
 wraps at its spaces into rows of even length. A font is looked for as a full path, then in `pbrt_scenes/film_assets/fonts`, the system's fonts folder and the program's `fonts`

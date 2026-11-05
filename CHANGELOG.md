@@ -6,6 +6,15 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **Teaching films side by side: `sidebyside depth N`, and How Light Bounces (2026-11-04).** A film line that renders every frame twice from the same camera and
+  puts the two side by side, each half the whole view at half the video's width: the left with the rays stopped after N surfaces, the right at the video's own ray
+  depth. The scene carries `# @rt-sidebyside depth N` and the launcher renders and joins the halves (CPU and both GPU renderers; a still too). Captions take
+  `across=` to sit over one half. The first such film, `how-light-bounces`, shows global illumination in the Sun Hall, an original domed marble hall lit only by
+  the sun through its oculus (scripts/lessons/sun_hall.py).
+* **GPU: a normal- or bump-mapped diffuse surface under a sky (2026-11-04).** The default GPU renderer weighted a bounce that hit the sky with the pdf about the
+  unperturbed normal, though the bounce was sampled about the perturbed one: a 60 degree tilted normal map read 0.971 of pbrt-v4 under a uniform sky (1.000 under a
+  distant light, which a bounce never hits). Now 1.000 for every tilt; normal-mapped-plane and bump-mapped-plane 1.000 on all three renderers.
+
 * **CPU: normal- and bump-mapped coated and metal surfaces lit right (2026-11-04).** The CPU's normal-map and bump-map wrappers passed only `scatter`,
   `scattering_pdf` and `emitted` on to the material they wrap. Light sampling asks for the colour in the light's own direction (`scattering_attenuation`) and got the
   colour of whatever direction `scatter` had sampled: right for a plain diffuse surface, wrong wherever the colour depends on direction. Against real pbrt-v4, a

@@ -5,6 +5,7 @@
 // makes the film's frames and sound (DataFilm), defined in film_file.cpp, and its world and its nature's sound in film_world.cpp - all compiled once, in cpu_renderer.
 
 #include "film_parse.h"
+#include "../side_by_side.h"
 
 namespace cartoon {
 namespace film_file {
@@ -440,6 +441,8 @@ class DataFilm {
 	// A black frame: the scene's own header and nothing lit (a speck far below the set: a world with nothing in it is not a scene).
 	std::string creditsScene() const;
 	std::string headerAt(double t) const;
+	// The `# @rt-sidebyside` line of every frame of a film shown side by side (`sidebyside depth N`: src/shared/side_by_side.h), else nothing.
+	std::string sideBySideLine() const { return spec.sideBySideDepth >= 1 ? side_by_side::line(spec.sideBySideDepth) : std::string(); }
 	// The `# @rt-toon` line of every frame of a film with the toon look (`toon`), else nothing.
 	// The frame's `# @rt-toon` line at t: the film's toon look, with the frame's seed when its lines boil (drawn afresh every other frame).
 	std::string toonLine(double t) const {

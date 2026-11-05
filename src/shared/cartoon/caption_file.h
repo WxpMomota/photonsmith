@@ -97,6 +97,7 @@ inline std::vector<Caption> parse(const std::string &text, std::vector<std::stri
 				const std::string key = word.substr(0, eq), value = eq == std::string::npos ? std::string() : word.substr(eq + 1);
 				if (key == "fade") c.fade = std::atof(value.c_str());
 				else if (key == "centre" || key == "center") c.centreY = std::atof(value.c_str());
+				else if (key == "across") c.centreX = std::atof(value.c_str());
 				else if (key == "width") c.width = std::atof(value.c_str());
 				else if (key == "gap") c.lineGap = std::atof(value.c_str());
 				else problem = "unknown caption setting \"" + key + "\"";
