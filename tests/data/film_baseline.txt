@@ -16,10 +16,10 @@ a-day-at-home|5|925b84a78a4eb288|In the rain
 a-day-at-home|6|413cf57c0af13ace|Evening
 a-day-at-home|7|3b5b57e1e17f287f|Power cut
 a-day-at-home|8|e782531eb854de92|Good night
-a-walk-at-dusk|1|6899d512ddcf0233|Setting out
-a-walk-at-dusk|2|3f2b2f780dd8ed63|Along the path
-a-walk-at-dusk|3|025c746613e5f579|The lantern
-a-walk-at-dusk|4|1df043fd3e9e9632|The first star
+a-walk-at-dusk|1|b992f3e42084ec0c|Setting out
+a-walk-at-dusk|2|757523269a8a2dd6|Along the path
+a-walk-at-dusk|3|d1aec8655fb8f161|The lantern
+a-walk-at-dusk|4|f0e6b0120c648834|The first star
 ball-parade|1|be82b9a4eec4a8ce|The row of balls
 candle|1|8782ad171cbdf69c|Portrait of the flame
 candle|2|ff22690a18254670|Macro on the wax and drips

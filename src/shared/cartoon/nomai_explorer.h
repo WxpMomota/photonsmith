@@ -2,11 +2,12 @@
 // nomai_explorer.h -- the explorer of "The Last Nomai Signal" (nomai_signal.h): an original Nomai, made after the game's own (Mobius Digital's concept art of the Nomai
 // suit, the in-game suit of Solanum, the statue in the Observatory, the wiki): tall and slender (1.86 m), digitigrade, with a goat-like face, a wide nose and a long
 // flowing beard, three amber eyes with the goat's level oblong pupils (two below, one on the forehead), two horns curling back like a ram's and a top antler that forks
-// into two points, short tan fur, small three-fingered hands. It wears the Nomai's life-support suit: a deep green robe patterned with fine cream lines, trimmed in gold
-// (the opening, the hem, the chest, the cuffs, a waist band), a gold collar with the statue's square-key steps, woven rust-red pads on the shoulders, dark green
-// trousers, big pale three-toed feet, a bronze pack on the back with a horizontal ivory tank, a hose to the mask - and the mask itself, an ivory-and-gold helmet with a
-// diamond face, three diamond windows for the eyes, a crown of gold prongs and an ivory beak over the muzzle. It carries the writing sceptre: a wooden shaft with a boxy
-// ivory head and gold rods.
+// into two points, short tan fur, small three-fingered hands. Its suit, mask and staff are our own designs in the Nomai's spirit (a pale mask with three eye windows,
+// warm metal, a ghostly blue light, a long robe): a sea-green twill robe embroidered with a star chart, with rust-red embroidered borders (the opening, the hem, a
+// rounded neckline, a waist band), bronze cuff bands and a beaded bronze collar, quilted umber leather pads on the shoulders, dark green trousers, big pale three-toed
+// feet, a bronze pack on the back with a horizontal ivory tank, a hose to the mask; the mask a rounded ivory shield with three round windows in bronze bezels, tide rings
+// and a glowing inlay round the third, silver stars on the brow, swept blades at the temples and a smooth cowl over the muzzle; and a sky-compass staff, two gimbal
+// rings round a glowing crystal on a wooden shaft.
 //
 // The figure is sculpted for each frame from its pose (signed distance functions blended like clay, meshed by sdf::surfaceNets), so every part follows the pose: the robe's
 // skirt swings with the long, slow steps of low gravity and stirs in the wind, each eyelid closes on its own, the third eye can open after the other two, the mask comes off
@@ -336,132 +337,162 @@ inline double hornSdf(Vec3 q) {
 }
 
 // ---- the life-support mask ------------------------------------------------------------------------------------------------------------------------------------------
-// After Mobius Digital's concept sheet of the Nomai suit: a big angular helmet of ivory edged in gold. In the middle a cluster of four small diamonds set as one large
-// diamond - the top one and the two at the sides are the windows of the three eyes, the bottom one a dark inset - each ringed in gold, on an ivory face plate; angular
-// wings step out from its sides with small teal squares in them; two big curved ivory arcs rise from its top like horns round a central gold spine; a great gold fan
-// arc stands behind the head; an ivory beak with a gold ridge covers the long muzzle below. Four materials: ivory, gold, a dark brown and the teal.
-// `q` in the mask's own space (the head's, when it is worn).
+// Our own mask, in the spirit of the Nomai's - a pale mask with a window for each of the three eyes, warm metal and a faint blue light - but drawn afresh: a rounded
+// shield of bone-white ivory bent round the face, wider at the brow; its three round eye windows set in bronze bezels; round the third eye's window, on the brow, tide
+// rings cut into the ivory and a thin inlay glowing faint blue (glowRingFrame); five small silver stars on an arc above them; two swept blades at each temple like a
+// swift's wings, each with a bronze spine; a smooth cowl over the long muzzle with a bronze band and a dark breathing grille at its tip. Materials: ivory, bronze,
+// silver, the dark grille and the blue glow. `q` in the mask's own space (the head's, when it is worn).
 inline Vec3 maskCentre() { return {0.0, 0.104, 0.172}; }
-// A point's coordinates on the bent face plate: (along one diagonal, along the other, depth).
+// A point's coordinates on the bent face plate: (across, up, depth above the plate's middle surface).
 inline Vec3 maskPlate(Vec3 q) {
 	const Vec3 c = maskCentre();
 	const double x = q.x - c.x, y = q.y - c.y;
-	const double z = q.z - c.z + 2.0 * x * x + 0.7 * y * y;
-	return {(x + y) * 0.70710678, (y - x) * 0.70710678, z};
+	return {x, y, q.z - c.z + 2.0 * x * x + 0.7 * y * y};
 }
-inline double diamondSdf(Vec3 p, double half, double depth) {   // a square in plate coordinates (a diamond on the face), `half` its half-diagonal
-	const double s = half * 0.70710678;
-	const Vec3 d{std::abs(p.x) - s, std::abs(p.y) - s, std::abs(p.z) - depth};
-	const Vec3 m{std::max(d.x, 0.0), std::max(d.y, 0.0), std::max(d.z, 0.0)};
-	return length(m) + std::min(std::max(d.x, std::max(d.y, d.z)), 0.0);
+// The shield's outline in plate coordinates: a big squared plate with rounded corners (a superellipse), a little narrower at the bottom where the cowl meets it
+// (negative inside, about metres). It is bent round the face (maskPlate), so its sides turn back towards the ears.
+inline double shieldOutline(double x, double y) {
+	constexpr double top = 0.172, bottom = -0.092;
+	const double h = 0.5 * (top - bottom), v = (y - 0.5 * (top + bottom)) / h;
+	const double w = 0.150 - 0.018 * std::pow(std::max(0.0, -v), 2.0);
+	const double e = std::pow(std::pow(std::abs(x) / w, 4.5) + std::pow(std::abs(v), 4.5), 1.0 / 4.5) - 1.0;
+	return e * std::min(w, h);
 }
-// The four small diamonds: top, left, right (the eyes), bottom (an inset).
-inline Vec3 maskDiamondAt(int k) {
-	if (k < 3) {
-		const EyePlace &e = eyePlace(k);
-		return {e.c.x + 0.07 * std::sin(e.outward * kPi / 180.0), e.c.y, 0.0};
-	}
-	return {0.0, 0.040, 0.0};
+constexpr double kMaskHalfThick = 0.008;
+// The eye windows, in plate coordinates (0 left, 1 right, 2 the third), and their radius. The two lower windows sit a little outward of their eyes, as the eyes look out.
+inline Vec3 maskPortAt(int k) {
+	const EyePlace &e = eyePlace(k);
+	const Vec3 c = maskCentre();
+	return {e.c.x + 0.07 * std::sin(e.outward * kPi / 180.0) - c.x, e.c.y - c.y, 0.0};
 }
-constexpr double kMaskSmall = 0.031;   // half-diagonal of a small diamond
-inline double smallDiamond(Vec3 q, int k, double grow, double depth, double lift = 0.0) {
-	const Vec3 at = maskDiamondAt(k);
-	const Vec3 p = maskPlate(q), c = maskPlate({at.x, at.y, q.z});
-	return diamondSdf({p.x - c.x, p.y - c.y, p.z - lift}, kMaskSmall + grow, depth);
+inline double maskPortRadius(int k) { return k < 2 ? 0.024 : 0.022; }
+inline double portDistance(Vec3 p, int k) {   // from the window's axis, in the plate
+	const Vec3 at = maskPortAt(k);
+	return std::hypot(p.x - at.x, p.y - at.y) - maskPortRadius(k);
 }
+constexpr double kGlowRing = 0.032;   // the glowing inlay's radius round the third eye's window
 inline Mat4 beakFrameInv() {
 	static const Mat4 m = invertAffine(mul(translate(0.0, 0.010, 0.150), rotate({1.0, 0.0, 0.0}, 22.0)));
 	return m;
 }
-// A thick flat ribbon along an arc in the plane z = zc of mask space: centre (cx, cy), radius r, from angle a0 to a1 (radians, from +x towards +y), `w` wide, `t` thick.
-inline double arcRibbon(Vec3 q, double cx, double cy, double zc, double r, double a0, double a1, double w, double t) {
-	const double dx = q.x - cx, dy = q.y - cy;
-	double a = std::atan2(dy, dx);
-	const double mid = 0.5 * (a0 + a1), half = 0.5 * std::abs(a1 - a0);
-	const double off = std::abs(std::remainder(a - mid, 2.0 * kPi)) - half;
-	const double radial = std::abs(std::sqrt(dx * dx + dy * dy) - r) - w * 0.5;
-	const double along = std::max(0.0, off * r);
-	const double inPlane = along > 0.0 ? std::sqrt(std::max(0.0, radial) * std::max(0.0, radial) + along * along) : radial;
-	return std::max(inPlane, std::abs(q.z - zc) - t * 0.5);
+inline Vec3 cowlRadii() { return {0.066, 0.090, 0.104}; }
+// The swept blades at the temples: side s (+1 its left), upper (0) or lower (1): their root and tip in mask space.
+inline void bladeEnds(int s, int k, Vec3 &root, Vec3 &tip) {
+	root = k == 0 ? Vec3{0.138 * s, 0.222, 0.118} : Vec3{0.146 * s, 0.128, 0.118};   // (from the shield's upper corners and its sides)
+	tip = k == 0 ? Vec3{0.212 * s, 0.272, -0.010} : Vec3{0.222 * s, 0.150, 0.010};   // (swept back more than up, like a swift's wings)
+}
+// A blade's frame: along it, the normal of its flat face (level, across the blade) and the direction in its face towards its upper edge.
+inline void bladeAxes(Vec3 root, Vec3 tip, Vec3 &along, Vec3 &normal, Vec3 &upEdge) {
+	along = normalize(tip - root);
+	normal = normalize(cross(along, Vec3{0.0, 1.0, 0.0}));
+	upEdge = normalize(cross(normal, along));
+	if (upEdge.y < 0.0) upEdge = upEdge * -1.0;
+}
+inline double bladeSdf(Vec3 q, int s, int k) {
+	Vec3 root, tip, along, normal, up;
+	bladeEnds(s, k, root, tip);
+	bladeAxes(root, tip, along, normal, up);
+	const double t = clamp01(dot(q - root, along) / length(tip - root));
+	const Vec3 bow = up * (0.010 * std::sin(kPi * t));   // (a gentle curve, like a feather's)
+	const double body = sdf::roundCone(q - bow, root, tip, k == 0 ? 0.026 : 0.020, 0.005);
+	return std::max(body, std::abs(dot(q - bow - root, normal)) - 0.0040);
+}
+inline double bladeSpineSdf(Vec3 q, int s, int k) {
+	Vec3 root, tip, along, normal, up;
+	bladeEnds(s, k, root, tip);
+	bladeAxes(root, tip, along, normal, up);
+	const double t = clamp01(dot(q - root, along) / length(tip - root));
+	const Vec3 bow = up * (0.010 * std::sin(kPi * t));
+	const double r0 = k == 0 ? 0.026 : 0.020;
+	return sdf::roundCone(q - bow, root + up * (r0 - 0.004), tip + up * 0.002, 0.0042, 0.0022);
 }
 inline double maskIvorySdf(Vec3 q) {
 	using namespace sdf;
 	const Vec3 p = maskPlate(q);
-	// the face plate: a broad diamond, its corners clipped into steps
-	double d = diamondSdf(p, 0.118, 0.010);
-	d = std::max(d, std::abs(q.x) - 0.105);
-	// the wings stepping out from its sides, turned back round the head
-	for (int s = -1; s <= 1; s += 2) {
-		const Mat4 w = invertAffine(mul(translate(0.125 * s, 0.100, 0.132), rotate({0.0, 1.0, 0.0}, 34.0 * s)));
-		d = std::min(d, roundBox(q, w, {0.040, 0.040, 0.009}, 0.003));
-		const Mat4 w2 = invertAffine(mul(translate(0.150 * s, 0.050, 0.110), rotate({0.0, 1.0, 0.0}, 42.0 * s)));
-		d = std::min(d, roundBox(q, w2, {0.024, 0.026, 0.008}, 0.003));
-	}
-	// the crown's two great arcs, curling out like horns from the top corner
-	for (int s = -1; s <= 1; s += 2) d = std::min(d, arcRibbon(q, 0.070 * s, 0.250, 0.150, 0.060, s > 0 ? -2.4 : kPi - 1.0, s > 0 ? 1.0 : kPi + 2.4, 0.028, 0.014));
-	// the beak
+	// the shield, its edge rounded
+	const double o = shieldOutline(p.x, p.y) + 0.002, t = std::abs(p.z) - kMaskHalfThick + 0.002;
+	double d = std::min(std::max(o, t), 0.0) + std::hypot(std::max(o, 0.0), std::max(t, 0.0)) - 0.002;
+	// the cowl over the muzzle, joined to the shield's lower edge
 	const Vec3 b = transformPoint(beakFrameInv(), q);
-	double shell = std::abs(ellipsoid(b, identity(), {0.066, 0.100, 0.118})) - 0.0065;
-	shell = std::max(shell, 0.010 - b.z);
-	shell = std::max(shell, b.y - 0.040);
-	d = std::min(d, shell);
-	// the engraving: fine lines cut into the ivory - diamonds round the face plate's middle, a line inset round each wing, the beak's overlapping segments
+	double cowl = std::abs(ellipsoid(b, identity(), cowlRadii())) - 0.0065;
+	cowl = std::max(cowl, std::max(0.010 - b.z, -p.z - 0.004));   // (only what stands in front of the shield: the shield closes it behind, no open edge)
+	d = smin(d, cowl, 0.010);
+	// the engraving on the face: tide rings rising over the brow round the third window (arcs, open below), a groove for the glowing inlay, a line inset round the
+	// shield's edge
 	const auto groove = [](double dist, double w, double depth) { return depth * (1.0 - smoothstep(0.0, w, std::abs(dist))); };
 	double cut = 0.0;
-	const double ring = std::max(std::abs(p.x), std::abs(p.y)) / 0.70710678;   // (a diamond's half-diagonal through p)
-	if (std::abs(p.z) < 0.02) for (const double r : {0.074, 0.098, 0.110}) cut = std::max(cut, groove(ring - r, 0.0016, 0.0012));
-	for (int s = -1; s <= 1; s += 2) {
-		const Vec3 w = transformPoint(invertAffine(mul(translate(0.125 * s, 0.100, 0.132), rotate({0.0, 1.0, 0.0}, 34.0 * s))), q);
-		if (std::abs(w.z) < 0.02) cut = std::max(cut, groove(std::max(std::abs(w.x), std::abs(w.y)) - 0.030, 0.0014, 0.0010));
-	}
-	if (b.z > 0.010 && b.y < 0.040) {
-		const double seg = (0.040 - b.y) / 0.026;
-		cut = std::max(cut, groove((seg - std::floor(seg) - 0.5) * 0.026, 0.0016, 0.0013) * smoothstep(0.0, 0.4, seg));
+	if (p.z > 0.0 && p.z < 0.02) {
+		const Vec3 third = maskPortAt(2);
+		const double r = std::hypot(p.x - third.x, p.y - third.y);
+		const double above = smoothstep(-0.020, -0.004, p.y - third.y);
+		for (const double ring : {0.040, 0.049, 0.058, 0.067, 0.076}) cut = std::max(cut, groove(r - ring, 0.0016, 0.0013) * above);
+		cut = std::max(cut, groove(r - kGlowRing, 0.0030, 0.0030));
+		for (const double inset : {0.011, 0.020}) cut = std::max(cut, groove(shieldOutline(p.x, p.y) + inset, 0.0014, 0.0010));
 	}
 	d += cut;
-	// the windows (through) and the inset (shallow)
-	for (int k = 0; k < 3; ++k) d = std::max(d, -smallDiamond(q, k, 0.0, 1.0));
-	d = std::max(d, -smallDiamond(q, 3, 0.0, 0.006, 0.010));
+	// the windows, through
+	for (int k = 0; k < 3; ++k) d = std::max(d, -portDistance(p, k));
+	// the breathing grille: four slots across the cowl's tip
+	if (b.z > 0.080)
+		for (int k = 0; k < 4; ++k) d = std::max(d, -std::max(std::abs(b.y - (-0.030 + 0.016 * k)) - 0.0028, std::abs(b.x) - 0.024 + 0.08 * std::max(0.0, std::abs(b.y) - 0.03)));
 	return d;
 }
-inline double maskGoldSdf(Vec3 q) {
+// The swept blades on side s (ivory, made apart from the shield: they are coarser), a faint line along each.
+inline double maskBladesSdf(Vec3 q, int s) {
+	double d = 1e9;
+	for (int k = 0; k < 2; ++k) {
+		Vec3 root, tip, along, normal, up;
+		bladeEnds(s, k, root, tip);
+		bladeAxes(root, tip, along, normal, up);
+		double e = bladeSdf(q, s, k);
+		const double tt = dot(q - root, along) / length(tip - root);
+		if (tt > 0.08 && tt < 0.85) e += 0.0008 * (1.0 - smoothstep(0.0, 0.0012, std::abs(dot(q - root, up) - 0.006 * (1.0 - tt))));
+		d = std::min(d, e);
+	}
+	return d;
+}
+inline double maskBronzeSdf(Vec3 q) {
 	using namespace sdf;
 	const Vec3 p = maskPlate(q);
-	// the rim of the plate and the rings of the four small diamonds
-	double d = std::max(diamondSdf({p.x, p.y, p.z - 0.002}, 0.126, 0.012), -diamondSdf(p, 0.116, 1.0));
-	d = std::max(d, std::abs(q.x) - 0.110);
-	for (int k = 0; k < 4; ++k) d = std::min(d, std::max(smallDiamond(q, k, 0.009, 0.013, 0.004), -smallDiamond(q, k, 0.0, 1.0)));
-	// the edges of the crown's arcs and of the wings
-	for (int s = -1; s <= 1; s += 2) {
-		d = std::min(d, arcRibbon(q, 0.070 * s, 0.250, 0.150, 0.075, s > 0 ? -2.2 : kPi - 0.9, s > 0 ? 0.9 : kPi + 2.2, 0.007, 0.012));
-		const Mat4 w = invertAffine(mul(translate(0.125 * s, 0.100, 0.132), rotate({0.0, 1.0, 0.0}, 34.0 * s)));
-		d = std::min(d, std::max(roundBox(q, w, {0.046, 0.046, 0.011}, 0.003), -roundBox(q, w, {0.038, 0.038, 0.02}, 0.002)));
+	// the rim round the shield (proud of it on both faces) and the bezels round the windows
+	const double o = shieldOutline(p.x, p.y);
+	double d = std::max(std::abs(o + 0.0035) - 0.0035, std::abs(p.z) - kMaskHalfThick - 0.0022);
+	for (int k = 0; k < 3; ++k) {
+		const double r = portDistance(p, k);   // (0 at the window's edge)
+		d = std::min(d, std::hypot(r - 0.0030, p.z - kMaskHalfThick) - 0.0045);
 	}
-	// the central spine of the crown and its cross piece
-	const auto bar3 = [&](Vec3 a, Vec3 e, double r) { return roundCone(q, a, e, r, r); };
-	const Vec3 c = maskCentre();
-	d = std::min(d, bar3(c + Vec3{0.0, 0.110, -0.012}, c + Vec3{0.0, 0.215, -0.030}, 0.008));
-	d = std::min(d, bar3(c + Vec3{-0.035, 0.175, -0.024}, c + Vec3{0.035, 0.175, -0.024}, 0.006));
-	// the great fan behind the head: a half ring standing on the crown, two spokes
-	const double fz = -0.060;
-	d = std::min(d, arcRibbon(q, 0.0, 0.250, fz, 0.150, 0.15, kPi - 0.15, 0.030, 0.016));
-	d = std::min(d, bar3({0.0, 0.250, fz}, {0.106, 0.356, fz}, 0.009));
-	d = std::min(d, bar3({0.0, 0.250, fz}, {-0.106, 0.356, fz}, 0.009));
-	d = std::min(d, bar3({0.0, 0.200, fz + 0.02}, {0.0, 0.250, fz}, 0.012));
-	// the ridge down the beak
+	// the blades' spines
+	for (int s = -1; s <= 1; s += 2)
+		for (int k = 0; k < 2; ++k) d = std::min(d, bladeSpineSdf(q, s, k));
+	// a band round the cowl
 	const Vec3 b = transformPoint(beakFrameInv(), q);
-	const double onShell = std::abs(ellipsoid(b, identity(), {0.066, 0.100, 0.118})) - 0.0085;
-	d = std::min(d, std::max(std::max(onShell, std::abs(b.x) - 0.006), std::max(b.y - 0.035, 0.030 - b.z)));
+	const double onShell = std::abs(ellipsoid(b, identity(), cowlRadii())) - 0.0088;
+	d = std::min(d, std::max(std::max(onShell, std::abs(b.z - 0.052) - 0.0055), -p.z - 0.002));
 	return d;
 }
-inline double maskDarkSdf(Vec3 q) { return smallDiamond(q, 3, -0.004, 0.004, 0.006); }   // the bottom diamond's dark centre
-inline double maskTealSdf(Vec3 q) {   // the small teal squares in the wings
+// The five silver stars on an arc above the tide rings: four-pointed, flat on the face, the middle one larger.
+inline double maskStarSdf(Vec3 q) {
+	const Vec3 p = maskPlate(q), third = maskPortAt(2);
 	double d = 1e9;
-	for (int s = -1; s <= 1; s += 2) {
-		const Mat4 w = invertAffine(mul(translate(0.125 * s, 0.100, 0.132), rotate({0.0, 1.0, 0.0}, 34.0 * s)));
-		d = std::min(d, sdf::roundBox(q, mul(translate(0.0, 0.0, -0.010), w), {0.014, 0.014, 0.004}, 0.002));
+	for (int k = 0; k < 5; ++k) {
+		const double a = (40.0 + 25.0 * k) * kPi / 180.0, size = k == 2 ? 0.0105 : 0.0075;
+		const double x = p.x - (third.x + 0.094 * std::cos(a)), y = p.y - (third.y + 0.094 * std::sin(a));
+		const double star = std::min(std::abs(x) / size + std::abs(y) / (size * 0.28), std::abs(x) / (size * 0.28) + std::abs(y) / size) - 1.0;
+		d = std::min(d, std::max(star * size * 0.28, std::abs(p.z - kMaskHalfThick) - 0.0016));
 	}
 	return d;
+}
+// The dark inside of the cowl's tip, seen through the grille.
+inline double maskDarkSdf(Vec3 q) {
+	const Vec3 b = transformPoint(beakFrameInv(), q);
+	const Vec3 r = cowlRadii() - Vec3{0.010, 0.010, 0.010};
+	return std::max(std::abs(sdf::ellipsoid(b, identity(), r)) - 0.0015, 0.078 - b.z);
+}
+// The glowing inlay round the third window: a thin ring laid in its groove (mask space; the ring is a torus about its frame's y axis).
+inline Mat4 glowRingFrame() {
+	const Vec3 third = maskPortAt(2), c = maskCentre();
+	const double y = third.y, z = c.z + kMaskHalfThick - 0.0018 - 0.7 * y * y;
+	return alignY({third.x + c.x, third.y + c.y, z}, normalize(Vec3{0.0, 1.4 * y, 1.0}));
 }
 
 // ---- the body (body space) ------------------------------------------------------------------------------------------------------------------------------------------
@@ -535,8 +566,8 @@ inline double hipWrapSdf(Vec3 q, const ExplorerBody &b) {
 	}
 	return d;
 }
-// The gold trim: bands down both edges of the front panel and the slits' outer edges, the hem, the back slit's edges, the stepped yoke round the neck front and back,
-// the waist band across the back, and three bands at each cuff.
+// The embroidered borders (woven cloth, borderMaterial): bands down both edges of the front panel and the slits' outer edges, the hem, the back slit's edges, a rounded
+// neckline front and back, and the waist band across the back.
 inline double trimSdf(Vec3 q, const ExplorerPose &p, const ExplorerBody &b) {
 	const double surface = std::abs(outerRobeSdf(q, p, b) + 0.002) - 0.006;
 	double band = 1e9;
@@ -546,41 +577,46 @@ inline double trimSdf(Vec3 q, const ExplorerPose &p, const ExplorerBody &b) {
 	}
 	if (q.y < b.pelvis.y - 0.08 && q.z < 0.0) band = std::min(band, std::abs(std::abs(q.x) - (0.010 + 0.10 * (b.pelvis.y - 0.08 - q.y)) - 0.012) - 0.012);
 	band = std::min(band, std::abs(q.y - b.hemY - 0.030) - 0.024);
-	// the yoke: a stepped frame round the neck, front and back
-	const double yy = q.y - (b.chest.y - 0.02);
-	if (q.y > b.chest.y - 0.08 && q.y < b.neck.y) {
-		band = std::min(band, std::abs(std::abs(q.x) - 0.085) - 0.011);
-		band = std::min(band, std::max(std::abs(yy + 0.050) - 0.011, std::abs(q.x) - 0.096));
+	// the neckline: a rounded U from the shoulders down the chest, front and back (shallower at the back)
+	if (q.y > b.chest.y - 0.16 && q.y < b.neck.y + 0.02) {
+		const double depth = q.z > 0.0 ? 0.150 : 0.080;
+		const double ex = q.x / 0.100, ey = (q.y - b.neck.y) / depth;
+		if (ey < 0.0) band = std::min(band, std::abs(std::sqrt(ex * ex + ey * ey) - 1.0) * 0.100 - 0.012);
 	}
-	if (q.y > b.pelvis.y - 0.02 && q.y < b.chest.y - 0.06 && q.z > 0.0) band = std::min(band, std::abs(std::abs(q.x) - 0.075) - 0.011);
+	// from the neckline down to the waist at the front, two bands either side of the panel
+	if (q.y > b.pelvis.y - 0.02 && q.y < b.chest.y + 0.04 && q.z > 0.0) band = std::min(band, std::abs(std::abs(q.x) - 0.075) - 0.011);
 	if (q.z < 0.0) band = std::min(band, std::abs(q.y - (b.pelvis.y + 0.06)) - 0.020);
-	double d = std::max(surface, band);
+	return std::max(surface, band);
+}
+// Two bronze bands at each cuff.
+inline double cuffBandSdf(Vec3 q, const ExplorerBody &b) {
+	double d = 1e9;
 	for (int s = 0; s < 2; ++s)
-		for (int k = 0; k < 3; ++k) {
-			const Vec3 c = b.wrist[s] - b.handDir[s] * (0.020 + 0.034 * k);
+		for (int k = 0; k < 2; ++k) {
+			const Vec3 c = b.wrist[s] - b.handDir[s] * (0.022 + 0.040 * k);
 			const Vec3 v = q - c;
 			const double along = dot(v, b.handDir[s]);
 			const double radial = length(v - b.handDir[s] * along);
-			d = std::min(d, std::max(std::abs(radial - (0.050 + 0.006 * k)) - 0.011, std::abs(along) - 0.012));
+			d = std::min(d, std::max(std::abs(radial - (0.050 + 0.007 * k)) - 0.009, std::abs(along) - 0.009));
 		}
 	return d;
 }
-// A thin cream line inside the gold bands of the front panel, and one above the hem.
+// A thin silver piping inside the borders of the front panel, and one above the hem.
 inline double creamLineSdf(Vec3 q, const ExplorerPose &p, const ExplorerBody &b) {
 	const double surface = std::abs(outerRobeSdf(q, p, b) + 0.001) - 0.0065;
 	double band = std::abs(q.y - b.hemY - 0.075) - 0.006;
 	if (q.y < b.pelvis.y - 0.02 && q.z > 0.0) band = std::min(band, std::abs(std::abs(q.x) - panelHalf(b, q.y) + 0.040) - 0.0045);
 	return std::max(surface, band);
 }
-// The gold collar: a band round the neck's base with the square-key steps of the statue's collar.
+// The bronze collar: a rolled band round the neck's base, beaded (thirty rounded beads round it), dipping a little at the front.
 inline double collarSdf(Vec3 q, const ExplorerBody &b) {
 	const Vec3 v = q - (b.neck + Vec3{0.0, -0.045, 0.010});
 	const double a = std::atan2(v.x, v.z);
-	const double step = std::fmod(a / (2.0 * kPi) * 24.0 + 100.0, 1.0) < 0.5 ? 0.012 : 0.0;
 	const double r = std::sqrt(v.x * v.x + v.z * v.z / 0.8);
-	return std::max(std::abs(r - 0.120 - step * 0.5) - 0.022 - step * 0.5, std::abs(v.y + 0.02 * std::cos(a)) - 0.016);
+	const double bead = 0.0035 * std::pow(std::abs(std::cos(a * 15.0)), 0.6);
+	return std::hypot(r - 0.124, v.y + 0.02 * std::cos(a)) - 0.0145 - bead;
 }
-// The woven shoulder pads: rust-red basket weave over each shoulder and upper arm, ringed in gold at the bottom.
+// The quilted shoulder pads: umber leather over each shoulder and upper arm in stitched channels, ringed in bronze at the bottom.
 inline double padSdf(Vec3 q, const ExplorerBody &b) {
 	double d = 1e9;
 	for (int s = 0; s < 2; ++s) {
@@ -589,8 +625,7 @@ inline double padSdf(Vec3 q, const ExplorerBody &b) {
 		const Vec3 l = transformPoint(invertAffine(f), q);
 		double e = sdf::ellipsoid(l, identity(), {0.098, 0.135, 0.098});
 		e = std::max(e, l.y - 0.095);
-		const double th = std::atan2(l.x, l.z);
-		e += 0.0035 * std::sin(th * 9.0 + l.y * 70.0) * std::sin(th * 9.0 - l.y * 70.0);   // (the weave)
+		e += 0.0040 * std::pow(std::abs(std::cos(l.y * 72.0)), 6.0);   // (the stitched channels round the arm: the stitches pull the leather in)
 		d = std::min(d, e);
 	}
 	return d;
@@ -709,9 +744,10 @@ inline double clawSdf(Vec3 q, const ExplorerBody &b) {
 	return d;
 }
 
-// ---- the sceptre ---------------------------------------------------------------------------------------------------------------------------------------------------
-// The Nomai's writing sceptre: a dark wooden shaft and a boxy ivory head with gold rods standing out of it (they type on it and press its end to a surface to write); a
-// small crystal in the head and two fine channels in it glow ghostly blue.
+// ---- the staff ------------------------------------------------------------------------------------------------------------------------------------------------------
+// The explorer's sky-compass staff: a polished dark wooden shaft with carved rings, a leather wrap where it is held, bronze collars and a bronze foot; on top a bronze
+// cradle holds two nested gimbal rings - the outer bronze with a scale of ticks, the inner silver - round a crystal that glows ghostly blue (a real light: it lights
+// the hand and the mask).
 inline Mat4 staffFrame(const ExplorerPose &p, const ExplorerBody &b) {
 	const int s = p.staff > 0 ? 0 : 1;
 	const Vec3 grip = b.wrist[s] + b.handDir[s] * 0.05;
@@ -721,26 +757,53 @@ inline Mat4 staffFrame(const ExplorerPose &p, const ExplorerBody &b) {
 // The sceptre at `m` (its grip at the origin, the shaft along +y), its light at `glowAmount` (0 .. 1).
 inline std::string sceptreText(const Mat4 &m, double glowAmount) {
 	std::string out;
+	// the shaft: tapering a little to the top, a shallow carved ring every 12 cm
 	std::vector<std::pair<double, double>> shaft;
-	for (int i = 0; i <= 30; ++i) shaft.push_back({i == 0 ? 0.0 : 0.015 + 0.0015 * std::sin(i * 1.7), -1.20 + 1.75 * i / 30.0});
-	shaft.push_back({0.0, 0.55});
-	out += attr(diffuseMaterial({0.24, 0.15, 0.09}), meshText(lathe(shaft, 12), m));
-	std::string gold;
-	for (int k = 0; k < 4; ++k) gold += meshText(torus(0.0175, 0.004, 14, 6), mul(m, translate(0.0, 0.25 + 0.08 * k, 0.0)));
-	// the head: an ivory block, turned a little, with rods standing out of its side like a comb
-	const Mat4 head = mul(m, translate(0.0, 0.66, 0.0), rotate({0.0, 0.0, 1.0}, 12.0));
-	out += attr(coated({0.84, 0.78, 0.64}, 0.4), meshText(roundedBox(0.075, 0.22, 0.050, 0.012, 2), head));
-	gold += meshText(roundedBox(0.090, 0.020, 0.060, 0.006, 1), mul(head, translate(0.0, -0.115, 0.0))) + meshText(roundedBox(0.090, 0.020, 0.060, 0.006, 1), mul(head, translate(0.0, 0.115, 0.0)));
-	for (int k = 0; k < 5; ++k) {
-		const double y = -0.08 + 0.04 * k;
-		const double len = 0.10 + 0.05 * std::sin(k * 1.9 + 0.5);
-		gold += rod(transformPoint(head, {0.035, y, 0.0}), transformPoint(head, {0.035 + len, y + 0.012, 0.0}), 0.0055, 6);
+	shaft.push_back({0.0, -1.14});
+	for (int i = 0; i <= 120; ++i) {
+		const double y = -1.14 + 1.66 * i / 120.0;
+		const double ring = std::pow(std::abs(std::cos(kPi * (y + 1.14) / 0.12)), 24.0);
+		shaft.push_back({0.0158 - 0.0022 * (y + 1.14) / 1.66 - 0.0016 * ring, y});
 	}
-	out += attr(metalMaterial({0.86, 0.66, 0.30}, 0.32), gold);
+	shaft.push_back({0.0, 0.52});
+	out += attr(coated({0.17, 0.095, 0.050}, 0.35), meshText(lathe(shaft, 16), m));
+	// the leather wrap where it is held: a binding wound round it
+	std::string wrap;
+	for (int k = 0; k < 15; ++k) wrap += meshText(torus(0.0160, 0.0034, 18, 6), mul(m, translate(0.0, -0.075 + 0.0105 * k, 0.0), rotate({1.0, 0.0, 0.0}, 6.0)));
+	out += attr(diffuseMaterial({0.16, 0.085, 0.045}), wrap);
+	// bronze: the foot, collars above and below the wrap and under the head, the cradle and the outer ring
+	std::string bronze;
+	bronze += meshText(lathe({{0.0, -1.20}, {0.006, -1.198}, {0.012, -1.185}, {0.0165, -1.15}, {0.0170, -1.13}, {0.0, -1.13}}, 16), m);
+	for (const double y : {-0.092, 0.090, 0.30, 0.50}) bronze += meshText(torus(0.0168, 0.0042, 18, 8), mul(m, translate(0.0, y, 0.0)));
+	bronze += meshText(lathe({{0.0, 0.49}, {0.0175, 0.50}, {0.0210, 0.53}, {0.0120, 0.575}, {0.0060, 0.60}, {0.0, 0.61}}, 16), m);
+	const double R = 0.066, cy = 0.690;   // the outer ring's radius, the rings' centre above the grip
+	for (int i = 0; i < 12; ++i) {        // the cradle: a half circle under the rings, from pivot to pivot
+		const double a0 = kPi + kPi * i / 12.0, a1 = kPi + kPi * (i + 1) / 12.0;
+		bronze += rod(transformPoint(m, {(R + 0.010) * std::cos(a0), cy + (R + 0.010) * std::sin(a0), 0.0}), transformPoint(m, {(R + 0.010) * std::cos(a1), cy + (R + 0.010) * std::sin(a1), 0.0}), 0.0042, 8);
+	}
+	for (int s = -1; s <= 1; s += 2) {   // the pivots, with a bead on the end of each
+		bronze += rod(transformPoint(m, {s * (R - 0.003), cy, 0.0}), transformPoint(m, {s * (R + 0.016), cy, 0.0}), 0.0030, 8);
+		bronze += meshText(uvSphere(0.0055, 10, 6), mul(m, translate(s * (R + 0.017), cy, 0.0)));
+	}
+	const Mat4 outer = mul(m, translate(0.0, cy, 0.0), rotate({1.0, 0.0, 0.0}, 90.0 + 24.0));
+	bronze += meshText(torus(R, 0.0050, 48, 8), outer);
+	for (int k = 0; k < 24; ++k) {   // the scale round the outer ring, a longer tick every sixth
+		const double a = 2.0 * kPi * k / 24.0, len = k % 6 == 0 ? 0.011 : 0.006;
+		bronze += rod(transformPoint(outer, {(R + 0.004) * std::cos(a), 0.0, (R + 0.004) * std::sin(a)}), transformPoint(outer, {(R + 0.004 + len) * std::cos(a), 0.0, (R + 0.004 + len) * std::sin(a)}), 0.0013, 4);
+	}
+	out += attr(metalMaterial({0.78, 0.56, 0.32}, 0.28), bronze);
+	// the inner ring, silver, pivoting on the outer one across it
+	const double r = 0.047;
+	const Mat4 inner = mul(outer, rotate({0.0, 0.0, 1.0}, 58.0));
+	std::string silver = meshText(torus(r, 0.0038, 40, 8), inner);
+	for (int s = -1; s <= 1; s += 2) silver += rod(transformPoint(outer, {0.0, 0.0, s * (r - 0.002)}), transformPoint(outer, {0.0, 0.0, s * (R - 0.003)}), 0.0024, 6);
+	out += attr(metalMaterial({0.86, 0.87, 0.90}, 0.18), silver);
+	// the crystal: a long six-sided double point at the centre, glowing
 	const double glow = 0.15 + 0.85 * clamp01(glowAmount);
-	out += emissiveSphere(transformPoint(head, {0.0, 0.0, 0.028}), 0.016, Vec3{0.55, 0.80, 1.0} * (4.0 * glow));
-	const Vec3 e = Vec3{0.45, 0.75, 1.0} * (1.4 * glow);
-	out += attr("Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]", meshText(box(0.004, 0.18, 0.004), mul(head, translate(0.018, 0.0, 0.026))) + meshText(box(0.004, 0.18, 0.004), mul(head, translate(-0.018, 0.0, 0.026))), &e);
+	const Vec3 e = Vec3{0.50, 0.78, 1.0} * (2.6 * glow);
+	// (two-sided: a mesh's faces light only to their front, and story space mirrors every mesh, so a closed glowing mesh would light inwards)
+	out += "AttributeBegin\n  AreaLightSource \"diffuse\" \"rgb L\" [ " + fmt3(e) + " ] \"bool twosided\" true\n  Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]\n" +
+		   meshText(lathe({{0.0, -0.034}, {0.0125, -0.010}, {0.0125, 0.010}, {0.0, 0.034}}, 6), mul(m, translate(0.0, cy, 0.0), rotate({0.0, 0.0, 1.0}, 8.0))) + "AttributeEnd\n";
 	return out;
 }
 inline std::string staffText(const ExplorerPose &p, const ExplorerBody &b, const Mat4 &world) {
@@ -843,42 +906,149 @@ inline void headUV(Mesh &m) {
 }
 inline std::string beardMaterial() { return "Material \"diffuse\" \"rgb reflectance\" [ 0.92 0.90 0.84 ]"; }
 inline std::string ivoryMaterial() { return "Material \"coateddiffuse\" \"rgb reflectance\" [ 0.86 0.80 0.66 ] \"float roughness\" [ 0.35 ]"; }
-inline std::string goldMaterial() { return metalMaterial({0.86, 0.66, 0.30}, 0.30); }
-// The robe's cloth: deep green with fine cream lines in branching curves (the suits' pattern), laid round the robe (u round the body, twice; v up it).
-inline std::string robeTexture() {
-	return film_sky::picture(kFilmKey, "robe_teal", 1024, 1024, [](std::vector<float> &rgb) {
-		const int N = 1024;
-		struct Arc {
-			double u, v, r, a0, a1;
-		};
-		std::vector<Arc> arcs;
-		for (int k = 0; k < 46; ++k) {
-			const double a0 = 2.0 * kPi * hash01(k, 901), span = 0.8 + 2.2 * hash01(k, 902);
-			arcs.push_back({hash01(k, 903), hash01(k, 904), 0.06 + 0.22 * hash01(k, 905), a0, a0 + span});
+inline std::string goldMaterial() { return metalMaterial({0.78, 0.56, 0.32}, 0.28); }   // (a warm bronze, for every metal fitting)
+// The robe's cloth: a deep sea-green twill embroidered with a star chart - constellations of small silver-cream stars joined by fine stitched lines, a few brighter
+// stars with four-pointed glints, and loose single stars between - laid round the robe (u round the body, twice; v up it). The picture repeats across u and v.
+// A twill's fine diagonal ribs: their height at (u, v) of the robe's picture (0 .. 1), and the stitched star chart's mask (0 .. 1) and brightness.
+constexpr int kRobePicture = 1024;
+constexpr double kTwillPeriod = 1.0 / 170.0;   // (u is about 0.6 m round the body: a rib every 3.5 mm, six pixels of the picture)
+inline double twillHeight(double u, double v) {
+	const double s = (u + v) / kTwillPeriod;
+	return std::pow(0.5 + 0.5 * std::cos(2.0 * kPi * s), 1.5);
+}
+struct StarChart {
+	struct Star {
+		double u, v, size;
+		bool glint;
+	};
+	std::vector<Star> stars;
+	std::vector<std::pair<int, int>> lines;   // (indices into stars)
+};
+inline const StarChart &robeStarChart() {
+	static const StarChart chart = [] {
+		StarChart c;
+		for (int g = 0; g < 16; ++g) {   // the constellations: a few stars round a centre, joined in a chain with a branch
+			const double cu = hash01(g, 931), cv = hash01(g, 932), spread = 0.045 + 0.040 * hash01(g, 933);
+			const int n = 4 + static_cast<int>(hash01(g, 934) * 4.0), first = static_cast<int>(c.stars.size());
+			for (int i = 0; i < n; ++i) {
+				const double a = 2.0 * kPi * hash01(g * 31 + i, 935), r = spread * std::sqrt(hash01(g * 31 + i, 936));
+				c.stars.push_back({cu + r * std::cos(a), cv + r * std::sin(a), 0.0024 + 0.0030 * hash01(g * 31 + i, 937), hash01(g * 31 + i, 938) > 0.78});
+				if (i > 0) c.lines.push_back({first + i - 1 - (i == n - 1 && n > 4 ? 1 : 0), first + i});
+			}
 		}
+		for (int k = 0; k < 140; ++k) c.stars.push_back({hash01(k, 941), hash01(k, 942), 0.0010 + 0.0012 * hash01(k, 943), false});   // (the loose stars)
+		return c;
+	}();
+	return chart;
+}
+// How much of the embroidery covers (u, v): 0 bare cloth .. 1 thread.
+inline double starChartThread(double u, double v) {
+	const StarChart &c = robeStarChart();
+	double cover = 0.0;
+	for (int wu = -1; wu <= 1; ++wu)
+		for (int wv = -1; wv <= 1; ++wv) {
+			for (const auto &s : c.stars) {
+				const double du = u - s.u - wu, dv = v - s.v - wv;
+				if (std::abs(du) > 0.02 || std::abs(dv) > 0.02) continue;
+				const double r = std::hypot(du, dv);
+				cover = std::max(cover, 1.0 - smoothstep(s.size * 0.7, s.size, r));
+				if (s.glint) {
+					const double arm = std::min(std::abs(du) + 6.0 * std::abs(dv), 6.0 * std::abs(du) + std::abs(dv));
+					cover = std::max(cover, 0.85 * (1.0 - smoothstep(s.size * 2.4, s.size * 3.2, arm)));
+				}
+			}
+			for (const auto &l : c.lines) {
+				const auto &a = c.stars[static_cast<std::size_t>(l.first)], &b = c.stars[static_cast<std::size_t>(l.second)];
+				const double ax = u - a.u - wu, ay = v - a.v - wv, bx = b.u - a.u, by = b.v - a.v;
+				const double t = clamp01((ax * bx + ay * by) / std::max(1e-12, bx * bx + by * by));
+				const double dist = std::hypot(ax - bx * t, ay - by * t);
+				// (a running stitch: the line is broken into short stitches)
+				const double stitch = std::fmod(t * std::hypot(bx, by) / 0.0045 + 10.0, 1.0) < 0.72 ? 1.0 : 0.0;
+				cover = std::max(cover, 0.75 * stitch * (1.0 - smoothstep(0.0005, 0.0010, dist)));
+			}
+		}
+	return cover;
+}
+// The embroidery's cover at each pixel of the robe's picture (row 0 at the top, v = 1), worked out once for the picture and its normal map.
+inline const std::vector<float> &robeThreadGrid() {
+	static const std::vector<float> grid = [] {
+		const int N = kRobePicture;
+		std::vector<float> g(static_cast<std::size_t>(N) * N);
+		film_sky::eachRow(N, [&g, N](int j) {
+			for (int i = 0; i < N; ++i) g[static_cast<std::size_t>(j) * N + i] = static_cast<float>(starChartThread((i + 0.5) / N, 1.0 - (j + 0.5) / N));
+		});
+		return g;
+	}();
+	return grid;
+}
+inline std::string robeTexture() {
+	return film_sky::picture(kFilmKey, "robe_starchart", kRobePicture, kRobePicture, [](std::vector<float> &rgb) {
+		const int N = kRobePicture;
+		const std::vector<float> &thread = robeThreadGrid();
+		film_sky::eachRow(N, [&rgb, &thread, N](int j) {
+			for (int i = 0; i < N; ++i) {
+				const double u = (i + 0.5) / N, v = 1.0 - (j + 0.5) / N;
+				const double n = nature::fbm2(u * 60.0, v * 60.0, 907), slub = nature::fbm2(u * 9.0, v * 170.0, 908);
+				Vec3 c = Vec3{0.075, 0.215, 0.200} * (0.86 + 0.16 * n + 0.08 * (slub - 0.5)) * (0.90 + 0.12 * twillHeight(u, v));
+				c = lerp(c, Vec3{0.80, 0.79, 0.70}, 0.92 * thread[static_cast<std::size_t>(j) * N + i]);
+				const std::size_t k = (static_cast<std::size_t>(j) * N + i) * 3;
+				rgb[k] = static_cast<float>(c.x);
+				rgb[k + 1] = static_cast<float>(c.y);
+				rgb[k + 2] = static_cast<float>(c.z);
+			}
+		});
+	});
+}
+// The weave's normal map: the twill's ribs and the embroidery standing a little proud of the cloth.
+inline std::string robeNormalTexture() {
+	return film_sky::picture(kFilmKey, "robe_starchart_n", kRobePicture, kRobePicture, [](std::vector<float> &rgb) {
+		const int N = kRobePicture;
+		const std::vector<float> &thread = robeThreadGrid();
+		const double du = 1.0 / N, mPerU = 0.60, mPerV = 1.0 / 0.9;   // (metres per unit of u and of v, as wrapUV lays them)
+		const auto height = [&thread, N](int i, int j) {
+			i = (i % N + N) % N, j = (j % N + N) % N;
+			return 0.00025 * twillHeight((i + 0.5) / N, 1.0 - (j + 0.5) / N) + 0.00040 * thread[static_cast<std::size_t>(j) * N + i];
+		};
+		film_sky::eachRow(N, [&](int j) {
+			for (int i = 0; i < N; ++i) {
+				const double sx = (height(i + 1, j) - height(i - 1, j)) / (2.0 * du * mPerU), sy = (height(i, j - 1) - height(i, j + 1)) / (2.0 * du * mPerV);
+				const Vec3 nn = normalize(Vec3{-sx, -sy, 1.0});
+				const std::size_t k = (static_cast<std::size_t>(j) * N + i) * 3;
+				rgb[k] = static_cast<float>(0.5 + 0.5 * nn.x);
+				rgb[k + 1] = static_cast<float>(0.5 + 0.5 * nn.y);
+				rgb[k + 2] = static_cast<float>(0.5 + 0.5 * nn.z);
+			}
+		});
+	});
+}
+inline std::string robeMaterial() {
+	return "Texture \"ns_robe\" \"spectrum\" \"imagemap\" \"string filename\" [ \"" + robeTexture() + "\" ]\n  Material \"diffuse\" \"texture reflectance\" \"ns_robe\" \"string normalmap\" [ \"" +
+		   robeNormalTexture() + "\" ]";
+}
+// The borders' embroidered cloth: a rust-red weave worked with rows of small cream stars between pairs of dots, the same seen along a band or across it (the borders run
+// both round the robe and up it).
+inline std::string borderMaterial() {
+	const std::string pic = film_sky::picture(kFilmKey, "border_stars", 512, 512, [](std::vector<float> &rgb) {
+		const int N = 512;
 		for (int j = 0; j < N; ++j)
 			for (int i = 0; i < N; ++i) {
 				const double u = (i + 0.5) / N, v = 1.0 - (j + 0.5) / N;
-				double line = 1e9;
-				for (const Arc &a : arcs)
-					for (int w = -1; w <= 1; ++w) {
-						const double du = u - a.u + w, dv = v - a.v;
-						double ang = std::atan2(dv, du);
-						while (ang < a.a0) ang += 2.0 * kPi;
-						if (ang > a.a1) continue;
-						line = std::min(line, std::abs(std::sqrt(du * du + dv * dv) - a.r));
-					}
-				const double n = nature::fbm2(u * 90.0, v * 90.0, 907);
-				Vec3 c = Vec3{0.20, 0.38, 0.37} * (0.90 + 0.18 * n);
-				c = lerp(c, Vec3{0.80, 0.76, 0.56}, 0.85 * (1.0 - smoothstep(0.0012, 0.0026, line)));
+				const double weave = 0.5 + 0.5 * std::sin(2.0 * kPi * u * 160.0) * std::sin(2.0 * kPi * v * 160.0);
+				Vec3 c = Vec3{0.43, 0.15, 0.075} * (0.88 + 0.14 * weave + 0.10 * (nature::fbm2(u * 40.0, v * 40.0, 951) - 0.5));
+				// a lattice of motifs every 1/16: a four-pointed star at the cell's middle, a dot at each corner
+				const double cu = u * 16.0 - std::floor(u * 16.0) - 0.5, cv = v * 16.0 - std::floor(v * 16.0) - 0.5;
+				const double star = std::min(std::abs(cu) + 3.2 * std::abs(cv), 3.2 * std::abs(cu) + std::abs(cv));
+				double thread = 1.0 - smoothstep(0.20, 0.25, star);
+				thread = std::max(thread, 1.0 - smoothstep(0.045, 0.065, std::hypot(std::abs(cu) - 0.5, std::abs(cv) - 0.5)));
+				c = lerp(c, Vec3{0.86, 0.78, 0.58}, 0.90 * thread);
 				const std::size_t k = (static_cast<std::size_t>(j) * N + i) * 3;
 				rgb[k] = static_cast<float>(c.x);
 				rgb[k + 1] = static_cast<float>(c.y);
 				rgb[k + 2] = static_cast<float>(c.z);
 			}
 	});
+	return "Texture \"ns_border\" \"spectrum\" \"imagemap\" \"string filename\" [ \"" + pic + "\" ]\n  Material \"diffuse\" \"texture reflectance\" \"ns_border\"";
 }
-inline std::string robeMaterial() { return "Texture \"ns_robe\" \"spectrum\" \"imagemap\" \"string filename\" [ \"" + robeTexture() + "\" ]\n  Material \"diffuse\" \"texture reflectance\" \"ns_robe\""; }
 // Coordinates round the body for a mesh in body space: u the angle round the vertical (twice round), v the height; a triangle across the seam at the back gets its own
 // copies of the vertices on the low side, so the picture does not smear across it.
 inline void wrapUV(Mesh &m) {
@@ -925,28 +1095,35 @@ inline Mat4 maskFrame(const ExplorerPose &p, const ExplorerBody &b) {
 	m[2] = z.x; m[6] = z.y; m[10] = z.z;
 	return m;
 }
-inline const Mesh &maskIvoryMesh() {
-	static const Mesh m = sdf::surfaceNets([](Vec3 q) { return maskIvorySdf(q); }, {-0.20, -0.12, 0.02}, {0.20, 0.34, 0.30}, 0.0012);   // (fine: the engraving)
+inline Mesh maskIvoryMesh() {   // (fine: the engraving)
+	return sdf::surfaceNets([](Vec3 q) { return maskIvorySdf(q); }, {-0.175, -0.125, 0.06}, {0.175, 0.290, 0.30}, 0.0011);
+}
+inline Mesh maskBladesMesh() {
+	Mesh m;
+	for (int s = -1; s <= 1; s += 2) {
+		const Mesh side = sdf::surfaceNets([s](Vec3 q) { return maskBladesSdf(q, s); }, {s > 0 ? 0.10 : -0.26, 0.09, -0.03}, {s > 0 ? 0.26 : -0.10, 0.31, 0.16}, 0.0012);
+		const int base = static_cast<int>(m.verts.size());
+		m.verts.insert(m.verts.end(), side.verts.begin(), side.verts.end());
+		m.normals.insert(m.normals.end(), side.normals.begin(), side.normals.end());
+		for (auto t : side.tris) m.tris.push_back({t[0] + base, t[1] + base, t[2] + base});
+	}
 	return m;
 }
-inline const Mesh &maskGoldMesh() {
-	static const Mesh m = sdf::surfaceNets([](Vec3 q) { return maskGoldSdf(q); }, {-0.20, -0.10, -0.10}, {0.20, 0.42, 0.30}, 0.0025);
-	return m;
-}
-inline const Mesh &maskDarkMesh() {
-	static const Mesh m = sdf::surfaceNets([](Vec3 q) { return maskDarkSdf(q); }, {-0.06, -0.02, 0.10}, {0.06, 0.10, 0.25}, 0.0015);
-	return m;
-}
-inline const Mesh &maskTealMesh() {
-	static const Mesh m = sdf::surfaceNets([](Vec3 q) { return maskTealSdf(q); }, {-0.20, 0.04, 0.05}, {0.20, 0.16, 0.20}, 0.0015);
-	return m;
-}
-// The mask on its own (laid on the ground beside the campfire): at `frame` (mask space -> world). Its four meshes never change: made once as PLY parts (film_cache::part).
-inline std::string maskText(const Mat4 &frame, double = 0.0) {
-	return film_cache::part(kFilmKey, "mask_ivory2", ivoryMaterial(), frame, [] { return maskIvoryMesh(); }) +   // ("2": engraved)
-		   film_cache::part(kFilmKey, "mask_gold", goldMaterial(), frame, [] { return maskGoldMesh(); }) +
-		   film_cache::part(kFilmKey, "mask_dark", diffuseMaterial({0.10, 0.07, 0.05}), frame, [] { return maskDarkMesh(); }) +
-		   film_cache::part(kFilmKey, "mask_teal", diffuseMaterial({0.28, 0.55, 0.55}), frame, [] { return maskTealMesh(); });
+inline Mesh maskBronzeMesh() { return sdf::surfaceNets([](Vec3 q) { return maskBronzeSdf(q); }, {-0.26, -0.11, -0.03}, {0.26, 0.31, 0.30}, 0.0015); }
+inline Mesh maskStarMesh() { return sdf::surfaceNets([](Vec3 q) { return maskStarSdf(q); }, {-0.12, 0.14, 0.12}, {0.12, 0.29, 0.20}, 0.0006); }
+inline Mesh maskDarkMesh() { return sdf::surfaceNets([](Vec3 q) { return maskDarkSdf(q); }, {-0.07, -0.11, 0.17}, {0.07, 0.11, 0.30}, 0.0012); }
+inline std::string boneIvoryMaterial() { return "Material \"coateddiffuse\" \"rgb reflectance\" [ 0.84 0.79 0.68 ] \"float roughness\" [ 0.28 ]"; }
+inline std::string silverMaterial() { return metalMaterial({0.86, 0.87, 0.90}, 0.18); }
+// The mask on its own (laid on the ground beside the campfire): at `frame` (mask space -> world). Its meshes never change: made once as PLY parts (film_cache::part,
+// "mask3_": our own mask). Its inlay glows at `glow` (0 .. 1).
+inline std::string maskText(const Mat4 &frame, double glow = 0.0) {
+	const Vec3 e = Vec3{0.55, 0.80, 1.0} * (0.6 + 1.4 * clamp01(glow));
+	return film_cache::part(kFilmKey, "mask3_ivory", boneIvoryMaterial(), frame, [] { return maskIvoryMesh(); }) +
+		   film_cache::part(kFilmKey, "mask3_blades", boneIvoryMaterial(), frame, [] { return maskBladesMesh(); }) +
+		   film_cache::part(kFilmKey, "mask3_bronze", goldMaterial(), frame, [] { return maskBronzeMesh(); }) +
+		   film_cache::part(kFilmKey, "mask3_stars", silverMaterial(), frame, [] { return maskStarMesh(); }) +
+		   film_cache::part(kFilmKey, "mask3_dark", diffuseMaterial({0.035, 0.030, 0.028}), frame, [] { return maskDarkMesh(); }) +
+		   attr("Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]", meshText(torus(kGlowRing, 0.0018, 36, 5), mul(frame, glowRingFrame())), &e);
 }
 
 // The explorer standing at `world` (body space -> story space) in pose `p`, sculpted at `cell` metres (the face and the hands finer).
@@ -985,16 +1162,20 @@ inline std::string explorerText(const ExplorerPose &p, const Mat4 &world, double
 	}
 	out += attr(irisMaterial(), eyes);
 	out += attr("Material \"coateddiffuse\" \"rgb reflectance\" [ 0.008 0.008 0.008 ] \"float roughness\" [ 0.02 ]", pupils);
-	if (p.maskShown) out += maskText(mul(world, maskFrame(p, b)));
+	if (p.maskShown) out += maskText(mul(world, maskFrame(p, b)), p.staffGlow);
 	// the suit
 	Mesh robe = sdf::surfaceNets([&](Vec3 q) { return outerRobeSdf(q, p, b); }, lo, hi, cell);
 	wrapUV(robe);
 	out += attr(robeMaterial(), meshText(robe, world));
 	out += attr(diffuseMaterial({0.15, 0.28, 0.28}), meshText(sdf::surfaceNets([&](Vec3 q) { return trousersSdf(q, p, b); }, {-0.4, -0.05, -0.4}, {0.4, b.pelvis.y + 0.05, 0.5}, cell), world));
 	out += attr(diffuseMaterial({0.50, 0.23, 0.11}), meshText(sdf::surfaceNets([&](Vec3 q) { return hipWrapSdf(q, b); }, {-0.4, 0.2, -0.4}, {0.4, b.pelvis.y + 0.15, 0.5}, cell * 0.6), world));
-	out += attr(goldMaterial(), meshText(sdf::surfaceNets([&](Vec3 q) { return std::min(trimSdf(q, p, b), std::min(collarSdf(q, b), padRingSdf(q, b))); }, lo, hi, cell * 0.5), world));
-	out += attr(diffuseMaterial({0.86, 0.82, 0.62}), meshText(sdf::surfaceNets([&](Vec3 q) { return creamLineSdf(q, p, b); }, {-0.55, -0.02, -0.55}, {0.55, b.pelvis.y + 0.02, 0.65}, cell * 0.4), world));
-	out += attr(diffuseMaterial({0.50, 0.21, 0.11}), meshText(sdf::surfaceNets([&](Vec3 q) { return padSdf(q, b); }, {-0.45, b.chest.y - 0.25, -0.30}, {0.45, b.neck.y + 0.15, 0.30}, cell * 0.5), world));
+	Mesh border = sdf::surfaceNets([&](Vec3 q) { return trimSdf(q, p, b); }, lo, hi, cell * 0.5);
+	wrapUV(border);
+	for (auto &uv : border.uvs) uv = {uv.first * 2.0, uv.second * 2.0};   // (the border's motifs: about 2.3 cm apart round the robe)
+	out += attr(borderMaterial(), meshText(border, world));
+	out += attr(goldMaterial(), meshText(sdf::surfaceNets([&](Vec3 q) { return std::min(cuffBandSdf(q, b), std::min(collarSdf(q, b), padRingSdf(q, b))); }, lo, hi, cell * 0.5), world));
+	out += attr(silverMaterial(), meshText(sdf::surfaceNets([&](Vec3 q) { return creamLineSdf(q, p, b); }, {-0.55, -0.02, -0.55}, {0.55, b.pelvis.y + 0.02, 0.65}, cell * 0.4), world));
+	out += attr(coated({0.27, 0.15, 0.085}, 0.45), meshText(sdf::surfaceNets([&](Vec3 q) { return padSdf(q, b); }, {-0.45, b.chest.y - 0.25, -0.30}, {0.45, b.neck.y + 0.15, 0.30}, cell * 0.5), world));
 	// the life-support pack and the hose
 	const Vec3 plo{-0.40, -0.15, -0.45}, phi{0.40, 0.40, 0.0};
 	out += film_cache::part(kFilmKey, "pack" + grain, metalMaterial({0.60, 0.44, 0.26}, 0.40), neck,

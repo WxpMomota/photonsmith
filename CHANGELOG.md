@@ -6,6 +6,17 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **The Nomai explorer's mask, robe and staff redrawn as our own (2026-11-04).** The `nomai-explorer` kind keeps the cues players remember (a big pale mask with
+  three eye windows, warm metal, a ghostly blue light, a long sea-green robe and a staff), drawn afresh rather than after the game's suit:
+  - The mask is a big squared ivory shield bent round the face, with round windows in bronze bezels. Tide rings and a blue inlay surround the third window, glowing
+    with the staff, and silver stars sit on the brow. Swept blades rise at the temples, and a respirator cowl with a bronze band and a breathing grille covers the
+    muzzle.
+  - The robe is a twill embroidered with a star chart, with a woven normal map. Its borders are rust-red embroidered cloth, with a rounded neckline, bronze cuffs, a
+    beaded collar and quilted leather pads.
+  - The staff is a sky compass: two gimbal rings round a glowing crystal (a two-sided light) on a carved wooden shaft with a leather grip.
+
+  A Walk at Dusk's baseline was re-recorded.
+
 * **Cartoons in sub-tabs, and every film's defaults 1920 x 1080, 300 samples, depth 10 (2026-11-04).** The Cartoons list now has tabs like the Large Scenes:
   Stories, Nature, Space, Showcases, Teaching and My Films. A film's tab comes from a `genre` line or else from its tags (a film in parts from its whole), and its
   still carries `# @rt-subcategory`. A film's recommended settings and Video Settings now default to 1920 x 1080, 300 samples per pixel and max depth 10 (and
