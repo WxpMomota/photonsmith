@@ -53,6 +53,10 @@ __device__ __forceinline__ void shade_lambertian(ShadeState& s) {
 		? sample_texture(mat.textureIdx, uv_u, uv_v, hit_point) * mat.emissionScale
 		: mat.albedo;
 	scattered = true;
+	// The sampled direction's pdf, about the normal it was sampled about: the closest-hit programs' fallback (cosine_pdf about their own, unperturbed normal) is what
+	// the next hit's MIS weight read, so a normal-mapped or bumped diffuse surface weighted every BSDF-sampled sky hit with the wrong pdf - a 60 degree tilt read 2.9%
+	// dark under a uniform sky against pbrt and the CPU (2026-11-04; right under a distant light, which a BSDF sample never hits). The same value when nothing tilts it.
+	s.brdf_pdf_override = cosine_pdf(scattered_dir, normal);
 
 	// Add direct lighting via explicit light sampling (Next Event Estimation)
 	{
