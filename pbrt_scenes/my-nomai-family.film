@@ -1,0 +1,22 @@
+film my-nomai-family
+name The Last Signal - Nomai Family Study
+about A child, adolescent, two adults and an elder, using the reference-aligned Nomai character kinds.
+scene film_assets/nomai-family-study/set.pbrt
+length 8
+still 0.5
+tags character, nomai, family, study
+
+character child nomai-child at -2.4 0 0 facing 0 detail 0.014
+character adolescent nomai-adolescent at -1.2 0 0 facing 0 detail 0.014
+character adult_a nomai-adult-a at 0 0 0 facing 0 detail 0.014
+character adult_b nomai-adult-b at 1.2 0 0 facing 0 detail 0.014
+character elder nomai-elder at 2.4 0 0 facing 0 detail 0.014
+gesture child "look up" 1.5 2.0 3.0 3.5
+gesture elder "nod" 3.5 4.0 5.0 5.5
+
+shot 0 Family proportions
+  key 0 2.0 8.2 0 0.95 0 26
+shot 5 The child
+  key -2.4 1.1 2.0 -2.4 1.0 0 35
+shot 6.5 The elder
+  key 2.4 1.5 2.0 2.4 1.35 0 35
