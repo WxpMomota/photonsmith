@@ -1110,11 +1110,15 @@ void OptiXRenderer::buildGeometryGases(const SceneInputs &in, SceneBuildState &s
 		if (!disks.empty()) diskCylinderBuildInputVec.push_back(diskBuildInput);
 		if (!cylinders.empty()) diskCylinderBuildInputVec.push_back(cylinderBuildInput);
 
-		// triAccelOptions, not customAccelOptions: neither shape supports
-		// motion blur, matching every other static (numKeys=0) GAS here.
+		// Static (one key): neither shape supports motion blur, and their build
+		// inputs carry ONE AABB buffer each. Not triAccelOptions - that one has
+		// two motion keys whenever a triangle moves, and with two keys OptiX reads
+		// a second AABB buffer these inputs do not have (an illegal memory access
+		// when the scene was traced: staticAccelOptions' own comment).
+		const OptixAccelBuildOptions dcAccelOptions = staticAccelOptions(triAccelOptions);
 		OptixAccelBufferSizes dcBufferSizes;
 		OPTIX_CHECK(optixAccelComputeMemoryUsage(
-			context_, &triAccelOptions, diskCylinderBuildInputVec.data(),
+			context_, &dcAccelOptions, diskCylinderBuildInputVec.data(),
 			static_cast<unsigned int>(diskCylinderBuildInputVec.size()), &dcBufferSizes));
 
 		ScopedCudaFree tempGuard, outputGuard;
@@ -1122,7 +1126,7 @@ void OptiXRenderer::buildGeometryGases(const SceneInputs &in, SceneBuildState &s
 		CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&outputGuard.ptr), dcBufferSizes.outputSizeInBytes));
 
 		OPTIX_CHECK(optixAccelBuild(
-			context_, stream_, &triAccelOptions, diskCylinderBuildInputVec.data(),
+			context_, stream_, &dcAccelOptions, diskCylinderBuildInputVec.data(),
 			static_cast<unsigned int>(diskCylinderBuildInputVec.size()),
 			tempGuard.ptr, dcBufferSizes.tempSizeInBytes,
 			outputGuard.ptr, dcBufferSizes.outputSizeInBytes,
@@ -1144,7 +1148,9 @@ void OptiXRenderer::buildInstanceGases(const SceneInputs &in, SceneBuildState &s
 	const auto &triangles = in.triangles;
 	OptixAccelBuildOptions customAccelOptions = st.customAccelOptions;
 	CUdeviceptr d_gasCustomOutput = st.d_gasCustomOutput;
-	OptixAccelBuildOptions triAccelOptions = st.triAccelOptions;
+	// An instance definition never moves (a pbrt ObjectInstance has one static transform) and its build inputs carry ONE vertex or AABB buffer: its GASes are built
+	// with no motion keys, whatever the scene's own triangles do (staticAccelOptions' own comment).
+	const OptixAccelBuildOptions groupAccelOptions = staticAccelOptions(st.triAccelOptions);
 	CUdeviceptr d_gasTriOutput = st.d_gasTriOutput;
 	CUdeviceptr d_gasDiskCylinderOutput = st.d_gasDiskCylinderOutput;
 	// ---- object instancing: one GAS per instance DEFINITION -----------------
@@ -1197,14 +1203,14 @@ void OptiXRenderer::buildInstanceGases(const SceneInputs &in, SceneBuildState &s
 
 		OptixAccelBufferSizes groupBufferSizes;
 		OPTIX_CHECK(optixAccelComputeMemoryUsage(
-			context_, &triAccelOptions, &groupBuildInput, 1, &groupBufferSizes));
+			context_, &groupAccelOptions, &groupBuildInput, 1, &groupBufferSizes));
 
 		ScopedCudaFree tempGuard, outputGuard;
 		CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&tempGuard.ptr), groupBufferSizes.tempSizeInBytes));
 		CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&outputGuard.ptr), groupBufferSizes.outputSizeInBytes));
 
 		OPTIX_CHECK(optixAccelBuild(
-			context_, stream_, &triAccelOptions, &groupBuildInput, 1,
+			context_, stream_, &groupAccelOptions, &groupBuildInput, 1,
 			tempGuard.ptr, groupBufferSizes.tempSizeInBytes,
 			outputGuard.ptr, groupBufferSizes.outputSizeInBytes,
 			&gasGroupTriHandles_[g], nullptr, 0));
@@ -1256,20 +1262,19 @@ void OptiXRenderer::buildInstanceGases(const SceneInputs &in, SceneBuildState &s
 		groupSphereInput.customPrimitiveArray.sbtIndexOffsetSizeInBytes = 0;
 		groupSphereInput.customPrimitiveArray.sbtIndexOffsetStrideInBytes = 0;
 
-		// triAccelOptions rather than customAccelOptions: that one carries the
-		// scene's motion keys, and an instance definition never moves (a pbrt
-		// ObjectInstance has one static transform). numKeys=0 is what this
-		// wants regardless of sceneHasMotion_.
+		// groupAccelOptions (numKeys=0): an instance definition never moves (a
+		// pbrt ObjectInstance has one static transform), whatever the scene's
+		// spheres (customAccelOptions) or triangles (triAccelOptions) do.
 		OptixAccelBufferSizes groupBufferSizes;
 		OPTIX_CHECK(optixAccelComputeMemoryUsage(
-			context_, &triAccelOptions, &groupSphereInput, 1, &groupBufferSizes));
+			context_, &groupAccelOptions, &groupSphereInput, 1, &groupBufferSizes));
 
 		ScopedCudaFree tempGuard, outputGuard;
 		CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&tempGuard.ptr), groupBufferSizes.tempSizeInBytes));
 		CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&outputGuard.ptr), groupBufferSizes.outputSizeInBytes));
 
 		OPTIX_CHECK(optixAccelBuild(
-			context_, stream_, &triAccelOptions, &groupSphereInput, 1,
+			context_, stream_, &groupAccelOptions, &groupSphereInput, 1,
 			tempGuard.ptr, groupBufferSizes.tempSizeInBytes,
 			outputGuard.ptr, groupBufferSizes.outputSizeInBytes,
 			&gasGroupSphereHandles_[g], nullptr, 0));

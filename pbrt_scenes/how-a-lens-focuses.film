@@ -1,0 +1,49 @@
+# How a Lens Focuses: a teaching film for one technique of ray tracing - depth of field, the thin lens - shown side by side, as How Light Bounces shows bounced light.
+# It opens on a title card over black (Chinese above, English below: what the technique is, and how to read the two halves), then fades up onto the terrace. From then
+# on every frame is rendered twice from the same camera, each half the whole view (`sidebyside pinhole from 7`): on the left through a pinhole, every ray from one
+# point, so everything is sharp; on the right through a lens, rays from all over its opening, so only one distance is sharp and the rest blurs - the strings of
+# lights metres behind the board into the round discs a real lens makes of small bright lights. The camera's keys pull the focus (their last two numbers: the lens's
+# radius and the distance in focus) from the near pieces to the far ones, to the lights, and back.
+# The set is the Chess Terrace (film_assets/how-a-lens-focuses/chess_terrace.pbrt, written by scripts/lessons/chess_terrace.py): an original terrace at dusk, a game
+# of chess by candlelight, strings of lights across the garden. The title card is a `black` shot. Its words: film_assets/how-a-lens-focuses/captions.txt.
+film    how-a-lens-focuses
+name    How a Lens Focuses
+about   A teaching film: chess by candlelight on a terrace at dusk, shown twice side by side - through a pinhole, where everything is sharp, and through a lens that focuses.
+scene   film_assets/how-a-lens-focuses/chess_terrace.pbrt
+length  38
+still   12
+tags    teaching, lighting, outdoors, dusk
+
+sidebyside pinhole from 7
+music      clear
+
+# the title card: black (the credits' empty scene: nothing of the terrace made or lit)
+shot 0 Title
+  key    0.05 0.84 0.45     0.0 0.80 -0.15     38  0.010 0.30
+  black
+
+# low at the board behind white's pawns: the focus on the near pieces, pulled across the board to black's, then out to the lights in the garden, and back
+shot 7 Across the board
+  key    0.05 0.840 0.450     0.000 0.800 -0.150     38  0.010 0.30   at 0
+  key    0.04 0.840 0.448     0.000 0.800 -0.150     38  0.010 0.30   at 2.5
+  key    0.03 0.842 0.446     0.000 0.801 -0.150     38  0.010 0.62   at 5
+  key    0.02 0.842 0.444     0.000 0.801 -0.150     38  0.010 0.62   at 7
+  key    0.01 0.845 0.442     0.000 0.803 -0.150     38  0.010 6.0    at 9.5
+  key    0.00 0.845 0.440     0.000 0.803 -0.150     38  0.010 6.0    at 11
+  key   -0.01 0.845 0.438     0.000 0.803 -0.150     38  0.010 0.30   at 14
+  fade   1.5
+
+# round the near side of the board, the focus on its middle: the pieces sharp, the balustrade and the lights behind them soft
+shot 21 Round the board
+  key    0.42 0.95 0.52     0.00 0.80 -0.02     40  0.012 0.66   at 0
+  key    0.00 0.97 0.62     0.00 0.80 -0.02     40  0.012 0.64   at 4
+  key   -0.40 0.95 0.52     0.00 0.80 -0.02     40  0.012 0.66   at 8
+  dissolve 0.8
+
+# rising away from the table: the focus held on the board as the lens opens wider, and the lights behind it grow into big soft discs
+shot 29 The terrace at dusk
+  key    0.15 1.05 0.80     0.00 0.82 -0.05     42  0.010 0.84   at 0
+  key    0.35 1.22 1.45     0.00 0.98 -0.12     42  0.018 1.55   at 5
+  key    0.50 1.30 1.90     0.00 1.12 -0.20     42  0.024 2.05   at 9
+  dissolve 0.8
+fadeout  1.5

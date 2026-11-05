@@ -488,6 +488,19 @@ and the launcher renders the halves and joins them, with a thin pale line betwee
 such a frame is side by side too. `sidebyside depth N from T` keeps the frames before T one picture - a title card over black, with no line down its middle. `how-light-bounces.film` is one: global illumination in the Sun Hall, an original domed marble hall lit only by the sun through its
 oculus (scripts/lessons/sun_hall.py writes it), with a label over each half from its captions file.
 
+Two more techniques can be turned down in the left half. `sidebyside samples N` renders it with N rays a pixel (up to 4096), with no denoiser and no adaptive sampling,
+so it shows the Monte Carlo noise of so few rays as it is. `sidebyside pinhole` renders it through a pinhole, with a lens radius of 0 over the scene's own, so everything
+is sharp beside the right half's depth of field. The Metal backend has no lens override, so there both halves keep the lens. Several `sidebyside` lines change the left
+half at their times, each `from T` later than the one before:
+
+    sidebyside samples 1 from 7
+    sidebyside samples 4 from 13
+    sidebyside samples 16 from 19
+
+`how-rays-add-up.film` steps through 1, 4, 16, 64 and 256 rays a pixel in the Attic Study, a study under the roof lit by lamps and the moon
+(scripts/lessons/attic_study.py). `how-a-lens-focuses.film` pulls the focus across a game of chess on the Chess Terrace at dusk, with strings of lights in the garden
+behind (scripts/lessons/chess_terrace.py). Its camera keys' last two numbers are the lens radius and the distance in focus.
+
 The text is set in the font at the frame's own size (sharp at any resolution), centred, with a soft dark halo so it reads over a bright sky; a line wider than the caption's `width`
 wraps at its spaces into rows of even length. A font is looked for as a full path, then in `pbrt_scenes/film_assets/fonts`, the system's fonts folder and the program's `fonts`
 folder; a font that cannot be found is reported once and Noto Sans SC is used instead. A line the file cannot read is reported with its number and left out. The video also gets the

@@ -1,0 +1,22 @@
+# How Rays Add Up: the title card at the start (Chinese above, English below), then a label over each half of the side-by-side picture (caption_file.h) - the left's
+# changing with the rays a pixel it is rendered with (the film's `sidebyside samples N from T` lines).
+style zhtitle  font=msyhbd.ttc size=0.074 colour=1,1,1
+style entitle  font=segoeuib.ttf size=0.044 colour=0.93,0.93,0.93
+style zh       font=msyh.ttc size=0.036 colour=0.97,0.97,0.97
+style en       font=segoeui.ttf size=0.027 colour=0.82,0.82,0.82
+style zhlabel  font=msyhbd.ttc size=0.034 colour=1,1,1
+style enlabel  font=segoeui.ttf size=0.024 colour=0.92,0.92,0.92
+
+# the title card over black, a line at a time
+caption 0.6 6.4 fade=0.8 centre=0.30 width=0.8 gap=0.30 | zhtitle: 蒙特卡洛采样 | entitle: Monte Carlo Sampling
+caption 2.0 6.4 fade=0.8 centre=0.53 width=0.8 gap=0.40 | zh: 每个像素随机发出许多条光线，再取它们的平均值：光线越多，噪点越少。 | en: Each pixel sends out random rays and averages what they find: the more rays, the less noise.
+caption 3.4 6.4 fade=0.8 centre=0.70 width=0.8 gap=0.40 | zh: 左：每像素的光线逐渐增多　　　右：每像素数百条光线 | en: Left: more and more rays per pixel          Right: hundreds of rays per pixel
+
+# the left half's label, as its rays a pixel go up
+caption 7.4 12.8 fade=0.5 centre=0.075 across=0.25 width=0.46 gap=0.25 | zhlabel: 每像素 1 条光线 | enlabel: 1 ray per pixel
+caption 13.2 18.8 fade=0.5 centre=0.075 across=0.25 width=0.46 gap=0.25 | zhlabel: 每像素 4 条光线 | enlabel: 4 rays per pixel
+caption 19.2 24.8 fade=0.5 centre=0.075 across=0.25 width=0.46 gap=0.25 | zhlabel: 每像素 16 条光线 | enlabel: 16 rays per pixel
+caption 25.2 30.8 fade=0.5 centre=0.075 across=0.25 width=0.46 gap=0.25 | zhlabel: 每像素 64 条光线 | enlabel: 64 rays per pixel
+caption 31.2 38 fade=0.5 centre=0.075 across=0.25 width=0.46 gap=0.25 | zhlabel: 每像素 256 条光线 | enlabel: 256 rays per pixel
+# the right half's, all the way
+caption 7.4 38 fade=1.0 centre=0.075 across=0.75 width=0.46 gap=0.25 | zhlabel: 每像素数百条光线 | enlabel: Hundreds of rays per pixel

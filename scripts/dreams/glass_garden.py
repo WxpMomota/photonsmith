@@ -416,7 +416,7 @@ def write_film():
           'about   A dream: giant flowers of coloured glass round a still pond in a mossy hollow, the sunset shining through them, then a night lit by their own blossoms.',
           'scene   film_assets/%s/garden.pbrt' % KEY, 'length  60', 'still   20', 'genre   showcase', 'tags    glass, dusk, night, emissive, backlight, fog, dof', '',
           '# the sun and sky: from a low sun into the afterglow and the first of the night; the camera opens up as the light goes',
-          'sky       17:40 20:22  south 180  latitude 40  physical', 'shutter   0                                   # (moving blocks sharp: the wavefront GPU renderer, which the mist needs, cannot draw a moving mesh yet)', 'exposure  auto 2', 'optics    rays 0.7  alpenglow 0.8', 'mist      0.0011  radius 260', 'ambience  wind 0.12', '',
+          'sky       17:40 20:22  south 180  latitude 40  physical', 'exposure  auto 2', 'optics    rays 0.7  alpenglow 0.8', 'mist      0.0011  radius 260', 'ambience  wind 0.12', 'mute      sounds', '',
           '# trees round the hollow\'s rim, ferns and rocks round the pond, glowing fungi in the moss, fireflies at night']
     r = np.random.default_rng(81)
     for i in range(40):   # (none in the west, where the sun sets: the sky behind the flowers stays open)
@@ -455,7 +455,7 @@ def write_film():
     for (name, start, path, ax, spin) in PETALS:
         L.append('move  %s  ' % name + "   ".join("%.2f %.3f %.3f %.3f" % p for p in path))
         L.append('turn  %s about %s axis %s   ' % (name, nums(*start), nums(*ax)) + "   ".join("%.2f %.1f" % s for s in spin))
-    L += ['', 'title  "The Glass Garden"  at 1.2  for 5.5', 'credits', 'credit  "A dream made with light: coloured glass, dispersion, mist, and a garden that lights itself"', '']
+    # (no title over the opening and no credits after it: the film is the picture and its music alone)
     L += ['# the shots: slow, gliding cameras (key: from, at, fov [lens radius, focus distance])',
           'shot 0 The hollow at sunset',
           '  key  16 9.5 15    -6 3.2 0.5    46',

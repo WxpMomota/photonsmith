@@ -442,9 +442,13 @@ class DataFilm {
 	// A black frame: the scene's own header and nothing lit (a speck far below the set: a world with nothing in it is not a scene).
 	std::string creditsScene() const;
 	std::string headerAt(double t) const;
-	// The `# @rt-sidebyside` line of a frame at t of a film shown side by side (`sidebyside depth N [from T]`: src/shared/side_by_side.h), else nothing.
+	// The `# @rt-sidebyside` line of a frame at t of a film shown side by side (`sidebyside depth N | samples N | pinhole [from T]`: src/shared/side_by_side.h) - the last
+	// step begun by t - else nothing.
 	std::string sideBySideLine(double t) const {
-		return spec.sideBySideDepth >= 1 && t >= spec.sideBySideFrom ? side_by_side::line(spec.sideBySideDepth) : std::string();
+		const Spec::SideBySideStep *now = nullptr;
+		for (const Spec::SideBySideStep &step : spec.sideBySide)
+			if (t >= step.from) now = &step;
+		return now ? side_by_side::line(now->left) : std::string();
 	}
 	// The `# @rt-toon` line of every frame of a film with the toon look (`toon`), else nothing.
 	// The frame's `# @rt-toon` line at t: the film's toon look, with the frame's seed when its lines boil (drawn afresh every other frame).

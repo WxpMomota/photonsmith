@@ -1,0 +1,47 @@
+# How Rays Add Up: a teaching film for one technique of ray tracing - Monte Carlo sampling, many random rays a pixel averaged - shown side by side, as How Light Bounces
+# shows bounced light. It opens on a title card over black (Chinese above, English below: what the technique is, and how to read the two halves), then fades up into the
+# attic. From then on every frame is rendered twice from the same camera, each half the whole view: on the left with few rays a pixel and no denoiser (`sidebyside
+# samples N`: 1, then 4, 16, 64 and 256 - each pixel's colour the average of that many random paths of light, grainy where few of them find a light); on the right as the
+# video is rendered (by default 300 rays a pixel, denoised).
+# The set is the Attic Study (film_assets/how-rays-add-up/attic_study.pbrt, written by scripts/lessons/attic_study.py): an original study under the roof at night, lit
+# by a desk lamp, an oil lamp on the shelves and the moon through the window - nearly all of it by light that has bounced, where few rays are noisiest. The title card is
+# a `black` shot. Its words: film_assets/how-rays-add-up/captions.txt.
+film    how-rays-add-up
+name    How Rays Add Up
+about   A teaching film: an attic study at night by lamplight and moonlight, shown twice side by side - with 1, 4, 16, 64 and 256 rays a pixel, and with hundreds.
+scene   film_assets/how-rays-add-up/attic_study.pbrt
+length  38
+still   22
+tags    teaching, lighting, indoors, night
+
+sidebyside samples 1 from 7
+sidebyside samples 4 from 13
+sidebyside samples 16 from 19
+sidebyside samples 64 from 25
+sidebyside samples 256 from 31
+exposure   2.5
+music      clear
+
+# the title card: black (the credits' empty scene: nothing of the attic made or lit)
+shot 0 Title
+  key    0.9 1.45 2.6     -0.6 0.95 -2.2     55
+  black
+
+# a slow push into the study from its door: the moonlit window in the far gable, the lamp on the desk, the moon's square on the rug
+shot 7 The study at night
+  key    0.90 1.45 2.60     -0.60 0.95 -2.20     55   at 0
+  key    0.60 1.40 1.40     -0.70 0.95 -2.20     55   at 12
+  fade   1.5
+
+# close to the desk under the lamp: the open book, the glass ball and the bright spot of light it focuses, the globe
+shot 19 The desk
+  key   -0.55 1.25 -0.85     -1.55 0.84 -1.95     45   at 0
+  key   -0.95 1.15 -1.00     -1.70 0.82 -1.98     45   at 10
+  dissolve 0.8
+
+# the moonlight: down at the square of light on the rug, then up to the window it came through
+shot 29 Moonlight
+  key   -0.40 1.00 0.60      0.30 0.20 -1.15     50   at 0
+  key    0.10 1.25 0.95      0.10 1.40 -3.00     50   at 9
+  dissolve 0.8
+fadeout  1.5

@@ -1,0 +1,171 @@
+# The Attic Study - an original set: a study under the roof at night, a desk lamp and the moon (written by attic_study.py; see its header).
+LookAt 0.9 1.45 2.6   -0.6 0.95 -2.2   0 1 0
+Camera "perspective" "float fov" [ 55 ]
+Film "rgb" "integer xresolution" [ 1920 ] "integer yresolution" [ 1080 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+WorldBegin
+# the night outside, seen through the window, and the moon: its light falls through the window in a square on the floor, onto the chair
+LightSource "infinite" "rgb L" [ 0.06 0.08 0.16 ]
+LightSource "distant" "point3 from" [ -0.12 1.1 -1.0 ] "point3 to" [ 0 0 0 ] "rgb L" [ 3.6 4.2 5.7 ]
+Texture "floor" "spectrum" "imagemap" "string filename" [ "floor.png" ]
+Texture "roof" "spectrum" "imagemap" "string filename" [ "roof.png" ]
+Texture "plaster" "spectrum" "imagemap" "string filename" [ "plaster.png" ]
+Texture "rug" "spectrum" "imagemap" "string filename" [ "rug.png" ]
+Texture "globe" "spectrum" "imagemap" "string filename" [ "globe.png" ]
+Texture "pages" "spectrum" "imagemap" "string filename" [ "pages.png" ]
+AttributeBegin
+Material "coateddiffuse" "texture reflectance" "floor" "float roughness" [ 0.25 ]
+Shape "plymesh" "string filename" [ "meshes/m000.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "plaster"
+Shape "plymesh" "string filename" [ "meshes/m001.ply" ]
+
+Shape "plymesh" "string filename" [ "meshes/m002.ply" ]
+
+Shape "plymesh" "string filename" [ "meshes/m003.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "roof"
+Shape "plymesh" "string filename" [ "meshes/m004.ply" ]
+
+Shape "plymesh" "string filename" [ "meshes/m005.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.30 0.20 0.12 ]
+Shape "plymesh" "string filename" [ "meshes/m006.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.70 0.68 0.62 ]
+Shape "plymesh" "string filename" [ "meshes/m007.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "coateddiffuse" "rgb reflectance" [ 0.24 0.12 0.06 ] "float roughness" [ 0.12 ]
+Shape "plymesh" "string filename" [ "meshes/m008.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.30 0.07 0.05 ]
+Shape "plymesh" "string filename" [ "meshes/m009.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "pages"
+Shape "plymesh" "string filename" [ "meshes/m010.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.88 0.86 0.80 ]
+Shape "plymesh" "string filename" [ "meshes/m011.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "dielectric" "float eta" [ 1.5 ]
+Translate -1.770 0.805 -2.030
+Shape "sphere" "float radius" [ 0.045 ]
+AttributeEnd
+AttributeBegin
+Material "conductor" "rgb eta" [ 0.27 0.68 1.12 ] "rgb k" [ 3.61 2.62 2.29 ] "float roughness" [ 0.2 ]
+Shape "plymesh" "string filename" [ "meshes/m012.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "coateddiffuse" "rgb reflectance" [ 0.05 0.20 0.10 ] "float roughness" [ 0.08 ]
+Shape "plymesh" "string filename" [ "meshes/m013.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.85 0.83 0.78 ]
+Shape "plymesh" "string filename" [ "meshes/m014.ply" ]
+
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 900 660 380 ]
+  Material "diffuse" "rgb reflectance" [ 0 0 0 ]
+  Translate -1.860 1.090 -2.010
+  Shape "sphere" "float radius" [ 0.028 ]
+AttributeEnd
+AttributeBegin
+Material "conductor" "rgb eta" [ 0.27 0.68 1.12 ] "rgb k" [ 3.61 2.62 2.29 ] "float roughness" [ 0.25 ]
+Shape "plymesh" "string filename" [ "meshes/m015.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "coateddiffuse" "texture reflectance" "globe" "float roughness" [ 0.1 ]
+Translate -0.500 1.02 -1.700
+Rotate -90 1 0 0
+Shape "sphere" "float radius" [ 0.28 ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rug"
+Translate 0.300 0.004 -1.150
+Rotate -90 1 0 0
+Shape "disk" "float radius" [ 1.1 ]
+AttributeEnd
+AttributeBegin
+Translate 1.200 0 -2.050
+Rotate -125 0 1 0
+Material "diffuse" "rgb reflectance" [ 0.38 0.08 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m016.ply" ]
+
+Material "diffuse" "rgb reflectance" [ 0.12 0.07 0.04 ]
+Shape "plymesh" "string filename" [ "meshes/m017.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.26 0.16 0.09 ]
+Shape "plymesh" "string filename" [ "meshes/m018.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "coateddiffuse" "rgb reflectance" [ 0.36 0.08 0.06 ] "float roughness" [ 0.3 ]
+Shape "plymesh" "string filename" [ "meshes/m019.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "coateddiffuse" "rgb reflectance" [ 0.10 0.18 0.12 ] "float roughness" [ 0.3 ]
+Shape "plymesh" "string filename" [ "meshes/m020.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "coateddiffuse" "rgb reflectance" [ 0.12 0.12 0.25 ] "float roughness" [ 0.3 ]
+Shape "plymesh" "string filename" [ "meshes/m021.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "coateddiffuse" "rgb reflectance" [ 0.42 0.28 0.12 ] "float roughness" [ 0.3 ]
+Shape "plymesh" "string filename" [ "meshes/m022.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "coateddiffuse" "rgb reflectance" [ 0.18 0.10 0.06 ] "float roughness" [ 0.3 ]
+Shape "plymesh" "string filename" [ "meshes/m023.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "coateddiffuse" "rgb reflectance" [ 0.55 0.48 0.34 ] "float roughness" [ 0.3 ]
+Shape "plymesh" "string filename" [ "meshes/m024.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "conductor" "rgb eta" [ 0.27 0.68 1.12 ] "rgb k" [ 3.61 2.62 2.29 ] "float roughness" [ 0.2 ]
+Shape "plymesh" "string filename" [ "meshes/m025.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "thindielectric" "float eta" [ 1.5 ]
+Shape "plymesh" "string filename" [ "meshes/m026.ply" ]
+
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 700 420 150 ]
+  Material "diffuse" "rgb reflectance" [ 0 0 0 ]
+  Translate 2.340 1.280 -0.350
+  Scale 1 1.8 1
+  Shape "sphere" "float radius" [ 0.011 ]
+AttributeEnd

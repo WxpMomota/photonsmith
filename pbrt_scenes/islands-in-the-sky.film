@@ -14,9 +14,9 @@ tags    dawn, nature, fog, emissive, backlight, water
 sky       4:04 5:24  south 180  latitude 40  physical
 exposure  auto 1.6
 optics    rays 0.8  alpenglow 1
-shutter   0                                   # (moving blocks sharp: the wavefront GPU renderer, which the haze needs, cannot draw a moving mesh yet)
 clouds    deck  base 0  thick 170  cover 0.88  area 9000  density 1.2
 ambience  wind 0.25
+mute      sounds
 
 # woods and meadows on the islands (each patch at its island's height)
 scatter  tree 10 in -35.3 64.1 0.7 100.1  scale 2.4 4.0  seed 10  y 425.63
@@ -119,10 +119,6 @@ move  lantern59  0.00 0.00 0.00 0.00   47.87 0.00 0.00 0.00   48.88 0.64 0.54 0.
 
 # the moon sets into the morning
 light  moon  0 1   18 1   30 0.25   44 0
-
-title  "Islands in the Sky"  at 1.5  for 5.5
-credits
-credit  "A dream made with light: a sea of cloud, a sunrise, and the air between the islands"
 
 # the shots (key: from, at, fov [lens radius, focus distance])
 shot 0 Before dawn

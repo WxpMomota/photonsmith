@@ -747,25 +747,38 @@ static bool announceRenderedFile(const std::string &out_path, bool use_gpu, bool
         return true;
 }
 
-// A scene whose header asks for two halves (`# @rt-sidebyside depth N`, src/shared/side_by_side.h): the whole view rendered twice at half the picture's width - the left at
-// ray depth N, the right at this render's own - and the two joined into the picture asked for, in the format the renderer writes, before it is finished as any picture is
-// (cut, converted, announced). False, with the render's result, when a half or the join fails.
-static bool renderSideBySide(const LaunchArgs &args, const RenderSetup &s, int leftDepth, double cam_x, double cam_y, double cam_z, const RenderOptions &render_opts,
-							 int &render_result) {
+// A scene whose header asks for two halves (`# @rt-sidebyside ...`, src/shared/side_by_side.h): the whole view rendered twice at half the picture's width - the left with
+// one technique turned down (ray depth N; N samples a pixel with no denoiser and no adaptive sampling; a pinhole for the lens), the right as this render was asked for - and
+// the two joined into the picture asked for, in the format the renderer writes, before it is finished as any picture is (cut, converted, announced). False, with the
+// render's result, when a half or the join fails.
+static bool renderSideBySide(const LaunchArgs &args, const RenderSetup &s, const side_by_side::Left &asked, double cam_x, double cam_y, double cam_z,
+							 const RenderOptions &render_opts, int &render_result) {
 	RenderSetup left = s, right = s;
+	RenderOptions left_opts = render_opts;
 	left.image_width = s.image_width / 2;
 	right.image_width = s.image_width - left.image_width;
-	left.max_ray_depth = leftDepth;
 	left.out_path = side_by_side_frame::halfPath(s.out_path, "left");
 	right.out_path = side_by_side_frame::halfPath(s.out_path, "right");
-	std::cout << "Side by side (the scene's @rt-sidebyside line): the left half at ray depth " << leftDepth << ", the right at " << s.max_ray_depth << ", each "
-			  << left.image_width << " x " << s.image_height << std::endl;
+	std::string how;
+	if (asked.depth >= 1) {
+		left.max_ray_depth = asked.depth;
+		how = "at ray depth " + std::to_string(asked.depth) + ", the right at " + std::to_string(s.max_ray_depth);
+	} else if (asked.samples >= 1) {   // (the noise of so few rays as it is: not denoised, and every pixel given all of them)
+		left.samples_per_pixel = asked.samples;
+		left_opts.denoise = false;
+		left_opts.adaptive_sampling = false;
+		how = "at " + std::to_string(asked.samples) + " sample(s) a pixel, not denoised; the right at " + std::to_string(s.samples_per_pixel);
+	} else if (asked.pinhole) {   // (a lens radius of 0 over the scene's own; the Metal backend keeps the scene's lens: backend_capabilities.h DofOverride)
+		left_opts.aperture_override = 0.0;
+		how = "through a pinhole, the right through the scene's lens";
+	}
+	std::cout << "Side by side (the scene's @rt-sidebyside line): the left half " << how << ", each " << left.image_width << " x " << s.image_height << std::endl;
 	const auto dropHalves = [&]() {   // (a half that failed leaves no half-wide picture beside the frames: a retry, or the next run, starts clean)
 		std::error_code ec;
 		std::filesystem::remove(left.out_path, ec);
 		std::filesystem::remove(right.out_path, ec);
 	};
-	if (!runIntegrator(args, left, cam_x, cam_y, cam_z, render_opts, render_result) || render_result != 0 ||
+	if (!runIntegrator(args, left, cam_x, cam_y, cam_z, left_opts, render_result) || render_result != 0 ||
 		!runIntegrator(args, right, cam_x, cam_y, cam_z, render_opts, render_result) || render_result != 0) {
 		dropHalves();
 		return false;
@@ -827,13 +840,13 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
 
     // (a scene that asks for two halves side by side gets them: not for an EXR, whose two halves would need joining in linear light, or AOV passes, which are of one view)
     const char *side_scene = cpu_scene_pbrt_path_by_id(scene_id.c_str());
-    const int side_asked = side_scene ? side_by_side::depthOfFile(side_scene) : -1;
-    const int side_depth = !args.aovs && !is_exr_output_path(out_path) ? side_asked : -1;
-    if (side_asked >= 1 && side_depth < 1)
+    const side_by_side::Left side_asked = side_scene ? side_by_side::leftOfFile(side_scene) : side_by_side::Left();
+    const bool side_two = side_asked.asked() && !args.aovs && !is_exr_output_path(out_path);
+    if (side_asked.asked() && !side_two)
         std::cout << "Note: the scene asks for two halves side by side (@rt-sidebyside), but " << (args.aovs ? "AOV passes are" : "an EXR is")
                   << " of one view: rendered as one picture." << std::endl;
-    if (side_depth >= 1) {
-        if (!renderSideBySide(args, s, side_depth, cam_x, cam_y, cam_z, render_opts, render_result)) return render_result;
+    if (side_two) {
+        if (!renderSideBySide(args, s, side_asked, cam_x, cam_y, cam_z, render_opts, render_result)) return render_result;
     } else if (!runIntegrator(args, s, cam_x, cam_y, cam_z, render_opts, render_result)) {
         return render_result;
     }
@@ -859,7 +872,7 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
         if (!problem.empty()) std::cerr << "Warning: the scene's @rt-toon line: " << problem << " (the look is left out)" << std::endl;
         if (toon.on && is_exr_output_path(out_path)) {
             std::cout << "Note: the toon look is for pictures; the EXR stays as rendered." << std::endl;
-        } else if (toon.on && side_depth >= 1) {   // (its passes are rendered again from one camera over the whole width: they would match neither half)
+        } else if (toon.on && side_two) {   // (its passes are rendered again from one camera over the whole width: they would match neither half)
             std::cout << "Note: the toon look is not made on a side-by-side picture; it stays as rendered." << std::endl;
         } else if (toon.on) {
             std::cout << "\nMaking the toon look (its passes, then the bands and lines)..." << std::endl;
@@ -868,7 +881,7 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
         }
         // and last, the scene's cartoon marks (`# @rt-mark` lines: a film's `mark`, src/shared/screen_marks.h), drawn over the finished picture
         const std::vector<screen_marks::Mark> marks = scene_file ? screen_marks::fromSceneFile(scene_file) : std::vector<screen_marks::Mark>();
-        if (!marks.empty() && side_depth >= 1)   // (a mark's place is the whole frame's: on two halves it would land in the wrong one)
+        if (!marks.empty() && side_two)   // (a mark's place is the whole frame's: on two halves it would land in the wrong one)
             std::cout << "Note: the scene's cartoon marks are not drawn on a side-by-side picture." << std::endl;
         else if (!marks.empty() && !is_exr_output_path(out_path) && !marks_frame::apply(out_path, marks, problem))
             std::cerr << "WARNING: the cartoon marks could not be drawn (" << problem << ")." << std::endl;

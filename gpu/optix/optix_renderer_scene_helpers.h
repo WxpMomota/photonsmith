@@ -40,6 +40,17 @@ struct ScopedCudaFree {
 	void release() { ptr = 0; }
 };
 
+// `options` with no motion keys: for a GAS whose build inputs carry one vertex or AABB buffer each - an instance definition's (a pbrt ObjectInstance never moves)
+// and the disks' and cylinders' (no motion blur). With motionOptions.numKeys = 2 OptiX reads numKeys buffers from every input's vertexBuffers/aabbBuffers array, so
+// building such a GAS with the triangle GAS's options - two keys as soon as one triangle moves - read past the one-element array: a garbage device pointer, and an
+// illegal memory access (CUDA 700) on the first launch of every frame of a film with a moving `# @anim` mesh beside instanced or disk/cylinder geometry, on both GPU
+// renderers (2026-11-05: The Glass Garden's drifting petals among its instanced flowers; regression scene pbrt_scenes/moving-mesh-beside-instances.pbrt).
+inline OptixAccelBuildOptions staticAccelOptions(OptixAccelBuildOptions options) {
+	options.motionOptions.numKeys = 0;
+	options.motionOptions.flags = OPTIX_MOTION_FLAG_NONE;
+	return options;
+}
+
 // World-space AABB for a disk/cylinder given its object-space extent and
 // o2w transform - corner-by-corner (a naive transform of the object-space
 // box's own min/max would clip the geometry the moment a rotation is

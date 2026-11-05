@@ -1297,12 +1297,23 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 	} else if (verb == "sidebyside") {
 		const std::vector<std::string> t = detail::tokens(line);
 		double v = 0.0, from = 0.0;
-		if ((t.size() != 3 && t.size() != 5) || t[1] != "depth" || !number(t[2], v) || v < 1.0 || v > 64.0 || v != std::floor(v) ||
-			(t.size() == 5 && (t[3] != "from" || !number(t[4], from) || from < 0.0)))
-			return fail("`sidebyside depth N [from T]`: every frame shown twice side by side, each half the whole view - the left with rays stopped after N surfaces (1: only "
-						"the light that comes straight from a light, no bounces), the right as the video is rendered; from T on (one picture before it: a title card)");
-		s.sideBySideDepth = static_cast<int>(v);
-		s.sideBySideFrom = from;
+		Spec::SideBySideStep step;
+		const bool counted = t.size() >= 3 && (t[1] == "depth" || t[1] == "samples");   // (a number follows; `pinhole` takes none)
+		const std::size_t rest = counted ? 3 : 2;
+		bool ok = t.size() >= 2 && (counted || t[1] == "pinhole") && (t.size() == rest || t.size() == rest + 2);
+		if (ok && counted) ok = number(t[2], v) && v >= 1.0 && v <= (t[1] == "depth" ? 64.0 : 4096.0) && v == std::floor(v);
+		if (ok && t.size() == rest + 2) ok = t[rest] == "from" && number(t[rest + 1], from) && from >= 0.0;
+		if (ok && !s.sideBySide.empty()) ok = from > s.sideBySide.back().from;
+		if (!ok)
+			return fail("`sidebyside depth N | samples N | pinhole [from T]`: every frame shown twice side by side, each half the whole view - the left with one technique turned "
+						"down, the right as the video is rendered: `depth N` stops the left's rays after N surfaces (1: only the light that comes straight from a light, no "
+						"bounces), `samples N` gives it N rays a pixel (up to 4096) and no denoiser, `pinhole` gives it no lens (everything sharp). From T on (one picture before "
+						"it: a title card); several lines change the left half at each T, later than the one before");
+		if (t[1] == "depth") step.left.depth = static_cast<int>(v);
+		else if (t[1] == "samples") step.left.samples = static_cast<int>(v);
+		else step.left.pinhole = true;
+		step.from = from;
+		s.sideBySide.push_back(step);
 	} else if (verb == "exposure") {
 		const std::vector<std::string> t = detail::tokens(line);
 		double v = 0.0;

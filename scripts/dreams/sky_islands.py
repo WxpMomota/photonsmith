@@ -326,9 +326,9 @@ def write_film(centre):
          'about   A dream: floating islands over a sea of cloud at dawn - a setting moon, the sunrise, a waterfall falling into the clouds, and lanterns rising into the morning.',
          'scene   film_assets/%s/islands.pbrt' % KEY, 'length  60', 'still   27', 'genre   showcase', 'tags    dawn, nature, fog, emissive, backlight, water', '',
          '# the dawn: the blue hour, the sun rising out of the cloud sea at about 22 s, then the low gold of the first hour; the camera opens up in the dark',
-         'sky       4:04 5:24  south 180  latitude 40  physical', 'exposure  auto 1.6', 'optics    rays 0.8  alpenglow 1', 'shutter   0                                   # (moving blocks sharp: the wavefront GPU renderer, which the haze needs, cannot draw a moving mesh yet)',
+         'sky       4:04 5:24  south 180  latitude 40  physical', 'exposure  auto 1.6', 'optics    rays 0.8  alpenglow 1',
          'clouds    deck  base 0  thick 170  cover 0.88  area 9000  density 1.2',
-         'ambience  wind 0.25', '']
+         'ambience  wind 0.25', 'mute      sounds', '']
     L += ['# woods and meadows on the islands (each patch at its island\'s height)']
     rng = np.random.default_rng(91)
     for isl in ISLANDS:
@@ -367,7 +367,7 @@ def write_film(centre):
     for (name, start, path) in LANTERNS:
         L.append('move  %s  ' % name + "   ".join("%.2f %.2f %.2f %.2f" % p for p in path))
     L += ['', '# the moon sets into the morning', 'light  moon  0 1   18 1   30 0.25   44 0', '']
-    L += ['title  "Islands in the Sky"  at 1.5  for 5.5', 'credits', 'credit  "A dream made with light: a sea of cloud, a sunrise, and the air between the islands"', '']
+    # (no title over the opening and no credits after it: the film is the picture and its music alone)
     gx, gy, gz = centre
     L += ['# the shots (key: from, at, fov [lens radius, focus distance])',
           'shot 0 Before dawn',

@@ -96,16 +96,16 @@
 @31.50  choir  76 81 length 5.00 gain 0.016 send 0.95
 
 # --- The garden wakes (36-47): each blossom rings a bell as it lights; the harp and the choir grow under them
-@39.00  bell  86 length 4.00 gain 0.024 pan 0.38 send 0.95
-@41.50  bell  81 length 4.00 gain 0.024 pan 0.66 send 0.95
-@40.20  bell  90 length 4.00 gain 0.024 pan 0.19 send 0.95
-@43.00  bell  88 length 4.00 gain 0.024 pan 0.75 send 0.95
-@42.30  bell  85 length 4.00 gain 0.024 pan -0.36 send 0.95
-@44.00  bell  93 length 4.00 gain 0.024 pan -0.51 send 0.95
-@45.00  bell  80 length 4.00 gain 0.024 pan 0.15 send 0.95
-@45.80  bell  83 length 4.00 gain 0.024 pan -0.59 send 0.95
+@39.00  bell  86 length 4.00 gain 0.024 pan 0.43 send 0.95
+@41.50  bell  81 length 4.00 gain 0.024 pan 0.64 send 0.95
+@40.20  bell  90 length 4.00 gain 0.024 pan 0.22 send 0.95
+@43.00  bell  88 length 4.00 gain 0.024 pan 0.79 send 0.95
+@42.30  bell  85 length 4.00 gain 0.024 pan -0.34 send 0.95
+@44.00  bell  93 length 4.00 gain 0.024 pan -0.42 send 0.95
+@45.00  bell  80 length 4.00 gain 0.024 pan 0.19 send 0.95
+@45.80  bell  83 length 4.00 gain 0.024 pan -0.63 send 0.95
 @46.50  bell  88 length 4.00 gain 0.024 pan 0.80 send 0.95
-@47.20  bell  90 length 4.00 gain 0.024 pan -0.14 send 0.95
+@47.20  bell  90 length 4.00 gain 0.024 pan -0.17 send 0.95
 @48.00  bell  86 length 4.00 gain 0.024 pan 0.09 send 0.95
 @49.30  bell  86 length 4.00 gain 0.024 pan -0.19 send 0.95
 @50.60  bell  81 length 4.00 gain 0.024 pan -0.27 send 0.95

@@ -47,14 +47,14 @@ Shape "plymesh" "string filename" [ "meshes/m006.ply" ]
 AttributeEnd
 AttributeBegin
 Material "dielectric" "float eta" [ 1.52 ] "float abbenumber" [ 26 ]
-Translate -5.3943 6.4033 1.9179
+Translate -5.9804 6.4033 0.7644
 Shape "sphere" "float radius" [ 0.1870 ]
 AttributeEnd
 # @anim glow_rose
 AttributeBegin
 AreaLightSource "diffuse" "rgb L" [ 0.744 0.409 0.461 ]
 Material "coateddiffuse" "rgb reflectance" [ 0.82 0.78 0.72 ] "float roughness" [ 0.1 ]
-Translate -5.3450 6.9097 1.9518
+Translate -5.9788 6.9097 0.7046
 Shape "sphere" "float radius" [ 0.1870 ]
 AttributeEnd
 # the amber flower
@@ -72,14 +72,14 @@ Shape "plymesh" "string filename" [ "meshes/m009.ply" ]
 AttributeEnd
 AttributeBegin
 Material "dielectric" "float eta" [ 1.52 ] "float abbenumber" [ 26 ]
-Translate -9.2596 4.7702 -3.4684
+Translate -9.0419 4.7702 -2.7405
 Shape "sphere" "float radius" [ 0.1430 ]
 AttributeEnd
 # @anim glow_amber
 AttributeBegin
 AreaLightSource "diffuse" "rgb L" [ 1.271 0.865 0.445 ]
 Material "coateddiffuse" "rgb reflectance" [ 0.82 0.78 0.72 ] "float roughness" [ 0.1 ]
-Translate -9.2395 5.1577 -3.5076
+Translate -9.0036 5.1577 -2.7188
 Shape "sphere" "float radius" [ 0.1430 ]
 AttributeEnd
 # the violet flower
@@ -97,14 +97,14 @@ Shape "plymesh" "string filename" [ "meshes/m012.ply" ]
 AttributeEnd
 AttributeBegin
 Material "dielectric" "float eta" [ 1.52 ] "float abbenumber" [ 26 ]
-Translate -2.7460 5.4087 6.5767
+Translate -3.0683 5.4087 6.6265
 Shape "sphere" "float radius" [ 0.1540 ]
 AttributeEnd
 # @anim glow_violet
 AttributeBegin
 AreaLightSource "diffuse" "rgb L" [ 0.822 0.658 1.096 ]
 Material "coateddiffuse" "rgb reflectance" [ 0.82 0.78 0.72 ] "float roughness" [ 0.1 ]
-Translate -2.7257 5.8257 6.6228
+Translate -3.0738 5.8257 6.6765
 Shape "sphere" "float radius" [ 0.1540 ]
 AttributeEnd
 # the aqua flower
@@ -122,14 +122,14 @@ Shape "plymesh" "string filename" [ "meshes/m015.ply" ]
 AttributeEnd
 AttributeBegin
 Material "dielectric" "float eta" [ 1.52 ] "float abbenumber" [ 26 ]
-Translate -10.5804 3.7416 5.4686
+Translate -11.0734 3.7416 5.0857
 Shape "sphere" "float radius" [ 0.1100 ]
 AttributeEnd
 # @anim glow_aqua
 AttributeBegin
 AreaLightSource "diffuse" "rgb L" [ 1.074 2.149 1.934 ]
 Material "coateddiffuse" "rgb reflectance" [ 0.82 0.78 0.72 ] "float roughness" [ 0.1 ]
-Translate -10.5459 4.0396 5.4660
+Translate -11.0794 4.0396 5.0516
 Shape "sphere" "float radius" [ 0.1100 ]
 AttributeEnd
 # the gold flower
@@ -147,14 +147,14 @@ Shape "plymesh" "string filename" [ "meshes/m018.ply" ]
 AttributeEnd
 AttributeBegin
 Material "dielectric" "float eta" [ 1.52 ] "float abbenumber" [ 26 ]
-Translate 4.9618 4.1614 7.2489
+Translate 4.7526 4.1614 7.9610
 Shape "sphere" "float radius" [ 0.1210 ]
 AttributeEnd
 # @anim glow_gold
 AttributeBegin
 AreaLightSource "diffuse" "rgb L" [ 1.776 1.509 0.888 ]
 Material "coateddiffuse" "rgb reflectance" [ 0.82 0.78 0.72 ] "float roughness" [ 0.1 ]
-Translate 4.9994 4.4886 7.2285
+Translate 4.7731 4.4886 7.9985
 Shape "sphere" "float radius" [ 0.1210 ]
 AttributeEnd
 # the ice flower
@@ -172,14 +172,14 @@ Shape "plymesh" "string filename" [ "meshes/m021.ply" ]
 AttributeEnd
 AttributeBegin
 Material "dielectric" "float eta" [ 1.52 ] "float abbenumber" [ 26 ]
-Translate 7.0785 5.8222 -10.7496
+Translate 5.8796 5.8222 -10.6101
 Shape "sphere" "float radius" [ 0.1650 ]
 AttributeEnd
 # @anim glow_ice
 AttributeBegin
 AreaLightSource "diffuse" "rgb L" [ 0.669 0.840 0.955 ]
 Material "coateddiffuse" "rgb reflectance" [ 0.82 0.78 0.72 ] "float roughness" [ 0.1 ]
-Translate 7.1246 6.2694 -10.7694
+Translate 5.8303 6.2694 -10.6189
 Shape "sphere" "float radius" [ 0.1650 ]
 AttributeEnd
 # the rose2 flower
@@ -197,14 +197,14 @@ Shape "plymesh" "string filename" [ "meshes/m024.ply" ]
 AttributeEnd
 AttributeBegin
 Material "dielectric" "float eta" [ 1.52 ] "float abbenumber" [ 26 ]
-Translate -2.1028 3.2875 -11.6397
+Translate -2.6566 3.2875 -11.1092
 Shape "sphere" "float radius" [ 0.0990 ]
 AttributeEnd
 # @anim glow_rose2
 AttributeBegin
 AreaLightSource "diffuse" "rgb L" [ 2.653 1.459 1.645 ]
 Material "coateddiffuse" "rgb reflectance" [ 0.82 0.78 0.72 ] "float roughness" [ 0.1 ]
-Translate -2.0698 3.5552 -11.6513
+Translate -2.6696 3.5552 -11.0767
 Shape "sphere" "float radius" [ 0.0990 ]
 AttributeEnd
 # the violet2 flower
@@ -222,14 +222,14 @@ Shape "plymesh" "string filename" [ "meshes/m027.ply" ]
 AttributeEnd
 AttributeBegin
 Material "dielectric" "float eta" [ 1.52 ] "float abbenumber" [ 26 ]
-Translate 8.2879 2.8406 0.7657
+Translate 8.8159 2.8406 1.0096
 Shape "sphere" "float radius" [ 0.0880 ]
 AttributeEnd
 # @anim glow_violet2
 AttributeBegin
 AreaLightSource "diffuse" "rgb L" [ 2.518 2.014 3.357 ]
 Material "coateddiffuse" "rgb reflectance" [ 0.82 0.78 0.72 ] "float roughness" [ 0.1 ]
-Translate 8.2700 3.0791 0.7459
+Translate 8.8426 3.0791 1.0104
 Shape "sphere" "float radius" [ 0.0880 ]
 AttributeEnd
 # the amber2 flower
@@ -247,14 +247,14 @@ Shape "plymesh" "string filename" [ "meshes/m030.ply" ]
 AttributeEnd
 AttributeBegin
 Material "dielectric" "float eta" [ 1.52 ] "float abbenumber" [ 26 ]
-Translate -13.4912 5.1719 -7.8732
+Translate -14.2534 5.1719 -7.5409
 Shape "sphere" "float radius" [ 0.1430 ]
 AttributeEnd
 # @anim glow_amber2
 AttributeBegin
 AreaLightSource "diffuse" "rgb L" [ 1.271 0.865 0.445 ]
 Material "coateddiffuse" "rgb reflectance" [ 0.82 0.78 0.72 ] "float roughness" [ 0.1 ]
-Translate -13.4518 5.5597 -7.8634
+Translate -14.2730 5.5597 -7.5054
 Shape "sphere" "float radius" [ 0.1430 ]
 AttributeEnd
 # the aqua2 flower
@@ -272,14 +272,14 @@ Shape "plymesh" "string filename" [ "meshes/m033.ply" ]
 AttributeEnd
 AttributeBegin
 Material "dielectric" "float eta" [ 1.52 ] "float abbenumber" [ 26 ]
-Translate 1.9918 3.5220 12.4208
+Translate 2.3471 3.5220 11.7620
 Shape "sphere" "float radius" [ 0.1045 ]
 AttributeEnd
 # @anim glow_aqua2
 AttributeBegin
 AreaLightSource "diffuse" "rgb L" [ 1.190 2.381 2.143 ]
 Material "coateddiffuse" "rgb reflectance" [ 0.82 0.78 0.72 ] "float roughness" [ 0.1 ]
-Translate 1.9911 3.8049 12.4556
+Translate 2.3758 3.8049 11.7423
 Shape "sphere" "float radius" [ 0.1045 ]
 AttributeEnd
 AttributeBegin
