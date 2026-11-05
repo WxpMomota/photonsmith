@@ -452,7 +452,8 @@ TEST(FilmFile, EveryBundledFilmIsInItsSubTab) {
 		{"tengwang", "Stories"}, {"a-busy-evening", "Stories"}, {"a-day-at-home", "Stories"}, {"a-walk-at-dusk", "Stories"}, {"cosmic-voyage", "Space"},
 		{"down-to-the-sea", "Stories"}, {"fire-and-ice", "Nature"}, {"how-light-bounces", "Teaching"}, {"nova-and-robo", "Space"}, {"pip-goes-out", "Stories"},
 		{"powers-of-ten", "Space"}, {"seasons-wood", "Nature"}, {"swell-breaks", "Nature"}, {"the-great-blue", "Nature"}, {"the-lantern-below", "Stories"},
-		{"the-midnight-garden", "Nature"}, {"thunder-plains", "Nature"}, {"valley-of-mists", "Nature"}, {"worlds-beyond", "Space"}};
+		{"the-midnight-garden", "Nature"}, {"thunder-plains", "Nature"}, {"valley-of-mists", "Nature"}, {"worlds-beyond", "Space"},
+		{"the-glass-garden", "Showcases"}, {"islands-in-the-sky", "Showcases"}};
 	int seen = 0;
 	for (const cartoon::Film *f : cartoon::films()) {
 		const std::string key = f->key;

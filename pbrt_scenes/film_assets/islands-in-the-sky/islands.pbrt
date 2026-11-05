@@ -1,0 +1,844 @@
+# Islands in the Sky - floating islands over a sea of cloud (written by scripts/dreams/sky_islands.py; see its header). Metres, +y up; the cloud sea
+# lies from 0 to about 170 m, the islands float from 250 m to 700 m. The film adds the sky, the clouds, the haze, the trees, the birds and the waterfall.
+LookAt 180 470 300   -400 420 -300   0 1 0
+Camera "perspective" "float fov" [ 50 ]
+Film "rgb" "integer xresolution" [ 1920 ] "integer yresolution" [ 1080 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+WorldBegin
+LightSource "infinite" "rgb L" [ 0.5 0.6 0.8 ]
+Texture "meadow" "spectrum" "imagemap" "string filename" [ "meadow.png" ]
+Texture "rock" "spectrum" "imagemap" "string filename" [ "rock.png" ]
+Texture "lip" "spectrum" "imagemap" "string filename" [ "lip.png" ] "float uscale" [ 4 ] "float vscale" [ 4 ]
+# @anim moon
+AttributeBegin
+LightSource "distant" "point3 from" [ -0.80 0.20 -0.56 ] "point3 to" [ 0 0 0 ] "rgb L" [ 0.030 0.034 0.045 ]
+AreaLightSource "diffuse" "rgb L" [ 3.2 3.3 3.5 ]
+Material "diffuse" "rgb reflectance" [ 0 0 0 ]
+Translate -6400 1700 -4480
+Shape "sphere" "float radius" [ 95 ]
+AttributeEnd
+# the island "great"
+AttributeBegin
+Material "diffuse" "texture reflectance" "meadow"
+Shape "plymesh" "string filename" [ "meshes/m000.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lip"
+Shape "plymesh" "string filename" [ "meshes/m001.ply" ]
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m002.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m003.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.12 0.10 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m004.ply" ]
+AttributeEnd
+# the island "north"
+AttributeBegin
+Material "diffuse" "texture reflectance" "meadow"
+Shape "plymesh" "string filename" [ "meshes/m005.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lip"
+Shape "plymesh" "string filename" [ "meshes/m006.ply" ]
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m007.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m008.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.12 0.10 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m009.ply" ]
+AttributeEnd
+# the island "falls"
+AttributeBegin
+Material "diffuse" "texture reflectance" "meadow"
+Shape "plymesh" "string filename" [ "meshes/m010.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lip"
+Shape "plymesh" "string filename" [ "meshes/m011.ply" ]
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m012.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m013.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.12 0.10 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m014.ply" ]
+AttributeEnd
+# the island "east"
+AttributeBegin
+Material "diffuse" "texture reflectance" "meadow"
+Shape "plymesh" "string filename" [ "meshes/m015.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lip"
+Shape "plymesh" "string filename" [ "meshes/m016.ply" ]
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m017.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m018.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.12 0.10 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m019.ply" ]
+AttributeEnd
+# the island "high"
+AttributeBegin
+Material "diffuse" "texture reflectance" "meadow"
+Shape "plymesh" "string filename" [ "meshes/m020.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lip"
+Shape "plymesh" "string filename" [ "meshes/m021.ply" ]
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m022.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m023.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.12 0.10 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m024.ply" ]
+AttributeEnd
+# the island "far_e"
+AttributeBegin
+Material "diffuse" "texture reflectance" "meadow"
+Shape "plymesh" "string filename" [ "meshes/m025.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lip"
+Shape "plymesh" "string filename" [ "meshes/m026.ply" ]
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m027.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m028.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.12 0.10 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m029.ply" ]
+AttributeEnd
+# the island "far_w"
+AttributeBegin
+Material "diffuse" "texture reflectance" "meadow"
+Shape "plymesh" "string filename" [ "meshes/m030.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lip"
+Shape "plymesh" "string filename" [ "meshes/m031.ply" ]
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m032.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m033.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.12 0.10 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m034.ply" ]
+AttributeEnd
+# the island "far_n"
+AttributeBegin
+Material "diffuse" "texture reflectance" "meadow"
+Shape "plymesh" "string filename" [ "meshes/m035.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lip"
+Shape "plymesh" "string filename" [ "meshes/m036.ply" ]
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m037.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m038.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.12 0.10 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m039.ply" ]
+AttributeEnd
+# the island "low"
+AttributeBegin
+Material "diffuse" "texture reflectance" "meadow"
+Shape "plymesh" "string filename" [ "meshes/m040.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lip"
+Shape "plymesh" "string filename" [ "meshes/m041.ply" ]
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m042.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m043.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.12 0.10 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m044.ply" ]
+AttributeEnd
+# the island "far_s"
+AttributeBegin
+Material "diffuse" "texture reflectance" "meadow"
+Shape "plymesh" "string filename" [ "meshes/m045.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lip"
+Shape "plymesh" "string filename" [ "meshes/m046.ply" ]
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m047.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m048.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.12 0.10 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m049.ply" ]
+AttributeEnd
+# the island "rock0"
+AttributeBegin
+Material "diffuse" "texture reflectance" "meadow"
+Shape "plymesh" "string filename" [ "meshes/m050.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lip"
+Shape "plymesh" "string filename" [ "meshes/m051.ply" ]
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m052.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m053.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.12 0.10 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m054.ply" ]
+AttributeEnd
+# the island "rock1"
+AttributeBegin
+Material "diffuse" "texture reflectance" "meadow"
+Shape "plymesh" "string filename" [ "meshes/m055.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lip"
+Shape "plymesh" "string filename" [ "meshes/m056.ply" ]
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m057.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m058.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.12 0.10 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m059.ply" ]
+AttributeEnd
+# the island "rock2"
+AttributeBegin
+Material "diffuse" "texture reflectance" "meadow"
+Shape "plymesh" "string filename" [ "meshes/m060.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lip"
+Shape "plymesh" "string filename" [ "meshes/m061.ply" ]
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m062.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m063.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.12 0.10 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m064.ply" ]
+AttributeEnd
+# the island "rock3"
+AttributeBegin
+Material "diffuse" "texture reflectance" "meadow"
+Shape "plymesh" "string filename" [ "meshes/m065.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lip"
+Shape "plymesh" "string filename" [ "meshes/m066.ply" ]
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m067.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m068.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.12 0.10 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m069.ply" ]
+AttributeEnd
+# the island "rock4"
+AttributeBegin
+Material "diffuse" "texture reflectance" "meadow"
+Shape "plymesh" "string filename" [ "meshes/m070.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lip"
+Shape "plymesh" "string filename" [ "meshes/m071.ply" ]
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m072.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m073.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.12 0.10 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m074.ply" ]
+AttributeEnd
+# the island "rock5"
+AttributeBegin
+Material "diffuse" "texture reflectance" "meadow"
+Shape "plymesh" "string filename" [ "meshes/m075.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lip"
+Shape "plymesh" "string filename" [ "meshes/m076.ply" ]
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m077.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m078.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.12 0.10 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m079.ply" ]
+AttributeEnd
+# the island "rock6"
+AttributeBegin
+Material "diffuse" "texture reflectance" "meadow"
+Shape "plymesh" "string filename" [ "meshes/m080.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lip"
+Shape "plymesh" "string filename" [ "meshes/m081.ply" ]
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m082.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m083.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.12 0.10 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m084.ply" ]
+AttributeEnd
+# the island "rock7"
+AttributeBegin
+Material "diffuse" "texture reflectance" "meadow"
+Shape "plymesh" "string filename" [ "meshes/m085.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lip"
+Shape "plymesh" "string filename" [ "meshes/m086.ply" ]
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m087.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m088.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.12 0.10 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m089.ply" ]
+AttributeEnd
+# the island "rock8"
+AttributeBegin
+Material "diffuse" "texture reflectance" "meadow"
+Shape "plymesh" "string filename" [ "meshes/m090.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lip"
+Shape "plymesh" "string filename" [ "meshes/m091.ply" ]
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m092.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m093.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.12 0.10 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m094.ply" ]
+AttributeEnd
+# the island "rock9"
+AttributeBegin
+Material "diffuse" "texture reflectance" "meadow"
+Shape "plymesh" "string filename" [ "meshes/m095.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lip"
+Shape "plymesh" "string filename" [ "meshes/m096.ply" ]
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m097.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m098.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.12 0.10 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m099.ply" ]
+AttributeEnd
+# the island "rock10"
+AttributeBegin
+Material "diffuse" "texture reflectance" "meadow"
+Shape "plymesh" "string filename" [ "meshes/m100.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lip"
+Shape "plymesh" "string filename" [ "meshes/m101.ply" ]
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m102.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m103.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.12 0.10 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m104.ply" ]
+AttributeEnd
+# the island "rock11"
+AttributeBegin
+Material "diffuse" "texture reflectance" "meadow"
+Shape "plymesh" "string filename" [ "meshes/m105.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lip"
+Shape "plymesh" "string filename" [ "meshes/m106.ply" ]
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m107.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m108.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.12 0.10 0.07 ]
+Shape "plymesh" "string filename" [ "meshes/m109.ply" ]
+AttributeEnd
+# the standing stones
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m110.ply" ]
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "rock"
+Shape "plymesh" "string filename" [ "meshes/m111.ply" ]
+AttributeEnd
+# the lanterns
+# @anim lantern0
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.796 0.862 0.234 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m112.ply" ]
+AttributeEnd
+# @anim lantern1
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.632 0.783 0.212 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m113.ply" ]
+AttributeEnd
+# @anim lantern2
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.726 0.828 0.224 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m114.ply" ]
+AttributeEnd
+# @anim lantern3
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.538 0.738 0.200 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m115.ply" ]
+AttributeEnd
+# @anim lantern4
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.948 0.935 0.253 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m116.ply" ]
+AttributeEnd
+# @anim lantern5
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.830 0.879 0.238 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m117.ply" ]
+AttributeEnd
+# @anim lantern6
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.753 0.842 0.228 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m118.ply" ]
+AttributeEnd
+# @anim lantern7
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.915 0.919 0.249 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m119.ply" ]
+AttributeEnd
+# @anim lantern8
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.569 0.753 0.204 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m120.ply" ]
+AttributeEnd
+# @anim lantern9
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.900 0.912 0.247 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m121.ply" ]
+AttributeEnd
+# @anim lantern10
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.743 0.836 0.227 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m122.ply" ]
+AttributeEnd
+# @anim lantern11
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.841 0.884 0.239 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m123.ply" ]
+AttributeEnd
+# @anim lantern12
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.560 0.749 0.203 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m124.ply" ]
+AttributeEnd
+# @anim lantern13
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.720 0.826 0.224 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m125.ply" ]
+AttributeEnd
+# @anim lantern14
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.900 0.912 0.247 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m126.ply" ]
+AttributeEnd
+# @anim lantern15
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.476 0.709 0.192 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m127.ply" ]
+AttributeEnd
+# @anim lantern16
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.674 0.804 0.218 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m128.ply" ]
+AttributeEnd
+# @anim lantern17
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.724 0.827 0.224 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m129.ply" ]
+AttributeEnd
+# @anim lantern18
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.633 0.784 0.212 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m130.ply" ]
+AttributeEnd
+# @anim lantern19
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.709 0.820 0.222 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m131.ply" ]
+AttributeEnd
+# @anim lantern20
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.554 0.746 0.202 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m132.ply" ]
+AttributeEnd
+# @anim lantern21
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.665 0.799 0.216 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m133.ply" ]
+AttributeEnd
+# @anim lantern22
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.644 0.789 0.214 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m134.ply" ]
+AttributeEnd
+# @anim lantern23
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.487 0.714 0.193 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m135.ply" ]
+AttributeEnd
+# @anim lantern24
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.818 0.872 0.236 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m136.ply" ]
+AttributeEnd
+# @anim lantern25
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.525 0.732 0.198 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m137.ply" ]
+AttributeEnd
+# @anim lantern26
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.687 0.810 0.219 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m138.ply" ]
+AttributeEnd
+# @anim lantern27
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.917 0.920 0.249 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m139.ply" ]
+AttributeEnd
+# @anim lantern28
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.639 0.787 0.213 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m140.ply" ]
+AttributeEnd
+# @anim lantern29
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.736 0.833 0.226 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m141.ply" ]
+AttributeEnd
+# @anim lantern30
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.547 0.742 0.201 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m142.ply" ]
+AttributeEnd
+# @anim lantern31
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.750 0.840 0.228 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m143.ply" ]
+AttributeEnd
+# @anim lantern32
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.862 0.894 0.242 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m144.ply" ]
+AttributeEnd
+# @anim lantern33
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.625 0.780 0.211 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m145.ply" ]
+AttributeEnd
+# @anim lantern34
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.653 0.793 0.215 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m146.ply" ]
+AttributeEnd
+# @anim lantern35
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.837 0.882 0.239 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m147.ply" ]
+AttributeEnd
+# @anim lantern36
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.454 0.698 0.189 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m148.ply" ]
+AttributeEnd
+# @anim lantern37
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.522 0.730 0.198 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m149.ply" ]
+AttributeEnd
+# @anim lantern38
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.488 0.714 0.193 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m150.ply" ]
+AttributeEnd
+# @anim lantern39
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.887 0.906 0.245 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m151.ply" ]
+AttributeEnd
+# @anim lantern40
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.588 0.762 0.206 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m152.ply" ]
+AttributeEnd
+# @anim lantern41
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.798 0.863 0.234 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m153.ply" ]
+AttributeEnd
+# @anim lantern42
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.684 0.808 0.219 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m154.ply" ]
+AttributeEnd
+# @anim lantern43
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.841 0.883 0.239 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m155.ply" ]
+AttributeEnd
+# @anim lantern44
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.568 0.753 0.204 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m156.ply" ]
+AttributeEnd
+# @anim lantern45
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.496 0.718 0.194 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m157.ply" ]
+AttributeEnd
+# @anim lantern46
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.931 0.927 0.251 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m158.ply" ]
+AttributeEnd
+# @anim lantern47
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.455 0.698 0.189 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m159.ply" ]
+AttributeEnd
+# @anim lantern48
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.828 0.878 0.238 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m160.ply" ]
+AttributeEnd
+# @anim lantern49
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.796 0.862 0.234 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m161.ply" ]
+AttributeEnd
+# @anim lantern50
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.479 0.710 0.192 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m162.ply" ]
+AttributeEnd
+# @anim lantern51
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.647 0.791 0.214 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m163.ply" ]
+AttributeEnd
+# @anim lantern52
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.573 0.755 0.204 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m164.ply" ]
+AttributeEnd
+# @anim lantern53
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.708 0.820 0.222 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m165.ply" ]
+AttributeEnd
+# @anim lantern54
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.565 0.751 0.203 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m166.ply" ]
+AttributeEnd
+# @anim lantern55
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.943 0.933 0.253 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m167.ply" ]
+AttributeEnd
+# @anim lantern56
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.643 0.789 0.214 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m168.ply" ]
+AttributeEnd
+# @anim lantern57
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.456 0.699 0.189 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m169.ply" ]
+AttributeEnd
+# @anim lantern58
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.494 0.717 0.194 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m170.ply" ]
+AttributeEnd
+# @anim lantern59
+AttributeBegin
+AreaLightSource "diffuse" "rgb L" [ 1.684 0.808 0.219 ] "bool sampled" false "bool twosided" true
+Material "diffuse" "rgb reflectance" [ 0.9 0.8 0.6 ]
+Shape "plymesh" "string filename" [ "meshes/m171.ply" ]
+AttributeEnd
+# the waterfall: six sheets of falling water, one for each frame of six in turn (the film shows them so), so the water runs
+Texture "fall0" "float" "imagemap" "string filename" [ "fall0.png" ]
+# @anim fall0
+AttributeBegin
+Material "diffusetransmission" "rgb reflectance" [ 0.95 0.96 0.98 ] "rgb transmittance" [ 0.30 0.32 0.34 ]
+Shape "plymesh" "string filename" [ "meshes/m172.ply" ] "texture alpha" "fall0"
+AttributeEnd
+Texture "fall1" "float" "imagemap" "string filename" [ "fall1.png" ]
+# @anim fall1
+AttributeBegin
+Material "diffusetransmission" "rgb reflectance" [ 0.95 0.96 0.98 ] "rgb transmittance" [ 0.30 0.32 0.34 ]
+Shape "plymesh" "string filename" [ "meshes/m173.ply" ] "texture alpha" "fall1"
+AttributeEnd
+Texture "fall2" "float" "imagemap" "string filename" [ "fall2.png" ]
+# @anim fall2
+AttributeBegin
+Material "diffusetransmission" "rgb reflectance" [ 0.95 0.96 0.98 ] "rgb transmittance" [ 0.30 0.32 0.34 ]
+Shape "plymesh" "string filename" [ "meshes/m174.ply" ] "texture alpha" "fall2"
+AttributeEnd
+Texture "fall3" "float" "imagemap" "string filename" [ "fall3.png" ]
+# @anim fall3
+AttributeBegin
+Material "diffusetransmission" "rgb reflectance" [ 0.95 0.96 0.98 ] "rgb transmittance" [ 0.30 0.32 0.34 ]
+Shape "plymesh" "string filename" [ "meshes/m175.ply" ] "texture alpha" "fall3"
+AttributeEnd
+Texture "fall4" "float" "imagemap" "string filename" [ "fall4.png" ]
+# @anim fall4
+AttributeBegin
+Material "diffusetransmission" "rgb reflectance" [ 0.95 0.96 0.98 ] "rgb transmittance" [ 0.30 0.32 0.34 ]
+Shape "plymesh" "string filename" [ "meshes/m176.ply" ] "texture alpha" "fall4"
+AttributeEnd
+Texture "fall5" "float" "imagemap" "string filename" [ "fall5.png" ]
+# @anim fall5
+AttributeBegin
+Material "diffusetransmission" "rgb reflectance" [ 0.95 0.96 0.98 ] "rgb transmittance" [ 0.30 0.32 0.34 ]
+Shape "plymesh" "string filename" [ "meshes/m177.ply" ] "texture alpha" "fall5"
+AttributeEnd

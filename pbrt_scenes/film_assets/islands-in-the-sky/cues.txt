@@ -1,0 +1,138 @@
+# Islands in the Sky: a composed score (written by its generator in scripts/dreams; change it as any cues file). Every time is the film's (@).
+
+# --- Before dawn (0-10): a low drone, the choir alone, bells like stars going out
+@0.00  drone  39 length 10.50 gain 0.050 send 0.90
+@0.50  choir  58 63 length 9.00 gain 0.026 send 0.95
+@4.50  choir  67 70 length 6.00 gain 0.020 send 0.95
+@1.50  bell  82 length 3.50 gain 0.014 pan -0.40 send 0.95
+@2.90  bell  79 length 3.50 gain 0.014 pan -0.25 send 0.95
+@4.30  bell  77 length 3.50 gain 0.014 pan -0.10 send 0.95
+@5.70  bell  75 length 3.50 gain 0.014 pan 0.05 send 0.95
+@7.10  bell  74 length 3.50 gain 0.014 pan 0.20 send 0.95
+@8.50  bell  70 length 3.50 gain 0.014 pan 0.35 send 0.95
+
+# --- The sea of clouds (10-21): harp arpeggios gliding, the pad rising, the strings creeping in
+@10.00  pad  51 58 67 69 length 3.17 gain 0.038 send 0.90
+@10.00  bass  51 length 2.67 gain 0.050 send 0.40
+@10.00  pluck  58 67 69 79 length 2.50 gain 0.022 send 0.75 spread 0.14
+@11.33  pluck  58 67 69 length 2.00 gain 0.018 send 0.75 spread 0.12
+@12.67  pad  48 55 63 70 length 3.17 gain 0.038 send 0.90
+@12.67  bass  48 length 2.67 gain 0.050 send 0.40
+@12.67  pluck  55 63 70 75 length 2.50 gain 0.022 send 0.75 spread 0.14
+@14.00  pluck  55 63 70 length 2.00 gain 0.018 send 0.75 spread 0.12
+@15.33  pad  44 51 60 67 length 3.17 gain 0.038 send 0.90
+@15.33  bass  44 length 2.67 gain 0.050 send 0.40
+@15.33  pluck  51 60 67 72 length 2.50 gain 0.022 send 0.75 spread 0.14
+@16.67  pluck  51 60 67 length 2.00 gain 0.018 send 0.75 spread 0.12
+@18.00  pad  46 53 62 69 length 3.17 gain 0.038 send 0.90
+@18.00  bass  46 length 2.67 gain 0.050 send 0.40
+@18.00  pluck  53 62 69 74 length 2.50 gain 0.022 send 0.75 spread 0.14
+@19.33  pluck  53 62 69 length 2.00 gain 0.018 send 0.75 spread 0.12
+@15.00  strings  63 70 77 length 6.50 gain 0.024 send 0.85
+@19.00  swell  length 2.60 gain 0.060 send 0.85
+
+# --- Sunrise (21-31): the horns' call and the timpani as the sun breaks out of the clouds, the choir in full
+@21.00  impact  length 0.80 gain 0.040 send 0.70
+@21.20  brass  58 length 1.13 gain 0.034 send 0.70
+@22.03  brass  63 length 1.13 gain 0.034 send 0.70
+@22.87  brass  65 length 1.13 gain 0.034 send 0.70
+@23.70  brass  67 length 2.80 gain 0.034 send 0.70
+@26.20  brass  65 length 1.13 gain 0.034 send 0.70
+@27.03  brass  63 length 1.13 gain 0.034 send 0.70
+@27.87  brass  70 length 3.63 gain 0.034 send 0.70
+@21.00  strings  51 58 67 length 2.90 gain 0.032 send 0.85
+@21.00  bass  39 length 2.50 gain 0.060 send 0.40
+@21.00  timpani  39 length 1.20 gain 0.030 send 0.50
+@23.50  strings  53 60 69 length 2.90 gain 0.032 send 0.85
+@23.50  bass  41 length 2.50 gain 0.060 send 0.40
+@23.50  timpani  34 length 1.20 gain 0.030 send 0.50
+@26.00  strings  55 62 70 length 2.90 gain 0.032 send 0.85
+@26.00  bass  43 length 2.50 gain 0.060 send 0.40
+@26.00  timpani  39 length 1.20 gain 0.030 send 0.50
+@28.50  strings  44 51 60 67 length 2.90 gain 0.032 send 0.85
+@28.50  bass  44 length 2.50 gain 0.060 send 0.40
+@28.50  timpani  34 length 1.20 gain 0.030 send 0.50
+@22.00  choir  63 67 70 74 length 8.50 gain 0.030 send 0.95
+
+# --- The falls (31-41): the theme on the strings over a rolling pulse, the harp as the spray
+@31.20  strings  67 79 length 1.97 gain 0.030 send 0.85
+@32.70  strings  70 82 length 1.13 gain 0.030 send 0.85
+@33.45  strings  72 72 length 1.13 gain 0.030 send 0.85
+@34.20  strings  74 74 length 2.80 gain 0.030 send 0.85
+@36.45  strings  72 72 length 1.13 gain 0.030 send 0.85
+@37.20  strings  70 82 length 1.97 gain 0.030 send 0.85
+@38.70  strings  69 81 length 1.97 gain 0.030 send 0.85
+@40.20  strings  70 82 length 3.63 gain 0.030 send 0.85
+@31.00  pad  51 58 67 length 2.90 gain 0.034 send 0.90
+@31.00  bass  39 length 2.50 gain 0.050 send 0.40
+@31.00  pluck  82 length 1.20 gain 0.015 send 0.75
+@31.42  pluck  79 length 1.20 gain 0.015 pan 0.25 send 0.75
+@31.84  pluck  82 length 1.20 gain 0.015 pan 0.27 send 0.75
+@32.26  pluck  79 length 1.20 gain 0.015 pan 0.04 send 0.75
+@32.68  pluck  82 length 1.20 gain 0.015 pan -0.23 send 0.75
+@33.10  pluck  79 length 1.20 gain 0.015 pan -0.29 send 0.75
+@33.50  pad  48 55 63 length 2.90 gain 0.034 send 0.90
+@33.50  bass  36 length 2.50 gain 0.050 send 0.40
+@33.50  pluck  79 length 1.20 gain 0.015 pan 0.25 send 0.75
+@33.92  pluck  75 length 1.20 gain 0.015 pan 0.27 send 0.75
+@34.34  pluck  79 length 1.20 gain 0.015 pan 0.04 send 0.75
+@34.76  pluck  75 length 1.20 gain 0.015 pan -0.23 send 0.75
+@35.18  pluck  79 length 1.20 gain 0.015 pan -0.29 send 0.75
+@35.60  pluck  75 length 1.20 gain 0.015 pan -0.08 send 0.75
+@36.00  pad  44 51 60 length 2.90 gain 0.034 send 0.90
+@36.00  bass  44 length 2.50 gain 0.050 send 0.40
+@36.00  pluck  75 length 1.20 gain 0.015 pan 0.27 send 0.75
+@36.42  pluck  72 length 1.20 gain 0.015 pan 0.04 send 0.75
+@36.84  pluck  75 length 1.20 gain 0.015 pan -0.23 send 0.75
+@37.26  pluck  72 length 1.20 gain 0.015 pan -0.29 send 0.75
+@37.68  pluck  75 length 1.20 gain 0.015 pan -0.08 send 0.75
+@38.10  pluck  72 length 1.20 gain 0.015 pan 0.20 send 0.75
+@38.50  pad  46 53 62 length 2.90 gain 0.034 send 0.90
+@38.50  bass  46 length 2.50 gain 0.050 send 0.40
+@38.50  pluck  77 length 1.20 gain 0.015 pan 0.04 send 0.75
+@38.92  pluck  74 length 1.20 gain 0.015 pan -0.23 send 0.75
+@39.34  pluck  77 length 1.20 gain 0.015 pan -0.29 send 0.75
+@39.76  pluck  74 length 1.20 gain 0.015 pan -0.08 send 0.75
+@40.18  pluck  77 length 1.20 gain 0.015 pan 0.20 send 0.75
+@40.60  pluck  74 length 1.20 gain 0.015 pan 0.30 send 0.75
+
+# --- Lanterns (41-51): bells for the lanterns, the choir soaring, the orchestra swelling
+@41.00  bell  87 length 3.00 gain 0.016 send 0.95
+@41.72  bell  82 length 3.00 gain 0.016 pan 0.48 send 0.95
+@42.44  bell  79 length 3.00 gain 0.016 pan 0.26 send 0.95
+@43.16  bell  89 length 3.00 gain 0.016 pan -0.34 send 0.95
+@43.88  bell  86 length 3.00 gain 0.016 pan -0.44 send 0.95
+@44.60  bell  82 length 3.00 gain 0.016 pan 0.11 send 0.95
+@45.32  bell  84 length 3.00 gain 0.016 pan 0.50 send 0.95
+@46.04  bell  87 length 3.00 gain 0.016 pan 0.16 send 0.95
+@46.76  bell  82 length 3.00 gain 0.016 pan -0.41 send 0.95
+@47.48  bell  79 length 3.00 gain 0.016 pan -0.38 send 0.95
+@48.20  bell  89 length 3.00 gain 0.016 pan 0.21 send 0.95
+@48.92  bell  86 length 3.00 gain 0.016 pan 0.49 send 0.95
+@49.64  bell  82 length 3.00 gain 0.016 pan 0.05 send 0.95
+@50.36  bell  84 length 3.00 gain 0.016 pan -0.46 send 0.95
+@41.00  strings  51 58 67 74 length 2.90 gain 0.032 send 0.85
+@41.00  bass  39 length 2.50 gain 0.055 send 0.40
+@43.50  strings  44 51 60 67 length 2.90 gain 0.032 send 0.85
+@43.50  bass  44 length 2.50 gain 0.055 send 0.40
+@46.00  strings  53 60 69 75 length 2.90 gain 0.032 send 0.85
+@46.00  bass  41 length 2.50 gain 0.055 send 0.40
+@48.50  strings  46 53 62 70 length 2.90 gain 0.032 send 0.85
+@48.50  bass  46 length 2.50 gain 0.055 send 0.40
+@42.00  choir  70 74 79 length 9.00 gain 0.030 send 0.95
+@46.50  brass  63 70 length 4.00 gain 0.026 send 0.70
+
+# --- The world above the clouds (51-60): the last chord of everything as the camera pulls away, into the credits
+@51.00  impact  length 0.80 gain 0.030 send 0.70
+@51.00  timpani  39 length 2.00 gain 0.035 send 0.50
+@51.00  strings  51 58 67 74 81 length 9.50 gain 0.034 send 0.90
+@51.00  brass  51 58 67 length 8.00 gain 0.026 send 0.70
+@51.50  choir  63 67 70 74 length 9.00 gain 0.030 send 0.95
+@51.00  bass  39 length 9.00 gain 0.060 send 0.40
+@51.00  drone  27 length 10.00 gain 0.035 send 0.90
+@52.00  bell  94 length 4.00 gain 0.014 pan -0.30 send 0.95
+@53.30  bell  91 length 4.00 gain 0.014 pan -0.18 send 0.95
+@54.60  bell  87 length 4.00 gain 0.014 pan -0.06 send 0.95
+@55.90  bell  86 length 4.00 gain 0.014 pan 0.06 send 0.95
+@57.20  bell  82 length 4.00 gain 0.014 pan 0.18 send 0.95
+@58.50  bell  79 length 4.00 gain 0.014 pan 0.30 send 0.95

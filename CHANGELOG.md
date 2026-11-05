@@ -6,6 +6,21 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **Two dream showcase films: The Glass Garden and Islands in the Sky (2026-11-05).** Both films are from files, under Cartoons > Showcases. Each set, film and
+  score is written by a generator in `scripts/dreams/`, so the films contain no C++. Each film is 60 s plus credits and takes about 13-15 s a frame at
+  1920 x 1080 and 300 samples on an RTX 5080.
+  - *The Glass Garden:* giant flowers of coloured glass round a still pond in a mossy hollow. The film runs from golden hour to night. The petals are tinted
+    glass (`rgb tf`) and the stems and crystals are dispersive flint glass. It has a thin mist and painted crepuscular rays, a carpet of 220 instanced little
+    glass flowers, and petals drifting onto the water. At night every blossom wakes with an orb of light, and fireflies and rising pollen fill the hollow.
+  - *Islands in the Sky:* floating islands over a cloud deck, from the blue hour with a setting moon through the sunrise. A waterfall pours off an island into
+    the clouds; it is a flipbook of six alpha sheets, one shown a frame in turn, so the water runs. Sixty paper lanterns rise from a ring of standing stones,
+    and geese and eagles fly between the islands.
+
+  Found on the way:
+  - The GPU loader keeps no medium inside a mesh, so the glass is tinted with `rgb tf` instead.
+  - A mist's sphere and a cloud deck's sphere must not cross.
+  - The wavefront GPU renderer crashes on a moving mesh, so both films use `shutter 0`.
+
 * **The Nomai explorer's mask, robe and staff redrawn as our own (2026-11-04).** The `nomai-explorer` kind keeps the cues players remember (a big pale mask with
   three eye windows, warm metal, a ghostly blue light, a long sea-green robe and a staff), drawn afresh rather than after the game's suit:
   - The mask is a big squared ivory shield bent round the face, with round windows in bronze bezels. Tide rings and a blue inlay surround the third window, glowing

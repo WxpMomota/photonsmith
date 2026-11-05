@@ -1,0 +1,296 @@
+# The Glass Garden: a dream showcase film, written by scripts/dreams/glass_garden.py (change that and run it again, not this file).
+# A mossy hollow at sunset where giant flowers of coloured glass grow round a still pond. The low sun shines through their petals and stems - coloured glass,
+# dispersion, light shafts in a thin mist - then sets; the sky fades through its afterglow, and the garden wakes into a night lit by its own blossoms, with
+# fireflies, glowing fungi, rising pollen and petals drifting down onto the water. Glass looks its best at a ray depth of 12 or more.
+film    the-glass-garden
+name    The Glass Garden
+about   A dream: giant flowers of coloured glass round a still pond in a mossy hollow, the sunset shining through them, then a night lit by their own blossoms.
+scene   film_assets/the-glass-garden/garden.pbrt
+length  60
+still   20
+genre   showcase
+tags    glass, dusk, night, emissive, backlight, fog, dof
+
+# the sun and sky: from a low sun into the afterglow and the first of the night; the camera opens up as the light goes
+sky       17:40 20:22  south 180  latitude 40  physical
+shutter   0                                   # (moving blocks sharp: the wavefront GPU renderer, which the mist needs, cannot draw a moving mesh yet)
+exposure  auto 2
+optics    rays 0.7  alpenglow 0.8
+mist      0.0011  radius 260
+ambience  wind 0.12
+
+# trees round the hollow's rim, ferns and rocks round the pond, glowing fungi in the moss, fireflies at night
+place  tree  at -25.96 3.008 -44.48  scale 2.89  turn 147  seed 1
+place  tree  at -24.71 4.223 -53.67  scale 2.36  turn 219  seed 2
+place  tree  at -18.74 3.367 -49.83  scale 1.85  turn 31  seed 3
+place  tree  at -12.38 3.815 -55.26  scale 2.99  turn 329  seed 4
+place  tree  at -9.67 5.071 -63.36  scale 2.72  turn 257  seed 5
+place  tree  at -2.41 2.970 -51.10  scale 2.28  turn 74  seed 6
+place  tree  at 2.41 3.000 -51.00  scale 2.86  turn 315  seed 7
+place  tree  at 8.30 6.377 -71.00  scale 1.84  turn 327  seed 8
+place  tree  at 13.94 3.063 -49.69  scale 2.71  turn 335  seed 9
+place  tree  at 19.28 3.328 -49.73  scale 2.13  turn 40  seed 10
+place  tree  at 29.28 6.285 -64.81  scale 2.00  turn 185  seed 11
+place  tree  at 24.40 2.730 -42.72  scale 2.71  turn 43  seed 12
+place  tree  at 40.35 5.406 -52.13  scale 2.93  turn 271  seed 13
+place  tree  at 34.25 3.203 -39.89  scale 2.72  turn 51  seed 14
+place  tree  at 35.87 2.788 -34.42  scale 1.82  turn 130  seed 15
+place  tree  at 52.05 5.179 -38.56  scale 1.99  turn 31  seed 16
+place  tree  at 59.94 5.971 -34.65  scale 2.69  turn 207  seed 17
+place  tree  at 47.26 3.261 -23.39  scale 2.93  turn 130  seed 18
+place  tree  at 57.40 4.719 -22.95  scale 2.20  turn 187  seed 19
+place  tree  at 48.99 3.048 -15.25  scale 2.23  turn 92  seed 20
+place  tree  at 45.90 2.453 -7.57  scale 2.79  turn 43  seed 21
+place  tree  at 59.53 4.309 -2.62  scale 2.16  turn 161  seed 22
+place  tree  at 46.43 2.386 1.66  scale 1.90  turn 291  seed 23
+place  tree  at 68.23 5.838 5.45  scale 2.10  turn 37  seed 24
+place  tree  at 45.31 2.390 10.34  scale 2.05  turn 154  seed 25
+place  tree  at 46.24 2.723 15.14  scale 1.98  turn 194  seed 26
+place  tree  at 56.97 4.652 23.54  scale 2.26  turn 28  seed 27
+place  tree  at 56.57 5.234 31.57  scale 2.18  turn 10  seed 28
+place  tree  at 43.89 3.370 30.85  scale 2.30  turn 30  seed 29
+place  tree  at 46.04 4.049 35.61  scale 2.72  turn 108  seed 30
+place  tree  at 44.46 4.617 42.07  scale 2.96  turn 113  seed 31
+place  tree  at 34.41 3.328 40.62  scale 2.67  turn 70  seed 32
+place  tree  at 31.09 3.932 48.23  scale 2.07  turn 31  seed 33
+place  tree  at 30.07 4.502 52.33  scale 2.04  turn 145  seed 34
+place  tree  at 21.13 3.354 49.32  scale 2.49  turn 166  seed 35
+place  tree  at 13.90 2.528 45.18  scale 2.46  turn 256  seed 36
+place  tree  at 11.69 2.842 48.81  scale 2.53  turn 162  seed 37
+place  tree  at 6.42 3.379 55.25  scale 2.02  turn 230  seed 38
+place  tree  at -0.77 2.648 53.83  scale 2.30  turn 351  seed 39
+place  tree  at -4.02 1.848 47.78  scale 2.23  turn 279  seed 40
+scatter  tree 7 in -43.9 -59.7 -29.9 -45.7  scale 2.0 3.4  seed 200  y 5.06
+scatter  tree 7 in -34.8 -62.1 -20.8 -48.1  scale 2.0 3.4  seed 201  y 4.66
+scatter  tree 7 in -26.6 -65.4 -12.6 -51.4  scale 2.0 3.4  seed 202  y 4.61
+scatter  tree 7 in -22.6 -92.3 -8.6 -78.3  scale 2.0 3.4  seed 203  y 8.38
+scatter  tree 7 in -9.4 -70.0 4.6 -56.0  scale 2.0 3.4  seed 204  y 4.86
+scatter  tree 7 in 2.2 -93.1 16.2 -79.1  scale 2.0 3.4  seed 205  y 8.40
+scatter  tree 7 in 12.3 -82.9 26.3 -68.9  scale 2.0 3.4  seed 206  y 7.36
+scatter  tree 7 in 22.9 -79.2 36.9 -65.2  scale 2.0 3.4  seed 207  y 7.38
+scatter  tree 7 in 33.3 -74.9 47.3 -60.9  scale 2.0 3.4  seed 208  y 7.48
+scatter  tree 7 in 29.6 -52.4 43.6 -38.4  scale 2.0 3.4  seed 209  y 4.02
+scatter  tree 7 in 42.4 -52.8 56.4 -38.8  scale 2.0 3.4  seed 210  y 5.61
+scatter  tree 7 in 65.0 -56.7 79.0 -42.7  scale 2.0 3.4  seed 211  y 8.46
+scatter  tree 7 in 61.8 -41.2 75.8 -27.2  scale 2.0 3.4  seed 212  y 7.17
+scatter  tree 7 in 72.0 -33.0 86.0 -19.0  scale 2.0 3.4  seed 213  y 8.02
+scatter  tree 7 in 65.9 -19.9 79.9 -5.9  scale 2.0 3.4  seed 214  y 6.70
+scatter  tree 7 in 56.1 -9.0 70.1 5.0  scale 2.0 3.4  seed 215  y 4.86
+scatter  tree 7 in 76.2 2.4 90.2 16.4  scale 2.0 3.4  seed 216  y 8.03
+scatter  tree 7 in 71.8 13.6 85.8 27.6  scale 2.0 3.4  seed 217  y 7.77
+scatter  tree 7 in 48.5 16.4 62.5 30.4  scale 2.0 3.4  seed 218  y 4.38
+scatter  tree 7 in 66.4 37.2 80.4 51.2  scale 2.0 3.4  seed 219  y 8.25
+scatter  tree 7 in 53.9 42.8 67.9 56.8  scale 2.0 3.4  seed 220  y 7.47
+scatter  tree 7 in 39.1 43.3 53.1 57.3  scale 2.0 3.4  seed 221  y 5.81
+scatter  tree 7 in 36.6 56.9 50.6 70.9  scale 2.0 3.4  seed 222  y 7.27
+scatter  tree 7 in 28.5 65.5 42.5 79.5  scale 2.0 3.4  seed 223  y 7.68
+scatter  tree 7 in 13.8 57.6 27.8 71.6  scale 2.0 3.4  seed 224  y 5.73
+scatter  tree 7 in 7.3 77.3 21.3 91.3  scale 2.0 3.4  seed 225  y 8.03
+scatter  tree 7 in -5.0 73.1 9.0 87.1  scale 2.0 3.4  seed 226  y 6.35
+scatter  tree 7 in -13.9 51.1 0.1 65.1  scale 2.0 3.4  seed 227  y 2.54
+scatter  tree 14 in 50.0 210.4 78.0 238.4  scale 2.6 4.2  seed 400  y 34.32
+scatter  tree 14 in 126.4 16.9 154.4 44.9  scale 2.6 4.2  seed 401  y 13.02
+scatter  tree 14 in -53.8 105.0 -25.8 133.0  scale 2.6 4.2  seed 402  y 3.48
+scatter  tree 14 in 66.8 36.1 94.8 64.1  scale 2.6 4.2  seed 403  y 8.83
+scatter  tree 14 in -133.2 -48.1 -105.2 -20.1  scale 2.6 4.2  seed 404  y 4.63
+scatter  tree 14 in 227.6 37.6 255.6 65.6  scale 2.6 4.2  seed 405  y 32.23
+scatter  tree 14 in 210.9 -21.5 238.9 6.5  scale 2.6 4.2  seed 406  y 27.93
+scatter  tree 14 in -154.7 -220.0 -126.7 -192.0  scale 2.6 4.2  seed 407  y 35.84
+scatter  tree 14 in 100.7 54.9 128.7 82.9  scale 2.6 4.2  seed 408  y 11.64
+scatter  tree 14 in -198.5 -166.8 -170.5 -138.8  scale 2.6 4.2  seed 409  y 32.24
+scatter  tree 14 in -148.5 -108.5 -120.5 -80.5  scale 2.6 4.2  seed 410  y 15.23
+scatter  tree 14 in -130.8 -74.0 -102.8 -46.0  scale 2.6 4.2  seed 411  y 8.61
+scatter  tree 14 in 39.4 80.6 67.4 108.6  scale 2.6 4.2  seed 412  y 9.55
+scatter  tree 14 in 102.4 35.0 130.4 63.0  scale 2.6 4.2  seed 413  y 10.87
+scatter  tree 14 in -102.8 -92.5 -74.8 -64.5  scale 2.6 4.2  seed 414  y 10.27
+scatter  tree 14 in 63.2 160.9 91.2 188.9  scale 2.6 4.2  seed 415  y 22.74
+scatter  tree 14 in 168.1 -157.1 196.1 -129.1  scale 2.6 4.2  seed 416  y 29.95
+scatter  tree 14 in 65.1 131.0 93.1 159.0  scale 2.6 4.2  seed 417  y 17.08
+scatter  tree 14 in 128.5 94.7 156.5 122.7  scale 2.6 4.2  seed 418  y 18.10
+scatter  tree 14 in -48.3 141.0 -20.3 169.0  scale 2.6 4.2  seed 419  y 7.66
+scatter  tree 14 in 143.8 -201.6 171.8 -173.6  scale 2.6 4.2  seed 420  y 33.42
+scatter  tree 14 in 53.6 227.6 81.6 255.6  scale 2.6 4.2  seed 421  y 38.95
+scatter  tree 14 in 9.1 -255.4 37.1 -227.4  scale 2.6 4.2  seed 422  y 34.86
+scatter  tree 14 in 107.7 -73.4 135.7 -45.4  scale 2.6 4.2  seed 423  y 11.83
+scatter  tree 14 in 158.2 1.4 186.2 29.4  scale 2.6 4.2  seed 424  y 17.59
+scatter  tree 14 in 223.9 31.9 251.9 59.9  scale 2.6 4.2  seed 425  y 31.32
+scatter  tree 14 in 109.9 11.6 137.9 39.6  scale 2.6 4.2  seed 426  y 11.00
+scatter  tree 14 in -122.5 -95.2 -94.5 -67.2  scale 2.6 4.2  seed 427  y 11.57
+scatter  tree 14 in 192.5 -126.5 220.5 -98.5  scale 2.6 4.2  seed 428  y 29.42
+scatter  tree 14 in 203.3 21.0 231.3 49.0  scale 2.6 4.2  seed 429  y 26.67
+scatter  tree 14 in 158.6 101.8 186.6 129.8  scale 2.6 4.2  seed 430  y 23.35
+scatter  tree 14 in -110.6 -137.6 -82.6 -109.6  scale 2.6 4.2  seed 431  y 15.68
+scatter  tree 14 in 82.9 44.5 110.9 72.5  scale 2.6 4.2  seed 432  y 9.75
+scatter  tree 14 in -202.1 -78.8 -174.1 -50.8  scale 2.6 4.2  seed 433  y 12.37
+scatter  tree 14 in 64.7 -182.9 92.7 -154.9  scale 2.6 4.2  seed 434  y 21.24
+scatter  tree 14 in 162.6 176.6 190.6 204.6  scale 2.6 4.2  seed 435  y 34.37
+scatter  tree 14 in 8.7 -107.7 36.7 -79.7  scale 2.6 4.2  seed 436  y 8.89
+scatter  tree 14 in 111.1 -169.2 139.1 -141.2  scale 2.6 4.2  seed 437  y 23.36
+scatter  tree 14 in 114.2 148.6 142.2 176.6  scale 2.6 4.2  seed 438  y 24.02
+scatter  tree 14 in -17.9 -153.4 10.1 -125.4  scale 2.6 4.2  seed 439  y 13.13
+scatter  tree 14 in -33.1 -205.2 -5.1 -177.2  scale 2.6 4.2  seed 440  y 23.19
+scatter  tree 14 in 138.1 -161.4 166.1 -133.4  scale 2.6 4.2  seed 441  y 25.71
+scatter  tree 14 in -240.3 -103.1 -212.3 -75.1  scale 2.6 4.2  seed 442  y 20.03
+scatter  tree 14 in 233.0 1.9 261.0 29.9  scale 2.6 4.2  seed 443  y 32.63
+scatter  tree 14 in 119.9 -19.8 147.9 8.2  scale 2.6 4.2  seed 444  y 11.86
+scatter  tree 14 in 135.6 40.4 163.6 68.4  scale 2.6 4.2  seed 445  y 15.04
+scatter  tree 14 in 163.1 -164.8 191.1 -136.8  scale 2.6 4.2  seed 446  y 30.26
+scatter  tree 14 in 161.9 49.2 189.9 77.2  scale 2.6 4.2  seed 447  y 19.62
+scatter  tree 14 in -121.8 -123.2 -93.8 -95.2  scale 2.6 4.2  seed 448  y 15.10
+scatter  tree 14 in -202.2 -84.8 -174.2 -56.8  scale 2.6 4.2  seed 449  y 13.64
+scatter  tree 14 in -81.4 -108.6 -53.4 -80.6  scale 2.6 4.2  seed 450  y 10.25
+scatter  tree 14 in 110.4 -215.2 138.4 -187.2  scale 2.6 4.2  seed 451  y 32.22
+scatter  tree 14 in -29.2 83.2 -1.2 111.2  scale 2.6 4.2  seed 452  y 5.00
+scatter  tree 14 in -229.3 -122.7 -201.3 -94.7  scale 2.6 4.2  seed 453  y 24.11
+scatter  tree 14 in 77.7 58.7 105.7 86.7  scale 2.6 4.2  seed 454  y 10.04
+scatter  tree 14 in 103.1 18.4 131.1 46.4  scale 2.6 4.2  seed 455  y 10.43
+scatter  tree 14 in -33.4 -148.0 -5.4 -120.0  scale 2.6 4.2  seed 456  y 12.63
+scatter  tree 14 in 32.5 71.1 60.5 99.1  scale 2.6 4.2  seed 457  y 8.93
+scatter  tree 14 in 18.7 223.0 46.7 251.0  scale 2.6 4.2  seed 458  y 34.20
+scatter  tree 14 in -98.6 -239.8 -70.6 -211.8  scale 2.6 4.2  seed 459  y 35.23
+scatter  bush 5 in 13.0 2.3 18.0 7.3  scale 0.8 1.4  seed 300  y -0.07
+scatter  bush 5 in 7.5 10.9 12.5 15.9  scale 0.8 1.4  seed 301  y 0.04
+scatter  bush 5 in -2.2 15.3 2.8 20.3  scale 0.8 1.4  seed 302  y 0.05
+scatter  bush 5 in -11.6 10.4 -6.6 15.4  scale 0.8 1.4  seed 303  y -0.00
+scatter  bush 5 in -17.3 2.5 -12.3 7.5  scale 0.8 1.4  seed 304  y -0.07
+scatter  bush 5 in -18.4 -7.4 -13.4 -2.4  scale 0.8 1.4  seed 305  y -0.05
+scatter  bush 5 in -11.8 -14.9 -6.8 -9.9  scale 0.8 1.4  seed 306  y -0.08
+scatter  bush 5 in -2.8 -20.5 2.2 -15.5  scale 0.8 1.4  seed 307  y 0.05
+scatter  bush 5 in 6.7 -15.6 11.7 -10.6  scale 0.8 1.4  seed 308  y -0.01
+scatter  bush 5 in 13.9 -8.1 18.9 -3.1  scale 0.8 1.4  seed 309  y 0.02
+place  rock  at 7.38 -0.015 -6.28  scale 0.74  turn 211  seed 50
+place  fern  at 6.59 -0.041 -2.79  scale 0.77  turn 157  seed 51
+place  fern  at 5.84 -0.060 -1.27  scale 0.75  turn 212  seed 52
+place  rock  at 2.69 -0.016 0.19  scale 0.38  turn 82  seed 53
+place  fern  at 0.84 0.014 0.53  scale 0.46  turn 351  seed 54
+place  fern  at -1.69 -0.025 -1.01  scale 0.78  turn 17  seed 55
+place  rock  at -4.45 0.025 -3.51  scale 0.48  turn 343  seed 56
+place  fern  at -4.68 0.008 -5.54  scale 0.68  turn 107  seed 57
+place  fern  at -3.85 -0.013 -8.62  scale 0.53  turn 298  seed 58
+place  rock  at -2.07 -0.062 -10.16  scale 0.50  turn 232  seed 59
+place  fern  at 0.90 -0.016 -11.20  scale 0.79  turn 118  seed 60
+place  fern  at 2.32 -0.001 -11.70  scale 0.56  turn 282  seed 61
+place  rock  at 5.39 0.044 -10.26  scale 0.77  turn 306  seed 62
+place  fern  at 7.14 -0.009 -7.91  scale 0.46  turn 143  seed 63
+scatter  grass 900 in -16 -16 14 14  scale 0.5 1.0  seed 4  y 0.02
+scatter  fern 70 in -16 -16 14 14  scale 0.5 0.9  seed 6  y 0.02
+fireflies 260  in -18 -18 16 16  height 2.6  during 40 60
+
+# the moon comes up as the sun goes
+light  moon  0 0   36 0   46 1   60 1
+
+# the blossoms wake one by one as the light goes (each flower's orb: its block glow_NAME)
+light  glow_rose  0 0   39.00 0   41.50 1   60 1
+light  glow_amber  0 0   41.50 0   44.00 1   60 1
+light  glow_violet  0 0   40.20 0   42.70 1   60 1
+light  glow_aqua  0 0   43.00 0   45.50 1   60 1
+light  glow_gold  0 0   42.30 0   44.80 1   60 1
+light  glow_ice  0 0   44.00 0   46.50 1   60 1
+light  glow_rose2  0 0   45.00 0   47.50 1   60 1
+light  glow_violet2  0 0   45.80 0   48.30 1   60 1
+light  glow_amber2  0 0   46.50 0   49.00 1   60 1
+light  glow_aqua2  0 0   47.20 0   49.70 1   60 1
+light  glow_small0  0 0   52.99 0   55.49 1   60 1
+light  glow_small1  0 0   50.44 0   52.94 1   60 1
+light  glow_small2  0 0   51.14 0   53.64 1   60 1
+light  glow_small3  0 0   47.71 0   50.21 1   60 1
+light  glow_small4  0 0   48.11 0   50.61 1   60 1
+light  glow_small5  0 0   48.58 0   51.08 1   60 1
+light  glow_small6  0 0   50.88 0   53.38 1   60 1
+light  glow_small7  0 0   52.35 0   54.85 1   60 1
+light  glow_small8  0 0   51.75 0   54.25 1   60 1
+light  glow_small9  0 0   47.19 0   49.69 1   60 1
+light  glow_small10  0 0   51.45 0   53.95 1   60 1
+light  glow_small11  0 0   52.61 0   55.11 1   60 1
+light  glow_small12  0 0   48.94 0   51.44 1   60 1
+light  glow_small13  0 0   51.82 0   54.32 1   60 1
+light  glow_small14  0 0   50.10 0   52.60 1   60 1
+light  glow_small15  0 0   48.06 0   50.56 1   60 1
+light  glow_small16  0 0   49.77 0   52.27 1   60 1
+light  glow_small17  0 0   49.19 0   51.69 1   60 1
+light  glow_small18  0 0   48.05 0   50.55 1   60 1
+light  glow_small19  0 0   47.92 0   50.42 1   60 1
+light  glow_small20  0 0   50.09 0   52.59 1   60 1
+light  glow_small21  0 0   52.59 0   55.09 1   60 1
+light  glow_small22  0 0   51.41 0   53.91 1   60 1
+light  glow_small23  0 0   48.04 0   50.54 1   60 1
+light  glow_lotus0  0 0   48.00 0   50.50 1   60 1
+light  glow_lotus1  0 0   49.30 0   51.80 1   60 1
+light  glow_lotus2  0 0   50.60 0   53.10 1   60 1
+
+# pollen rising from the great rose once it glows
+swarm  pollen 240 from -5.345  6.910  1.952 radius 2.4 during 44 60 velocity 0 0.22 0 spread 0.7 gravity -0.005 life 16 colour 1 0.78 0.45 bright 1.0 size 0.02 pulse 0.3 seed 5
+
+# the drifting petals: each falls from a bloom on a wandering breeze, tumbling, onto the pond or the moss
+move  petal0  0.00 0.000 0.000 0.000   6.92 0.000 0.000 0.000   8.94 0.891 -0.707 -0.615   10.96 1.901 -1.414 -1.310   12.98 2.891 -2.120 -2.125   15.00 3.727 -2.827 -3.043   17.01 4.370 -3.534 -3.994   19.03 4.893 -4.241 -4.894   21.05 5.445 -4.948 -5.682   23.07 6.150 -5.655 -6.352   25.09 7.038 -6.361 -6.954   27.11 8.021 -7.068 -7.573   60.00 8.017 -7.068 -7.327
+turn  petal0 about -4.893  6.988  1.603 axis 0.156  0.150  0.976   0.00 0.0   6.92 0.0   27.11 -469.3
+move  petal1  0.00 0.000 0.000 0.000   8.13 0.000 0.000 0.000   9.63 1.015 -0.525 -0.576   11.13 1.981 -1.050 -1.201   12.63 2.781 -1.574 -1.790   14.13 3.401 -2.099 -2.275   15.63 3.940 -2.624 -2.637   17.13 4.549 -3.149 -2.918   18.63 5.336 -3.673 -3.199   20.13 6.303 -4.198 -3.559   21.63 7.340 -4.723 -4.039   23.13 8.301 -5.248 -4.620   60.00 8.058 -5.248 -4.704
+turn  petal1 about -8.682  5.168  -3.552 axis 0.305  -0.671  0.676   0.00 0.0   8.13 0.0   23.13 449.2
+move  petal2  0.00 0.000 0.000 0.000   10.39 0.000 0.000 0.000   12.07 0.048 -0.589 -0.173   13.75 -0.077 -1.178 -0.225   15.44 -0.360 -1.767 -0.187   17.12 -0.684 -2.356 -0.133   18.80 -0.902 -2.945 -0.147   20.49 -0.926 -3.534 -0.280   22.17 -0.785 -4.123 -0.526   23.85 -0.604 -4.712 -0.824   25.53 -0.529 -5.301 -1.090   27.22 -0.632 -5.890 -1.254   60.00 -0.865 -5.890 -1.231
+turn  petal2 about -2.684  5.911  6.616 axis 0.159  0.643  -0.749   0.00 0.0   10.39 0.0   27.22 -521.3
+move  petal3  0.00 0.000 0.000 0.000   10.04 0.000 0.000 0.000   11.21 1.321 -0.408 -1.142   12.38 2.505 -0.816 -2.335   13.54 3.683 -1.224 -3.640   14.71 4.996 -1.632 -5.062   15.87 6.505 -2.039 -6.549   17.04 8.155 -2.447 -8.019   18.20 9.805 -2.855 -9.395   19.37 11.318 -3.263 -10.649   20.53 12.645 -3.671 -11.809   21.70 13.857 -4.079 -12.953   60.00 13.889 -4.079 -12.672
+turn  petal3 about -10.127  3.999  4.938 axis 0.831  -0.297  0.470   0.00 0.0   10.04 0.0   21.70 610.6
+move  petal4  0.00 0.000 0.000 0.000   13.03 0.000 0.000 0.000   14.37 -0.326 -0.467 -1.054   15.70 -0.627 -0.935 -2.187   17.04 -0.776 -1.402 -3.317   18.38 -0.737 -1.870 -4.365   19.71 -0.593 -2.337 -5.290   21.05 -0.492 -2.805 -6.112   22.38 -0.556 -3.272 -6.898   23.72 -0.807 -3.740 -7.733   25.05 -1.153 -4.207 -8.679   26.39 -1.445 -4.675 -9.741   60.00 -1.363 -4.675 -9.786
+turn  petal4 about 4.504  4.595  7.089 axis 0.820  0.570  0.053   0.00 0.0   13.03 0.0   26.39 -339.4
+move  petal5  0.00 0.000 0.000 0.000   15.16 0.000 0.000 0.000   17.01 -0.357 -0.649 -0.050   18.87 -0.552 -1.298 0.016   20.72 -0.575 -1.947 0.192   22.58 -0.532 -2.596 0.417   24.43 -0.570 -3.245 0.606   26.29 -0.795 -3.894 0.690   28.14 -1.199 -4.543 0.651   30.00 -1.668 -5.193 0.531   31.85 -2.053 -5.842 0.410   33.70 -2.266 -6.491 0.368   60.00 -1.975 -6.491 0.292
+turn  petal5 about 6.741  6.480  -10.765 axis 0.040  0.446  0.894   0.00 0.0   15.16 0.0   33.70 524.1
+move  petal6  0.00 0.000 0.000 0.000   17.71 0.000 0.000 0.000   18.78 0.662 -0.377 0.553   19.86 1.476 -0.753 1.088   20.94 2.322 -1.130 1.529   22.01 3.053 -1.507 1.847   23.09 3.590 -1.884 2.074   24.17 3.968 -2.260 2.283   25.24 4.318 -2.637 2.558   26.32 4.785 -3.014 2.952   27.40 5.436 -3.391 3.456   28.47 6.221 -3.767 4.010   60.00 6.419 -3.767 3.744
+turn  petal6 about -2.500  3.687  -12.037 axis 0.746  0.641  -0.178   0.00 0.0   17.71 0.0   28.47 -454.3
+move  petal7  0.00 0.000 0.000 0.000   19.09 0.000 0.000 0.000   20.69 1.518 -0.558 -0.059   22.28 3.038 -1.117 -0.218   23.88 4.421 -1.675 -0.409   25.47 5.613 -2.234 -0.547   27.07 6.678 -2.792 -0.572   28.67 7.757 -3.351 -0.478   30.26 8.985 -3.909 -0.317   31.86 10.404 -4.468 -0.172   33.45 11.939 -5.026 -0.119   35.05 13.446 -5.585 -0.186   60.00 13.156 -5.585 0.003
+turn  petal7 about -13.774  5.505  -7.799 axis 0.657  -0.707  0.261   0.00 0.0   19.09 0.0   35.05 321.8
+move  petal8  0.00 0.000 0.000 0.000   21.56 0.000 0.000 0.000   22.64 0.346 -0.377 0.034   23.71 0.541 -0.754 0.171   24.79 0.557 -1.131 0.428   25.87 0.481 -1.508 0.763   26.94 0.462 -1.885 1.097   28.02 0.617 -2.262 1.348   29.10 0.960 -2.639 1.477   30.18 1.394 -3.016 1.502   31.25 1.769 -3.393 1.493   32.33 1.979 -3.770 1.533   60.00 2.204 -3.770 1.546
+turn  petal8 about 1.589  3.769  12.008 axis 0.163  -0.240  0.957   0.00 0.0   21.56 0.0   32.33 -321.6
+move  petal9  0.00 0.000 0.000 0.000   22.63 0.000 0.000 0.000   24.66 0.919 -0.710 -0.365   26.68 1.675 -1.419 -0.716   28.71 2.373 -2.129 -1.134   30.74 3.163 -2.839 -1.670   32.77 4.142 -3.548 -2.319   34.79 5.294 -4.258 -3.017   36.82 6.502 -4.968 -3.682   38.85 7.615 -5.678 -4.243   40.88 8.550 -6.387 -4.684   42.90 9.334 -7.097 -5.045   60.00 9.184 -7.097 -5.111
+turn  petal9 about -5.569  7.017  1.660 axis 0.346  0.935  0.084   0.00 0.0   22.63 0.0   42.90 515.1
+move  petal10  0.00 0.000 0.000 0.000   23.44 0.000 0.000 0.000   25.04 1.010 -0.561 -0.301   26.65 1.995 -1.123 -0.716   28.25 3.096 -1.684 -1.195   29.85 4.388 -2.245 -1.654   31.46 5.828 -2.806 -2.018   33.06 7.281 -3.368 -2.258   34.66 8.605 -3.929 -2.405   36.27 9.738 -4.490 -2.533   37.87 10.736 -5.052 -2.727   39.48 11.736 -5.613 -3.037   60.00 11.525 -5.613 -3.092
+turn  petal10 about -9.758  5.533  -3.175 axis -0.830  -0.558  -0.005   0.00 0.0   23.44 0.0   39.48 -646.2
+move  petal11  0.00 0.000 0.000 0.000   25.14 0.000 0.000 0.000   26.80 -0.240 -0.580 0.073   28.46 -0.344 -1.161 0.227   30.12 -0.264 -1.741 0.501   31.78 -0.069 -2.321 0.878   33.43 0.096 -2.902 1.287   35.09 0.102 -3.482 1.643   36.75 -0.087 -4.062 1.887   38.41 -0.389 -4.643 2.012   40.07 -0.657 -5.223 2.072   41.72 -0.772 -5.803 2.149   60.00 -0.653 -5.803 1.903
+turn  petal11 about -2.449  5.823  7.105 axis -0.793  -0.420  0.441   0.00 0.0   25.14 0.0   41.72 548.1
+move  petal12  0.00 0.000 0.000 0.000   27.07 0.000 0.000 0.000   28.23 1.222 -0.406 -1.204   29.39 2.617 -0.812 -2.359   30.55 4.094 -1.218 -3.552   31.71 5.504 -1.624 -4.850   32.87 6.734 -2.030 -6.269   34.03 7.779 -2.436 -7.769   35.19 8.743 -2.841 -9.269   36.35 9.776 -3.247 -10.688   37.51 10.980 -3.653 -11.988   38.67 12.347 -4.059 -13.185   60.00 12.583 -4.059 -13.233
+turn  petal12 about -11.150  3.979  5.084 axis -0.091  0.618  -0.781   0.00 0.0   27.07 0.0   38.67 -504.8
+move  petal13  0.00 0.000 0.000 0.000   30.02 0.000 0.000 0.000   31.35 -0.316 -0.463 -1.246   32.67 -0.580 -0.927 -2.613   34.00 -0.940 -1.390 -4.070   35.32 -1.488 -1.854 -5.541   36.64 -2.200 -2.317 -6.943   37.97 -2.953 -2.781 -8.226   39.29 -3.599 -3.244 -9.396   40.62 -4.057 -3.708 -10.515   41.94 -4.363 -4.171 -11.668   43.26 -4.647 -4.634 -12.923   60.00 -4.935 -4.634 -12.967
+turn  petal13 about 5.255  4.554  7.840 axis -0.233  -0.440  -0.867   0.00 0.0   30.02 0.0   43.26 686.3
+move  petal14  0.00 0.000 0.000 0.000   32.59 0.000 0.000 0.000   34.36 0.155 -0.618 -0.220   36.12 0.193 -1.235 -0.389   37.89 0.045 -1.853 -0.445   39.65 -0.238 -2.471 -0.384   41.41 -0.519 -3.088 -0.259   43.18 -0.659 -3.706 -0.153   44.94 -0.602 -4.323 -0.140   46.71 -0.412 -4.941 -0.251   48.47 -0.229 -5.559 -0.453   50.24 -0.184 -6.176 -0.672   60.00 0.098 -6.176 -0.568
+turn  petal14 about 7.275  6.207  -10.828 axis 0.043  -0.120  0.992   0.00 0.0   32.59 0.0   50.24 -351.5
+move  petal15  0.00 0.000 0.000 0.000   34.10 0.000 0.000 0.000   35.13 0.455 -0.361 0.570   36.16 0.731 -0.722 1.217   37.20 0.904 -1.083 1.861   38.23 1.117 -1.444 2.422   39.26 1.497 -1.805 2.860   40.29 2.070 -2.166 3.195   41.32 2.749 -2.527 3.495   42.35 3.385 -2.888 3.847   43.39 3.861 -3.249 4.309   44.42 4.165 -3.610 4.886   60.00 4.045 -3.610 4.916
+turn  petal15 about -2.033  3.530  -11.361 axis 0.138  -0.362  0.922   0.00 0.0   34.10 0.0   44.42 406.9
+move  petal16  0.00 0.000 0.000 0.000   33.85 0.000 0.000 0.000   35.45 1.321 -0.560 0.031   37.05 2.567 -1.120 -0.055   38.65 3.885 -1.680 -0.250   40.25 5.383 -2.240 -0.492   41.85 7.059 -2.800 -0.697   43.45 8.803 -3.360 -0.797   45.05 10.464 -3.920 -0.775   46.65 11.945 -4.480 -0.672   48.25 13.261 -5.040 -0.570   49.85 14.529 -5.600 -0.546   60.00 14.348 -5.600 -0.825
+turn  petal16 about -13.722  5.520  -7.444 axis 0.539  0.173  0.824   0.00 0.0   33.85 0.0   49.85 -394.8
+move  petal17  0.00 0.000 0.000 0.000   37.59 0.000 0.000 0.000   38.73 0.049 -0.396 -0.080   39.86 0.194 -0.792 -0.141   40.99 0.522 -1.188 -0.107   42.12 1.004 -1.584 0.049   43.25 1.511 -1.980 0.297   44.38 1.898 -2.376 0.560   45.52 2.090 -2.772 0.757   46.65 2.131 -3.168 0.835   47.78 2.153 -3.564 0.803   48.91 2.295 -3.960 0.721   60.00 2.519 -3.960 0.852
+turn  petal17 about 1.890  3.963  12.542 axis 0.928  -0.006  0.373   0.00 0.0   37.59 0.0   48.91 692.8
+move  petal18  0.00 0.000 0.000 0.000   37.87 0.000 0.000 0.000   39.86 0.462 -0.698 -0.555   41.86 1.105 -1.396 -1.010   43.85 1.872 -2.094 -1.435   45.85 2.625 -2.792 -1.913   47.84 3.228 -3.490 -2.506   49.83 3.633 -4.188 -3.217   51.83 3.911 -4.887 -3.994   53.82 4.205 -5.585 -4.753   55.82 4.643 -6.283 -5.420   57.81 5.260 -6.981 -5.967   60.00 5.132 -6.981 -6.080
+turn  petal18 about -5.473  6.901  2.186 axis 0.642  0.618  -0.453   0.00 0.0   37.87 0.0   57.81 -363.1
+move  petal19  0.00 0.000 0.000 0.000   40.36 0.000 0.000 0.000   41.91 1.248 -0.543 -0.154   43.46 2.594 -1.086 -0.412   45.01 3.892 -1.630 -0.789   46.57 5.022 -2.173 -1.244   48.12 5.964 -2.716 -1.696   49.67 6.812 -3.259 -2.065   51.22 7.717 -3.802 -2.312   52.77 8.791 -4.345 -2.456   54.33 10.040 -4.889 -2.565   55.88 11.362 -5.432 -2.725   60.00 11.590 -5.432 -2.593
+turn  petal19 about -9.649  5.352  -3.225 axis -0.365  0.894  0.258   0.00 0.0   40.36 0.0   55.88 476.3
+move  petal20  0.00 0.000 0.000 0.000   43.58 0.000 0.000 0.000   45.34 0.168 -0.617 -0.368   47.11 0.262 -1.234 -0.750   48.87 0.180 -1.852 -1.064   50.63 -0.071 -2.469 -1.258   52.40 -0.374 -3.086 -1.342   54.16 -0.582 -3.703 -1.375   55.92 -0.600 -4.320 -1.445   57.69 -0.451 -4.938 -1.618   59.45 -0.258 -5.555 -1.911
+turn  petal20 about -2.823  6.187  6.441 axis 0.304  0.766  0.566   0.00 0.0   43.58 0.0   60.00 -334.5
+move  petal21  0.00 0.000 0.000 0.000   45.31 0.000 0.000 0.000   46.52 1.225 -0.422 -0.941   47.73 2.272 -0.845 -1.767   48.93 3.176 -1.267 -2.530   50.14 4.067 -1.690 -3.315   51.35 5.089 -2.112 -4.196   52.55 6.309 -2.534 -5.200   53.76 7.676 -2.957 -6.297   54.97 9.054 -3.379 -7.411   56.18 10.305 -3.801 -8.459   57.38 11.376 -4.224 -9.391   60.00 11.261 -4.224 -9.113
+turn  petal21 about -10.199  4.144  5.346 axis -0.203  -0.974  -0.100   0.00 0.0   45.31 0.0   57.38 649.1
+
+title  "The Glass Garden"  at 1.2  for 5.5
+credits
+credit  "A dream made with light: coloured glass, dispersion, mist, and a garden that lights itself"
+
+# the shots: slow, gliding cameras (key: from, at, fov [lens radius, focus distance])
+shot 0 The hollow at sunset
+  key  16 9.5 15    -6 3.2 0.5    46
+  key  9.5 2.8 7.5   -6 3.6 0.8    42
+  fade 2.0
+shot 9 Among the stems
+  key  7.5 0.55 6.4    -6 1.6 1.2    40  0.025 9
+  key  2.6 0.45 4.4    -8 2.4 0.2    40  0.025 8
+shot 18 The great rose
+  key  -1.6 5.0 4.6    -6 6.1 1.5    44  0.02 5.5
+  key  -2.6 7.3 -1.9   -6 6.3 1.5    44  0.02 5
+shot 27 The still pond
+  key  7.0 0.32 -1.6   -4 1.6 -6.5    42
+  key  5.6 0.28 -6.8   -6 2.2 -3.2    42
+shot 36 The garden wakes
+  key  10 2.3 5.2      -5 2.6 -1     46
+  key  6.2 2.0 3.6     -5.5 2.8 -1.5   46
+shot 47 Lights on the water
+  key  7.2 0.55 -9.0   -5 2.4 0     42
+  key  6.0 0.45 -9.6   -6 2.6 0.5   42
+shot 54 The night garden
+  key  8 3 8          -4 2 -1        48
+  key  25 15 23       -4 1.2 -2      52
