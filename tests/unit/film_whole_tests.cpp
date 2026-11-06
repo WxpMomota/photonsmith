@@ -95,6 +95,106 @@ TEST(SideBySideRender, TheLauncherRendersTwoHalvesAndJoinsThem) {
 	EXPECT_NE(slurpFile(d / "log.txt").find("Side by side"), std::string::npos) << "the run says so";
 }
 
+// The other two techniques a side-by-side picture can turn down in its left half (src/shared/side_by_side.h): `samples N` (N rays a pixel, not denoised) and `pinhole` (no
+// lens). A checkered wall under an even sky, through a wide lens focused far in front of it: with `samples 1` the left half is grainier than the right (64 samples), pixel
+// to pixel; with `pinhole` the left half's checks are sharp and the right's blurred by the lens. On the CPU, small: the Fast tier and CI run it.
+TEST(SideBySideRender, TheLeftHalfCanHaveFewerSamplesOrNoLens) {
+	const std::string launcher = findRayTracerLauncher();
+	if (launcher.empty()) GTEST_SKIP() << "ray_tracer was not found";
+	const std::filesystem::path d = scratch("sidebyside_kinds");
+	const auto scene = [&](const std::string &name, const std::string &line) {
+		std::ofstream f(d / (name + ".pbrt"));
+		f << line << "\nLookAt 0 1 3  0 1 -1  0 1 0\nCamera \"perspective\" \"float fov\" [ 50 ] \"float lensradius\" [ 0.25 ] \"float focaldistance\" [ 0.8 ]\n"
+			 "Film \"rgb\" \"integer xresolution\" [ 96 ] \"integer yresolution\" [ 48 ]\nSampler \"halton\" \"integer pixelsamples\" [ 64 ]\nWorldBegin\n"
+			 "LightSource \"infinite\" \"rgb L\" [ 1 1 1 ]\n"
+			 "AttributeBegin\n  AreaLightSource \"diffuse\" \"rgb L\" [ 8 8 8 ]\n"
+			 "  Shape \"trianglemesh\" \"integer indices\" [ 0 1 2  0 2 3 ] \"point3 P\" [ 1.4 0.2 1.2  1.4 0.2 1.6  1.4 0.6 1.6  1.4 0.6 1.2 ]\nAttributeEnd\n"
+			 "Texture \"checks\" \"spectrum\" \"checkerboard\" \"float uscale\" [ 12 ] \"float vscale\" [ 6 ] \"rgb tex1\" [ 0.9 0.9 0.9 ] \"rgb tex2\" [ 0.05 0.05 0.05 ]\n"
+			 "Material \"diffuse\" \"texture reflectance\" \"checks\"\n"
+			 "Shape \"trianglemesh\" \"integer indices\" [ 0 1 2  0 2 3 ] \"point3 P\" [ -4 -1 -1  4 -1 -1  4 3 -1  -4 3 -1 ] \"point2 uv\" [ 0 0  1 0  1 1  0 1 ]\n";
+	};
+	// how much each half changes from one pixel to the next (grain and sharp edges both), away from the line between them
+	const auto busyness = [&](const std::string &name, double &left, double &right) {
+		const std::filesystem::path out = d / (name + ".png");
+		const int rc = runLauncher(launcher, "--cpu --seed 2 --height 48 --output \"" + out.string() + "\" 96 64 4 \"" + (d / (name + ".pbrt")).string() + "\"", d / (name + ".log"));
+		if (rc != 0) return false;
+		int w = 0, h = 0, n = 0;
+		unsigned char *px = stbi_load(out.string().c_str(), &w, &h, &n, 3);
+		if (!px || w != 96 || h != 48) return false;
+		const auto half = [&](int x0, int x1) {
+			double sum = 0.0;
+			for (int y = 0; y < h - 1; ++y)
+				for (int x = x0; x < x1 - 1; ++x)
+					for (int c = 0; c < 3; ++c)
+						sum += std::abs(px[(y * w + x + 1) * 3 + c] - px[(y * w + x) * 3 + c]) + std::abs(px[((y + 1) * w + x) * 3 + c] - px[(y * w + x) * 3 + c]);
+			return sum / ((x1 - x0 - 1) * (h - 1) * 3.0);
+		};
+		left = half(0, w / 2 - 2), right = half(w / 2 + 2, w);
+		stbi_image_free(px);
+		return true;
+	};
+	scene("grain", "# @rt-sidebyside samples 1");
+	scene("lens", "# @rt-sidebyside pinhole");
+	double left = 0.0, right = 0.0;
+	ASSERT_TRUE(busyness("grain", left, right)) << slurpFile(d / "grain.log");
+	EXPECT_GT(left, right * 1.5) << "one sample a pixel is grainier than 64: " << left << " vs " << right;
+	EXPECT_NE(slurpFile(d / "grain.log").find("1 sample(s) a pixel, not denoised"), std::string::npos) << slurpFile(d / "grain.log");
+	ASSERT_TRUE(busyness("lens", left, right)) << slurpFile(d / "lens.log");
+	EXPECT_GT(left, right * 1.5) << "through a pinhole the checks are sharp, through the lens blurred: " << left << " vs " << right;
+	EXPECT_NE(slurpFile(d / "lens.log").find("through a pinhole"), std::string::npos) << slurpFile(d / "lens.log");
+}
+
+// A moving triangle mesh beside instanced geometry and a disk (pbrt_scenes/moving-mesh-beside-instances.pbrt), through the launcher on both GPU renderers. With a
+// moving mesh the GPU's triangle GAS has two motion keys; the instance definitions' GASes and the disk/cylinder GAS used to be built with those same options, though
+// their build inputs carry one vertex or AABB buffer each, and every launch failed with an illegal memory access (GPU error 214): every frame of a film with a
+// moving `# @anim` block beside instanced flowers (The Glass Garden, 2026-11-05). They are built with no motion keys now (gpu/optix/optix_renderer_scene_helpers.h,
+// staticAccelOptions). Each renderer must finish, and its picture be the CPU's, the square's motion blur included, within noise. Skipped with no OptiX device.
+TEST(GpuMotionBesideInstances, BothGpuRenderersDrawAMovingMeshBesideInstancesAndADisk) {
+	const std::string launcher = findRayTracerLauncher();
+	if (launcher.empty()) GTEST_SKIP() << "ray_tracer was not found";
+	const std::filesystem::path scene = std::filesystem::absolute("pbrt_scenes/moving-mesh-beside-instances.pbrt");
+	if (!std::filesystem::exists(scene)) GTEST_SKIP() << "run from the repository root";
+	const std::filesystem::path d = scratch("gpu_motion_instances");
+	const auto render = [&](const std::string &name, const std::string &flags) {
+		return runLauncher(launcher, flags + " --seed 3 --output \"" + (d / (name + ".png")).string() + "\" 160 64 5 \"" + scene.string() + "\"", d / (name + ".log"));
+	};
+	const auto load = [&](const std::string &name, int &w, int &h) {
+		int n = 0;
+		unsigned char *px = stbi_load((d / (name + ".png")).string().c_str(), &w, &h, &n, 3);
+		std::vector<unsigned char> out;
+		if (px) out.assign(px, px + static_cast<std::size_t>(w) * h * 3), stbi_image_free(px);
+		return out;
+	};
+	ASSERT_EQ(render("cpu", "--cpu"), 0) << slurpFile(d / "cpu.log");
+	int w = 0, h = 0;
+	const std::vector<unsigned char> cpu = load("cpu", w, h);
+	ASSERT_FALSE(cpu.empty());
+	ASSERT_EQ(render("recursive", "--gpu"), 0) << "the recursive GPU renderer's launch failed\n" << slurpFile(d / "recursive.log");
+	if (slurpFile(d / "recursive.log").find("Calling optix_render_main") == std::string::npos) GTEST_SKIP() << "no OptiX device: the launcher rendered on the CPU";
+#ifdef _WIN32
+	const std::string wavefront = "--gpu";   // (with the variable set for the launcher's process below)
+	_putenv_s("RAY_TRACER_WAVEFRONT", "1");
+	const int wavefrontRc = render("wavefront", wavefront);
+	_putenv_s("RAY_TRACER_WAVEFRONT", "");
+#else
+	setenv("RAY_TRACER_WAVEFRONT", "1", 1);
+	const int wavefrontRc = render("wavefront", "--gpu");
+	unsetenv("RAY_TRACER_WAVEFRONT");
+#endif
+	ASSERT_EQ(wavefrontRc, 0) << "the wavefront GPU renderer's launch failed\n" << slurpFile(d / "wavefront.log");
+	for (const char *name : {"recursive", "wavefront"}) {
+		int gw = 0, gh = 0;
+		const std::vector<unsigned char> gpu = load(name, gw, gh);
+		ASSERT_EQ(gw, w) << name;
+		ASSERT_EQ(gh, h) << name;
+		double diff = 0.0;
+		for (std::size_t i = 0; i < gpu.size(); ++i) diff += std::abs(static_cast<int>(gpu[i]) - static_cast<int>(cpu[i]));
+		diff /= static_cast<double>(gpu.size());
+		EXPECT_LT(diff, 3.0) << name << ": the picture is not the CPU's (mean difference " << diff << " of 255)";
+	}
+	EXPECT_NE(slurpFile(d / "wavefront.log").find("WavefrontPathTracer"), std::string::npos) << "the wavefront run used the wavefront renderer";
+}
+
 // The films in test_parts.h's parts, so the Render tier's shards share them (one test of every film's baseline took 141 s of a shard, a quarter of the stills 126 s). The suite
 // is in the Render tier by its name (scripts/run_tests_parallel.ps1 $renderSuites). A part without a film passes at once.
 class FilmRenderTestParts : public ::testing::TestWithParam<int> {

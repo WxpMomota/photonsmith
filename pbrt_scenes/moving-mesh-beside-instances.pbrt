@@ -1,0 +1,53 @@
+# @rt-category Test Scenes
+# @rt-description A red square moving through the shutter (motion blur) beside two instanced green triangles and a disk. Checks a moving mesh among static GASes on the GPU.
+# @rt-performance Fast
+# @rt-size 6
+# moving-mesh-beside-instances.pbrt -- regression scene for a moving triangle mesh in a scene that also has instanced geometry and a disk.
+#
+# A mesh under ActiveTransform StartTime/EndTime makes the GPU's triangle GAS a two-key motion GAS. Until 2026-11-05 the instance definitions' GASes and the
+# disk/cylinder GAS were built with that GAS's own options, two motion keys included, though each of their build inputs carries one vertex or AABB buffer:
+# OptiX read a second buffer pointer past the end of the array, and the first launch failed with an illegal memory access (CUDA 700, GPU error 214) on both GPU
+# renderers. Film files hit it with any moving `# @anim` block beside instanced geometry (The Glass Garden's drifting petals among its little flowers). Those
+# GASes are built with no motion keys now (gpu/optix/optix_renderer_scene_helpers.h, staticAccelOptions). The square is blurred along x; the triangles and
+# the disk are sharp.
+#
+# Original, not derived from any distributed scene, so it carries no licence constraints.
+LookAt 0 2.4 6   0 0.8 0   0 1 0
+Camera "perspective" "float fov" [ 40 ]
+Film "rgb" "integer xresolution" [ 320 ] "integer yresolution" [ 240 ] "string filename" [ "moving-mesh-beside-instances.png" ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+Integrator "volpath" "integer maxdepth" [ 5 ]
+WorldBegin
+LightSource "distant" "point3 from" [ 1 2 1 ] "point3 to" [ 0 0 0 ] "rgb L" [ 3 3 3 ]
+LightSource "infinite" "rgb L" [ 0.3 0.35 0.4 ]
+AttributeBegin
+  Material "diffuse" "rgb reflectance" [ 0.5 0.5 0.5 ]
+  Shape "trianglemesh" "point3 P" [ -5 0 -5  5 0 -5  5 0 5  -5 0 5 ] "integer indices" [ 0 1 2  0 2 3 ]
+AttributeEnd
+AttributeBegin
+  ActiveTransform "StartTime"
+  Translate 0 0 0
+  ActiveTransform "EndTime"
+  Translate 0.4 0 0
+  ActiveTransform "All"
+  Material "diffuse" "rgb reflectance" [ 0.8 0.2 0.2 ]
+  Shape "trianglemesh" "point3 P" [ -0.5 0.5 0  0.5 0.5 0  0.5 1.5 0  -0.5 1.5 0 ] "integer indices" [ 0 1 2  0 2 3 ]
+AttributeEnd
+ObjectBegin "thing"
+  Material "diffuse" "rgb reflectance" [ 0.2 0.6 0.2 ]
+  Shape "trianglemesh" "point3 P" [ -0.3 0 0  0.3 0 0  0 0.6 0 ] "integer indices" [ 0 1 2 ]
+ObjectEnd
+AttributeBegin
+  Translate -1.6 0 1
+  ObjectInstance "thing"
+AttributeEnd
+AttributeBegin
+  Translate 1.6 0 1
+  ObjectInstance "thing"
+AttributeEnd
+AttributeBegin
+  Material "diffuse" "rgb reflectance" [ 0.2 0.3 0.8 ]
+  Translate 0 0.01 2
+  Rotate -90 1 0 0
+  Shape "disk" "float radius" [ 0.4 ]
+AttributeEnd

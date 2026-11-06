@@ -540,6 +540,8 @@ scripts/anim/__pycache__/
 !scripts/anim/*.py
 # the generators of the teaching films' sets (scripts/lessons/sun_hall.py writes film_assets/how-light-bounces)
 !scripts/lessons/*.py
+# the generators of the two dream showcase films' sets, films and scores (scripts/dreams/glass_garden.py, sky_islands.py)
+!scripts/dreams/*.py
 
 # The environment thumbnails the GUI shows (30 small pictures, 1.2 MB): tracked, unlike every other picture
 !environments/thumbnails/*.png

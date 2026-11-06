@@ -70,8 +70,22 @@ forest-dawn|2|a6e6d787cddf407f|Against the rising sun
 forest-dawn|3|b3881cd2ffaf4400|Dew on the grass
 forest-dawn|4|6e4b3260926b7742|Leaves in the beams
 forest-dawn|5|a9c3642115c78d3c|Crane up as the mist thins
+how-a-lens-focuses|1|a06e347ddb3ecfa2|Title
+how-a-lens-focuses|2|d23e7fd789e96e21|Across the board
+how-a-lens-focuses|3|5d5046aeb8d60edd|Round the board
+how-a-lens-focuses|4|a4b2d1f8b6b5fb56|The terrace at dusk
 how-light-bounces|1|b83efae2ad01828a|Title
 how-light-bounces|2|3cc9b3189b7b3dce|The Sun Hall
+how-rays-add-up|1|1bb12954e3d263cd|Title
+how-rays-add-up|2|273277e4c93262a1|The study at night
+how-rays-add-up|3|3a7b48f390e952d9|The desk
+how-rays-add-up|4|1d7b52b1a96aca08|Moonlight
+islands-in-the-sky|1|e0b13b39b570d653|Before dawn
+islands-in-the-sky|2|e6eb4dd3dc5f4834|The sea of clouds
+islands-in-the-sky|3|4d653de4cb325716|Sunrise
+islands-in-the-sky|4|da99d0a0a1d8cefa|The falls
+islands-in-the-sky|5|15056cba64f42434|Lanterns
+islands-in-the-sky|6|c608dc92e46b3c77|The world above the clouds
 lamp-and-ball|1|cb3aa4cd9b44fb6c|The desk
 little-robot|1|381397381a8bad30|Wide establishing
 little-robot|2|89564f3949c008a1|Medium on the waking robot
@@ -197,6 +211,13 @@ tengwang|56|1940601775feb7af|The stars over the river
 tengwang|57|61394eb350570369|The manuscript
 tengwang|58|ce808850ed728313|Dawn
 tengwang|59|d5560262f6b0c819|The title
+the-glass-garden|1|6abcc05a94a31936|The hollow at sunset
+the-glass-garden|2|4eff75f4f2dc110b|Among the stems
+the-glass-garden|3|b476d9d3f171c97d|The great rose
+the-glass-garden|4|6b21286235d8459b|The still pond
+the-glass-garden|5|80cd94e3f615cd43|The garden wakes
+the-glass-garden|6|efb1a2e4c5647d27|Lights on the water
+the-glass-garden|7|7940e624ab29cd14|The night garden
 the-great-blue|1|be2e15612bbff5c1|The descent
 the-great-blue|2|2697f79588716e70|The reef
 the-great-blue|3|7ac0995ea716e5d0|Mantas

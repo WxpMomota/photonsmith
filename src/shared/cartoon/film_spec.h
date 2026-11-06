@@ -22,6 +22,7 @@
 
 #include "../camera_keyframes.h"
 #include "../toon_look.h"
+#include "../side_by_side.h"
 #include "film_dressing.h"
 #include "film_faces.h"
 #include "film_flow.h"
@@ -663,8 +664,13 @@ struct Spec {
 	std::vector<dressing::Ambience> ambience;
 	bool muteBirds = false;   // (`mute birds`: no birdsong, no eagles' cries, no geese - whatever flies in the picture)
 	bool musicOnly = false;   // (`mute sounds`: the film's soundtrack is its music alone - no ambience, nature, events, weather, rooms or voices)
-	int sideBySideDepth = -1;   // (`sidebyside depth N`: every frame two renders side by side, the left at ray depth N - src/shared/side_by_side.h; -1: one picture)
-	double sideBySideFrom = 0.0;   // (`... from T`: one picture before T - a title card over black - and two halves from T on)
+	// (`sidebyside depth N | samples N | pinhole [from T]`: every frame from T on two renders side by side, the left with one technique turned down - src/shared/side_by_side.h.
+	// Several lines, in order of their T: the left half changes at each - a film of samples a pixel can show 1, then 4, then 16. Before the first T one picture (a title card.)
+	struct SideBySideStep {
+		double from = 0.0;
+		side_by_side::Left left;
+	};
+	std::vector<SideBySideStep> sideBySide;
 	std::string genre;   // (`genre story|nature|space|showcase|teaching`: its sub-tab under Cartoons - cartoon::genreOf; empty: from its tags)
 	bool draftMusic = true;   // (`music none`: no drafted score when there is no cues file)
 	bool clearMusic = false;  // (`music clear`: the score is not muffled while the camera is under the water - the voices and the sea's sounds still are)

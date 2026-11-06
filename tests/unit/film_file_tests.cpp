@@ -414,6 +414,44 @@ TEST(FilmFile, SideBySideAsksEveryFrameForTwoHalves) {
 	EXPECT_EQ(side_by_side::depthOf("WorldBegin\n# @rt-sidebyside depth 1\n"), -1) << "only in the header";
 }
 
+// `sidebyside samples N` and `sidebyside pinhole`: the left half with few rays a pixel, or with no lens. Several lines change the left half at their times - a lesson in
+// samples shows 1, then 4, then 16 - each later than the one before; before the first, one picture.
+TEST(FilmFile, SideBySideCanTurnDownSamplesOrTheLensAndChangeOverTime) {
+	const std::filesystem::path d = tempDir("sidebysidesteps");
+	write(d / "s.pbrt", kScene);
+	const std::string shots = "scene s.pbrt\nlength 12\nshot 0 A\n key 0 1 6  0 0 0\nshot 3 B\n key 2 1 6  0 0 0\n";
+	write(d / "noise.film", shots + "sidebyside samples 1 from 2\nsidebyside samples 4 from 5\nsidebyside samples 16 from 8\n");
+	write(d / "lens.film", shots + "sidebyside pinhole from 1\n");
+	cartoon::detail::Registry r;
+	for (const char *file : {"noise.film", "lens.film"}) cartoon::detail::addFilmFile(r, (d / file).string());
+	ASSERT_EQ(r.all.size(), 2u) << (r.problems.empty() ? std::string() : r.problems[0]);
+	for (const cartoon::Film *f : r.all) {
+		const bool noise = std::string(f->key) == "noise";
+		for (const double t : {0.5, 3.0, 6.0, 9.0}) {
+			const side_by_side::Left left = side_by_side::leftOf(f->sceneAt(t));
+			if (noise) {
+				const int want = t < 2.0 ? -1 : t < 5.0 ? 1 : t < 8.0 ? 4 : 16;
+				EXPECT_EQ(left.samples, want) << "noise at " << t;
+				EXPECT_EQ(left.depth, -1);
+				EXPECT_FALSE(left.pinhole);
+			} else {
+				EXPECT_EQ(left.pinhole, t >= 1.0) << "lens at " << t;
+				EXPECT_EQ(left.samples, -1);
+			}
+		}
+	}
+	side_by_side::Left samples;
+	samples.samples = 4;
+	EXPECT_EQ(side_by_side::leftOf(side_by_side::line(samples)), samples) << "a line is read back as written";
+	EXPECT_TRUE(side_by_side::leftOf("# @rt-sidebyside pinhole\nWorldBegin\n").pinhole);
+	for (const char *bad : {"sidebyside samples 0\n", "sidebyside samples 5000\n", "sidebyside samples\n", "sidebyside pinhole 2\n", "sidebyside lens\n",
+							"sidebyside samples 1 from 4\nsidebyside samples 4 from 4\n", "sidebyside samples 1 from 4\nsidebyside samples 4 from 2\n"}) {
+		const cartoon::film_file::Parsed p = cartoon::film_file::parse(shots + bad, "bad.film");
+		EXPECT_FALSE(p.ok) << bad;
+		EXPECT_NE(p.error.find("samples N | pinhole"), std::string::npos) << p.error;
+	}
+}
+
 // A film's genre is its sub-tab under Cartoons (its still's `# @rt-subcategory` line): a film of your own is under My Films, a `genre` line says the rest, and without one
 // the tags decide - teaching, then space, then nature, then a story (a character or a cartoon), else a showcase. Every built-in film has one of the six.
 TEST(FilmFile, AFilmsGenreIsItsSubTabUnderCartoons) {
@@ -452,7 +490,8 @@ TEST(FilmFile, EveryBundledFilmIsInItsSubTab) {
 		{"tengwang", "Stories"}, {"a-busy-evening", "Stories"}, {"a-day-at-home", "Stories"}, {"a-walk-at-dusk", "Stories"}, {"cosmic-voyage", "Space"},
 		{"down-to-the-sea", "Stories"}, {"fire-and-ice", "Nature"}, {"how-light-bounces", "Teaching"}, {"nova-and-robo", "Space"}, {"pip-goes-out", "Stories"},
 		{"powers-of-ten", "Space"}, {"seasons-wood", "Nature"}, {"swell-breaks", "Nature"}, {"the-great-blue", "Nature"}, {"the-lantern-below", "Stories"},
-		{"the-midnight-garden", "Nature"}, {"thunder-plains", "Nature"}, {"valley-of-mists", "Nature"}, {"worlds-beyond", "Space"}};
+		{"the-midnight-garden", "Nature"}, {"thunder-plains", "Nature"}, {"valley-of-mists", "Nature"}, {"worlds-beyond", "Space"},
+		{"the-glass-garden", "Showcases"}, {"islands-in-the-sky", "Showcases"}, {"how-a-lens-focuses", "Teaching"}, {"how-rays-add-up", "Teaching"}};
 	int seen = 0;
 	for (const cartoon::Film *f : cartoon::films()) {
 		const std::string key = f->key;

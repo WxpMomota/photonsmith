@@ -1,0 +1,16 @@
+# How a Lens Focuses: the title card at the start (Chinese above, English below), then a label over each half of the side-by-side picture (caption_file.h).
+style zhtitle  font=msyhbd.ttc size=0.074 colour=1,1,1
+style entitle  font=segoeuib.ttf size=0.044 colour=0.93,0.93,0.93
+style zh       font=msyh.ttc size=0.036 colour=0.97,0.97,0.97
+style en       font=segoeui.ttf size=0.027 colour=0.82,0.82,0.82
+style zhlabel  font=msyhbd.ttc size=0.034 colour=1,1,1
+style enlabel  font=segoeui.ttf size=0.024 colour=0.92,0.92,0.92
+
+# the title card over black, a line at a time
+caption 0.6 6.4 fade=0.8 centre=0.30 width=0.8 gap=0.30 | zhtitle: 景深 | entitle: Depth of Field
+caption 2.0 6.4 fade=0.8 centre=0.53 width=0.8 gap=0.40 | zh: 真实的镜头从整个镜孔收集光线：只有一个距离是清晰的，更近和更远的东西都会变模糊。 | en: A real lens gathers light through its whole opening: only one distance is sharp, and nearer and farther things blur.
+caption 3.4 6.4 fade=0.8 centre=0.70 width=0.8 gap=0.40 | zh: 左：针孔相机　　　右：真实的镜头 | en: Left: a pinhole camera          Right: a real lens
+
+# a label over each half, from the fade onto the terrace to the end
+caption 7.4 38 fade=1.0 centre=0.075 across=0.25 width=0.46 gap=0.25 | zhlabel: 针孔：处处清晰 | enlabel: Pinhole: everything sharp
+caption 7.4 38 fade=1.0 centre=0.075 across=0.75 width=0.46 gap=0.25 | zhlabel: 镜头：景深 | enlabel: Lens: depth of field

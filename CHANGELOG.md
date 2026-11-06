@@ -6,6 +6,41 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **Two more teaching films: How a Lens Focuses and How Rays Add Up (2026-11-05).** Both follow How Light Bounces. Each opens on a title card in Chinese and English,
+  then every frame shows the set twice side by side, with a label over each half. Both are under Cartoons > Teaching.
+  - *How a Lens Focuses* (depth of field): a game of chess by candlelight on a terrace at dusk, with strings of lights across the garden behind. The left half is a
+    pinhole, where everything is sharp. The right half is a lens whose focus is pulled from the near pieces to the far ones and out to the lights, which blur into
+    round discs. The set is written by `scripts/lessons/chess_terrace.py`.
+  - *How Rays Add Up* (Monte Carlo sampling): an attic study at night, lit by a desk lamp, an oil lamp and the moon through the window, so nearly all of it is lit
+    by bounced light. The left half has 1, then 4, 16, 64 and 256 rays a pixel with no denoiser; the right half is the video as rendered. The set is written by
+    `scripts/lessons/attic_study.py`.
+
+  To make them, `sidebyside` has two new modes besides `depth N`: `samples N` (N rays a pixel, not denoised, no adaptive sampling) and `pinhole` (a lens radius of 0).
+  Several `sidebyside` lines can change the left half over the film. A scene asks for these with `# @rt-sidebyside samples N` or `# @rt-sidebyside pinhole` in its
+  header. They are checked by `SideBySideRender.TheLeftHalfCanHaveFewerSamplesOrNoLens` and `FilmFile.SideBySideCanTurnDownSamplesOrTheLensAndChangeOverTime`.
+* **Two dream showcase films: The Glass Garden and Islands in the Sky (2026-11-05).** Both films are from files, under Cartoons > Showcases. Each set, film and
+  score is written by a generator in `scripts/dreams/`, so the films contain no C++. Each film is 60 s and takes about 13-15 s a frame at
+  1920 x 1080 and 300 samples on an RTX 5080. Both are the picture and the music alone: no title over the opening, no credits, and `mute sounds`
+  (no wind ambience).
+  - *The Glass Garden:* giant flowers of coloured glass round a still pond in a mossy hollow. The film runs from golden hour to night. The petals are tinted
+    glass (`rgb tf`) and the stems and crystals are dispersive flint glass. It has a thin mist and painted crepuscular rays, a carpet of 220 instanced little
+    glass flowers, and petals drifting onto the water. At night every blossom wakes with an orb of light, and fireflies and rising pollen fill the hollow.
+  - *Islands in the Sky:* floating islands over a cloud deck, from the blue hour with a setting moon through the sunrise. A waterfall pours off an island into
+    the clouds; it is a flipbook of six alpha sheets, one shown a frame in turn, so the water runs. Sixty paper lanterns rise from a ring of standing stones,
+    and geese and eagles fly between the islands.
+
+  Found on the way:
+  - The GPU loader keeps no medium inside a mesh, so the glass is tinted with `rgb tf` instead.
+  - A mist's sphere and a cloud deck's sphere must not cross.
+  - Moving blocks crashed the GPU; that is fixed below, and the films' petals and lanterns blur as they move.
+* **GPU: a moving mesh beside instanced geometry or a disk no longer crashes (2026-11-05).** When any triangle moves, the GPU's triangle GAS has two motion
+  keys. The instance definitions' GASes and the disk/cylinder GAS were built with those same build options, two keys included, though each of their build
+  inputs carries only one vertex or AABB buffer. OptiX read a second buffer pointer past the end of the array, so every launch failed with an illegal memory
+  access (CUDA 700, GPU error 214) on both GPU renderers. Film files hit it with any moving `# @anim` block beside instanced geometry, such as The Glass
+  Garden's drifting petals among its little flowers. Those GASes are now built with no motion keys (`staticAccelOptions`). The regression scene
+  `pbrt_scenes/moving-mesh-beside-instances.pbrt` is checked by `GpuMotionBesideInstances`: both GPU renderers finish and match the CPU's picture, motion blur
+  included, to 0.2 (recursive) and 0.9 (wavefront) of 255.
+
 * **The Nomai explorer's mask, robe and staff redrawn as our own (2026-11-04).** The `nomai-explorer` kind keeps the cues players remember (a big pale mask with
   three eye windows, warm metal, a ghostly blue light, a long sea-green robe and a staff), drawn afresh rather than after the game's suit:
   - The mask is a big squared ivory shield bent round the face, with round windows in bronze bezels. Tide rings and a blue inlay surround the third window, glowing

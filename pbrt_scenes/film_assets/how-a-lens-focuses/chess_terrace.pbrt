@@ -1,0 +1,712 @@
+# The Chess Terrace - an original set: chess at dusk by candlelight, strings of lights across the garden (written by chess_terrace.py; see its header).
+LookAt 0.05 0.86 0.48   0.0 0.80 -0.10   0 1 0
+Camera "perspective" "float fov" [ 38 ] "float lensradius" [ 0.012 ] "float focaldistance" [ 0.45 ]
+Film "rgb" "integer xresolution" [ 1920 ] "integer yresolution" [ 1080 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+WorldBegin
+# the dusk sky: a deep blue glow over everything (no sun: it has set)
+LightSource "infinite" "rgb L" [ 0.045 0.065 0.130 ]
+# a paper lantern hanging high over the table, out of every shot: the warm light the board is lit by
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 55.0 38.5 21.0 ]
+  Material "diffuse" "rgb reflectance" [ 0.8 0.75 0.65 ]
+  Translate -0.15 2.60 -0.02
+  Shape "sphere" "float radius" [ 0.20 ]
+AttributeEnd
+Texture "board" "spectrum" "imagemap" "string filename" [ "board.png" ]
+Texture "slabs" "spectrum" "imagemap" "string filename" [ "slabs.png" ]
+Texture "table_marble" "spectrum" "imagemap" "string filename" [ "table_marble.png" ]
+Texture "balustrade" "spectrum" "imagemap" "string filename" [ "balustrade.png" ]
+Texture "hedge" "spectrum" "imagemap" "string filename" [ "hedge.png" ]
+Texture "lawn" "spectrum" "imagemap" "string filename" [ "lawn.png" ]
+AttributeBegin
+Material "diffuse" "texture reflectance" "slabs"
+Shape "plymesh" "string filename" [ "meshes/m000.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "lawn"
+Shape "plymesh" "string filename" [ "meshes/m001.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "balustrade"
+Shape "plymesh" "string filename" [ "meshes/m002.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "balustrade"
+Shape "plymesh" "string filename" [ "meshes/m003.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "diffuse" "texture reflectance" "hedge"
+Shape "plymesh" "string filename" [ "meshes/m004.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.02 0.035 0.02 ]
+Shape "plymesh" "string filename" [ "meshes/m005.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "diffuse" "rgb reflectance" [ 0.06 0.045 0.035 ]
+Shape "plymesh" "string filename" [ "meshes/m006.ply" ]
+
+Shape "plymesh" "string filename" [ "meshes/m007.ply" ]
+
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 21.00 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -3.067 2.313 -3.029
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 23.40 14.40 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -2.733 2.244 -3.057
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 18.60 9.00 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -2.400 2.184 -3.086
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 22.20 16.50 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -2.067 2.131 -3.114
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 29.40 16.80 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -1.733 2.087 -3.143
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 21.00 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -1.400 2.051 -3.171
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 23.40 14.40 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -1.067 2.023 -3.200
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 18.60 9.00 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -0.733 2.004 -3.229
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 22.20 16.50 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -0.400 1.992 -3.257
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 29.40 16.80 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -0.067 1.989 -3.286
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 21.00 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 0.267 1.993 -3.314
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 23.40 14.40 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 0.600 2.006 -3.343
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 18.60 9.00 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 0.933 2.027 -3.371
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 22.20 16.50 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 1.267 2.057 -3.400
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 29.40 16.80 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 1.600 2.094 -3.429
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 21.00 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 1.933 2.140 -3.457
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 23.40 14.40 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 2.267 2.193 -3.486
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 18.60 9.00 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 2.600 2.255 -3.514
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 22.20 16.50 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 2.933 2.325 -3.543
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 29.40 16.80 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 3.267 2.404 -3.571
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 21.00 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -4.248 2.552 -5.624
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 23.40 14.40 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -3.896 2.470 -5.648
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 18.60 9.00 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -3.544 2.396 -5.672
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 22.20 16.50 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -3.192 2.328 -5.696
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 29.40 16.80 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -2.840 2.268 -5.720
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 21.00 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -2.488 2.215 -5.744
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 23.40 14.40 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -2.136 2.168 -5.768
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 18.60 9.00 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -1.784 2.129 -5.792
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 22.20 16.50 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -1.432 2.097 -5.816
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 29.40 16.80 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -1.080 2.072 -5.840
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 21.00 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -0.728 2.054 -5.864
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 23.40 14.40 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -0.376 2.043 -5.888
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 18.60 9.00 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -0.024 2.039 -5.912
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 22.20 16.50 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 0.328 2.042 -5.936
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 29.40 16.80 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 0.680 2.052 -5.960
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 21.00 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 1.032 2.069 -5.984
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 23.40 14.40 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 1.384 2.093 -6.008
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 18.60 9.00 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 1.736 2.124 -6.032
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 22.20 16.50 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 2.088 2.163 -6.056
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 29.40 16.80 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 2.440 2.208 -6.080
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 21.00 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 2.792 2.260 -6.104
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 23.40 14.40 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 3.144 2.320 -6.128
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 18.60 9.00 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 3.496 2.386 -6.152
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 22.20 16.50 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 3.848 2.460 -6.176
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 29.40 16.80 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -5.110 2.757 -8.821
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 21.00 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -4.721 2.680 -8.841
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 23.40 14.40 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -4.331 2.609 -8.862
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 18.60 9.00 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -3.941 2.545 -8.883
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 22.20 16.50 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -3.552 2.486 -8.903
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 29.40 16.80 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -3.162 2.434 -8.924
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 21.00 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -2.772 2.388 -8.945
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 23.40 14.40 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -2.383 2.348 -8.966
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 18.60 9.00 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -1.993 2.315 -8.986
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 22.20 16.50 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -1.603 2.287 -9.007
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 29.40 16.80 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -1.214 2.266 -9.028
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 21.00 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -0.824 2.251 -9.048
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 23.40 14.40 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -0.434 2.242 -9.069
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 18.60 9.00 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -0.045 2.239 -9.090
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 22.20 16.50 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 0.345 2.242 -9.110
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 29.40 16.80 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 0.734 2.252 -9.131
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 21.00 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 1.124 2.268 -9.152
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 23.40 14.40 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 1.514 2.290 -9.172
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 18.60 9.00 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 1.903 2.318 -9.193
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 22.20 16.50 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 2.293 2.352 -9.214
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 29.40 16.80 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 2.683 2.393 -9.234
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 21.00 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 3.072 2.440 -9.255
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 23.40 14.40 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 3.462 2.493 -9.276
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 18.60 9.00 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 3.852 2.552 -9.297
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 22.20 16.50 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 4.241 2.617 -9.317
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 29.40 16.80 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 4.631 2.689 -9.338
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 21.00 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 5.021 2.766 -9.359
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 23.40 14.40 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 5.410 2.850 -9.379
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 18.60 9.00 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -6.565 3.050 -12.516
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 22.20 16.50 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -6.129 2.965 -12.532
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 29.40 16.80 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -5.694 2.887 -12.548
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 21.00 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -5.258 2.816 -12.565
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 23.40 14.40 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -4.823 2.750 -12.581
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 18.60 9.00 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -4.387 2.691 -12.597
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 22.20 16.50 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -3.952 2.638 -12.613
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 29.40 16.80 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -3.516 2.591 -12.629
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 21.00 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -3.081 2.551 -12.645
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 23.40 14.40 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -2.645 2.517 -12.661
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 18.60 9.00 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -2.210 2.489 -12.677
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 22.20 16.50 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -1.774 2.467 -12.694
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 29.40 16.80 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -1.339 2.451 -12.710
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 21.00 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -0.903 2.442 -12.726
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 23.40 14.40 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -0.468 2.439 -12.742
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 18.60 9.00 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate -0.032 2.442 -12.758
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 22.20 16.50 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 0.403 2.452 -12.774
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 29.40 16.80 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 0.839 2.468 -12.790
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 21.00 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 1.274 2.490 -12.806
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 23.40 14.40 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 1.710 2.518 -12.823
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 18.60 9.00 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 2.145 2.552 -12.839
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 22.20 16.50 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 2.581 2.593 -12.855
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 29.40 16.80 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 3.016 2.640 -12.871
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 21.00 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 3.452 2.693 -12.887
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 23.40 14.40 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 3.887 2.752 -12.903
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 18.60 9.00 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 4.323 2.818 -12.919
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 22.20 16.50 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 4.758 2.890 -12.935
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 29.40 16.80 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 5.194 2.968 -12.952
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 21.00 10.80 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 5.629 3.052 -12.968
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 30.00 23.40 14.40 ] "bool sampled" false
+  Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+  Translate 6.065 3.143 -12.984
+  Shape "sphere" "float radius" [ 0.035 ]
+AttributeEnd
+AttributeBegin
+Material "coateddiffuse" "texture reflectance" "table_marble" "float roughness" [ 0.05 ]
+Shape "plymesh" "string filename" [ "meshes/m008.ply" ]
+
+Shape "plymesh" "string filename" [ "meshes/m009.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "coateddiffuse" "texture reflectance" "board" "float roughness" [ 0.12 ]
+Shape "plymesh" "string filename" [ "meshes/m010.ply" ]
+
+Material "coateddiffuse" "rgb reflectance" [ 0.22 0.12 0.06 ] "float roughness" [ 0.15 ]
+Shape "plymesh" "string filename" [ "meshes/m011.ply" ]
+
+AttributeEnd
+# the white pieces
+AttributeBegin
+Material "coateddiffuse" "rgb reflectance" [ 0.80 0.66 0.44 ] "float roughness" [ 0.10 ]
+Shape "plymesh" "string filename" [ "meshes/m012.ply" ]
+
+AttributeEnd
+# the black pieces
+AttributeBegin
+Material "coateddiffuse" "rgb reflectance" [ 0.035 0.025 0.02 ] "float roughness" [ 0.06 ]
+Shape "plymesh" "string filename" [ "meshes/m013.ply" ]
+
+AttributeEnd
+AttributeBegin
+Material "conductor" "rgb eta" [ 0.27 0.68 1.12 ] "rgb k" [ 3.61 2.62 2.29 ] "float roughness" [ 0.18 ]
+Shape "plymesh" "string filename" [ "meshes/m014.ply" ]
+
+Material "coateddiffuse" "rgb reflectance" [ 0.85 0.66 0.32 ] "float roughness" [ 0.3 ]
+Shape "plymesh" "string filename" [ "meshes/m015.ply" ]
+
+AttributeEnd
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 60 34 11 ]
+  Material "diffuse" "rgb reflectance" [ 0 0 0 ]
+  Translate -0.360 0.982 -0.200
+  Scale 1 2.1 1
+  Shape "sphere" "float radius" [ 0.0075 ]
+AttributeEnd
