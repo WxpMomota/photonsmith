@@ -192,7 +192,7 @@ inline ExplorerBody explorerBody(const ExplorerPose &p) {
 	const Mat4 turn = mul(rotate({0.0, 1.0, 0.0}, p.headYaw), rotate({1.0, 0.0, 0.0}, p.headPitch), rotate({0.0, 0.0, 1.0}, p.headTilt));
 	b.head = mul(translate(b.headPivot), turn, scale(p.headScale, p.headScale, p.headScale));
 	b.headInv = invertAffine(b.head);
-	b.hemY = 0.28 + 0.10 * p.sit - 0.08 * p.crouch;
+	b.hemY = 0.28 - 0.22 * p.sit - 0.08 * p.crouch;   // (sitting: the hem falls to the ground over the folded legs - lifted above the pelvis, the skirt was a wide dome)
 	return b;
 }
 // A foot lock for the explorer walking with its body at `frameAt(t)` and its walk `stepsAt(t)` steps in (stride and slope as walkPose and ExplorerPose have them), on the
@@ -358,8 +358,8 @@ inline Vec3 robeSway(const ExplorerPose &p, const ExplorerBody &b, double y) {
 inline double skirtSdf(Vec3 q, const ExplorerPose &p, const ExplorerBody &b, double inset) {
 	using namespace sdf;
 	const Vec3 s = q - robeSway(p, b, q.y);
-	const Vec3 hemCentre{0.0, b.hemY, 0.035 + 0.05 * p.sit};
-	double d = roundCone(s, b.pelvis + Vec3{0.0, 0.03, 0.0}, hemCentre, 0.185 - inset, 0.32 + 0.14 * p.sit - inset);
+	const Vec3 hemCentre{0.0, b.hemY, 0.035 + 0.17 * p.sit};   // (sitting: forward, over the knees)
+	double d = roundCone(s, b.pelvis + Vec3{0.0, 0.03, 0.0}, hemCentre, 0.185 - inset, 0.32 + 0.03 * p.sit - inset);
 	for (int k = 0; k < 2; ++k) d = smin(d, roundCone(s, b.hip[k], b.knee[k], 0.12 - inset, 0.10 - inset), 0.08);
 	// the cloth's folds: soft vertical pleats from the waist, deeper towards the hem, uneven round the body and swaying a little with the cloth
 	const double below = clamp01((b.pelvis.y - q.y) / std::max(0.2, b.pelvis.y - b.hemY));
