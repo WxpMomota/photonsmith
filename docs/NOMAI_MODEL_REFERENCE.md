@@ -2,6 +2,8 @@
 
 The procedural explorer was revised against Ian Jacobson's published **Nomai suit**, **MaskB**, and **Nomai statue** sheets on his [Outer Wilds portfolio](https://www.ianjacobson.com/Outer-Wilds). All replacement geometry and textures were authored in this repository.
 
+The [subsequent fidelity review](NOMAI_FIDELITY_REVIEW.md) adds mask inlays, lens lattice, facial sculpt detail and a corrected mask grip, and records remaining limitations across the full asset catalogue.
+
 ## Changes
 
 | Feature | Previous model | Revised model |

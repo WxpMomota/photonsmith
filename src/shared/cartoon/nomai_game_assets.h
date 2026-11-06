@@ -34,6 +34,9 @@ struct Model {
     // Portable geometric assets: no cache paths or proprietary source meshes.
     void exportObj(const std::filesystem::path &path) const {
         std::ofstream obj(path),mtl(path.parent_path()/(path.stem().string()+".mtl"));
+        // Miniature towers on normalized planets contain sub-millimetre inlays.
+        // The default six significant digits can collapse their exported faces.
+        obj.precision(17);
         obj<<"mtllib "<<path.stem().string()<<".mtl\n";
         size_t first=1;
         for(size_t k=0;k<pieces.size();++k) {
@@ -42,10 +45,19 @@ struct Model {
             mtl<<"newmtl material_"<<k<<"\nKd "<<p.colour.x<<' '<<p.colour.y<<' '<<p.colour.z<<"\nNs "<<(p.metal>0?45:8)<<"\n";
             if(p.glow>0) mtl<<"Ke "<<p.colour.x*p.glow<<' '<<p.colour.y*p.glow<<' '<<p.colour.z*p.glow<<"\n";
             for(Vec3 v:p.mesh.verts) { v=transformPoint(p.frame,v); obj<<"v "<<v.x<<' '<<v.y<<' '<<v.z<<"\n"; }
+            const Mat4 inv=invertAffine(p.frame);
+            for(Vec3 n:p.mesh.normals) {
+                n=normalize(Vec3{inv[0]*n.x+inv[4]*n.y+inv[8]*n.z,
+                                 inv[1]*n.x+inv[5]*n.y+inv[9]*n.z,
+                                 inv[2]*n.x+inv[6]*n.y+inv[10]*n.z});
+                obj<<"vn "<<n.x<<' '<<n.y<<' '<<n.z<<"\n";
+            }
             for(auto t:p.mesh.tris) {
                 const Vec3 a=transformPoint(p.frame,p.mesh.verts[t[0]]),b=transformPoint(p.frame,p.mesh.verts[t[1]]),c=transformPoint(p.frame,p.mesh.verts[t[2]]);
                 if(length(cross(b-a,c-a))<1e-10) continue;
-                obj<<"f "<<first+t[0]<<' '<<first+t[1]<<' '<<first+t[2]<<"\n";
+                obj<<"f";
+                for(int i:t) obj<<' '<<first+i<<"//"<<first+i;
+                obj<<"\n";
             }
             first+=p.mesh.verts.size();
         }
@@ -55,6 +67,19 @@ struct Model {
 inline Vec3 ivory() { return {0.66,0.61,0.49}; }
 inline Vec3 gold() { return {0.52,0.33,0.10}; }
 inline Vec3 teal() { return {0.10,0.30,0.31}; }
+// Fully three-dimensional fragments. nature::rock deliberately flattens its
+// underside for ground scatter and cannot form an overhead crust or cave wall.
+inline Mesh rockFragment(double size,int salt) {
+    Mesh m=uvSphere(1,16,10);
+    for(Vec3 &v:m.verts) v=v*(size*0.5*(0.82+0.30*nature::fbm2(v.x*3+v.y,v.z*3-v.y,salt)));
+    std::vector<Vec3> sum(m.verts.size(),Vec3{0,0,0});
+    for(auto t:m.tris) {
+        const Vec3 n=cross(m.verts[t[1]]-m.verts[t[0]],m.verts[t[2]]-m.verts[t[0]]);
+        for(int i:t) sum[i]=sum[i]+n;
+    }
+    for(size_t i=0;i<sum.size();++i) m.normals[i]=length(sum[i])>1e-12?normalize(sum[i]):normalize(m.verts[i]);
+    return m;
+}
 inline void beam(Model &m,Vec3 a,Vec3 b,double width,Vec3 colour,double depth=0.0) {
     m.add(box(width,length(b-a),depth>0?depth:width),alignY((a+b)*0.5,b-a),colour);
 }
@@ -79,6 +104,40 @@ inline Mesh polygonPrism(const std::vector<Vec3> &points,double depth) {
     for(int i=0;i<n;++i) {const int j=(i+1)%n;quad(m,points[i]-Vec3{0,0,depth*0.5},points[j]-Vec3{0,0,depth*0.5},points[j]+Vec3{0,0,depth*0.5},points[i]+Vec3{0,0,depth*0.5});}
     return m;
 }
+// Closed continuous rectangular sweep in the yz plane, avoiding visible
+// overlapping box caps along the escape pod's curved protection plates.
+inline Mesh sweptPlate(const std::vector<Vec3> &path,double width,double depth) {
+    Mesh m;std::vector<std::array<Vec3,4>> rings;
+    for(size_t i=0;i<path.size();++i) {
+        const Vec3 tangent=normalize(path[std::min(i+1,path.size()-1)]-path[i?i-1:0]);
+        const Vec3 n=normalize(cross(Vec3{1,0,0},tangent))*width*0.5;
+        const Vec3 x{depth*0.5,0,0},c=path[i];
+        rings.push_back({c-x-n,c-x+n,c+x+n,c+x-n});
+    }
+    for(size_t i=1;i<rings.size();++i) for(int j=0;j<4;++j)
+        quad(m,rings[i-1][j],rings[i-1][(j+1)%4],rings[i][(j+1)%4],rings[i][j]);
+    const auto &a=rings.front(),&b=rings.back();
+    quad(m,a[3],a[2],a[1],a[0]);quad(m,b[0],b[1],b[2],b[3]);
+    return m;
+}
+inline void hexLines(Model &m,const Mat4 &at,double radius,double yScale,double z,double width,Vec3 colour) {
+    for(int k=0;k<6;++k) {
+        const double a=kPi/2+k*kPi/3,b=a+kPi/3;
+        beam(m,transformPoint(at,{radius*std::cos(a),radius*yScale*std::sin(a),z}),
+               transformPoint(at,{radius*std::cos(b),radius*yScale*std::sin(b),z}),width,colour);
+    }
+}
+// Angular branching spirals: decorative writing, not a translation of game text.
+inline void writing(Model &m,const Mat4 &at,double size=1.0) {
+    for(int branch=0;branch<3;++branch) {
+        const Vec3 root{(branch-1)*0.19,branch==1?0.16:-0.14,0};
+        for(int i=0;i<32;++i) {
+            const auto point=[&](double t) {const double a=t*8.5,r=0.012+0.13*t;return root+Vec3{r*std::cos(a),r*std::sin(a),0};};
+            beam(m,transformPoint(at,point(i/32.0)*size),transformPoint(at,point((i+1)/32.0)*size),0.009*size,{0.28,0.55,0.72});
+        }
+        beam(m,transformPoint(at,root*size),transformPoint(at,Vec3{0,-0.35,0}*size),0.009*size,{0.28,0.55,0.72});
+    }
+}
 inline Model door(double width=1.4,double height=2.3) {
     Model m;
     const double x=width*0.5, spring=height*0.65;
@@ -94,18 +153,20 @@ inline Model dwelling(double radius=1.6,double height=3.1,int sides=10) {
     Model m;
     m.add(lathe({{0,0},{radius+0.25,0},{radius+0.25,0.22},{0,0.22}},sides),identity(),ivory());
     // Separate courses leave a real opening at the front, not a painted door.
-    for(int row=0;row<6;++row) for(int k=0;k<sides;++k) {
+    const int rows=std::max(6,static_cast<int>(std::ceil(height/0.45)));
+    const double doorwayHeight=std::min(2.3,height*0.80);
+    for(int row=0;row<rows;++row) for(int k=0;k<sides;++k) {
         const double a=2*kPi*(k+0.5)/sides;
-        if(std::sin(a)>0.7 && row<4) continue;
-        const double y=0.25+(height-0.25)*(row+0.5)/6;
+        if(std::sin(a)>0 && std::abs(std::cos(a))<1.5*std::sin(kPi/sides) && 0.25+(height-0.25)*row/rows<doorwayHeight+0.22) continue;
+        const double y=0.25+(height-0.25)*(row+0.5)/rows;
         const double span=2*radius*std::tan(kPi/sides)*0.97;
         const Vec3 c{radius*std::cos(a),y,radius*std::sin(a)};
         const Vec3 colour=row==4?teal():ivory()*(0.90+0.10*hash01(row*sides+k,218));
-        m.add(roundedBox(span,(height-0.25)/6-0.018,0.26,0.025,1),mul(translate(c),rotate({0,1,0},90.0-a*180/kPi)),colour);
+        m.add(roundedBox(span,(height-0.25)/rows-0.018,0.26,0.025,1),mul(translate(c),rotate({0,1,0},90.0-a*180/kPi)),colour);
     }
     m.add(lathe({{radius+0.12,height},{radius+0.12,height+0.16},{0.4,height+1.0},{0.35,height+1.0},{radius-0.08,height+0.05}},sides),identity(),ivory());
     m.add(torus(radius,0.08,sides*3,5),translate(0,height-0.18,0),gold());
-    m.append(door(),translate(0,0.22,radius+0.04));
+    m.append(door(1.4,doorwayHeight),translate(0,0.22,radius+0.04));
     for(int side:{-1,1}) {
         const double x=side*1.08;
         m.add(box(0.50,1.15,0.10),translate(x,1.55,radius*0.78),{0.24,0.32,0.29});
@@ -116,6 +177,22 @@ inline Model dwelling(double radius=1.6,double height=3.1,int sides=10) {
         }
     }
 
+    // Roof seams and entry threshold; actual recesses remain open.
+    for(int k=0;k<sides;++k) {
+        const double a=2*kPi*k/sides;
+        beam(m,{(radius+0.13)*std::cos(a),height+0.17,(radius+0.13)*std::sin(a)},
+               {0.40*std::cos(a),height+1.015,0.40*std::sin(a)},0.025,gold());
+    }
+    m.add(box(1.48,0.12,0.75),translate(0,0.22,radius+0.25),ivory());
+    m.add(box(1.62,0.10,0.95),translate(0,0.10,radius+0.35),ivory()*0.85);
+    // Circular interior bench, roof oculus rim, wall-mounted writing surfaces.
+    for(int k=0;k<sides;++k) {
+        const double a=2*kPi*(k+0.5)/sides;
+        if(std::sin(a)>0.7) continue; // Keep the entry traversable.
+        m.add(box(2*(radius-0.30)*std::tan(kPi/sides)*0.96,0.35,0.30),
+              mul(translate((radius-0.30)*std::cos(a),0.43,(radius-0.30)*std::sin(a)),rotate({0,1,0},90-a*180/kPi)),{0.40,0.32,0.21});
+    }
+    m.add(torus(0.38,0.035,24,5),translate(0,height+1.0,0),gold());
     // Blue/rust triangular frieze beneath the roof.
     for(int k=0;k<sides;++k) {
         const double a=2*kPi*(k+0.5)/sides;
@@ -127,16 +204,33 @@ inline Model dwelling(double radius=1.6,double height=3.1,int sides=10) {
 inline Model suspensionBridge(double length=6.0,double width=2.0) {
     Model m;
     m.add(box(width,0.26,length),translate(0,0.02,0),ivory());
+    // Layered rust/teal cornices, inset flagstones, alternating diamond border.
+    const int courses=static_cast<int>(std::ceil(length/0.34));
+    for(int i=0;i<courses;++i) for(int j=0;j<3;++j)
+        m.add(box((width-0.38)/3-0.018,0.035,length/courses-0.016),
+              translate((j-1)*(width-0.38)/3,0.165,-length/2+(i+0.5)*length/courses),ivory()*(0.82+0.16*hash01(i*3+j,78)));
     for(int side:{-1,1}) {
-        beam(m,{side*(width*0.5),0.2,-length*0.5},{side*(width*0.5),0.2,length*0.5},0.16,gold());
-        beam(m,{side*(width*0.5),0.05,-length*0.5},{side*(width*0.5),0.05,length*0.5},0.24,teal());
+        const double x=side*(width/2-0.10);
+        m.add(box(0.20,0.09,length),translate(x,0.18,0),{0.42,0.19,0.095});
+        m.add(box(0.12,0.08,length),translate(side*width/2,-0.04,0),teal());
+        m.add(box(0.13,0.035,length),translate(side*width/2,-0.10,0),gold());
+        for(int i=0;i<courses;++i) {
+            const double z=-length/2+(i+0.5)*length/courses;
+            m.add(box(0.12,0.015,0.12),mul(translate(x,0.235,z),rotate({0,1,0},45)),ivory());
+            m.add(box(0.068,0.018,0.068),mul(translate(x,0.245,z),rotate({0,1,0},45)),teal());
+        }
+        // Splayed carved pylons and rigid stays from the published bridge sheet.
         for(int end:{-1,1}) {
-            const Vec3 base{side*(width*0.5+0.16),0.0,end*(length*0.5-0.35)},top=base+Vec3{0,2.4,0};
-            beam(m,base,top,0.26,ivory());
-            beam(m,top,{side*(width*0.5),0.35,0},0.055,gold());
+            const double z=end*(length/2-0.4);
+            const std::vector<Vec3> profile={{-0.34,-0.38,0},{0.34,-0.38,0},{0.22,0.40,0},{0.12,1.65,0},{-0.12,1.65,0},{-0.22,0.40,0}};
+            const Mat4 pillar=translate(side*(width/2+0.15),0,z);
+            m.add(polygonPrism(profile,0.32),pillar,ivory());
+            for(int rib:{-1,1}) beam(m,transformPoint(pillar,{rib*0.24,-0.30,0.18}),transformPoint(pillar,{rib*0.08,1.58,0.18}),0.045,gold());
+            const Vec3 top=transformPoint(pillar,{0,1.5,0});
+            beam(m,top,{side*(width/2),0.35,0},0.075,gold());
+            m.add(box(0.21,0.15,0.23),translate(side*width/2,0.30,0),ivory());
         }
     }
-    for(int i=0;i<8;++i) m.add(box(width-0.25,0.016,0.025),translate(0,0.16,-length*0.5+(i+0.5)*length/8),{0.35,0.32,0.24});
     return m;
 }
 inline Model hangingCity() {
@@ -149,8 +243,15 @@ inline Model hangingCity() {
     }
     m.append(suspensionBridge(4.0,1.6),mul(translate(-1.9,0.1,0.3),rotate({0,1,0},90)));
     m.append(suspensionBridge(4.0,1.6),mul(translate(1.9,0.1,0.3),rotate({0,1,0},90)));
-    // A broken underside of crust makes the suspension readable in a studio view.
-    for(int i=0;i<9;++i) m.add(uvSphere(1,8,5),mul(translate((i-4)*1.3,8.3,-1.8),scale(1.1,0.8+0.2*hash01(i,29),1.3)),{0.16,0.18,0.23});
+    // Every hanger has an anchor block in the crust above its own district.
+    for(int k=0;k<3;++k) {
+        const Vec3 at{(k-1)*3.8,k==1?1.0:0.0,k==1?-2.0:0.0};
+        for(int side:{-1,1}) {
+            const Vec3 top=at+Vec3{side*1.9,7.3,-0.8};
+            m.add(box(0.48,0.22,0.52),translate(top),ivory());
+            m.add(rockFragment(2.4,97+k*2+side),mul(translate(top+Vec3{0,0.55,0}),scale(1.8,0.65,1.3)),{0.16,0.18,0.23});
+        }
+    }
     return m;
 }
 inline Model sunlessCity() {
@@ -162,21 +263,45 @@ inline Model sunlessCity() {
         for(int i=0;i<6;++i) m.add(box(1.25,0.20,0.48),translate(0,y+i*0.18,z+1.7-i*0.42),ivory());
     }
     // Layered canyon backdrop, left open for cameras and animation staging.
-    for(int i=0;i<9;++i) m.add(box(12,0.65,0.65+0.15*std::sin(i)),translate(0,i*0.7,-7.8),i%3==0?Vec3{0.62,0.35,0.15}:Vec3{0.42,0.20,0.09});
+    for(int row=0;row<9;++row) for(int col=0;col<7;++col) {
+        const double x=(col-3)*1.65+(row%2)*0.3,y=row*0.7;
+        m.add(rockFragment(1.0,31+row*7+col),mul(translate(x,y,-7.8),scale(2.1,0.95,1.2)),
+              row%3==0?Vec3{0.62,0.35,0.15}:Vec3{0.42,0.20,0.09});
+    }
     return m;
 }
 inline Model ashTwinTower() {
     Model m;
-    m.add(lathe({{0,0},{1.7,0},{1.4,0.35},{0.55,0.8},{0.35,8.7},{0.6,8.85},{0,8.85}},12),identity(),ivory());
-    for(int side=0;side<4;++side) for(int level=0;level<3;++level) {
-        std::vector<Vec3> hex;
-        for(int k=0;k<6;++k) {const double a=kPi/2+2*kPi*k/6;hex.push_back({0.85*std::cos(a),1.0*std::sin(a),0});}
-        const Mat4 panel=mul(rotate({0,1,0},side*90),translate(0,3.5+level*1.55,0.95+0.10*level),rotate({1,0,0},-18));
-        m.add(polygonPrism(hex,0.12),panel,gold(),1.0);
-        for(Vec3 &v:hex) v=v*0.84;
-        m.add(polygonPrism(hex,0.14),mul(panel,translate(0,0,0.05)),{0.06,0.24,0.43},1.0);
-        for(int k=0;k<6;++k) {const Vec3 a=hex[k],b=hex[(k+1)%6];beam(m,transformPoint(panel,a+Vec3{0,0,0.14}),transformPoint(panel,b+Vec3{0,0,0.14}),0.035,gold());}
-        beam(m,{0,1.3,0},transformPoint(panel,{0,-0.9,0}),0.07,gold());
+    m.add(lathe({{0,0},{1.2,0},{1.2,0.18},{0.48,0.48},{0.23,8.7},{0.38,8.8},{0.38,8.95},{0,8.95}},12),identity(),ivory());
+    for(int side=0;side<4;++side) {
+        const Mat4 around=rotate({0,1,0},side*90);
+        // Fluted spine and spreading root buttresses, not a plain cylinder.
+        for(int rib:{-1,1}) {
+            std::vector<Vec3> root={{rib*0.16,0.05,1.0},{rib*0.16,0.5,0.72},{rib*0.16,1.3,0.35},{rib*0.16,2.1,0.27},{rib*0.16,8.65,0.27}};
+            for(size_t i=1;i<root.size();++i) beam(m,transformPoint(around,root[i-1]),transformPoint(around,root[i]),0.07,gold());
+        }
+        for(int level=0;level<5;++level) {
+            std::vector<Vec3> hex;
+            for(int k=0;k<6;++k) {const double a=kPi/2+2*kPi*k/6;hex.push_back({0.68*std::cos(a),0.79*std::sin(a),0});}
+            const Mat4 panel=mul(around,translate(0,2.65+level*1.22,0.58+0.09*level),rotate({1,0,0},-13));
+            m.add(polygonPrism(hex,0.12),panel,gold(),1.0);
+            for(Vec3 &v:hex) v=v*0.90;
+            m.add(polygonPrism(hex,0.14),mul(panel,translate(0,0,0.035)),{0.035,0.17,0.32},1.0);
+            // Blue glass panes and nested copper hexagonal circuitry on both faces.
+            for(int face:{-1,1}) {
+                for(double r:{0.15,0.31,0.52,0.63}) hexLines(m,panel,r,0.79/0.68,face*0.12,0.014,gold());
+                for(int k=0;k<6;++k) {
+                    const double a=kPi/2+k*kPi/3;
+                    beam(m,transformPoint(panel,{0.15*std::cos(a),0.174*std::sin(a),face*0.12}),
+                           transformPoint(panel,{0.63*std::cos(a),0.732*std::sin(a),face*0.12}),0.012,gold());
+                }
+            }
+            for(int strip=0;strip<7;++strip) {
+                const double x=(strip-3)*0.13,h=0.61-0.4*std::abs(x);
+                m.add(box(0.025,h*2,0.005),mul(panel,translate(x,0,0.109)),{0.04,0.24+0.02*(strip%3),0.42},1.0);
+            }
+            beam(m,transformPoint(around,{0,2.2+level*1.22,0.25}),transformPoint(panel,{0,-0.65,0}),0.07,gold());
+        }
     }
     return m;
 }
@@ -184,9 +309,24 @@ inline Model giantsDeepIsland() {
     Model m;
     m.add(uvSphere(1,32,16),mul(translate(0,-1.2,0),scale(6.0,1.8,5.0)),{0.14,0.19,0.16});
     m.add(uvSphere(1,32,12),mul(translate(0,-0.2,0),scale(5.5,0.35,4.6)),{0.24,0.28,0.15});
+    for(int k=0;k<18;++k) {
+        const double a=2*kPi*k/18;
+        m.add(nature::rock(1.4,180+k),mul(translate(4.6*std::cos(a),-0.20,3.7*std::sin(a)),scale(1.1,0.8,1.1)),{0.16,0.22,0.16});
+    }
     // A tall, stacked trial tower with pale stone, teal bands and open crown.
     m.append(dwelling(1.65,6.8,12),translate(0,0.05,-0.6));
     for(double y:{2.2,4.2,6.5}) m.add(torus(1.78,0.10,36,5),translate(0,y,-0.6),teal());
+    // Paired exterior ramp studies and the three-diamond Nomai motif.
+    for(int side:{-1,1}) for(int i=0;i<40;++i) {
+        const double a=side*(0.4+i*0.09),b=side*(0.4+(i+1)*0.09);
+        const Vec3 p{2.0*std::sin(a),0.4+i*0.10,-0.6+2.0*std::cos(a)},q{2.0*std::sin(b),0.5+i*0.10,-0.6+2.0*std::cos(b)};
+        beam(m,p,q,0.42,ivory(),0.16);
+    }
+    for(int i=0;i<3;++i) {
+        const Vec3 at{(i-1)*0.34,5.4+(i==1?0.34:0.0),1.23};
+        m.add(box(0.30,0.30,0.08),mul(translate(at),rotate({0,0,1},45)),gold());
+        m.add(box(0.19,0.19,0.09),mul(translate(at+Vec3{0,0,0.03}),rotate({0,0,1},45)),{0.65,0.32,0.05},0,0.5);
+    }
     for(int i=0;i<3;++i) {
         const Vec3 root{(i-1)*3.4,0.0,1.5};
         beam(m,root,root+Vec3{0.25,2.0,0},0.12,{0.25,0.17,0.08});
@@ -224,27 +364,50 @@ inline Model shuttle() {
 // swept protective vanes, curled lower scrolls, central dark glass and keel.
 inline Model escapePod() {
     Model m;
-    m.add(uvSphere(1,24,16),mul(translate(0,2.2,0),scale(1.8,2.2,1.6)),{0.06,0.15,0.18},1.0);
-    for(int vane=0;vane<4;++vane) {
-        const Mat4 frame=rotate({0,1,0},vane*90);
-        for(int i=0;i<24;++i) {
-            const auto path=[](double t) {return Vec3{0,0.45+5.8*t,1.60+0.45*std::sin(t*kPi)-0.60*t*t};};
-            const Vec3 a=transformPoint(frame,path(i/24.0)),b=transformPoint(frame,path((i+1)/24.0));
-            beam(m,a,b,0.62,ivory(),0.24);
-            beam(m,a+transformPoint(frame,{0.23,0,0.10}),b+transformPoint(frame,{0.23,0,0.10}),0.075,gold());
-        }
-        for(int i=0;i<22;++i) {
-            const auto scroll=[](double t) {const double a=0.6+5.1*t,r=0.75*(1-0.70*t);return Vec3{0,1.05+r*std::sin(a),1.75+r*std::cos(a)};};
-            beam(m,transformPoint(frame,scroll(i/22.0)),transformPoint(frame,scroll((i+1)/22.0)),0.24,ivory());
-        }
+    m.add(uvSphere(1,40,24),mul(translate(0,2.1,0),scale(1.35,1.75,1.6)),{0.055,0.18,0.24},1.0);
+    // Swept continuous plates with a genuine curled lower profile. The earlier
+    // four straight rods read as a cage and missed the concept's main silhouette.
+    std::vector<Vec3> path;
+    const Vec3 p0{0,5.8,-1.6},p1{0,3.4,-1.6},p2{0,3.4,2.3},p3{0,1.2,2.3};
+    for(int i=0;i<=64;++i) {
+        const double t=i/64.0,u=1-t;
+        path.push_back(p0*(u*u*u)+p1*(3*u*u*t)+p2*(3*u*t*t)+p3*(t*t*t));
     }
-    m.add(box(1.1,0.5,2.8),translate(0,0.1,0),ivory());
+    for(int i=1;i<=64;++i) {
+        const double t=i/64.0,a=-5.6*t,r=1.05*(1-0.78*t);
+        path.push_back({0,1.2+r*std::sin(a),1.25+r*std::cos(a)});
+    }
+    // The protection plates sweep in one longitudinal direction, on either
+    // side of the cabin. A radial arrangement incorrectly resembles a cage.
+    for(int side:{-1,1}) {
+        const Mat4 frame=translate(side*1.32,0,0);
+        m.add(sweptPlate(path,0.54,0.30),frame,ivory());
+        m.add(sweptPlate(path,0.24,0.32),frame,{0.18,0.22,0.21});
+        for(int edge:{-1,1}) m.add(sweptPlate(path,0.055,0.025),mul(frame,translate(edge*0.16,0,0)),gold(),1.0);
+        const Vec3 tip=path.front();
+        m.add(box(0.36,0.25,0.35),mul(frame,translate(tip)),ivory());
+        // Nested outer relief follows the same curl, avoiding separate floating scrolls.
+        m.add(sweptPlate(path,0.38,0.06),mul(frame,translate(side*0.19,0,0)),ivory());
+        m.add(sweptPlate(path,0.12,0.065),mul(frame,translate(side*0.19,0,0)),gold());
+    }
+    // Canopy ribs, a lower keel and a framed exit hatch.
+    for(int k=0;k<8;++k) {
+        const Mat4 frame=rotate({0,1,0},k*45);
+        std::vector<Vec3> rib;
+        for(int i=0;i<=32;++i) {const double a=0.16+(kPi-0.32)*i/32.0;rib.push_back({0,2.1+1.77*std::cos(a),1.62*std::sin(a)});}
+        m.add(sweptPlate(rib,0.035,0.04),frame,gold());
+    }
+    m.add(lathe({{0,0.12},{0.75,0.12},{1.05,0.35},{1.3,0.7},{1.25,0.82},{0,0.82}},12),identity(),ivory());
+    m.add(box(0.95,1.3,0.12),translate(0,1.60,1.46),{0.10,0.15,0.16});
+    for(int side:{-1,1}) beam(m,{side*0.52,0.91,1.55},{side*0.52,2.30,1.55},0.10,ivory());
+    for(double y:{0.91,2.30}) beam(m,{-0.52,y,1.55},{0.52,y,1.55},0.10,ivory());
+    writing(m,translate(0,1.6,1.54),1.0);
     return m;
 }
 inline Vec3 spherePoint(double u,double v) { const double a=2*kPi*u,p=kPi*v;return {std::sin(p)*std::cos(a),std::cos(p),std::sin(p)*std::sin(a)}; }
 inline Vec3 planetColour(int kind,Vec3 p) {
     const double u=std::atan2(p.z,p.x)/(2*kPi)+0.5,v=std::acos(std::max(-1.0,std::min(1.0,p.y)))/kPi;
-    const double n=nature::fbm2(u*14+2*nature::noise2(u*5,v*5,81),v*13,82);
+    const double n=(nature::fbm2(p.x*7+p.z*3,p.y*7,82)+nature::fbm2(p.z*9,p.y*9+p.x*3,91))*0.5;
     if(kind==0) {
         double cloud=0.35+0.55*n;
         for(int k=0;k<6;++k) {
@@ -259,7 +422,7 @@ inline Vec3 planetColour(int kind,Vec3 p) {
     return lerp(Vec3{0.32,0.10,0.035},Vec3{0.72,0.39,0.14},0.5*n+0.5*bands);
 }
 inline Model globe(int kind,double radius=1.0,bool cutaway=false) {
-    Model m;std::array<Mesh,24> groups;
+    Model m;std::array<Mesh,24> groups;Mesh crust;
     const int nu=112,nv=56;
     for(int y=0;y<nv;++y) for(int x=0;x<nu;++x) {
         const Vec3 c=spherePoint((x+0.5)/nu,(y+0.5)/nv);
@@ -274,6 +437,16 @@ inline Model globe(int kind,double radius=1.0,bool cutaway=false) {
             p=p*r;
         }
         quad(groups[bin],pts[0],pts[1],pts[2],pts[3],true);
+        if(cutaway) {
+            const auto removed=[](Vec3 p) {return p.z>0.25 && p.x>-0.55 && p.y<0.65;};
+            const auto inside=[](Vec3 p) {return normalize(p)*0.88;};
+            quad(crust,inside(pts[3]),inside(pts[2]),inside(pts[1]),inside(pts[0]));
+            const Vec3 neighbors[4]={spherePoint((x+0.5)/nu,(y-0.5)/nv),spherePoint((x+1.5)/nu,(y+0.5)/nv),
+                                     spherePoint((x+0.5)/nu,(y+1.5)/nv),spherePoint((x-0.5)/nu,(y+0.5)/nv)};
+            for(int edge=0;edge<4;++edge) if(removed(neighbors[edge])) {
+                const Vec3 a=pts[edge],b=pts[(edge+1)%4];quad(crust,a,inside(a),inside(b),b);
+            }
+        }
     }
     for(int i=0;i<24;++i) if(!groups[i].tris.empty()) {
         Vec3 colour;
@@ -283,6 +456,7 @@ inline Model globe(int kind,double radius=1.0,bool cutaway=false) {
         else colour=lerp(Vec3{0.23,0.07,0.025},Vec3{0.84,0.47,0.18},n);
         m.add(std::move(groups[i]),identity(),colour);
     }
+    if(!crust.tris.empty()) m.add(std::move(crust),identity(),{0.13,0.15,0.21});
     return m;
 }
 inline Model giantsDeep() {
@@ -293,13 +467,13 @@ inline Model giantsDeep() {
         const Vec3 n=centers[storm],x=normalize(cross(n,Vec3{0,1,0})),y=cross(x,n);
         const double size=storm==0?0.29:0.18;
         const auto point=[&](double t,double offset,double radius) {
-            const double a=t*5.4*kPi,r=0.018+(size-0.018)*t+offset;
+            const double a=t*5.4*kPi,r=0.018+(size-0.018)*t+offset*(0.25+0.75*std::sin(t*kPi));
             return normalize(n+x*(r*std::cos(a))+y*(r*std::sin(a)))*radius;
         };
         for(int i=0;i<120;++i) {
             const double t=i/120.0,u=(i+1)/120.0;
-            quad(cloud,point(t,-0.009,1.004),point(u,-0.009,1.004),point(u,0.009,1.004),point(t,0.009,1.004),true);
-            quad(shadow,point(t,0.010,1.003),point(u,0.010,1.003),point(u,0.016,1.003),point(t,0.016,1.003),true);
+            quad(cloud,point(t,-0.020,1.004),point(u,-0.020,1.004),point(u,0.020,1.004),point(t,0.020,1.004),true);
+            quad(shadow,point(t,0.021,1.003),point(u,0.021,1.003),point(u,0.032,1.003),point(t,0.032,1.003),true);
         }
     }
     m.add(cloud,identity(),{0.55,0.71,0.43});m.add(shadow,identity(),{0.025,0.14,0.09});
@@ -308,7 +482,6 @@ inline Model giantsDeep() {
 inline Model brittleHollow() {
     Model m=globe(1,1.0,true);
     m.add(uvSphere(0.18,32,16),identity(),{0.001,0.001,0.002});
-    m.add(torus(0.25,0.012,64,5),rotate({1,0,0},24),{0.42,0.55,0.95},0,2.0);
     for(int i=0;i<12;++i) {
         const double a=2*kPi*i/12;
         const Vec3 pos{0.72*std::cos(a),-0.38+0.13*std::sin(a*2),0.72*std::sin(a)};

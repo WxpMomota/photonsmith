@@ -2,6 +2,8 @@
 
 Prepared on `nomai-reference-alignment` for review before merging.
 
+See [the detailed fidelity review](NOMAI_FIDELITY_REVIEW.md) for the subsequent construction/detail pass, validation, and outstanding differences. The author chose to retain the movie's invented setting while matching the game's visual design. These assets are not certified game replicas.
+
 ## Character proportions and family
 
 The adult's pelvis and chest were shortened and the shoulders widened. The mask is 15% larger relative to the head. This corrects the previous elongated silhouette without flattening the face or helmet geometry. The standing character's crest is approximately 1.8 metres high; this is a production scale, not a verified canonical measurement.

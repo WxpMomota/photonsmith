@@ -237,6 +237,15 @@ inline double headSkinSdf(Vec3 q) {
 	d = smin(d, ellv(q, {0.0, 0.006, 0.198}, {0.046, 0.030, 0.030}), 0.025);
 	d = smin(d, ellv(q, {0.0, -0.030, 0.120}, {0.040, 0.026, 0.070}), 0.03);
 	d = smin(d, ellv(q, {0.0, 0.118, 0.080}, {0.075, 0.050, 0.040}), 0.03);
+    for(int side:{-1,1}) {
+        for(int lock=0;lock<3;++lock) {
+            const Vec3 root{side*0.062,0.060-lock*0.025,0.070};
+            const Vec3 tip{side*(0.115-lock*0.006),0.065-lock*0.038,0.015};
+            d=smin(d,roundCone(q,root,tip,0.028,0.003),0.009);
+        }
+        d=smin(d,roundCone(q,{side*0.025,0.126,0.105},{side*0.082,0.135,0.067},0.015,0.006),0.008);
+        d=std::max(d,-ellv(q,{side*0.021,0.015,0.222},{0.008,0.006,0.012}));
+    }
 	d = smin(d, roundCone(q, {0.0, 0.03, -0.03}, {0.0, -0.16, -0.01}, 0.050, 0.060), 0.05);
 	return d;
 }
@@ -861,13 +870,15 @@ inline std::vector<Foot> explorerFeet(const ExplorerPose &p, const Mat4 &world) 
 	return {{transformPoint(world, b.ball[0]), b.planted[0]}, {transformPoint(world, b.ball[1]), b.planted[1]}};
 }
 // The mask's frame (mask space -> body space): on the face, lifted away from it, then lowered into the left hand.
+constexpr double kSuitMaskScale = 1.15;
+inline Vec3 maskGripPoint() { return {0.247,0.12,0.19}; }
 inline Mat4 maskFrame(const ExplorerPose &p, const ExplorerBody &b) {
 	if (p.maskOff <= 0.0) return b.head;
 	const double u = clamp01(p.maskOff);
 	const Mat4 lifted = mul(b.head, translate(0.0, 0.0, 0.08 * smoothstep(0.0, 0.35, u)));
 	if (u <= 0.35) return lifted;
 	const Vec3 hand = b.wrist[0] + b.handDir[0] * 0.06;
-	const Mat4 held = mul(translate(hand + Vec3{0.0, 0.03, 0.0}), rotate({1.0, 0.0, 0.0}, -60.0), rotate({0.0, 1.0, 0.0}, 25.0), translate(0.0, -0.10, -0.12));
+	const Mat4 held = mul(translate(hand), rotate({1.0, 0.0, 0.0}, -60.0), rotate({0.0, 1.0, 0.0}, 25.0), translate(maskGripPoint()*-kSuitMaskScale));
 	const double v = smoothstep(0.35, 1.0, u);
 	Mat4 m;
 	for (int i = 0; i < 16; ++i) m[static_cast<std::size_t>(i)] = lerp(lifted[static_cast<std::size_t>(i)], held[static_cast<std::size_t>(i)], v);
@@ -991,13 +1002,33 @@ inline Mesh maskLensMesh() {
     }
     return m;
 }
+inline Mesh maskInlayMesh() {
+    Mesh m;
+    for(int sector=0;sector<3;++sector) {
+        Vec3 previous{};
+        for(int i=0;i<7;++i) {
+            const double a=(49+sector*120+i*13)*kPi/180.0;
+            const Vec3 c{0.264*std::cos(a),0.12+0.264*std::sin(a),0};
+            const double r=(i%3==0)?0.0055:0.0035;
+            maskPrism(m,{c+Vec3{r,0,0},c+Vec3{0,r,0},c-Vec3{r,0,0},c-Vec3{0,r,0}},0.204,0.004);
+            if(i>0) maskRail(m,previous,c,0.0015,0.200,0.002);
+            previous=c;
+        }
+    }
+    for(int k=0;k<3;++k) {
+        const Vec3 c=maskEyeAt(k);
+        maskDiamond(m,c,0.018,0.015,0.210,0.002);
+        for(int side:{-1,1}) maskRail(m,c+Vec3{side*0.008,0.007,0},c+Vec3{0,-0.015,0},0.0018,0.211,0.002);
+    }
+    return m;
+}
 inline std::string boneIvoryMaterial() { return "Material \"coateddiffuse\" \"rgb reflectance\" [ 0.72 0.69 0.58 ] \"float roughness\" [ 0.42 ]"; }
 inline std::string silverMaterial() { return metalMaterial({0.86, 0.87, 0.90}, 0.18); }
-constexpr double kSuitMaskScale = 1.15;
 inline std::string maskText(const Mat4 &at, double glow = 0.0) {
     const Mat4 frame = mul(at, scale(kSuitMaskScale,kSuitMaskScale,kSuitMaskScale));
     const Vec3 e = Vec3{0.35, 0.12, 0.015} * (0.12 + 0.28 * clamp01(glow));
-    return film_cache::part(kFilmKey, "mask5_angular_ivory", boneIvoryMaterial(), frame, [] { return maskIvoryMesh(); }) +
+    return film_cache::part(kFilmKey, "mask6_constellation_inlays", goldMaterial(), frame, [] { return maskInlayMesh(); }) +
+           film_cache::part(kFilmKey, "mask5_angular_ivory", boneIvoryMaterial(), frame, [] { return maskIvoryMesh(); }) +
            film_cache::part(kFilmKey, "mask5_angular_gold", goldMaterial(), frame, [] { return maskBronzeMesh(); }) +
            film_cache::part(kFilmKey, "mask5_chin_housing", diffuseMaterial({0.055, 0.045, 0.030}), frame, [] { return maskBackingMesh(); }) +
            attr("Material \"coateddiffuse\" \"rgb reflectance\" [ 0.42 0.19 0.028 ] \"float roughness\" [ 0.13 ]", meshText(maskLensMesh(), frame), &e);
@@ -1090,7 +1121,7 @@ inline std::string explorerText(const ExplorerPose &p, const Mat4 &world, double
 		out += attr(coated({0.05, 0.05, 0.06}, 0.3), meshText(sdf::tubeMesh(hose, 0.010, 1.0, 8), world));
 	}
 	for (int s = 0; s < 2; ++s) {
-		const double grip = (p.staff == (s == 0 ? 1 : -1)) ? 0.9 : 0.25;
+		const double grip = (p.staff == (s == 0 ? 1 : -1)) ? 0.9 : (s==0 && p.maskShown ? lerp(0.25,0.85,smoothstep(0.7,1.0,p.maskOff)) : 0.25);
 		const Vec3 c = b.wrist[s] + b.handDir[s] * 0.06;
 		out += attr(diffuseMaterial({0.34, 0.17, 0.11}), meshText(sdf::surfaceNets([&](Vec3 q) { return handSdf(q, b, s, grip); }, c - Vec3{0.12, 0.12, 0.12}, c + Vec3{0.12, 0.12, 0.12}, fine), world));
 		out += attr(diffuseMaterial({0.90, 0.86, 0.74}), meshText(sdf::surfaceNets([&](Vec3 q) { return fingerTipSdf(q, b, s, grip); }, c - Vec3{0.12, 0.12, 0.12}, c + Vec3{0.12, 0.12, 0.12}, fine * 0.7), world));

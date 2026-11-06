@@ -15,14 +15,31 @@ static void checkMesh(const Mesh &m) {
         if (dot(normalize(cross(b-a,c-a)), m.normals[t[0]]) < 0.99) throw std::runtime_error("wrong normal");
     }
 }
+static void writePoseReview(const std::filesystem::path &out,const char *name,const ExplorerPose &pose) {
+    std::ofstream f(out/(std::string("nomai-pose-")+name+".pbrt"));
+    f<<"Film \"rgb\" \"integer xresolution\" [800] \"integer yresolution\" [800]\n"
+      <<"LookAt 2.3 1.6 4.5 0 0.95 0 0 1 0\nCamera \"perspective\" \"float fov\" [30]\nWorldBegin\n"
+      <<"LightSource \"infinite\" \"rgb L\" [0.28 0.28 0.28]\n"
+      <<"AttributeBegin\nLightSource \"distant\" \"point3 from\" [3 5 4] \"point3 to\" [0 1 0] \"rgb L\" [2.5 2.3 2]\nAttributeEnd\n"
+      <<explorerText(pose,identity(),0.012)<<"\nWorldEnd\n";
+    if(!f) throw std::runtime_error("could not write pose review");
+}
 int main(int argc, char **argv) {
     checkMesh(maskIvoryMesh()); checkMesh(maskBronzeMesh()); checkMesh(maskLensMesh()); checkMesh(maskBackingMesh());
+    checkMesh(maskInlayMesh());
     std::cout << "PASS: angular mask vertices, indices, areas and face normals\n";
     for (double t : {0.0,0.5,1.0,1.5,2.0}) {
         const ExplorerBody b = explorerBody(walkPose(t,t));
         for (int s=0;s<2;++s) if (!std::isfinite(length(b.ball[s]))) throw std::runtime_error("invalid gait");
     }
     std::cout << "PASS: walking skeleton remains finite\n";
+    for(double yaw:{-35.0,0.0,35.0}) {
+        ExplorerPose held=standPose(0.5);held.maskOff=1;held.headYaw=yaw;
+        const ExplorerBody b=explorerBody(held);
+        const Vec3 grip=transformPoint(mul(maskFrame(held,b),scale(kSuitMaskScale)),maskGripPoint());
+        if(length(grip-(b.wrist[0]+b.handDir[0]*0.06))>1e-9) throw std::runtime_error("mask does not meet palm");
+    }
+    std::cout<<"PASS: removed mask grip meets left palm\n";
     if (argc < 2) return 0;
     const std::filesystem::path out = argv[1];
     std::filesystem::create_directories(out);
@@ -39,4 +56,13 @@ int main(int argc, char **argv) {
         if (!f) throw std::runtime_error("could not write scene");
     }
     std::cout << "Wrote four studio scenes from the revised repository header\n";
+    ExplorerPose lifted=standPose(0.5);lifted.staff=0;lifted.maskOff=0.5;
+    writePoseReview(out,"mask-lifting",lifted);
+    lifted.maskOff=1.0;
+    writePoseReview(out,"mask-removed",lifted);
+    ExplorerPose walking=walkPose(0.5,0.5);walking.headYaw=25;
+    writePoseReview(out,"walking",walking);
+    ExplorerPose kneeling=standPose(0.5);kneeling.staff=0;kneeling.crouch=1;kneeling.handL={0.18,0.12,0.42};kneeling.headPitch=34;
+    writePoseReview(out,"kneeling",kneeling);
+    std::cout<<"Wrote mask lifting/removal, walking and kneeling reviews\n";
 }
