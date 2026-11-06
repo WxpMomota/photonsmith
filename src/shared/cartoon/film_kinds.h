@@ -21,7 +21,7 @@
 #include "film_faces.h"
 #include "film_file.h"
 #include "human_actor.h"
-#include "nomai_explorer.h"
+#include "nomai_family.h"
 #include "rig.h"
 #include "turtle_actor.h"
 
@@ -608,20 +608,27 @@ inline CharacterKind turtleKind() {
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // The Nomai explorer
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
-inline CharacterKind explorerKind() {
+inline CharacterKind explorerKind(nomai::LifeStage stage=nomai::LifeStage::AdultA, bool family=false) {
 	CharacterKind explorer;
-	const auto pose = [](const CharacterMoment &m) {
+	const auto pose = [stage,family](const CharacterMoment &m) {
 		nomai::ExplorerPose p = m.moving || m.steps > 0.0 ? nomai::walkPose(m.steps, m.t, 1.0) : nomai::standPose(m.t);   // (after a walk: its feet where they came down)
+        if(family) {
+            const nomai::ExplorerPose look=nomai::familyPose(stage,m.t);
+            p.headScale=look.headScale; p.hornGrowth=look.hornGrowth; p.beardScale=look.beardScale;
+            p.robeTint=look.robeTint; p.furTint=look.furTint; p.maskShown=look.maskShown; p.hood=look.hood;
+            p.lean+=look.lean; p.headPitch+=look.headPitch; p.staff=0;
+            p.handR=m.moving ? Vec3{-0.21,0.73,0.06+0.10*std::sin(p.walk*kPi)} : look.handR;
+        }
 		p.wind = p.wind + m.trail * 0.5;   // (the robe's hem trails the body: nomai::robeTrail)
 		p.staffGlow += (1.0 - p.staffGlow) * m.voice;   // (it speaks behind a mask: its staff lights up with its voice, and is as it was when it is silent)
-		const Mat4 toBody = invertAffine(m.frame);   // (its hands are placed in body space)
+		const Mat4 toBody = invertAffine(family?nomai::familyFrame(stage,m.frame):m.frame);   // (its hands are placed in body space)
 		if (m.hands[0].weight > 0.0) p.handL = lerp(p.handL, transformPoint(toBody, m.hands[0].at), m.hands[0].weight);
 		if (m.hands[1].weight > 0.0) p.handR = lerp(p.handR, transformPoint(toBody, m.hands[1].at), m.hands[1].weight);
 		p.crouch += 0.8 * reachingDown(m, 1.0, 0.6);
 		if (m.look.weight > 0.0) {   // (its head turns left with a positive yaw)
 			double yaw = 0.0, pitch = 0.0, weight = 0.0;
 			Vec3 look;
-			lookWith(m, {0.0, 1.72, 0.08}, 70.0, yaw, pitch, look, weight);
+			lookWith(m, {0.0, 1.40*(family?nomai::familyLook(stage).stature:1.0), 0.08}, 70.0, yaw, pitch, look, weight);
 			p.headYaw -= yaw;
 			p.headPitch += pitch;
 		}
@@ -631,13 +638,21 @@ inline CharacterKind explorerKind() {
 			p.lockFeet = true;
 			p.lockedBall[0] = m.lockedFeet[0];
 			p.lockedBall[1] = m.lockedFeet[1];
+            if(family) {
+                const auto look=nomai::familyLook(stage);
+                for(Vec3 &foot:p.lockedBall) foot={foot.x/(look.stature*look.build),foot.y/look.stature,foot.z/(look.stature*look.build)};
+            }
 		}
 		return m.gestures && !m.gestures->empty() ? rig::act(p, *m.gestures, m.t, nomai::explorerPoses()) : p;
 	};
-	explorer.text = [pose](const CharacterMoment &m) { return nomai::explorerText(pose(m), m.frame, m.detail > 0.0 ? m.detail : 0.012); };
-	explorer.feet = [pose](const CharacterMoment &m) { return nomai::explorerFeet(pose(m), m.frame); };
-	explorer.chest = {0.0, 1.25, 0.0};
-	explorer.footAt = [](double steps, int s) { return nomai::explorerBody(nomai::walkPose(steps, 0.0, 1.0)).ball[s]; };
+	explorer.text = [pose,stage,family](const CharacterMoment &m) { return nomai::explorerText(pose(m), family?nomai::familyFrame(stage,m.frame):m.frame, m.detail > 0.0 ? m.detail : 0.012); };
+	explorer.feet = [pose,stage,family](const CharacterMoment &m) { return nomai::explorerFeet(pose(m), family?nomai::familyFrame(stage,m.frame):m.frame); };
+	explorer.chest = {0.0, 1.02, 0.0};
+	explorer.footAt = [stage,family](double steps, int s) {
+        Vec3 foot=nomai::explorerBody(nomai::walkPose(steps,0.0,1.0)).ball[s];
+        if(family) {const auto look=nomai::familyLook(stage);foot={foot.x*look.stature*look.build,foot.y*look.stature,foot.z*look.stature*look.build};}
+        return foot;
+    };
 	explorer.plantedAt = [](double steps, int s) { return nomai::explorerBody(nomai::walkPose(steps, 0.0, 1.0)).planted[s]; };
 	explorer.stride = 0.84;
 	explorer.firstStep = 0.5;
@@ -645,15 +660,22 @@ inline CharacterKind explorerKind() {
 	explorer.poses = namesOf(nomai::explorerPoses());
 	explorer.voice = {165.0, 1.05, 0.12};   // (behind a mask: breathier)
 	explorer.face = false;                   // (its mask)
-	explorer.handAt = [pose](const CharacterMoment &m, int s) {
+	explorer.handAt = [pose,stage,family](const CharacterMoment &m, int s) {
 		const nomai::ExplorerBody b = nomai::explorerBody(pose(m));
-		return transformPoint(m.frame, b.wrist[s] + b.handDir[s] * 0.06);
+		return transformPoint(family?nomai::familyFrame(stage,m.frame):m.frame, b.wrist[s] + b.handDir[s] * 0.06);
 	};
 	explorer.carry = {0.18, 1.0, 0.32};
 	explorer.hand = 0;
-	explorer.head = {0.0, 1.72, 0.08};
+	explorer.head = {0.0, 1.40, 0.08};
 	explorer.radius = 0.3;
-	explorer.height = 2.1;
+	explorer.height = 1.80;
+    if(family) {
+        const auto look=nomai::familyLook(stage);
+        explorer.chest=explorer.chest*look.stature; explorer.head=explorer.head*look.stature;
+        explorer.stride*=look.stature*look.build; explorer.radius*=look.stature*look.build; explorer.height*=look.stature;
+        explorer.carry={explorer.carry.x*look.stature*look.build,explorer.carry.y*look.stature,explorer.carry.z*look.stature*look.build};
+        explorer.voice={stage==nomai::LifeStage::Child?250.0:stage==nomai::LifeStage::Adolescent?195.0:stage==nomai::LifeStage::Elder?145.0:165.0,1.05,0.12};
+    }
 	return explorer;
 }
 
@@ -661,6 +683,11 @@ inline CharacterKind explorerKind() {
 inline void install() {
 	auto &kinds = film_file::characterKinds();
 	kinds["nomai-explorer"] = explorerKind();
+    kinds["nomai-child"] = explorerKind(nomai::LifeStage::Child,true);
+    kinds["nomai-adolescent"] = explorerKind(nomai::LifeStage::Adolescent,true);
+    kinds["nomai-adult-a"] = explorerKind(nomai::LifeStage::AdultA,true);
+    kinds["nomai-adult-b"] = explorerKind(nomai::LifeStage::AdultB,true);
+    kinds["nomai-elder"] = explorerKind(nomai::LifeStage::Elder,true);
 	kinds["pip"] = pipKind();
 	kinds["person"] = personKind();
 	kinds["turtle"] = turtleKind();
