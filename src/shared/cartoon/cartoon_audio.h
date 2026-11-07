@@ -410,6 +410,17 @@ class Mix {
 		}
 	}
 
+	// Another mix from `from` seconds on, laid on this one from its start (a film that is a stretch of a longer one: its sound is that stretch of the longer one's).
+	void addFrom(const Mix &other, double from) {
+		if (from < 0.0) return;
+		const std::size_t skip = static_cast<std::size_t>(from * kRate);
+		for (std::size_t i = 0; i < dry_[0].size() && skip + i < other.dry_[0].size(); ++i)
+			for (int c = 0; c < 2; ++c) {
+				dry_[c][i] += other.dry_[c][skip + i];
+				wet_[c][i] += other.wet_[c][skip + i];
+			}
+	}
+
 	// The reverb; brought to a film's loudness (`targetLufs`, BS.1770: a video's soundtrack is heard at about -16 LUFS, and one made quieter is not turned up by the
 	// player); a fade in and out; a look-ahead limiter that keeps every peak under `headroom` without the distortion of clipping; 16-bit stereo, interleaved, exactly
 	// `seconds` long. (`targetLufs` of 0 or more: leave the level as it is.)
