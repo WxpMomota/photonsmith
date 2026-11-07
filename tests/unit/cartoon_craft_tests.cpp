@@ -453,19 +453,46 @@ TEST(FilmEvents, TheNomaiFilmsFootstepsAreTheShotsOwnWalks) {
 		impacts += e.kind == cartoon::EventKind::Impact;
 		touches += e.kind == cartoon::EventKind::Touch;
 	}
-	EXPECT_EQ(impacts, 1) << "the touchdown";
+	EXPECT_GE(impacts, 1) << "the touchdown (and since the recut the falling slab and the leap's landing, twice: the film opens on the leap)";
 	EXPECT_EQ(touches, 2) << "the carved wall and the ring of glyphs";
 	EXPECT_GT(footfalls, 40);
-	// the footsteps shot (50 - 57 s): the walk from 49 s at 0.70 m/s, a step every 1.2 s, half a step in
+	// the shots found by name (the film is recut now and then: 2026-11-05 moved them all)
+	const std::vector<double> starts = film->shotStarts();
+	std::vector<std::string> names;
+	for (std::string s = film->meta.shotNames; !s.empty();) {
+		const std::size_t bar = s.find('|');
+		names.push_back(s.substr(0, bar));
+		s = bar == std::string::npos ? std::string() : s.substr(bar + 1);
+	}
+	ASSERT_EQ(names.size(), starts.size());
+	const auto shot = [&](const std::string &name, double &from, double &to) {
+		for (std::size_t i = 0; i < names.size(); ++i)
+			if (names[i] == name) {
+				from = starts[i], to = i + 1 < starts.size() ? starts[i + 1] : film->duration;
+				return true;
+			}
+		return false;
+	};
+	// the footsteps shot: the walk from a second before it at 0.70 m/s, a step every 1.2 s, half a step in
+	double from = 0.0, to = 0.0;
+	ASSERT_TRUE(shot("Footsteps", from, to));
 	std::vector<double> inShot;
 	for (const cartoon::FilmEvent &e : events)
-		if (e.kind == cartoon::EventKind::Footfall && e.t >= 50.0 && e.t < 57.0) inShot.push_back(e.t);
-	ASSERT_GE(inShot.size(), 5u);
+		if (e.kind == cartoon::EventKind::Footfall && e.t >= from && e.t < to) inShot.push_back(e.t);
+	ASSERT_GE(inShot.size(), 4u) << from << " - " << to;
 	// (a stride of about 0.84 m: stretched or shrunk a little so the walk ends as a foot comes down)
 	for (std::size_t i = 1; i < inShot.size(); ++i) EXPECT_NEAR(inShot[i] - inShot[i - 1], 0.84 / 0.70, 0.03);
-	EXPECT_NEAR(std::fmod(inShot[0] - 49.0, inShot[1] - inShot[0]), 0.5 * (inShot[1] - inShot[0]), 1e-6);
+	EXPECT_NEAR(std::fmod(inShot[0] - (from - 1.0), inShot[1] - inShot[0]), 0.5 * (inShot[1] - inShot[0]), 1e-6);
+	double landFrom = 0.0, landTo = 0.0;
+	ASSERT_TRUE(shot("The landing", landFrom, landTo));
+	int touchdowns = 0;
+	for (const cartoon::FilmEvent &e : events) touchdowns += e.kind == cartoon::EventKind::Impact && e.t >= landFrom && e.t < landTo;
+	EXPECT_EQ(touchdowns, 1) << "the shuttle sets down once";
+	double mapAt = 0.0, dawnAt = 0.0, unused = 0.0;
+	ASSERT_TRUE(shot("The star map", mapAt, unused));
+	ASSERT_TRUE(shot("Dawn", dawnAt, unused));
 	for (const cartoon::FilmEvent &e : events)
-		if (e.kind == cartoon::EventKind::Footfall) EXPECT_FALSE(e.t > 166.0 && e.t < 250.0) << "nobody walks between the star map and the dawn: " << e.t;
+		if (e.kind == cartoon::EventKind::Footfall) EXPECT_FALSE(e.t > mapAt && e.t < dawnAt) << "nobody walks between the star map and the dawn: " << e.t;
 }
 
 // ---- a shot's share of the samples (shot_cameras.h `samples`, read by the video) ------------------------------------------------------------------------

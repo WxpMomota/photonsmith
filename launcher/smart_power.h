@@ -196,7 +196,8 @@ inline bool fullScreenProgram() {
 }
 
 // Whether a process does not count as another program: this program under the same path (the workers and frame runs it starts are; so is another render of this program), its GUI beside
-// it, and what only shows the desktop: its own drawing (dwm) and Chrome Remote Desktop, which kept 11% of the 3D engine by itself and tripped the 15% with nothing else running. dwm is one no
+// it, and what only shows the desktop: its own drawing (dwm), Chrome Remote Desktop, which kept 11% of the 3D engine by itself and tripped the 15% with nothing else running, and
+// Windows' own csrss, which reached 25% of it while the computer was used over Chrome Remote Desktop and paused a film every 30 s (2026-11-06; no program runs there). dwm is one no
 // program may open, so these are found by name in the list of processes.
 class OurProcesses {
   public:
@@ -222,7 +223,7 @@ class OurProcesses {
 		bool desktop = false;
 		for (BOOL more = Process32FirstW(all, &entry); more; more = Process32NextW(all, &entry))
 			if (entry.th32ProcessID == pid) {
-				desktop = _wcsicmp(entry.szExeFile, L"dwm.exe") == 0 || _wcsicmp(entry.szExeFile, L"remoting_desktop.exe") == 0;
+				desktop = _wcsicmp(entry.szExeFile, L"dwm.exe") == 0 || _wcsicmp(entry.szExeFile, L"remoting_desktop.exe") == 0 || _wcsicmp(entry.szExeFile, L"csrss.exe") == 0;
 				break;
 			}
 		CloseHandle(all);

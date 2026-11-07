@@ -591,6 +591,14 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
                 const long long free = gpu_memory::freeMb(device);
                 return free > 0 && free < 1024;
             };
+            // room for one more: as much free as the frames at work hold each (all that is used, other programs' share too, so on the safe side) and 3 GB to spare - the stop
+            // above is at under 1 GB free
+            hooks.cardRoom = [device](int running) {
+                long long total = 0;
+                const long long free = gpu_memory::freeMb(device, &total);
+                if (free <= 0 || total <= free || running < 1) return false;
+                return free >= (total - free) / running + 3072;
+            };
         }
         // --smart-power: the workers that go on after one is stopped for the card's memory pause as fewer frames at once (they are started again on its frames, and read this)
         if (RunPolicy::from(args).smart)

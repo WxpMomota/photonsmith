@@ -1280,6 +1280,70 @@ TEST(CartoonWorkers, WhenTheCardsMemoryStaysFullOneWorkerFewerRunsAndEveryFrameS
 	EXPECT_EQ(lists.size(), 2u);
 }
 
+TEST(CartoonWorkers, AWorkerStoppedForTheCardsMemoryStartsAgainWhenTheCardHasRoom) {
+	cartoon_render::WorkerHooks hooks;
+	std::set<int> markers;
+	struct Made {
+		FakeWorker *w;
+		std::shared_ptr<bool> killed;
+	};
+	std::vector<Made> made;
+	std::vector<std::vector<int>> lists;
+	hooks.start = [&](int, const std::vector<int> &frames) -> std::unique_ptr<cartoon_render::WorkerHandle> {
+		lists.push_back(frames);
+		auto w = std::make_unique<FakeWorker>();
+		w->frames = frames;
+		w->killedOut = std::make_shared<bool>(false);
+		made.push_back({w.get(), w->killedOut});
+		return w;
+	};
+	int looks = 0, mostAtOnceAfterTheRoom = 0;
+	std::vector<int> told;
+	hooks.poll = [&](int frame, int &rc) {
+		if (++looks % 6 == 0) {
+			int atWork = 0;
+			for (const Made &m : made)
+				if (!*m.killed && m.w->alive && m.w->next < m.w->frames.size()) {
+					++atWork;
+					markers.insert(m.w->frames[m.w->next++]);
+					if (m.w->next == m.w->frames.size()) m.w->alive = false;
+				}
+			if (told.size() >= 2) mostAtOnceAfterTheRoom = std::max(mostAtOnceAfterTheRoom, atWork);
+		}
+		if (markers.count(frame) == 0) return false;
+		markers.erase(frame);
+		rc = 0;
+		return true;
+	};
+	int fullAsks = 0;
+	hooks.cardFull = [&] { return ++fullAsks <= 3; };   // full for a moment (a heavy shot starting in both workers), then not
+	std::vector<int> roomAsked;
+	hooks.cardRoom = [&](int running) {
+		roomAsked.push_back(running);
+		return true;
+	};
+	hooks.cardFullSeconds = 0.0, hooks.cardCheckSeconds = 0.0, hooks.cardRoomSeconds = 0.0;
+	hooks.workersNow = [&](int n) { told.push_back(n); };
+	std::vector<int> todo, handed;
+	for (int f = 0; f < 40; ++f) todo.push_back(f);
+	const int ok = cartoon_render::runWorkers(todo, 2, 0, hooks, [](int, int, double) {}, [&](int f, int) { handed.push_back(f); }, 1);
+	EXPECT_EQ(ok, 40) << "no frame lost or given up";
+	EXPECT_EQ(handed, todo);
+	ASSERT_GE(told.size(), 2u);
+	EXPECT_EQ(told[0], 1) << "one worker stopped for the card's memory";
+	EXPECT_EQ(told[1], 2) << "and started again when the card had room";
+	ASSERT_FALSE(roomAsked.empty());
+	EXPECT_EQ(roomAsked.front(), 1) << "asked about room beside the one worker at work";
+	EXPECT_EQ(mostAtOnceAfterTheRoom, 2) << "two at work again after the room came back";
+	for (const std::vector<int> &l : lists) EXPECT_TRUE(std::is_sorted(l.begin(), l.end())) << ::testing::PrintToString(l);
+
+	// no cardRoom: the stopped worker stays stopped (as before)
+	made.clear(), lists.clear(), markers.clear(), handed.clear(), told.clear(), fullAsks = 0, looks = 0;
+	hooks.cardRoom = nullptr;
+	EXPECT_EQ(cartoon_render::runWorkers(todo, 2, 0, hooks, [](int, int, double) {}, [&](int f, int) { handed.push_back(f); }, 1), 40);
+	EXPECT_EQ(told, (std::vector<int>{1}));
+}
+
 TEST(CartoonWorkers, TheMemoryLimitIsTheFlagThenTheEnvironmentThenEightGigabytes) {
 	const char *saved = std::getenv("RAY_TRACER_WORKER_MAX_MB");
 	const std::string before = saved ? saved : "";

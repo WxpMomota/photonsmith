@@ -18,8 +18,9 @@
 
 namespace gpu_memory {
 
-// Free memory of GPU `device` (as nvidia-smi numbers them) in megabytes; 0 when it cannot be said.
-inline long long freeMb(int device) {
+// Free memory of GPU `device` (as nvidia-smi numbers them) in megabytes; 0 when it cannot be said. `totalMb`, when given, is set to all the card's memory (0 when not known).
+inline long long freeMb(int device, long long *totalMb = nullptr) {
+	if (totalMb) *totalMb = 0;
 #if defined(_WIN32) || defined(__linux__)
 	struct Memory {
 		unsigned long long total, free, used;   // nvmlMemory_t
@@ -45,8 +46,10 @@ inline long long freeMb(int device) {
 	if (init && shutdown && handleOf && memoryOf && init() == 0) {   // (0 = NVML_SUCCESS)
 		void *handle = nullptr;
 		Memory memory{};
-		if (handleOf(static_cast<unsigned int>(device < 0 ? 0 : device), &handle) == 0 && memoryOf(handle, &memory) == 0)
+		if (handleOf(static_cast<unsigned int>(device < 0 ? 0 : device), &handle) == 0 && memoryOf(handle, &memory) == 0) {
 			mb = static_cast<long long>(memory.free / (1024ull * 1024ull));
+			if (totalMb) *totalMb = static_cast<long long>(memory.total / (1024ull * 1024ull));
+		}
 		shutdown();
 	}
 #ifdef _WIN32

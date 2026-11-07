@@ -343,6 +343,12 @@ struct WorkerHooks {
 	// full for `cardFullSeconds` one worker fewer runs at a time (down to one).
 	std::function<bool()> cardFull;
 	double cardFullSeconds = 20.0, cardCheckSeconds = 2.0;
+	// True while the card has room for another frame beside the `running` ones (null: a worker stopped for the card's memory stays stopped). When it has had room for
+	// `cardRoomSeconds` a stopped worker starts again: the card is mostly full for a moment - two workers both starting a heavy shot - and staying at one worker for the rest of the
+	// film halved its speed for hours (2026-11-06: 31 s a frame instead of 17.5 s, with 11 of the card's 16 GB free). Each stop after that doubles the wait (up to 16 times), so that
+	// a film whose frames really do not fit side by side does not keep being stopped.
+	std::function<bool(int running)> cardRoom;
+	double cardRoomSeconds = 120.0;
 	// Told how many workers render at once from now on, when the card's memory has made it fewer (null: nobody asks); before the workers that go on are started again, so they
 	// can be given the number (smart power's pauses follow it: RunPolicy::smartFrames).
 	std::function<void(int workers)> workersNow;
@@ -389,8 +395,9 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 	// workers at work (started, frames left); at most `allowed` at a time, one fewer each time the card stays full (hooks.cardFull): the one that began its frame last is stopped (that
 	// frame is begun again, not counted against it), and its frames go to the workers that go on, in order (handOver)
 	int allowed = workers;
-	Clock::time_point lastCardCheck = Clock::now(), fullSince = lastCardCheck;
-	bool full = false;
+	Clock::time_point lastCardCheck = Clock::now(), fullSince = lastCardCheck, lastRoomCheck = lastCardCheck, roomSince = lastCardCheck;
+	bool full = false, room = false;
+	int cardStops = 0;   // (each one doubles the wait for room: cardRoomSeconds)
 	const auto atWork = [&] {
 		int n = 0;
 		for (const Worker &x : ws) n += x.handle && !x.remaining.empty() ? 1 : 0;
@@ -420,6 +427,40 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 			if (x->remaining.size() > 1) x->restartAfter = x->remaining.front();
 		allowed = static_cast<int>(going.size());
 		if (hooks.workersNow) hooks.workersNow(allowed);
+	};
+	// One more worker at work (the card has room again: hooks.cardRoom): the frames after the one in hand of those at work, and any of a worker between two starts, dealt out again
+	// in order to them and to one of the stopped workers; those at work are started again on their new lists when they have finished the frame in hand, the other starts now.
+	// Nothing is done near the end of the film (fewer frames left than two for each).
+	const auto addOne = [&] {
+		std::vector<Worker *> going;
+		Worker *idle = nullptr;
+		std::size_t left = 0;
+		for (Worker &x : ws) {
+			if (x.handle && !x.remaining.empty()) going.push_back(&x), left += x.remaining.size() - 1;
+			else if (!x.handle) {
+				left += x.remaining.size();
+				if (!idle) idle = &x;
+			}
+		}
+		if (going.empty() || !idle || left < 2 * (going.size() + 1)) return false;
+		std::vector<int> rest;
+		for (Worker &x : ws) {
+			if (x.handle && !x.remaining.empty()) {
+				rest.insert(rest.end(), std::next(x.remaining.begin()), x.remaining.end());
+				x.remaining.resize(1);
+			} else if (!x.handle) {
+				rest.insert(rest.end(), x.remaining.begin(), x.remaining.end());
+				x.remaining.clear();
+			}
+		}
+		std::sort(rest.begin(), rest.end());
+		going.push_back(idle);
+		for (std::size_t i = 0; i < rest.size(); ++i) going[i % going.size()]->remaining.push_back(rest[i]);
+		for (Worker *x : going)
+			if (x->handle && x->remaining.size() > 1) x->restartAfter = x->remaining.front();
+		allowed = static_cast<int>(going.size());
+		if (hooks.workersNow) hooks.workersNow(allowed);
+		return true;
 	};
 	int failedInARow = 0;
 	const auto stopNow = [&] { return hooks.stopAfterFailures > 0 && failedInARow >= hooks.stopAfterFailures; };
@@ -464,9 +505,24 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 				latest->handle->kill();
 				latest->handle.reset();
 				handOver();
-				full = false;
+				full = false, room = false, ++cardStops;
 				std::cerr << "\nNote: the graphics card's memory is used up (these frames do not fit " << allowed + 1 << " at a time); going on with " << allowed << " worker" << (allowed == 1 ? "" : "s")
-						  << " at a time, which take up the stopped one's frames in order." << std::endl;
+						  << " at a time, which take up the stopped one's frames in order" << (hooks.cardRoom ? " (another starts again when the card has room)" : "") << "." << std::endl;
+			}
+		}
+		if (hooks.cardRoom && allowed < workers && cardStops > 0 && seconds(lastRoomCheck) >= hooks.cardCheckSeconds) {
+			lastRoomCheck = Clock::now();
+			const double wait = hooks.cardRoomSeconds * static_cast<double>(1 << (std::min)(cardStops - 1, 4));
+			if (!hooks.cardRoom(atWork())) {
+				room = false;
+			} else if (!room) {
+				room = true, roomSince = lastRoomCheck;
+			} else if (seconds(roomSince) >= wait) {
+				room = false;
+				if (addOne()) {
+					full = false, lastCardCheck = Clock::now();
+					std::cerr << "\nNote: the graphics card has room again; going on with " << allowed << " workers at a time." << std::endl;
+				}
 			}
 		}
 		for (std::size_t w = 0; w < ws.size() && !stopNow(); ++w) {
